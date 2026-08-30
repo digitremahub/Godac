@@ -10,6 +10,7 @@
 <title>GODAC — Fleet Management</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -261,16 +262,43 @@ function Kpi({ label, value, unit, delta, deltaColor, color=css.gold }) {
 function Modal({ open, title, onClose, children, footer }) {
   if (!open) return null;
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)"}}>
-    <div style={{background:"#141c2e",border:"1px solid #253550",borderRadius:12,width:"100%",maxWidth:460,maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)"}}>
+    <Scroll style={{height:"auto",background:"#141c2e",border:"1px solid #253550",borderRadius:12,width:"100%",maxWidth:460,maxHeight:"90vh",boxShadow:"0 20px 60px rgba(0,0,0,.5)"}}>
       <div style={{padding:"14px 18px",borderBottom:"1px solid #1e2d47",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <span style={{fontFamily:"monospace",fontSize:13,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:css.text}}>{title}</span>
         <button onClick={onClose} style={{background:"none",border:"none",color:css.textDim,fontSize:18,cursor:"pointer"}}>✕</button>
       </div>
       <div style={{padding:"16px 18px"}}>{children}</div>
       {footer&&<div style={{padding:"10px 18px",borderTop:"1px solid #1e2d47",display:"flex",gap:8,justifyContent:"flex-end"}}>{footer}</div>}
-    </div>
+    </Scroll>
   </div>;
 }
+
+// ═══════════════════════════════════════════════
+// SCROLL — panneau à défilement fluide (Lenis)
+// ═══════════════════════════════════════════════
+// Enveloppe tout conteneur qui défile de façon indépendante (vues, listes,
+// panneaux de chat, sidebar, modales) avec une instance Lenis dédiée,
+// scopée sur ce conteneur (pas sur la fenêtre). `ref` expose l'élément qui
+// défile réellement, pour un usage impératif (ex: scrollTop) comme avant.
+const Scroll = React.forwardRef(function Scroll({ children, style, contentStyle, className }, ref) {
+  const wrapperRef = useRef(null);
+  const setRefs = node => {
+    wrapperRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+  const contentRef = useRef(null);
+  useEffect(() => {
+    const wrapper = wrapperRef.current, content = contentRef.current;
+    if (!wrapper || !content || typeof Lenis === "undefined") return;
+    const lenis = new Lenis({ wrapper, content });
+    let rafId = requestAnimationFrame(function raf(time) { lenis.raf(time); rafId = requestAnimationFrame(raf); });
+    return () => { cancelAnimationFrame(rafId); lenis.destroy(); };
+  }, []);
+  return <div ref={setRefs} className={className} style={{ height:"100%", overflowY:"auto", ...style }}>
+    <div ref={contentRef} style={contentStyle}>{children}</div>
+  </div>;
+});
 
 // ═══════════════════════════════════════════════
 // OCR UPLOAD
@@ -347,7 +375,7 @@ function ViewDashboard({ data, user, onNewRav, onView }) {
   const actifs = data.vehicules.filter(v=>v.statut==="actif");
   const totalL = ravs.reduce((s,r)=>s+Number(r.quantite),0);
   const totalCost = ravs.reduce((s,r)=>s+Number(r.total_ttc),0);
-  return <div style={{padding:18,overflowY:"auto",height:"100%"}}>
+  return <Scroll contentStyle={{padding:18}}>
     <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:14}}>
       <div>
         <div style={{fontFamily:"Georgia,serif",fontSize:20,fontWeight:600}}>Bonjour, {user.prenom} 👋</div>
@@ -374,7 +402,7 @@ function ViewDashboard({ data, user, onNewRav, onView }) {
       </div>
       {can(user.role,"alertes")&&<Card title="Alertes actives" action="Gérer →" onAction={()=>onView("alertes")}>{alertes.length===0?<div style={{color:css.textDim,fontSize:12,fontFamily:"monospace"}}>✓ Aucune alerte</div>:alertes.slice(0,3).map(a=><div key={a.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid #1e2d47"}}><div style={{width:7,height:7,borderRadius:"50%",background:a.type==="danger"?css.red:a.type==="warn"?css.orange:css.blue,flexShrink:0,marginTop:4}}/><div><div style={{fontSize:11,fontWeight:500}}>{a.titre}</div><div style={{fontFamily:"monospace",fontSize:9,color:css.textDim}}>{new Date(a.created_at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div></div></div>)}</Card>}
     </div>}
-  </div>;
+  </Scroll>;
 }
 
 function ViewRavitaillements({ data, user, onNew }) {
@@ -384,7 +412,7 @@ function ViewRavitaillements({ data, user, onNew }) {
       <span style={{fontFamily:"monospace",fontSize:10,color:css.textDim}}>{ravs.length} entrée(s)</span>
       <div style={{display:"flex",gap:8}}>{can(user.role,"exports")&&<Btn sm v="outline">⬇ CSV</Btn>}<Btn sm v="gold" onClick={onNew}>+ Ravitaillement</Btn></div>
     </div>
-    <div style={{flex:1,overflowY:"auto",padding:"0 18px 18px",display:"flex",flexDirection:"column",gap:7}}>
+    <Scroll style={{flex:1}} contentStyle={{padding:"0 18px 18px",display:"flex",flexDirection:"column",gap:7}}>
       {[...ravs].reverse().map(r=>{const ch=data.employes.find(e=>e.id===r.chauffeur_id);const v=data.vehicules.find(x=>x.id===r.vehicule_id);const c=data.cuves.find(x=>x.id===r.cuve_id);const isA=r.statut==="alerte_prix";
       return <div key={r.id} style={{...css.surface,borderLeft:`3px solid ${isA?css.red:"#1e2d47"}`,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
         <Badge color={v?.type==="vl"?css.blue:css.orange}>{v?.type?.toUpperCase()||"?"}</Badge>
@@ -398,12 +426,12 @@ function ViewRavitaillements({ data, user, onNew }) {
         </div>
         <div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:"Georgia,serif",fontSize:16,fontWeight:700,color:css.gold}}>{Number(r.quantite).toLocaleString("fr-FR")} L</div><div style={{fontFamily:"monospace",fontSize:9,color:css.textMid}}>{Number(r.prix_unitaire).toFixed(3)} €/L · {Number(r.total_ttc).toFixed(2)} €</div></div>
       </div>;})}
-    </div>
+    </Scroll>
   </div>;
 }
 
 function ViewCuves({ data }) {
-  return <div style={{padding:18,overflowY:"auto",height:"100%",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14,alignContent:"start"}}>
+  return <Scroll contentStyle={{padding:18,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14,alignContent:"start"}}>
     {data.cuves.map(c=>{const p=Math.round(c.niveau_actuel/c.capacite*100);const color=p<=15?css.red:p<=30?css.orange:css.green;const distribue=data.ravitaillements.filter(r=>r.cuve_id===c.id).reduce((s,r)=>s+Number(r.quantite),0);
     return <div key={c.id} style={{...css.surface,padding:16}}>
       <div style={{fontFamily:"Georgia,serif",fontSize:18,fontWeight:700}}>{c.nom}</div>
@@ -420,13 +448,13 @@ function ViewCuves({ data }) {
       <div style={{marginTop:8,fontFamily:"monospace",fontSize:9,color:css.textDim}}>{c.type_carburant==="adblue"?"TVA : 0% récupérable":"TVA VL : 80% · PL : 100%"}</div>
       <div style={{marginTop:10}}><OcrUpload compact docType="jauge_cuve" label="Mettre à jour via photo" icon="📷" onResult={d=>alert(`Niveau détecté : ${d.niveau_detecte} L (${d.niveau_pct_detecte}%) — Confiance ${d.confiance}%`)}/></div>
     </div>;})}
-  </div>;
+  </Scroll>;
 }
 
 function ViewVehicules({ data, user }) {
   const vehicules = user.role==="chauffeur"?data.vehicules.filter(v=>v.id===user.vehicule_id):data.vehicules;
   const sc = {actif:css.green,maintenance:css.orange,inactif:css.textDim};
-  return <div style={{padding:18,overflowY:"auto",height:"100%",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,alignContent:"start"}}>
+  return <Scroll contentStyle={{padding:18,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,alignContent:"start"}}>
     {vehicules.map(v=>{const ravs=data.ravitaillements.filter(r=>r.vehicule_id===v.id);const tL=ravs.reduce((s,r)=>s+Number(r.quantite),0);const tE=ravs.reduce((s,r)=>s+Number(r.total_ttc),0);
     return <div key={v.id} style={{...css.surface,padding:14,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:v.type==="vl"?css.blue:css.orange}}/>
@@ -438,12 +466,12 @@ function ViewVehicules({ data, user }) {
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><div style={{width:6,height:6,borderRadius:"50%",background:sc[v.statut]||css.textDim}}/><span style={{fontFamily:"monospace",fontSize:9,color:css.textDim,textTransform:"uppercase",letterSpacing:".08em"}}>{v.statut}</span>{v.prochain_ct&&<Badge color={css.orange}>CT {v.prochain_ct}</Badge>}</div>
       <OcrUpload compact docType="compteur_km" label="Mettre à jour km" icon="🔢" onResult={d=>alert(`Km détecté : ${Number(d.km_compteur).toLocaleString("fr-FR")} km`)}/>
     </div>;})}
-  </div>;
+  </Scroll>;
 }
 
 function ViewEmployes({ data }) {
   const rc = {chauffeur:css.blue,exploitation:css.gold,comptable:css.orange,direction:css.green};
-  return <div style={{padding:18,overflowY:"auto",height:"100%",display:"flex",flexDirection:"column",gap:8}}>
+  return <Scroll contentStyle={{padding:18,display:"flex",flexDirection:"column",gap:8}}>
     {data.employes.map(u=>{const ravs=data.ravitaillements.filter(r=>r.chauffeur_id===u.id);const tL=ravs.reduce((s,r)=>s+Number(r.quantite),0);const an=ravs.filter(r=>r.statut==="alerte_prix").length;const veh=data.vehicules.find(v=>v.id===u.vehicule_id);const pe=u.permis_expiration&&new Date(u.permis_expiration)<new Date(Date.now()+90*24*3600e3);
     return <div key={u.id} style={{...css.surface,padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
       <div style={{width:36,height:36,borderRadius:8,background:"rgba(201,168,76,.1)",border:"1px solid rgba(201,168,76,.25)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Georgia,serif",fontSize:14,fontWeight:700,color:css.gold,flexShrink:0}}>{u.prenom[0]}{u.nom[0]}</div>
@@ -456,19 +484,19 @@ function ViewEmployes({ data }) {
         <div><div style={{fontFamily:"Georgia,serif",fontSize:14,fontWeight:600}}>{ravs.length}</div><div style={{fontFamily:"monospace",fontSize:8,color:css.textDim,textTransform:"uppercase"}}>Ravit.</div></div>
       </div>
     </div>;})}
-  </div>;
+  </Scroll>;
 }
 
 function ViewAlertes({ data, user, onResolve }) {
   const alertes = data.alertes.filter(a=>!a.resolu).filter(a=>user.role==="comptable"?["prix"].includes(a.categorie):true);
-  return <div style={{padding:18,overflowY:"auto",height:"100%",display:"flex",flexDirection:"column",gap:8}}>
+  return <Scroll contentStyle={{padding:18,display:"flex",flexDirection:"column",gap:8}}>
     {alertes.length===0&&<div style={{textAlign:"center",padding:48,color:css.textDim,fontFamily:"monospace",fontSize:12}}>✓ Aucune alerte active</div>}
     {alertes.map(a=>{const bc={danger:css.red,warn:css.orange,info:css.blue}[a.type];return <div key={a.id} style={{...css.surface,borderLeft:`3px solid ${bc}`,padding:"12px 14px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:13,fontWeight:500}}>{a.titre}</span><span style={{fontFamily:"monospace",fontSize:9,color:css.textDim}}>{new Date(a.created_at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span></div>
       <div style={{fontSize:12,color:css.textMid,lineHeight:1.5,marginBottom:10}}>{a.corps}</div>
       <Btn sm v="ghost" onClick={()=>onResolve(a.id)}>✓ Résolu</Btn>
     </div>;})}
-  </div>;
+  </Scroll>;
 }
 
 // ═══════════════════════════════════════════════
@@ -509,12 +537,12 @@ function ViewAgentsIA({ user, data }) {
   return <div style={{display:"flex",height:"100%",overflow:"hidden"}}>
     <div style={{width:180,flexShrink:0,borderRight:"1px solid #1e2d47",background:"#0f1521",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"10px 14px",borderBottom:"1px solid #1e2d47"}}><div style={{fontFamily:"monospace",fontSize:10,fontWeight:600,letterSpacing:".1em",textTransform:"uppercase",color:css.gold}}>Agents IA</div><div style={{fontFamily:"monospace",fontSize:9,color:css.textDim,marginTop:2}}>Transport spécialisés</div></div>
-      <div style={{flex:1,overflowY:"auto",padding:"8px 0"}}>
+      <Scroll style={{flex:1}} contentStyle={{padding:"8px 0"}}>
         {available.map(a=><button key={a.id} onClick={()=>setActiveId(a.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 12px",border:"none",borderLeft:`2px solid ${activeId===a.id?css.gold:"transparent"}`,background:activeId===a.id?"rgba(201,168,76,.08)":"none",color:activeId===a.id?css.gold:css.textMid,fontSize:12,fontWeight:activeId===a.id?500:400,fontFamily:"inherit",textAlign:"left",cursor:"pointer",transition:"all .12s"}}>
           <span style={{fontSize:15,width:20,textAlign:"center"}}>{a.icon}</span>{a.short}
           {(convs[a.id]||[]).length>0&&<div style={{marginLeft:"auto",width:6,height:6,borderRadius:"50%",background:css.gold,opacity:.6}}/>}
         </button>)}
-      </div>
+      </Scroll>
     </div>
     <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
       <div style={{padding:"10px 16px",borderBottom:"1px solid #1e2d47",background:"#0f1521",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
@@ -525,7 +553,7 @@ function ViewAgentsIA({ user, data }) {
         CONTEXTE · {user.prenom} {user.nom} · {user.role} · {data.entreprise.nom}
         {DEMO_MODE||!ANTHROPIC_KEY.startsWith("sk-")?" · ⚠️ MODE DÉMO — Ajoutez votre clé API":""}
       </div>
-      <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+      <Scroll ref={chatRef} style={{flex:1}} contentStyle={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
         <div style={{display:"flex",gap:8}}>
           <div style={{width:26,height:26,borderRadius:6,background:"rgba(201,168,76,.08)",border:"1px solid rgba(201,168,76,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{agent?.icon}</div>
           <div style={{maxWidth:"78%",padding:"9px 12px",background:"#141c2e",border:"1px solid #1e2d47",borderRadius:"2px 8px 8px 8px",fontSize:13,lineHeight:1.65,color:css.text}} dangerouslySetInnerHTML={{__html:fmt(welcomes[activeId]||"Bonjour !")}}/>
@@ -535,7 +563,7 @@ function ViewAgentsIA({ user, data }) {
           <div style={{maxWidth:"78%",padding:"9px 12px",borderRadius:m.role==="user"?"8px 2px 8px 8px":"2px 8px 8px 8px",background:m.role==="user"?css.gold:"#141c2e",border:`1px solid ${m.role==="user"?css.gold:"#1e2d47"}`,color:m.role==="user"?"#0a0e17":css.text,fontSize:13,lineHeight:1.65,fontWeight:m.role==="user"?500:400}} dangerouslySetInnerHTML={{__html:fmt(m.content)}}/>
         </div>)}
         {loading&&<div style={{display:"flex",gap:8}}><div style={{width:26,height:26,borderRadius:6,background:"#1a2438",border:"1px solid #1e2d47",display:"flex",alignItems:"center",justifyContent:"center"}}>{agent?.icon}</div><div style={{background:"#141c2e",border:"1px solid #1e2d47",borderRadius:"2px 8px 8px 8px",padding:"9px 12px",display:"flex",gap:4,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:css.textDim,animation:`blink 1.2s ${i*.2}s infinite`}}/>)}</div></div>}
-      </div>
+      </Scroll>
       <div style={{padding:"6px 14px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>
         {agent?.getSugs(user.role).map(s=><button key={s} onClick={()=>send(s)} style={{padding:"4px 9px",background:"#141c2e",border:"1px solid #253550",borderRadius:5,fontSize:10,color:css.textMid,cursor:"pointer",fontFamily:"monospace",letterSpacing:".03em",transition:"all .12s"}}>{s}</button>)}
       </div>
@@ -581,14 +609,14 @@ function ViewRH({ user, data }) {
       <div style={{fontFamily:"monospace",fontSize:9,color:css.textDim,marginBottom:6,textTransform:"uppercase",letterSpacing:".1em"}}>{user.role==="chauffeur"?"Mes demandes":`Demandes équipe (${mesDem.filter(d=>d.statut==="en_attente").length} en attente)`}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{mesDem.slice(0,4).map(d=><div key={d.id} style={{background:"#1a2438",border:"1px solid #1e2d47",borderRadius:6,padding:"4px 10px",fontSize:11,display:"flex",gap:6,alignItems:"center"}}>{d.titre||d.type}<Badge color={sc[d.statut]||css.textDim}>{d.statut.replace("_"," ")}</Badge></div>)}</div>
     </div>}
-    <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+    <Scroll ref={chatRef} style={{flex:1}} contentStyle={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
       <div style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.15)",borderRadius:8,padding:14}}><div style={{fontSize:14,fontWeight:500,marginBottom:3}}>👥 Agent RH — Bonjour {user.prenom}</div><div style={{fontSize:12,color:css.textMid,lineHeight:1.5}}>{user.role==="chauffeur"?"Je vous aide pour vos congés, droits et questions véhicule.":"Je vous assiste dans la gestion RH de votre équipe."}{DEMO_MODE?" ⚠️ Mode démo.":""}</div></div>
       {conv.map((m,i)=><div key={i} style={{display:"flex",gap:8,flexDirection:m.role==="user"?"row-reverse":"row"}}>
         <div style={{width:26,height:26,borderRadius:6,background:m.role==="user"?"rgba(201,168,76,.1)":"#1a2438",border:`1px solid ${m.role==="user"?"rgba(201,168,76,.25)":"#1e2d47"}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"monospace",fontSize:9,fontWeight:600,color:css.gold,flexShrink:0}}>{m.role==="user"?user.prenom[0]:"👥"}</div>
         <div style={{maxWidth:"78%",padding:"9px 12px",borderRadius:m.role==="user"?"8px 2px 8px 8px":"2px 8px 8px 8px",background:m.role==="user"?css.gold:"#141c2e",border:`1px solid ${m.role==="user"?css.gold:"#1e2d47"}`,color:m.role==="user"?"#0a0e17":css.text,fontSize:13,lineHeight:1.65,fontWeight:m.role==="user"?500:400}} dangerouslySetInnerHTML={{__html:fmt(m.content)}}/>
       </div>)}
       {loading&&<div style={{display:"flex",gap:8}}><div style={{width:26,height:26,borderRadius:6,background:"#1a2438",border:"1px solid #1e2d47",display:"flex",alignItems:"center",justifyContent:"center"}}>👥</div><div style={{background:"#141c2e",border:"1px solid #1e2d47",borderRadius:"2px 8px 8px 8px",padding:"9px 12px",display:"flex",gap:4,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:css.textDim,animation:`blink 1.2s ${i*.2}s infinite`}}/>)}</div></div>}
-    </div>
+    </Scroll>
     <div style={{padding:"6px 14px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>
       {agent.getSugs(user.role).map(s=><button key={s} onClick={()=>send(s)} style={{padding:"4px 9px",background:"#141c2e",border:"1px solid #253550",borderRadius:5,fontSize:10,color:css.textMid,cursor:"pointer",fontFamily:"monospace"}}>{s}</button>)}
       <button onClick={()=>setDemandeOpen(true)} style={{padding:"4px 9px",background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.2)",borderRadius:5,fontSize:10,color:css.gold,cursor:"pointer",fontFamily:"monospace"}}>📋 Nouvelle demande</button>
@@ -615,7 +643,7 @@ function ViewRH({ user, data }) {
 function ViewAdmin({ data, setData }) {
   const [ent, setEnt] = useState({...data.entreprise});
   const save = () => { setData(d=>({...d,entreprise:ent})); applyTheme(ent); alert("Paramètres sauvegardés !"); };
-  return <div style={{padding:18,overflowY:"auto",height:"100%",maxWidth:600}}>
+  return <Scroll style={{maxWidth:600}} contentStyle={{padding:18}}>
     <div style={{fontFamily:"Georgia,serif",fontSize:18,fontWeight:600,marginBottom:16}}>⚙️ Paramètres entreprise</div>
     <Card title="Identité" style={{marginBottom:14}}>
       <Field label="Nom de l'entreprise"><Inp value={ent.nom} onChange={e=>setEnt(p=>({...p,nom:e.target.value}))}/></Field>
@@ -635,7 +663,7 @@ function ViewAdmin({ data, setData }) {
       <Field label="Seuil alerte anomalie prix (%)"><Inp type="number" defaultValue={ent.seuil_alerte_prix||15} min={5} max={50}/></Field>
     </Card>
     <div style={{display:"flex",gap:8}}><Btn v="gold" onClick={save}>Sauvegarder</Btn><Btn v="ghost" onClick={()=>setEnt({couleur_primaire:"#C9A84C",couleur_secondaire:"#F0B429",couleur_bg:"#0a0e17",nom_app:"GODAC"})}>Réinitialiser</Btn></div>
-  </div>;
+  </Scroll>;
 }
 
 // ═══════════════════════════════════════════════
@@ -724,7 +752,7 @@ function GodacApp() {
       <div style={{width:28,height:28,borderRadius:6,background:"rgba(201,168,76,.1)",border:"1px solid rgba(201,168,76,.25)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Georgia,serif",fontSize:12,fontWeight:700,color:css.gold,flexShrink:0}}>{user.prenom?.[0]}{user.nom?.[0]}</div>
       <div style={{minWidth:0}}><div style={{fontSize:11,fontWeight:500,color:css.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.prenom} {user.nom}</div><div style={{fontFamily:"monospace",fontSize:8,color:css.gold,textTransform:"uppercase",letterSpacing:".08em"}}>{user.role}</div></div>
     </div>
-    <div style={{flex:1,overflowY:"auto",padding:"8px 0"}}>
+    <Scroll style={{flex:1}} contentStyle={{padding:"8px 0"}}>
       {sections.map(sec=>{const items=navItems.filter(n=>n.section===sec);if(!items.length)return null;return <div key={sec}>
         <div style={{padding:"6px 14px 3px",fontFamily:"monospace",fontSize:8,color:css.textDim,letterSpacing:".14em",textTransform:"uppercase"}}>{sec}</div>
         {items.map(item=><button key={item.id} onClick={()=>{setView(item.id);onClose?.();}} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 12px",background:view===item.id?"rgba(201,168,76,.08)":"none",borderLeft:`2px solid ${view===item.id?css.gold:"transparent"}`,border:"none",color:view===item.id?css.gold:css.textMid,fontSize:12,fontWeight:view===item.id?500:400,fontFamily:"inherit",textAlign:"left",cursor:"pointer",transition:"all .12s"}}>
@@ -733,7 +761,7 @@ function GodacApp() {
           {item.count!==undefined&&<span style={{fontFamily:"monospace",fontSize:9,padding:"1px 5px",borderRadius:3,background:item.alert?"rgba(224,82,82,.1)":"#1a2438",color:item.alert?css.red:css.textDim,border:`1px solid ${item.alert?"rgba(224,82,82,.3)":"#1e2d47"}`,animation:item.alert?"pulse 2s infinite":"none"}}>{item.count}</span>}
         </button>)}
       </div>;})}
-    </div>
+    </Scroll>
     <div style={{padding:"10px 12px",borderTop:"1px solid #1e2d47"}}>
       <div style={{fontFamily:"monospace",fontSize:8,color:css.textDim,letterSpacing:".08em"}}>GODAC v2.0 · {data.entreprise.nom}</div>
       <button onClick={()=>{setUser(null);setView("dashboard");}} style={{background:"none",border:"none",color:css.textDim,fontFamily:"monospace",fontSize:8,cursor:"pointer",marginTop:4}}>← Déconnexion</button>
