@@ -6,6 +6,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const bodySchema = z.object({
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
   active: z.boolean().optional(),
+  full_name: z.string().min(1).optional(),
+  service_id: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -48,14 +50,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { data: targetUser, error } = await supabase
-    .from("users")
-    .update(parsed.data)
-    .eq("id", id)
-    .select("id, role")
-    .single();
+  const { service_id, ...userFields } = parsed.data;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  let targetUser: { id: string; role: string } | null = null;
+  if (Object.keys(userFields).length > 0) {
+    const { data, error } = await supabase.from("users").update(userFields).eq("id", id).select("id, role").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    targetUser = data;
+  }
 
-  return NextResponse.json({ user: targetUser });
+  // A user has at most one service through this admin panel (the
+  // invite flow itself only ever sets one) — replace rather than
+  // accumulate rows in the underlying many-to-many table.
+  if (service_id !== undefined) {
+    const { error: clearError } = await supabase.from("user_services").delete().eq("user_id", id);
+    if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
+    if (service_id) {
+      const { error: linkError } = await supabase.from("user_services").insert({ user_id: id, service_id });
+      if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ user: targetUser ?? { id } });
 }

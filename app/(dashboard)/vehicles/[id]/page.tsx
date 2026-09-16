@@ -5,6 +5,8 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { InterventionsPanel } from "@/components/vehicles/InterventionsPanel";
+import { VehicleEditPanel } from "@/components/vehicles/VehicleEditPanel";
+import { RoleGate } from "@/components/layout/RoleGate";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,13 +18,14 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
   }
 
-  const [{ data: vehicle }, { data: interventions }] = await Promise.all([
-    supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, services(name)").eq("id", id).single(),
+  const [{ data: vehicle }, { data: interventions }, { data: services }] = await Promise.all([
+    supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, service_id, services(name)").eq("id", id).single(),
     supabase
       .from("vehicle_interventions")
       .select("id, type, description, status, scheduled_at, completed_at, cost")
       .eq("vehicle_id", id)
       .order("created_at", { ascending: false }),
+    supabase.from("services").select("id, name").order("name"),
   ]);
 
   if (!vehicle) notFound();
@@ -30,7 +33,23 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <PageHeader title={v.registration} description={`${v.type} · ${v.services?.name ?? "Sans service"}`} />
+      <PageHeader
+        title={v.registration}
+        description={`${v.type} · ${v.services?.name ?? "Sans service"}`}
+        actions={
+          <RoleGate role={appUser.role} allow={["manager", "manager_chauffeur", "direction"]}>
+            <VehicleEditPanel
+              vehicleId={v.id}
+              registration={v.registration}
+              type={v.type}
+              tankCapacity={v.tank_capacity_liters}
+              status={v.status}
+              serviceId={v.service_id}
+              services={services ?? []}
+            />
+          </RoleGate>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">

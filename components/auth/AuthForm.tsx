@@ -4,14 +4,18 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 /**
- * Passwordless auth (magic link / OTP email) for both sign-in and
- * sign-up — Supabase creates the account on first use, so there is no
- * separate password to set, confirm, or ever reset. Sign-in and
- * sign-up are the exact same action; only the on-screen copy differs.
+ * Sign-up (and a first sign-in) is always magic link / OTP — Supabase
+ * creates the account on first use, so there's nothing to set a
+ * password against yet. Once signed in, a user can set a password
+ * from /account (components/account/PasswordForm.tsx); after that,
+ * sign-in offers a password shortcut alongside the magic link so they
+ * don't need email access every time.
  */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const supabase = createBrowserSupabaseClient();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [usePassword, setUsePassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +25,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     setBusy(true);
     setError(null);
     try {
+      if (usePassword) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        window.location.href = "/dashboard";
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -53,7 +64,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <div>
         <h2 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h2>
         <p className="mt-1 text-sm text-white/50">
-          Pas de mot de passe — on vous envoie un lien de connexion par email.
+          {usePassword
+            ? "Connectez-vous avec le mot de passe défini depuis votre compte."
+            : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
         </p>
       </div>
       <div>
@@ -67,10 +80,31 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           placeholder="vous@entreprise.fr"
         />
       </div>
+      {mode === "sign-in" && usePassword && (
+        <div>
+          <label className="label">Mot de passe</label>
+          <input
+            type="password"
+            required
+            className="input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+      )}
       {error && <p className="text-sm text-orange">{error}</p>}
-      <button type="submit" className="btn-primary" disabled={busy || !email}>
-        {busy ? "Envoi…" : "Recevoir le lien de connexion"}
+      <button type="submit" className="btn-primary" disabled={busy || !email || (usePassword && !password)}>
+        {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
+      {mode === "sign-in" && (
+        <button
+          type="button"
+          className="text-sm text-white/50 hover:text-white hover:underline"
+          onClick={() => setUsePassword((v) => !v)}
+        >
+          {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}
+        </button>
+      )}
     </form>
   );
 }

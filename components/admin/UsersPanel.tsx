@@ -12,6 +12,7 @@ interface UserRow {
   email: string;
   role: UserRole;
   active: boolean;
+  service_id: string | null;
 }
 interface ServiceOption {
   id: string;
@@ -29,6 +30,10 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editServiceId, setEditServiceId] = useState("");
 
   async function invite() {
     setBusy(true);
@@ -54,13 +59,45 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
   async function changeRole(userId: string, newRole: UserRole) {
     setBusy(true);
+    setError(null);
     try {
-      await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole }),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
       router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEdit(user: UserRow) {
+    setEditingId(user.id);
+    setEditName(user.full_name);
+    setEditServiceId(user.service_id ?? "");
+    setError(null);
+  }
+
+  async function saveEdit(userId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: editName, service_id: editServiceId || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      setEditingId(null);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
       setBusy(false);
     }
@@ -106,39 +143,80 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       {sent && <p className="text-sm text-teal">Invitation envoyée par email.</p>}
 
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="text-left text-white/40">
             <tr>
               <th className="pb-2">Nom</th>
               <th className="pb-2">Email</th>
+              <th className="pb-2">Service</th>
               <th className="pb-2">Rôle</th>
               <th className="pb-2">Statut</th>
+              <th className="pb-2"></th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-t border-white/5">
-                <td className="py-2">{u.full_name}</td>
-                <td className="py-2">{u.email}</td>
-                <td className="py-2">
-                  <select
-                    className="input !w-auto !py-1"
-                    value={u.role}
-                    disabled={busy}
-                    onChange={(e) => changeRole(u.id, e.target.value as UserRole)}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2">
-                  <span className={u.active ? "badge-teal" : "badge-neutral"}>{u.active ? "Actif" : "Inactif"}</span>
-                </td>
-              </tr>
-            ))}
+            {users.map((u) => {
+              const isEditing = editingId === u.id;
+              return (
+                <tr key={u.id} className="border-t border-white/5">
+                  <td className="py-2">
+                    {isEditing ? (
+                      <input className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                    ) : (
+                      u.full_name
+                    )}
+                  </td>
+                  <td className="py-2">{u.email}</td>
+                  <td className="py-2">
+                    {isEditing ? (
+                      <select className="input !w-auto !py-1" value={editServiceId} onChange={(e) => setEditServiceId(e.target.value)}>
+                        <option value="">Aucun</option>
+                        {services.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      services.find((s) => s.id === u.service_id)?.name ?? "—"
+                    )}
+                  </td>
+                  <td className="py-2">
+                    <select
+                      className="input !w-auto !py-1"
+                      value={u.role}
+                      disabled={busy}
+                      onChange={(e) => changeRole(u.id, e.target.value as UserRole)}
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-2">
+                    <span className={u.active ? "badge-teal" : "badge-neutral"}>{u.active ? "Actif" : "Inactif"}</span>
+                  </td>
+                  <td className="py-2">
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        <button className="btn-primary !px-2 !py-1 text-xs" disabled={busy} onClick={() => saveEdit(u.id)}>
+                          Enregistrer
+                        </button>
+                        <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => setEditingId(null)}>
+                          Annuler
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => startEdit(u)}>
+                        Modifier
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Card>

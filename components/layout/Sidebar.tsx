@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/organizations", label: "Organisation", allow: ["direction"] },
   { href: "/admin/billing", label: "Abonnement", allow: ["direction"] },
   { href: "/admin/users", label: "Utilisateurs", allow: ["direction"] },
+  { href: "/account", label: "Mon compte", allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
 ];
 
 export function Sidebar({
