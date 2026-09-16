@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { TankPhotoCapture } from "@/components/tanks/TankPhotoCapture";
 
 export default async function TanksPage() {
   const supabase = await createServerSupabaseClient();
@@ -49,6 +50,7 @@ export default async function TanksPage() {
               </div>
 
               <QrCodeBadge type="tank" id={tank.id} title={tank.name} subtitle="À coller sur la pompe" />
+              <TankPhotoCapture tankId={tank.id} />
             </Card>
           ))}
         </div>

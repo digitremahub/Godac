@@ -72,7 +72,11 @@ as $$
     and (p_user_id = public.current_app_user_id() or public.is_direction());
 $$;
 
-revoke execute on function public.compute_hr_status(uuid) from anon;
+-- `create function` grants EXECUTE to PUBLIC by default, which every
+-- role (anon included) inherits regardless of a role-specific revoke
+-- — revoke from PUBLIC itself, then re-grant only to authenticated.
+revoke execute on function public.compute_hr_status(uuid) from public;
+grant execute on function public.compute_hr_status(uuid) to authenticated;
 
 -- Contracts, ID copies, medical fitness certificates, etc. — the
 -- file itself lives in the `employee-documents` storage bucket
