@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-navy: #0a0f1e;
+  --color-teal: #1be4c1;
+  --color-orange: #ff6b35;
+  --color-gold: #f5c842;
+}
+
+@layer base {
+  body {
+    @apply bg-navy text-white font-body antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-extrabold tracking-tight;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-semibold text-navy transition hover:brightness-95 active:brightness-90 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent px-4 py-2.5 font-semibold text-white transition hover:bg-white/10 disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 font-semibold text-white transition hover:brightness-95;
+  }
+  .input {
+    @apply w-full rounded-lg border border-white/15 bg-navy/60 px-3 py-2 text-white placeholder-white/40 outline-none focus:border-teal;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-white/70;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .badge-teal {
+    @apply badge bg-teal/15 text-teal;
+  }
+  .badge-orange {
+    @apply badge bg-orange/15 text-orange;
+  }
+  .badge-gold {
+    @apply badge bg-gold/15 text-gold;
+  }
+  .badge-neutral {
+    @apply badge bg-white/10 text-white/70;
+  }
+}

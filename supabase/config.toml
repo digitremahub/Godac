@@ -1,0 +1,23 @@
+project_id = "godac-v2"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+# Third-party auth: Clerk issues the JWTs GODAC uses for RLS.
+# Configure the matching project in the Supabase dashboard under
+# Authentication > Third Party Auth, and set CLERK_* env vars.
+[auth.third_party.clerk]
+enabled = true
