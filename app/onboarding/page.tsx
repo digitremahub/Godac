@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
+import { getFullCatalog } from "@/lib/organization/catalog";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 export default async function OnboardingPage({
@@ -21,10 +22,11 @@ export default async function OnboardingPage({
   if (existing) redirect("/dashboard");
 
   const params = await searchParams;
+  const catalog = await getFullCatalog(supabase);
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
-      <OnboardingWizard stripeStatus={params.stripe} />
+      <OnboardingWizard stripeStatus={params.stripe} catalog={catalog} />
     </main>
   );
 }

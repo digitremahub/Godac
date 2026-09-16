@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { RoleGate } from "@/components/layout/RoleGate";
 
@@ -13,6 +14,17 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function VehiclesPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
+
+  const fleetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fleet");
+  if (!fleetEnabled) {
+    return (
+      <EmptyState
+        title="Module Flotte non activé"
+        description="Activez-le depuis les paramètres de votre organisation pour gérer vos véhicules."
+      />
+    );
+  }
+
   const { data: vehicles } = await supabase
     .from("vehicles")
     .select("id, registration, type, status, tank_capacity_liters, services(name)")

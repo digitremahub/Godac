@@ -37,7 +37,8 @@ export interface Organization {
   id: string;
   name: string;
   plan: string;
-  ocr_enabled: boolean;
+  logo_url: string | null;
+  accent_color: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   subscription_status: "trialing" | "active" | "past_due" | "canceled" | "incomplete";

@@ -3,8 +3,11 @@
 -- has something to render against `supabase db reset`.
 -- Never run against a production project.
 
-insert into organizations (id, name, plan, ocr_enabled, subscription_status)
-values ('00000000-0000-0000-0000-000000000001', 'Sud Express 66 (démo)', 'pro', true, 'trialing');
+insert into organizations (id, name, plan, subscription_status)
+values ('00000000-0000-0000-0000-000000000001', 'Sud Express 66 (démo)', 'pro', 'trialing');
+
+insert into organization_modules (organization_id, module_key, enabled, pricing_mode, effective_monthly_price)
+values ('00000000-0000-0000-0000-000000000001', 'ocr', true, 'included', 0);
 
 -- No seed row for `users` here: a real row needs a matching
 -- auth.users id, created via a real Supabase Auth sign-up. Sign up

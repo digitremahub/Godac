@@ -5,6 +5,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { filterTicpeEligibleVehicles } from "@/lib/business/ticpe";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
+import { isModuleEnabled } from "@/lib/organization/modules";
 
 const bodySchema = z.object({
   period_start: z.string().date(),
@@ -32,6 +33,10 @@ export async function POST(req: Request) {
   const { period_start, period_end } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
+  const ticpeEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ticpe_export");
+  if (!ticpeEnabled) {
+    return NextResponse.json({ error: "Module Export TICPE non activé pour votre organisation" }, { status: 403 });
+  }
 
   const { data: organization } = await supabase
     .from("organizations")

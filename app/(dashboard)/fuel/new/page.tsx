@@ -1,5 +1,6 @@
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
 import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 
@@ -12,10 +13,10 @@ export default async function NewFuelEntryPage({
   const supabase = await createServerSupabaseClient();
   const params = await searchParams;
 
-  const [{ data: vehicles }, { data: tanks }, { data: organization }] = await Promise.all([
+  const [{ data: vehicles }, { data: tanks }, ocrEnabled] = await Promise.all([
     supabase.from("vehicles").select("id, registration, type").eq("status", "active").order("registration"),
     supabase.from("tanks").select("id, name, fuel_type").order("name"),
-    supabase.from("organizations").select("ocr_enabled").eq("id", appUser.organization_id).single(),
+    isModuleEnabled(supabase, appUser.organization_id, "ocr"),
   ]);
 
   return (
@@ -27,7 +28,7 @@ export default async function NewFuelEntryPage({
       <NewFuelEntryWizard
         vehicles={vehicles ?? []}
         tanks={tanks ?? []}
-        ocrEnabled={organization?.ocr_enabled ?? false}
+        ocrEnabled={ocrEnabled}
         initialVehicleId={params.vehicle}
         initialTankId={params.tank}
         selfDriverId={appUser.id}

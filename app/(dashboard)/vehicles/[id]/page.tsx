@@ -1,12 +1,20 @@
 import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { PageHeader, Card } from "@/components/ui";
+import { requireAppUser } from "@/lib/auth/session";
+import { isModuleEnabled } from "@/lib/organization/modules";
+import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { InterventionsPanel } from "@/components/vehicles/InterventionsPanel";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
+
+  const fleetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fleet");
+  if (!fleetEnabled) {
+    return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
+  }
 
   const [{ data: vehicle }, { data: interventions }] = await Promise.all([
     supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, services(name)").eq("id", id).single(),

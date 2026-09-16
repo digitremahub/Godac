@@ -15,15 +15,32 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const { name, ocr_enabled } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
+
+  if (name !== undefined) {
+    const { error } = await supabase.from("organizations").update({ name }).eq("id", appUser.organization_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (ocr_enabled !== undefined) {
+    const { error } = await supabase.from("organization_modules").upsert(
+      {
+        organization_id: appUser.organization_id,
+        module_key: "ocr",
+        enabled: ocr_enabled,
+      },
+      { onConflict: "organization_id,module_key" },
+    );
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   const { data, error } = await supabase
     .from("organizations")
-    .update(parsed.data)
+    .select("id, name")
     .eq("id", appUser.organization_id)
-    .select("id, name, ocr_enabled")
     .single();
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ organization: data });
 }

@@ -10,9 +10,17 @@ import {
   type VehicleCsvRow,
   type DriverCsvRow,
 } from "@/lib/utils/csv";
-import { PLANS } from "@/lib/stripe/plans";
+import { ModuleSelector } from "@/components/onboarding/ModuleSelector";
+import { PlanPicker } from "@/components/onboarding/PlanPicker";
+import { priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 
-type Step = "org" | "import" | "tanks" | "plan" | "done";
+type Step = "org" | "modules" | "import" | "tanks" | "subscribe" | "done";
+
+interface Catalog {
+  plans: Plan[];
+  modules: ModuleCatalogEntry[];
+  prices: ModulePlanPrice[];
+}
 
 interface TankDraft {
   name: string;
@@ -21,10 +29,12 @@ interface TankDraft {
   current_totalizer_index: string;
 }
 
-export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
+export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: string; catalog: Catalog }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "org");
   const [organizationName, setOrganizationName] = useState("");
+  const [planId, setPlanId] = useState<PlanId>("essentiel");
+  const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
   const [drivers, setDrivers] = useState<DriverCsvRow[]>([]);
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
@@ -42,6 +52,25 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: organizationName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      setStep("modules");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitModules() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/onboarding/modules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId, selectedModuleKeys }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
@@ -104,7 +133,7 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur cuves");
-      setStep("plan");
+      setStep("subscribe");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
@@ -112,15 +141,11 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
     }
   }
 
-  async function choosePlan(planId: "starter" | "pro") {
+  async function submitCheckout() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
-      });
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur Stripe");
       window.location.href = json.url;
@@ -157,6 +182,33 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
             {busy ? "Création…" : "Créer mon organisation"}
           </button>
         </Card>
+      )}
+
+      {step === "modules" && (
+        <div className="flex flex-col gap-6">
+          <div>
+            <p className="mb-2 text-white/70">Choisissez votre plan.</p>
+            <PlanPicker plans={catalog.plans} selected={planId} onChange={setPlanId} />
+          </div>
+          <div>
+            <p className="mb-2 text-white/70">
+              Ajoutez des modules complémentaires — vous pourrez les ajuster plus tard depuis
+              les paramètres de votre organisation.
+            </p>
+            <ModuleSelector
+              modules={catalog.modules}
+              prices={catalog.prices}
+              planId={planId}
+              selected={selectedModuleKeys}
+              onChange={setSelectedModuleKeys}
+            />
+          </div>
+          <div className="flex justify-end">
+            <button className="btn-primary" disabled={busy} onClick={submitModules}>
+              {busy ? "Enregistrement…" : "Continuer"}
+            </button>
+          </div>
+        </div>
       )}
 
       {step === "import" && (
@@ -262,7 +314,7 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
             + Ajouter une cuve
           </button>
           <div className="flex justify-end gap-3">
-            <button className="btn-secondary" onClick={() => setStep("plan")}>
+            <button className="btn-secondary" onClick={() => setStep("subscribe")}>
               Passer cette étape
             </button>
             <button className="btn-primary" disabled={busy} onClick={submitTanks}>
@@ -272,23 +324,14 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
         </Card>
       )}
 
-      {step === "plan" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {PLANS.map((plan) => (
-            <Card key={plan.id} className="flex flex-col gap-3">
-              <h3 className="text-xl">{plan.name}</h3>
-              <p className="text-sm text-white/60">{plan.description}</p>
-              <ul className="flex-1 space-y-1 text-sm text-white/70">
-                {plan.features.map((f) => (
-                  <li key={f}>• {f}</li>
-                ))}
-              </ul>
-              <button className="btn-primary" disabled={busy} onClick={() => choosePlan(plan.id)}>
-                Choisir {plan.name}
-              </button>
-            </Card>
-          ))}
-        </div>
+      {step === "subscribe" && (
+        <Card className="flex flex-col gap-4">
+          <h3 className="text-xl">Récapitulatif de votre abonnement</h3>
+          <SubscriptionSummary catalog={catalog} planId={planId} selectedModuleKeys={selectedModuleKeys} />
+          <button className="btn-primary" disabled={busy} onClick={submitCheckout}>
+            {busy ? "Redirection vers Stripe…" : "Passer au paiement"}
+          </button>
+        </Card>
       )}
 
       {step === "done" && (
@@ -303,12 +346,57 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
   );
 }
 
+function SubscriptionSummary({
+  catalog,
+  planId,
+  selectedModuleKeys,
+}: {
+  catalog: Catalog;
+  planId: PlanId;
+  selectedModuleKeys: string[];
+}) {
+  const plan = catalog.plans.find((p) => p.id === planId);
+  const selected = new Set(selectedModuleKeys);
+  const addons = catalog.modules
+    .filter((m) => m.wave !== "v3")
+    .map((m) => ({ module: m, price: priceFor(catalog.prices, m.key, planId) }))
+    .filter((x) => !x.price?.included && selected.has(x.module.key));
+  const addonsTotal = addons.reduce((sum, a) => sum + Number(a.price?.monthly_price ?? 0), 0);
+  const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
+
+  return (
+    <div className="flex flex-col gap-1 text-sm text-white/70">
+      <div className="flex justify-between">
+        <span>Plan {plan?.name ?? planId}</span>
+        <span>{plan?.monthly_base_price ?? 0} €/mois</span>
+      </div>
+      {plan && plan.setup_price > 0 && (
+        <div className="flex justify-between text-white/50">
+          <span>Mise en service (unique)</span>
+          <span>{plan.setup_price} €</span>
+        </div>
+      )}
+      {addons.map((a) => (
+        <div key={a.module.key} className="flex justify-between">
+          <span>{a.module.name}</span>
+          <span>{a.price?.monthly_price ?? 0} €/mois</span>
+        </div>
+      ))}
+      <div className="mt-2 flex justify-between border-t border-white/10 pt-2 text-lg text-white">
+        <span>Total</span>
+        <span className="font-display font-extrabold text-teal">{total.toFixed(2)} €/mois</span>
+      </div>
+    </div>
+  );
+}
+
 function StepIndicator({ step }: { step: Step }) {
   const steps: { id: Step; label: string }[] = [
     { id: "org", label: "1. Organisation" },
-    { id: "import", label: "2. Import" },
-    { id: "tanks", label: "3. Cuves" },
-    { id: "plan", label: "4. Abonnement" },
+    { id: "modules", label: "2. Modules" },
+    { id: "import", label: "3. Import" },
+    { id: "tanks", label: "4. Cuves" },
+    { id: "subscribe", label: "5. Abonnement" },
   ];
   return (
     <div className="mb-6 flex gap-2">

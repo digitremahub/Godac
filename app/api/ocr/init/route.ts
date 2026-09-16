@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
+import { isModuleEnabled } from "@/lib/organization/modules";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
@@ -29,6 +30,11 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createServerSupabaseClient();
+  const ocrEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ocr");
+  if (!ocrEnabled) {
+    return NextResponse.json({ error: "Module OCR non activé pour votre organisation" }, { status: 403 });
+  }
+
   const { data, error } = await supabase
     .from("fuel_entries")
     .insert({

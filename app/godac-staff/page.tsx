@@ -24,10 +24,14 @@ export default async function GodacStaffPage() {
   }
 
   const supabase = createAdminSupabaseClient();
-  const { data: organizations } = await supabase
-    .from("organizations")
-    .select("id, name, plan, subscription_status, ocr_enabled, created_at, vehicles(count), users(count)")
-    .order("created_at", { ascending: false });
+  const [{ data: organizations }, { data: ocrRows }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, name, plan, subscription_status, created_at, vehicles(count), users(count)")
+      .order("created_at", { ascending: false }),
+    supabase.from("organization_modules").select("organization_id, enabled").eq("module_key", "ocr"),
+  ]);
+  const ocrByOrg = new Map((ocrRows ?? []).map((r) => [r.organization_id as string, r.enabled as boolean]));
 
   return (
     <main className="min-h-screen bg-navy p-6">
@@ -58,7 +62,7 @@ export default async function GodacStaffPage() {
                     {org.subscription_status}
                   </span>
                 </td>
-                <td className="py-2">{org.ocr_enabled ? "Activé" : "Désactivé"}</td>
+                <td className="py-2">{ocrByOrg.get(org.id) ? "Activé" : "Désactivé"}</td>
                 <td className="py-2">{org.vehicles?.[0]?.count ?? 0}</td>
                 <td className="py-2">{org.users?.[0]?.count ?? 0}</td>
                 <td className="py-2">{new Date(org.created_at).toLocaleDateString("fr-FR")}</td>

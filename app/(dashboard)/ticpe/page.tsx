@@ -1,9 +1,18 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAppUser } from "@/lib/auth/session";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TicpeExportForm } from "@/components/ticpe/TicpeExportForm";
 
 export default async function TicpePage() {
+  const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
+
+  const ticpeEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ticpe_export");
+  if (!ticpeEnabled) {
+    return <EmptyState title="Module Export TICPE non activé" description="Activez-le depuis les paramètres de votre organisation." />;
+  }
+
   const { data: exports } = await supabase
     .from("ticpe_exports")
     .select("id, period_start, period_end, vehicle_count, total_liters, created_at")

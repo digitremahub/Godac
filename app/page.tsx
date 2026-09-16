@@ -27,7 +27,7 @@ export default async function HomePage() {
         Carburant, flotte, RH, planning et conformité TICPE — dans une seule
         plateforme pensée pour les PME de transport françaises.
       </p>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap justify-center gap-4">
         <Link href="/sign-in" className="btn-secondary">
           Connexion
         </Link>
@@ -35,6 +35,9 @@ export default async function HomePage() {
           Essayer GODAC
         </Link>
       </div>
+      <Link href="/modules" className="text-sm text-teal hover:underline">
+        Voir les modules et les tarifs →
+      </Link>
     </main>
   );
 }
