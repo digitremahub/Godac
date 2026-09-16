@@ -1,41 +1,64 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks(.*)",
-  "/api/cron(.*)",
-]);
+const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up", "/auth/callback"];
+const PUBLIC_PREFIXES = ["/api/webhooks", "/api/cron"];
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) {
-    return NextResponse.next();
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.includes(pathname)) return true;
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/**
+ * Refreshes the Supabase session cookie on every request (required by
+ * @supabase/ssr) and gates everything except the public paths above
+ * behind "is signed in". It deliberately does NOT check for an
+ * organisation here — that would mean a DB round trip on every
+ * request; (app/(dashboard)/layout.tsx already queries `users` to
+ * render the page, so it's the natural place to redirect a
+ * signed-in-but-orgless user to /onboarding.
+ */
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        },
+      },
+    },
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  if (!user && !isPublicPath(pathname)) {
+    const signInUrl = request.nextUrl.clone();
+    signInUrl.pathname = "/sign-in";
+    signInUrl.searchParams.set("redirect_to", pathname);
+    return NextResponse.redirect(signInUrl);
   }
 
-  const { userId, orgId, redirectToSignIn } = await auth();
-
-  if (!userId) {
-    return redirectToSignIn({ returnBackUrl: req.url });
+  if (user && (pathname === "/sign-in" || pathname === "/sign-up")) {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/dashboard";
+    return NextResponse.redirect(dashboardUrl);
   }
 
-  // Every authenticated area other than onboarding requires an active
-  // Clerk organisation (== a GODAC tenant). Users without one yet are
-  // funnelled through onboarding to create/join one. /godac-staff is
-  // the GODAC-side (not client-side) backoffice from Module 9 — it
-  // authorizes by email allowlist instead, see app/godac-staff/page.tsx.
-  if (
-    !orgId &&
-    !req.nextUrl.pathname.startsWith("/onboarding") &&
-    !req.nextUrl.pathname.startsWith("/godac-staff")
-  ) {
-    const onboardingUrl = new URL("/onboarding", req.url);
-    return NextResponse.redirect(onboardingUrl);
-  }
-
-  return NextResponse.next();
-});
+  return response;
+}
 
 export const config = {
   matcher: [

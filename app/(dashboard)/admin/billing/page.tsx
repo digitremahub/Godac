@@ -1,11 +1,11 @@
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { BillingPanel } from "@/components/admin/BillingPanel";
 
 export default async function BillingPage() {
   const appUser = await requireAppUser();
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")
     .select("plan, subscription_status, stripe_customer_id")

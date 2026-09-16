@@ -5,9 +5,9 @@ modulaire pour les PME françaises de transport routier de marchandises
 (TRM), flottes mixtes VL/PL/SPL.
 
 Ce dossier (`godac/`) contient l'application V2, construite en
-full-stack propre (Next.js + Supabase + Clerk + Stripe + Resend +
-Mindee), à côté du site vitrine Digitrema existant à la racine du
-repo — les deux sont des projets indépendants dans le même repository.
+full-stack propre (Next.js + Supabase + Stripe + Resend + Mindee), à
+côté du site vitrine Digitrema existant à la racine du repo — les deux
+sont des projets indépendants dans le même repository.
 
 ---
 
@@ -16,8 +16,7 @@ repo — les deux sont des projets indépendants dans le même repository.
 | Rôle | Techno |
 |---|---|
 | Frontend | Next.js 14 (App Router), déployé sur Vercel |
-| Backend / DB | Supabase (Postgres + Row Level Security + Storage) |
-| Auth multi-organisation | Clerk |
+| Backend / DB / Auth | Supabase (Postgres + Row Level Security + Storage + Auth) |
 | Paiement / abonnement SaaS | Stripe |
 | Jobs / webhooks lourds | Route Handlers Next.js aujourd'hui, migrable vers Railway sans changer la logique (voir plus bas) |
 | Email transactionnel | Resend |
@@ -31,28 +30,39 @@ gold `#F5C842`, police Syne ExtraBold pour les titres (voir
 
 ## Architecture multi-tenant
 
-Une **organisation Clerk = une entreprise de transport cliente**. Toute
-la donnée métier vit dans Postgres (Supabase), isolée par
-`organization_id` via **Row Level Security stricte** — jamais un
-filtre côté client. Voir `supabase/migrations/20260101000009_rls_policies.sql`
-pour le détail complet des règles par rôle.
+Une **organisation = une entreprise de transport cliente**, modélisée
+uniquement dans nos propres tables Postgres (pas de système
+d'organisations externe). Toute la donnée métier vit dans Postgres
+(Supabase), isolée par `organization_id` via **Row Level Security
+stricte** — jamais un filtre côté client. Voir
+`supabase/migrations/20260101000009_rls_policies.sql` pour le détail
+complet des règles par rôle.
 
-Clerk émet un JWT (configuré comme fournisseur d'auth tiers dans
-Supabase) que chaque appel Supabase utilise ; RLS résout
-`organization_id` et le rôle applicatif à partir de ce JWT via des
-fonctions `security definer` (`supabase/migrations/20260101000008_auth_helpers.sql`).
+L'authentification est celle de **Supabase Auth**, en connexion sans
+mot de passe (lien magique envoyé par email — `supabase.auth.signInWithOtp`).
+Aucun compte externe supplémentaire n'est nécessaire : un seul projet
+Supabase couvre base de données, stockage et authentification. RLS
+s'appuie directement sur `auth.uid()` — pas de pont JWT entre deux
+systèmes à maintenir (voir `supabase/migrations/20260101000008_auth_helpers.sql`).
 Même une requête mal filtrée côté frontend ne peut pas faire fuiter de
 données d'un autre client : Postgres refuse la ligne, pas le code
 applicatif.
 
+`public.users.id` est directement l'id Supabase Auth de l'utilisateur
+(le motif standard "profiles" de Supabase) — pas d'identifiant
+séparé à synchroniser entre deux systèmes.
+
 ### Les 5 rôles
 
 `chauffeur`, `manager`, `manager_chauffeur`, `comptable`, `direction` —
-stockés dans `public.users.role` (pas dans le système de rôles
-natif de Clerk, qui ne connaît que admin/basic_member). Le rôle et le
-service d'un utilisateur sont portés dans les métadonnées de
-l'invitation Clerk et resynchronisés vers Supabase par le webhook
-`app/api/webhooks/clerk/route.ts`.
+stockés dans `public.users.role`. Un nouvel utilisateur invité reçoit
+son rôle et son service via `app_metadata` (posé par
+`lib/auth/invitations.ts`, jamais modifiable par l'utilisateur
+lui-même contrairement à `user_metadata`) ; sa première visite après
+avoir cliqué le lien d'invitation finalise silencieusement sa fiche
+`users` (`lib/auth/provisioning.ts`). Le premier utilisateur d'une
+entreprise (inscription spontanée, pas une invitation) passe par
+`/onboarding` pour créer son organisation et devient `direction`.
 
 ### Identification rapide par QR code
 
@@ -78,7 +88,7 @@ Voir `supabase/migrations/*.sql`, dans l'ordre :
 5. `20260101000005_planning_rh.sql` — planning_entries, vehicle_interventions, fines, leave_requests (Phase 2)
 6. `20260101000006_ticpe.sql`
 7. `20260101000007_marketplace_stub.sql` — Module 10 (Phase 3), tables présentes mais RLS ferme tout, aucune UI
-8. `20260101000008_auth_helpers.sql` — fonctions de résolution JWT Clerk → org/rôle
+8. `20260101000008_auth_helpers.sql` — fonctions de résolution `auth.uid()` → org/rôle
 9. `20260101000009_rls_policies.sql` — toutes les policies
 10. `20260101000010_business_functions.sql` — trigger PMP + détection d'écart de totaliseur + génération d'alertes
 11. `20260101000011_storage.sql` — bucket `fuel-tickets`
@@ -118,7 +128,7 @@ app/
 lib/
   business/            # PMP, écart totaliseur, TICPE, congés (+ tests)
   supabase/            # clients server / browser / admin (service role)
-  clerk/               # résolution rôle + invitations
+  auth/                # session, invitations, provisioning des comptes invités
   ocr/                 # client Mindee + pipeline d'extraction
   email/               # Resend + templates
   stripe/              # client + plans
@@ -135,10 +145,9 @@ supabase/migrations/   # schéma versionné (voir ci-dessus)
 Voir `.env.example` pour la liste complète et commentée. Résumé par
 intégration :
 
-- **Clerk** : `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
-  `CLERK_WEBHOOK_SIGNING_SECRET`.
-- **Supabase** : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-  `SUPABASE_SERVICE_ROLE_KEY` (jamais exposée au client).
+- **Supabase** (base de données + auth + storage) : `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (jamais
+  exposée au client).
 - **Stripe** : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   `NEXT_PUBLIC_STRIPE_PRICE_STARTER` / `_PRO`.
 - **Resend** : `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
@@ -159,15 +168,12 @@ Ne jamais committer `.env.local`. `.gitignore` l'exclut déjà.
    supabase db push          # applique toutes les migrations
    supabase db seed          # données de démo (Sud Express 66 fictif)
    ```
-3. Dans le dashboard Supabase → **Authentication → Third Party Auth**,
-   ajouter Clerk comme fournisseur (nécessaire pour que
-   `lib/supabase/server.ts` / `client.ts` fonctionnent — voir section
-   suivante).
-4. Créer une app Clerk, activer les **organisations**, configurer les
-   webhooks (`/api/webhooks/clerk`) sur les événements
-   `organization.*`, `organizationMembership.*`, `user.updated`.
-5. Copier `.env.example` → `.env.local` et remplir les clés.
-6. `npm run dev`
+3. Dans le dashboard Supabase → **Authentication → URL Configuration**,
+   régler le Site URL et ajouter `<NEXT_PUBLIC_APP_URL>/auth/callback`
+   aux Redirect URLs (nécessaire pour que les liens magiques et les
+   invitations reviennent au bon endroit).
+4. Copier `.env.example` → `.env.local` et remplir les clés.
+5. `npm run dev`
 
 ```bash
 npm run typecheck   # tsc --noEmit
@@ -182,10 +188,10 @@ npm run build       # build de production (validé dans ce repo)
 Documenté explicitement, comme demandé — rien n'est masqué derrière un
 placeholder silencieux :
 
-- **Configuration Supabase "Third Party Auth" pour Clerk** : c'est un
-  réglage du dashboard Supabase, pas une migration SQL. Sans lui, tous
-  les appels `lib/supabase/server.ts` / `client.ts` échouent
-  silencieusement en RLS (aucune ligne visible, pas d'erreur explicite).
+- **Configuration Supabase "URL Configuration"** (Site URL + Redirect
+  URLs) : réglage du dashboard Supabase, pas une migration SQL. Sans
+  lui, les liens magiques et les invitations redirigent vers une URL
+  par défaut incorrecte.
 - **Webhook Supabase Database Webhooks → `/api/webhooks/supabase-alerts`** :
   également un réglage du dashboard (Database → Webhooks, sur
   `insert on public.alerts`), impossible à créer depuis une migration
@@ -226,7 +232,7 @@ placeholder silencieux :
 ## État d'avancement des modules
 
 ### MVP — fait
-- Module 1 — Authentification & Onboarding (Clerk multi-org, import CSV véhicules/chauffeurs, config cuves, choix plan Stripe, invitations Clerk)
+- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import CSV véhicules/chauffeurs, config cuves, choix plan Stripe, invitations par email)
 - Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection d'écart, historique, vue cuves)
 - Module 3 — OCR (capture photo mobile-first, pipeline Mindee, validation humaine obligatoire, revue manager, mode dégradé, QR badges véhicule/pompe/chauffeur)
 - Module 4 — Gestion de Flotte (fiche véhicule, interventions/entretien avec workflow de statut)

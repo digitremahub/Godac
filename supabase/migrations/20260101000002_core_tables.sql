@@ -1,9 +1,8 @@
 -- GODAC V2 — core multi-tenant tables.
--- One row in `organizations` == one Clerk Organization == one client company.
+-- One row in `organizations` == one client transport company.
 
 create table organizations (
   id uuid primary key default gen_random_uuid(),
-  clerk_org_id text not null unique,
   name text not null,
   plan text not null default 'starter',
   ocr_enabled boolean not null default true,
@@ -24,12 +23,12 @@ create table services (
   unique (organization_id, name)
 );
 
--- Mirrors Clerk users. One row per (clerk_user_id) globally; a user
--- belongs to exactly one GODAC organization at a time, matching the
--- "one Clerk organisation = one tenant" model.
+-- Profile row for a Supabase Auth user. `id` IS the auth.users id
+-- (not a separately generated uuid) — the standard Supabase
+-- "profiles" pattern — so RLS never needs to bridge between two
+-- identifiers. A user belongs to exactly one GODAC organization.
 create table users (
-  id uuid primary key default gen_random_uuid(),
-  clerk_user_id text not null unique,
+  id uuid primary key references auth.users (id) on delete cascade,
   organization_id uuid not null references organizations (id) on delete cascade,
   role user_role not null default 'chauffeur',
   full_name text not null,

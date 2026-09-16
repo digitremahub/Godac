@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /** Re-signs a download URL for a previously generated TICPE export (the original link expires after 5 minutes). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireAppUser();
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data: exportRow, error } = await supabase
     .from("ticpe_exports")

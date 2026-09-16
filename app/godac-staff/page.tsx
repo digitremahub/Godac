@@ -1,5 +1,5 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import { PageHeader, Card } from "@/components/ui";
@@ -13,8 +13,11 @@ import { PageHeader, Card } from "@/components/ui";
  * GODAC_STAFF_EMAILS allowlist instead (see lib/godac-staff/auth.ts).
  */
 export default async function GodacStaffPage() {
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress;
+  const userClient = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await userClient.auth.getUser();
+  const email = user?.email;
 
   if (!isGodacStaffEmail(email)) {
     redirect("/dashboard");

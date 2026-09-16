@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -10,7 +10,7 @@ export async function POST() {
     return NextResponse.json({ error: "Seule la direction peut gérer l'abonnement" }, { status: 403 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")
     .select("stripe_customer_id")

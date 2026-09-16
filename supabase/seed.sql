@@ -3,8 +3,14 @@
 -- has something to render against `supabase db reset`.
 -- Never run against a production project.
 
-insert into organizations (id, clerk_org_id, name, plan, ocr_enabled, subscription_status)
-values ('00000000-0000-0000-0000-000000000001', 'org_dev_seed', 'Sud Express 66 (démo)', 'pro', true, 'trialing');
+insert into organizations (id, name, plan, ocr_enabled, subscription_status)
+values ('00000000-0000-0000-0000-000000000001', 'Sud Express 66 (démo)', 'pro', true, 'trialing');
+
+-- No seed row for `users` here: a real row needs a matching
+-- auth.users id, created via a real Supabase Auth sign-up. Sign up
+-- once locally, then attach yourself to this demo org with:
+--   update users set organization_id = '00000000-0000-0000-0000-000000000001', role = 'direction'
+--   where id = auth.uid();
 
 insert into services (id, organization_id, name, code)
 values

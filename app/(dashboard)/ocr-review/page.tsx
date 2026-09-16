@@ -3,7 +3,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { OcrReviewCard } from "@/components/fuel/OcrReviewCard";
 
 export default async function OcrReviewPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data: entries } = await supabase
     .from("fuel_entries")

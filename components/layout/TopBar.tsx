@@ -1,6 +1,5 @@
-import { UserButton } from "@clerk/nextjs";
-import { OrganizationSwitcher } from "@clerk/nextjs";
 import { ROLE_LABELS } from "@/lib/roles/labels";
+import { SignOutButton } from "@/components/layout/SignOutButton";
 import type { UserRole } from "@/lib/types/domain";
 
 export function TopBar({ fullName, role }: { fullName: string; role: UserRole }) {
@@ -12,10 +11,7 @@ export function TopBar({ fullName, role }: { fullName: string; role: UserRole })
           {fullName} <span className="badge-teal ml-2">{ROLE_LABELS[role]}</span>
         </p>
       </div>
-      <div className="flex items-center gap-4">
-        <OrganizationSwitcher hidePersonal appearance={{ variables: { colorPrimary: "#1BE4C1" } }} />
-        <UserButton appearance={{ variables: { colorPrimary: "#1BE4C1" } }} />
-      </div>
+      <SignOutButton />
     </header>
   );
 }

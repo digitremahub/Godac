@@ -8,7 +8,7 @@ export default async function FuelHistoryPage({
   searchParams: Promise<{ vehicle?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   let query = supabase
     .from("fuel_entries")

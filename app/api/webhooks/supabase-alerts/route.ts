@@ -11,9 +11,9 @@ import type { UserRole } from "@/lib/types/domain";
  * README "Intégrations non branchées"). Resolves recipient emails
  * from `alerts.recipient_roles` and sends via Resend.
  *
- * Protected by a shared secret header rather than svix (Supabase DB
- * webhooks let you set arbitrary headers, unlike Clerk/Stripe which
- * sign their own payloads).
+ * Protected by a shared secret header rather than a signed payload
+ * (Supabase DB webhooks let you set arbitrary headers, unlike
+ * Stripe's webhooks, which sign their own payloads).
  */
 export async function POST(req: Request) {
   const expectedSecret = process.env.SUPABASE_DB_WEBHOOK_SECRET;

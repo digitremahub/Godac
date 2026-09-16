@@ -1,7 +1,7 @@
 -- GODAC V2 — Row Level Security.
 --
 -- Every tenant table is scoped by organization_id, checked against
--- public.current_organization_id() (resolved from the Clerk JWT).
+-- public.current_organization_id() (resolved from auth.uid()).
 -- This is the hard boundary: even a frontend bug that forgets a
 -- `.eq('organization_id', ...)` filter can never leak another
 -- client's rows, because Postgres itself refuses the read/write.

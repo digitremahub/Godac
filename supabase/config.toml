@@ -16,8 +16,9 @@ port = 54323
 enabled = true
 file_size_limit = "10MiB"
 
-# Third-party auth: Clerk issues the JWTs GODAC uses for RLS.
-# Configure the matching project in the Supabase dashboard under
-# Authentication > Third Party Auth, and set CLERK_* env vars.
-[auth.third_party.clerk]
+[auth]
 enabled = true
+# Invited users land here after clicking the email link (see
+# app/auth/callback/route.ts and app/invite/complete/page.tsx).
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]

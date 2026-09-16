@@ -3,7 +3,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 export default async function TanksPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: tanks } = await supabase
     .from("tanks")
     .select("id, name, fuel_type, capacity_liters, current_totalizer_index, last_reading_at, services(name)")

@@ -1,23 +1,33 @@
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
-import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 /**
  * Server-side Supabase client for Server Components / Route Handlers
- * / Server Actions. Uses the signed-in Clerk session's JWT as the
- * Supabase "third-party auth" token, so every query runs under the
- * calling user's Row Level Security policies — never elevated.
- *
- * Requires the Supabase project to have Clerk configured under
- * Authentication > Third Party Auth (see README).
+ * / Server Actions, bound to the signed-in visitor's own cookie-based
+ * session — every query still runs under that user's Row Level
+ * Security policies, never elevated (see lib/supabase/admin.ts for
+ * the service-role escape hatch).
  */
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
+  const cookieStore = await cookies();
   const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
   const supabaseAnonKey = requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    async accessToken() {
-      return (await auth()).getToken();
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        } catch {
+          // Called from a Server Component that can't write cookies —
+          // fine as long as middleware.ts is also refreshing the
+          // session on every request (it is, see middleware.ts).
+        }
+      },
     },
   });
 }

@@ -5,8 +5,9 @@ import { createClient } from "@supabase/supabase-js";
  * Service-role Supabase client. Bypasses Row Level Security entirely
  * — only ever use this from trusted server contexts that have
  * already established the correct tenant scope themselves:
- * webhooks (Clerk org sync, Stripe billing events), the OCR job that
- * writes back Mindee results, and cron jobs.
+ * onboarding bootstrap (creating a new organisation), invitations,
+ * webhooks (Stripe billing events), the OCR job that writes back
+ * Mindee results, and cron jobs.
  *
  * NEVER import this module from a Client Component or expose the
  * underlying key to the browser.

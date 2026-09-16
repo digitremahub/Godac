@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { PLANS, getPlanPriceId } from "@/lib/stripe/plans";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -9,10 +9,7 @@ const bodySchema = z.object({ planId: z.enum(["starter", "pro"]) });
 
 /** Onboarding step 4 / Module 9: creates a Stripe Checkout session for the org's subscription. */
 export async function POST(req: Request) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  }
+  const appUser = await requireAppUser();
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -28,11 +25,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")
     .select("id, stripe_customer_id")
-    .eq("clerk_org_id", orgId)
+    .eq("id", appUser.organization_id)
     .single();
 
   if (!organization) {
@@ -40,20 +37,17 @@ export async function POST(req: Request) {
   }
 
   const stripe = getStripeClient();
-  const user = await currentUser();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: organization.stripe_customer_id ?? undefined,
-    customer_email: organization.stripe_customer_id
-      ? undefined
-      : user?.primaryEmailAddress?.emailAddress,
+    customer_email: organization.stripe_customer_id ? undefined : appUser.email,
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
-      metadata: { godac_organization_id: organization.id, clerk_org_id: orgId },
+      metadata: { godac_organization_id: organization.id },
     },
-    metadata: { godac_organization_id: organization.id, clerk_org_id: orgId, plan: plan.id },
+    metadata: { godac_organization_id: organization.id, plan: plan.id },
     success_url: `${appUrl}/onboarding?stripe=success`,
     cancel_url: `${appUrl}/onboarding?stripe=cancelled`,
   });

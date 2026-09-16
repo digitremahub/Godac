@@ -12,7 +12,7 @@ import {
 } from "@/lib/utils/csv";
 import { PLANS } from "@/lib/stripe/plans";
 
-type Step = "import" | "tanks" | "plan" | "done";
+type Step = "org" | "import" | "tanks" | "plan" | "done";
 
 interface TankDraft {
   name: string;
@@ -23,7 +23,8 @@ interface TankDraft {
 
 export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "import");
+  const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "org");
+  const [organizationName, setOrganizationName] = useState("");
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
   const [drivers, setDrivers] = useState<DriverCsvRow[]>([]);
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
@@ -32,6 +33,25 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
   ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function submitOrganization() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/onboarding/create-organization", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: organizationName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      setStep("import");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleFile(kind: "vehicles" | "drivers", file: File) {
     const text = await file.text();
@@ -114,12 +134,29 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
     <div>
       <PageHeader
         title="Configuration de votre espace GODAC"
-        description="Trois étapes rapides avant de démarrer."
+        description="Quatre étapes rapides avant de démarrer."
       />
       <StepIndicator step={step} />
 
       {error && (
         <Card className="mb-4 border-orange/40 bg-orange/10 text-orange">{error}</Card>
+      )}
+
+      {step === "org" && (
+        <Card className="flex max-w-md flex-col gap-4">
+          <div>
+            <label className="label">Nom de votre entreprise de transport</label>
+            <input
+              className="input"
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
+              placeholder="ex: Sud Express 66"
+            />
+          </div>
+          <button className="btn-primary" disabled={busy || !organizationName} onClick={submitOrganization}>
+            {busy ? "Création…" : "Créer mon organisation"}
+          </button>
+        </Card>
       )}
 
       {step === "import" && (
@@ -268,9 +305,10 @@ export function OnboardingWizard({ stripeStatus }: { stripeStatus?: string }) {
 
 function StepIndicator({ step }: { step: Step }) {
   const steps: { id: Step; label: string }[] = [
-    { id: "import", label: "1. Import" },
-    { id: "tanks", label: "2. Cuves" },
-    { id: "plan", label: "3. Abonnement" },
+    { id: "org", label: "1. Organisation" },
+    { id: "import", label: "2. Import" },
+    { id: "tanks", label: "3. Cuves" },
+    { id: "plan", label: "4. Abonnement" },
   ];
   return (
     <div className="mb-6 flex gap-2">

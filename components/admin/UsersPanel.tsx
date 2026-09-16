@@ -22,6 +22,7 @@ const ROLES: UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptab
 
 export function UsersPanel({ users, services }: { users: UserRow[]; services: ServiceOption[] }) {
   const router = useRouter();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("chauffeur");
   const [serviceId, setServiceId] = useState("");
@@ -37,12 +38,13 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       const res = await fetch("/api/admin/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role, service_id: serviceId || undefined }),
+        body: JSON.stringify({ email, full_name: fullName || undefined, role, service_id: serviceId || undefined }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
       setSent(true);
       setEmail("");
+      setFullName("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
@@ -67,6 +69,10 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   return (
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className="label">Nom</label>
+          <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </div>
         <div className="flex-1">
           <label className="label">Email</label>
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -97,7 +103,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         </button>
       </Card>
       {error && <p className="text-sm text-orange">{error}</p>}
-      {sent && <p className="text-sm text-teal">Invitation envoyée par Clerk.</p>}
+      {sent && <p className="text-sm text-teal">Invitation envoyée par email.</p>}
 
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[560px] text-sm">

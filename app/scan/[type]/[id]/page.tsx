@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import type { ScanEntityType } from "@/lib/qr/scan-targets";
 
 const PARAM_BY_TYPE: Record<ScanEntityType, string> = {
@@ -11,10 +10,9 @@ const PARAM_BY_TYPE: Record<ScanEntityType, string> = {
 /**
  * Landing point for a QR sticker scanned by the phone's native camera
  * app (as opposed to the in-app scanner in components/fuel/QrScanner
- * used for the second/third scan in the same session). Signed-out
- * users get sent through sign-in first, then land back here via
- * Clerk's redirect_url, and finally reach /fuel/new pre-filled with
- * whatever was scanned.
+ * used for the second/third scan in the same session). middleware.ts
+ * already sends a signed-out visitor through /sign-in and back here
+ * afterwards, so by the time this renders a session always exists.
  */
 export default async function ScanRedirectPage({
   params,
@@ -22,13 +20,5 @@ export default async function ScanRedirectPage({
   params: Promise<{ type: string; id: string }>;
 }) {
   const { type, id } = await params;
-  const { userId } = await auth();
-
-  const target = `/fuel/new?${PARAM_BY_TYPE[type as ScanEntityType] ?? "vehicle"}=${id}`;
-
-  if (!userId) {
-    redirect(`/sign-in?redirect_url=${encodeURIComponent(target)}`);
-  }
-
-  redirect(target);
+  redirect(`/fuel/new?${PARAM_BY_TYPE[type as ScanEntityType] ?? "vehicle"}=${id}`);
 }

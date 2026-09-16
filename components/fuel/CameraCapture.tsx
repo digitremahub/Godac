@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSupabaseClient } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export interface OcrCaptureResult {
   fuelEntryId: string;
@@ -33,7 +33,7 @@ export function CameraCapture({
   driverId?: string;
   onResult: (result: OcrCaptureResult) => void;
 }) {
-  const supabase = useSupabaseClient();
+  const supabase = createBrowserSupabaseClient();
   const [preview, setPreview] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "extracting" | "error">("idle");
   const [error, setError] = useState<string | null>(null);

@@ -35,7 +35,6 @@ export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface Organization {
   id: string;
-  clerk_org_id: string;
   name: string;
   plan: string;
   ocr_enabled: boolean;

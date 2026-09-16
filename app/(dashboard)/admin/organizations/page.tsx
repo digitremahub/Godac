@@ -1,11 +1,11 @@
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { OrganizationSettingsForm } from "@/components/admin/OrganizationSettingsForm";
 
 export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")
     .select("name, ocr_enabled")

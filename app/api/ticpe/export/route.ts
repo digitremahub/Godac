@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { filterTicpeEligibleVehicles } from "@/lib/business/ticpe";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
   const { period_start, period_end } = parsed.data;
 
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data: organization } = await supabase
     .from("organizations")

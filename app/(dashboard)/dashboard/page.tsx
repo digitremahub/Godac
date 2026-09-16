@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/clerk/roles";
+import { requireAppUser } from "@/lib/auth/session";
 import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { RoleGate } from "@/components/layout/RoleGate";
@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export default async function DashboardPage() {
   const appUser = await requireAppUser();
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes] = await Promise.all([
     supabase.from("vehicles").select("id", { count: "exact", head: true }),

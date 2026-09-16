@@ -3,7 +3,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TicpeExportForm } from "@/components/ticpe/TicpeExportForm";
 
 export default async function TicpePage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: exports } = await supabase
     .from("ticpe_exports")
     .select("id, period_start, period_end, vehicle_count, total_liters, created_at")

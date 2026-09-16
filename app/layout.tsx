@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Syne, Inter } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { frFR } from "@clerk/localizations";
 import "./globals.css";
 
 const syne = Syne({
@@ -29,10 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider localization={frFR}>
-      <html lang="fr" className={`${syne.variable} ${inter.variable}`}>
-        <body>{children}</body>
-      </html>
-    </ClerkProvider>
+    <html lang="fr" className={`${syne.variable} ${inter.variable}`}>
+      <body>{children}</body>
+    </html>
   );
 }

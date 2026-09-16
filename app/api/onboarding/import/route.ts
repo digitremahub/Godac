@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { inviteOrganizationMember } from "@/lib/clerk/invitations";
+import { inviteOrganizationMember } from "@/lib/auth/invitations";
 import { vehicleCsvRowSchema, driverCsvRowSchema } from "@/lib/utils/csv";
 
 const bodySchema = z.object({
@@ -12,16 +12,13 @@ const bodySchema = z.object({
 
 /**
  * Onboarding step 2 (Module 1): bulk-creates vehicles directly, and
- * sends Clerk organisation invitations for drivers/managers — driver
- * accounts can't be inserted straight into `users` because that table
- * requires a real clerk_user_id, which only exists once the invitee
- * accepts (see app/api/webhooks/clerk/route.ts).
+ * sends Supabase Auth invitations for drivers/managers — driver
+ * accounts can't be inserted straight into `users` because that row
+ * is keyed by a real Supabase Auth user id, which only exists once
+ * the invitee accepts (see lib/auth/provisioning.ts).
  */
 export async function POST(req: Request) {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  }
+  const appUser = await requireAppUser();
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -29,19 +26,7 @@ export async function POST(req: Request) {
   }
   const { vehicles, drivers } = parsed.data;
 
-  const supabase = createServerSupabaseClient();
-  const { data: organization, error: orgError } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("clerk_org_id", orgId)
-    .single();
-
-  if (orgError || !organization) {
-    return NextResponse.json(
-      { error: "Organisation introuvable côté GODAC. Le webhook Clerk a-t-il bien synchronisé la création ?" },
-      { status: 409 },
-    );
-  }
+  const supabase = await createServerSupabaseClient();
 
   const serviceNames = new Set(
     [...vehicles.map((v) => v.service), ...drivers.map((d) => d.service)].filter(Boolean),
@@ -52,7 +37,7 @@ export async function POST(req: Request) {
     const { data: existing } = await supabase
       .from("services")
       .select("id")
-      .eq("organization_id", organization.id)
+      .eq("organization_id", appUser.organization_id)
       .eq("name", name)
       .maybeSingle();
 
@@ -63,7 +48,7 @@ export async function POST(req: Request) {
 
     const { data: created, error } = await supabase
       .from("services")
-      .insert({ organization_id: organization.id, name })
+      .insert({ organization_id: appUser.organization_id, name })
       .select("id")
       .single();
     if (error) {
@@ -78,7 +63,7 @@ export async function POST(req: Request) {
       .from("vehicles")
       .insert(
         vehicles.map((v) => ({
-          organization_id: organization.id,
+          organization_id: appUser.organization_id,
           registration: v.registration,
           type: v.type,
           tank_capacity_liters: v.tank_capacity_liters ?? null,
@@ -95,11 +80,11 @@ export async function POST(req: Request) {
   const invitationResults = await Promise.allSettled(
     drivers.map((d) =>
       inviteOrganizationMember({
-        clerkOrgId: orgId,
         email: d.email,
+        fullName: d.full_name,
         role: d.role,
+        organizationId: appUser.organization_id,
         serviceId: d.service ? serviceIdByName.get(d.service) : undefined,
-        inviterUserId: userId,
       }),
     ),
   );

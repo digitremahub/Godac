@@ -1,35 +1,20 @@
--- GODAC V2 — auth helper functions bridging Clerk JWTs (configured as
--- a Supabase third-party auth provider) to our own tables.
+-- GODAC V2 — auth helper functions built on Supabase's native
+-- `auth.uid()`. Because `public.users.id` IS the Supabase Auth user
+-- id (see 20260101000002_core_tables.sql), there is no JWT-claim
+-- bridging to do — RLS reads the organisation/role straight off the
+-- one profile row per signed-in user.
 --
 -- These are `security definer`, owned by the migration role (which
--- has bypassrls on Supabase), so they can read `users`/`organizations`
--- without being blocked by the very RLS policies that call them.
--- Never expose them for writes — read-only lookups only.
+-- has bypassrls on Supabase), so a policy on `users` calling
+-- current_role()/current_organization_id() doesn't recurse into its
+-- own RLS while resolving them.
 
-create or replace function public.clerk_user_id()
-returns text
+create or replace function public.current_app_user_id()
+returns uuid
 language sql
 stable
-security definer
-set search_path = public
 as $$
-  select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '');
-$$;
-
--- Clerk's native Supabase integration nests the active organisation
--- under the `o` claim (`o.id`). We also accept a flat `org_id` claim
--- as a fallback for custom JWT templates.
-create or replace function public.clerk_org_id()
-returns text
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce(
-    nullif(current_setting('request.jwt.claims', true)::jsonb -> 'o' ->> 'id', ''),
-    nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'org_id', '')
-  );
+  select auth.uid();
 $$;
 
 create or replace function public.current_organization_id()
@@ -39,19 +24,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from organizations where clerk_org_id = public.clerk_org_id();
-$$;
-
-create or replace function public.current_app_user_id()
-returns uuid
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select id from users
-  where clerk_user_id = public.clerk_user_id()
-    and organization_id = public.current_organization_id();
+  select organization_id from users where id = auth.uid();
 $$;
 
 create or replace function public.current_role()
@@ -61,7 +34,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select role from users where id = public.current_app_user_id();
+  select role from users where id = auth.uid();
 $$;
 
 create or replace function public.current_user_service_ids()
@@ -72,7 +45,7 @@ security definer
 set search_path = public
 as $$
   select coalesce(array_agg(service_id), '{}') from user_services
-  where user_id = public.current_app_user_id();
+  where user_id = auth.uid();
 $$;
 
 create or replace function public.is_manager_like()

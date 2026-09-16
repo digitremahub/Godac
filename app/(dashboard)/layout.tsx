@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCurrentAppUser } from "@/lib/clerk/roles";
+import { getCurrentAppUser } from "@/lib/auth/session";
+import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 
@@ -8,12 +9,16 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const appUser = await getCurrentAppUser();
+  let appUser = await getCurrentAppUser();
 
   if (!appUser) {
-    // Clerk session exists (middleware already enforced that) but the
-    // webhook hasn't synced this membership into Supabase yet, or the
-    // user was deactivated.
+    // An invited user's first visit after clicking their email link
+    // finishes silently here; an organic sign-up gets sent to
+    // onboarding to create their own organisation.
+    appUser = await tryAutoProvisionInvitedUser();
+  }
+
+  if (!appUser) {
     redirect("/onboarding");
   }
 

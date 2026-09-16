@@ -6,7 +6,7 @@ import { InterventionsPanel } from "@/components/vehicles/InterventionsPanel";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const [{ data: vehicle }, { data: interventions }] = await Promise.all([
     supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, services(name)").eq("id", id).single(),
