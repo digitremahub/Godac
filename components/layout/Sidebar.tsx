@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/tanks", label: "Cuves", allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
   { href: "/vehicles", label: "Flotte", allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
   { href: "/maintenance", label: "Demandes d'entretien", allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
+  { href: "/leaves", label: "Congés & Absences", allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "leave_management" },
   { href: "/alerts", label: "Alertes", allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
   { href: "/ticpe", label: "Export TICPE", allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
   { href: "/admin/organizations", label: "Organisation", allow: ["direction"] },
