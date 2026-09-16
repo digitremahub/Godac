@@ -25,11 +25,20 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabaseClient();
-  const enabledModuleKeys = await getEnabledModuleKeys(supabase, appUser.organization_id);
+  const [enabledModuleKeys, { data: organization }] = await Promise.all([
+    getEnabledModuleKeys(supabase, appUser.organization_id),
+    supabase.from("organizations").select("name, logo_url, accent_color").eq("id", appUser.organization_id).single(),
+  ]);
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar role={appUser.role} enabledModuleKeys={enabledModuleKeys} />
+      <Sidebar
+        role={appUser.role}
+        enabledModuleKeys={enabledModuleKeys}
+        organizationName={organization?.name ?? "GODAC"}
+        logoUrl={organization?.logo_url ?? null}
+        accentColor={organization?.accent_color ?? null}
+      />
       <div className="flex flex-1 flex-col">
         <TopBar fullName={appUser.full_name} role={appUser.role} />
         <main className="flex-1 overflow-y-auto bg-navy p-6">{children}</main>

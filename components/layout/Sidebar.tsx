@@ -27,16 +27,34 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/users", label: "Utilisateurs", allow: ["direction"] },
 ];
 
-export function Sidebar({ role, enabledModuleKeys }: { role: UserRole; enabledModuleKeys: string[] }) {
+export function Sidebar({
+  role,
+  enabledModuleKeys,
+  organizationName,
+  logoUrl,
+  accentColor,
+}: {
+  role: UserRole;
+  enabledModuleKeys: string[];
+  organizationName?: string;
+  logoUrl?: string | null;
+  accentColor?: string | null;
+}) {
   const pathname = usePathname();
   const enabled = new Set(enabledModuleKeys);
   const items = NAV_ITEMS.filter((item) => item.allow.includes(role) && (!item.moduleKey || enabled.has(item.moduleKey)));
+  const accent = accentColor || undefined;
 
   return (
     <nav className="flex h-full w-64 shrink-0 flex-col gap-1 border-r border-white/10 bg-navy/95 p-4">
       <div className="mb-6 flex items-center gap-2 px-2">
-        <div className="h-8 w-8 rounded-lg bg-teal" />
-        <span className="font-display text-xl font-extrabold">GODAC</span>
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={organizationName ?? "Logo"} className="h-8 w-8 rounded-lg object-contain" />
+        ) : (
+          <div className="h-8 w-8 rounded-lg" style={{ backgroundColor: accent ?? "#1BE4C1" }} />
+        )}
+        <span className="truncate font-display text-xl font-extrabold">{organizationName ?? "GODAC"}</span>
       </div>
       {items.map((item) => {
         const active = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
@@ -45,8 +63,9 @@ export function Sidebar({ role, enabledModuleKeys }: { role: UserRole; enabledMo
             key={item.href}
             href={item.href}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              active ? "bg-teal/15 text-teal" : "text-white/70 hover:bg-white/5 hover:text-white"
+              active ? "bg-white/10" : "text-white/70 hover:bg-white/5 hover:text-white"
             }`}
+            style={active ? { color: accent ?? "#1BE4C1", backgroundColor: accent ? `${accent}26` : undefined } : undefined}
           >
             {item.label}
           </Link>
