@@ -5,6 +5,7 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { TankPhotoCapture } from "@/components/tanks/TankPhotoCapture";
 import { TankEditPanel } from "@/components/tanks/TankEditPanel";
 import { AddTankForm } from "@/components/tanks/AddTankForm";
+import { TankDeliveryForm } from "@/components/tanks/TankDeliveryForm";
 
 export default async function TanksPage() {
   const appUser = await requireAppUser();
@@ -14,7 +15,9 @@ export default async function TanksPage() {
   const [{ data: tanks }, { data: services }] = await Promise.all([
     supabase
       .from("tanks")
-      .select("id, name, fuel_type, capacity_liters, current_totalizer_index, last_reading_at, service_id, services(name)")
+      .select(
+        "id, name, fuel_type, capacity_liters, current_totalizer_index, current_stock_liters, last_reading_at, service_id, services(name)",
+      )
       .order("name"),
     supabase.from("services").select("id, name").order("name"),
   ]);
@@ -54,8 +57,20 @@ export default async function TanksPage() {
                 </p>
               </div>
 
+              <div>
+                <div className="flex justify-between text-sm text-white/50">
+                  <span>Stock estimé</span>
+                  <span>{tank.capacity_liters?.toLocaleString("fr-FR")} L capacité</span>
+                </div>
+                <p className={`font-display text-xl font-extrabold ${tank.current_stock_liters < 0 ? "text-orange" : "text-gold"}`}>
+                  {tank.current_stock_liters?.toLocaleString("fr-FR")} L
+                </p>
+                {tank.current_stock_liters < 0 && (
+                  <p className="text-xs text-orange">Négatif = approvisionnements manquants dans l&apos;historique.</p>
+                )}
+              </div>
+
               <div className="flex justify-between text-sm text-white/50">
-                <span>Capacité: {tank.capacity_liters?.toLocaleString("fr-FR")} L</span>
                 <span>
                   {tank.last_reading_at
                     ? `Dernier plein: ${new Date(tank.last_reading_at).toLocaleDateString("fr-FR")}`
@@ -65,6 +80,7 @@ export default async function TanksPage() {
 
               <QrCodeBadge type="tank" id={tank.id} title={tank.name} subtitle="À coller sur la pompe" />
               <TankPhotoCapture tankId={tank.id} />
+              {canManage && <TankDeliveryForm tankId={tank.id} />}
               {canManage && (
                 <TankEditPanel
                   tankId={tank.id}
@@ -81,11 +97,12 @@ export default async function TanksPage() {
       )}
 
       <Card className="mt-6 text-sm text-white/50">
-        Le niveau réel de carburant restant (litres physiquement dans la cuve)
-        nécessite de suivre les livraisons de carburant, qui ne sont pas
-        encore enregistrées dans GODAC — c&apos;est prévu en Phase 2. En
-        attendant, l&apos;index totaliseur ci-dessus (cumul dispensé) reste la
-        donnée fiable utilisée pour la détection d&apos;écarts.
+        Le <b>stock estimé</b> augmente à chaque approvisionnement enregistré
+        et diminue à chaque ravitaillement validé — c&apos;est une estimation
+        qui part de 0 tant qu&apos;aucun approvisionnement initial n&apos;a été
+        saisi. L&apos;<b>index totaliseur</b> (cumul dispensé, jamais remis à
+        zéro) reste indépendant et demeure la donnée fiable utilisée pour la
+        détection d&apos;écarts.
       </Card>
     </div>
   );
