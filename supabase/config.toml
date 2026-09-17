@@ -22,3 +22,12 @@ enabled = true
 # app/auth/callback/route.ts and app/invite/complete/page.tsx).
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+
+# Branded magic-link email for local development. This only affects
+# the local Supabase stack (`supabase start`) — the hosted/production
+# project has no config-file-based way to set email templates, so the
+# same HTML must also be pasted into the Dashboard under Authentication
+# > Email Templates > Magic Link for it to apply there.
+[auth.email.template.magic_link]
+subject = "Votre lien de connexion GODAC"
+content_path = "./supabase/templates/magic_link.html"
