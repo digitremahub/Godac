@@ -22,6 +22,7 @@ import {
   IconUserCircle,
   IconUpload,
 } from "@/components/layout/icons";
+import { textSafeVariant } from "@/lib/theme/contrast";
 
 interface NavItem {
   href: string;
@@ -103,6 +104,11 @@ export function Sidebar({
   const pathname = usePathname() ?? "";
   const enabled = new Set(enabledModuleKeys);
   const accent = accentColor || "#1BE4C1";
+  // A custom accent color is only guaranteed contrast-safe as a fill
+  // (the bar, the logo square below) — used directly as the active
+  // nav item's text/icon color, an arbitrary pick could fail contrast
+  // against the light background.
+  const accentText = textSafeVariant(accent);
 
   const sections = SECTIONS.map((section) => ({
     ...section,
@@ -144,7 +150,7 @@ export function Sidebar({
                 className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
                   active ? "bg-navy/[0.08]" : "text-navy/60 hover:bg-navy/[0.05] hover:text-navy"
                 }`}
-                style={active ? { color: accent } : undefined}
+                style={active ? { color: accentText } : undefined}
               >
                 {active && (
                   <span className="absolute -left-4 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accent }} />

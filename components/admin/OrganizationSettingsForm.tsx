@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { textSafeVariant } from "@/lib/theme/contrast";
 
 const DEFAULT_ACCENT = "#1BE4C1";
 
@@ -119,6 +120,18 @@ export function OrganizationSettingsForm({
             onChange={(e) => setAccent(e.target.value)}
           />
           <span className="text-sm text-navy/50">{accent}</span>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="h-5 w-5 shrink-0 rounded" style={{ backgroundColor: accent }} />
+            Sur les boutons et badges — votre couleur exacte.
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold" style={{ color: textSafeVariant(accent) }}>
+              Aa
+            </span>
+            Utilisée comme texte (menu actif…) — assombrie automatiquement si besoin pour rester lisible.
+          </div>
         </div>
       </div>
 
