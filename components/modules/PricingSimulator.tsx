@@ -23,17 +23,19 @@ export function PricingSimulator({
   modules: ModuleCatalogEntry[];
   prices: ModulePlanPrice[];
 }) {
-  const [planId, setPlanId] = useState<PlanId>(plans[0]?.id ?? "essentiel");
+  const [planId, setPlanId] = useState<PlanId>(plans[0]?.id ?? "starter");
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
 
   const plan = plans.find((p) => p.id === planId);
   const selected = new Set(selectedModuleKeys);
-  const addonsTotal = modules
+  const selectedAddons = modules
     .filter((m) => m.wave !== "v3")
     .map((m) => ({ module: m, price: priceFor(prices, m.key, planId) }))
-    .filter((x) => !x.price?.included && selected.has(x.module.key))
-    .reduce((sum, x) => sum + Number(x.price?.monthly_price ?? 0), 0);
+    .filter((x) => !x.price?.included && selected.has(x.module.key));
+  const addonsTotal = selectedAddons.reduce((sum, x) => sum + Number(x.price?.monthly_price ?? 0), 0);
+  const addonsSetupTotal = selectedAddons.reduce((sum, x) => sum + Number(x.price?.setup_price ?? 0), 0);
   const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
+  const setupTotal = (plan?.setup_price ?? 0) + addonsSetupTotal;
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,11 +53,11 @@ export function PricingSimulator({
         <div>
           <p className="text-sm text-navy/60">Estimation pour le plan {plan?.name}</p>
           <p className="font-display text-3xl font-extrabold text-teal-ink">
-            {total.toFixed(2)} €{plan && plan.setup_price > 0 ? "*" : ""}
+            {total.toFixed(2)} €{setupTotal > 0 ? "*" : ""}
             <span className="text-base font-normal text-navy/40">/mois</span>
           </p>
-          {plan && plan.setup_price > 0 && (
-            <p className="text-xs text-navy/40">* + {plan.setup_price} € de mise en service, une seule fois</p>
+          {setupTotal > 0 && (
+            <p className="text-xs text-navy/40">* + {setupTotal.toFixed(2)} € de mise en service, une seule fois</p>
           )}
         </div>
         <Link href="/sign-up" className="btn-primary shrink-0">

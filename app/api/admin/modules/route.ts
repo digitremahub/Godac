@@ -54,6 +54,7 @@ export async function PATCH(req: Request) {
       enabled,
       pricing_mode: included ? ("included" as const) : ("a_la_carte" as const),
       effective_monthly_price: enabled ? Number(price?.monthly_price ?? 0) : 0,
+      effective_setup_price: enabled && !included ? Number(price?.setup_price ?? 0) : 0,
     };
   });
 

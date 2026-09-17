@@ -12,6 +12,9 @@ export interface Plan {
   monthly_base_price: number;
   setup_price: number;
   sort_order: number;
+  vehicle_min: number;
+  vehicle_max: number | null;
+  is_public: boolean;
 }
 
 export interface ModuleCatalogEntry {
@@ -29,6 +32,7 @@ export interface ModulePlanPrice {
   module_key: string;
   plan_id: PlanId;
   monthly_price: number;
+  setup_price: number;
   included: boolean;
 }
 

@@ -33,7 +33,7 @@ export async function POST() {
 
   const { data: addonRows } = await supabase
     .from("organization_modules")
-    .select("module_key, effective_monthly_price")
+    .select("module_key, effective_monthly_price, effective_setup_price")
     .eq("organization_id", organization.id)
     .eq("enabled", true)
     .eq("pricing_mode", "a_la_carte");
@@ -75,6 +75,16 @@ export async function POST() {
           },
         ]
       : []),
+    ...addons
+      .filter((addon) => Number(addon.effective_setup_price) > 0)
+      .map((addon) => ({
+        price_data: {
+          currency: "eur",
+          unit_amount: Math.round(Number(addon.effective_setup_price) * 100),
+          product_data: { name: `GODAC — Mise en service (${moduleByKey.get(addon.module_key)?.name ?? addon.module_key})` },
+        },
+        quantity: 1,
+      })),
   ];
 
   const total = plan.monthly_base_price + addons.reduce((sum, a) => sum + Number(a.effective_monthly_price), 0);

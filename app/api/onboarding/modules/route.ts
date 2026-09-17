@@ -23,6 +23,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const planId = parsed.data.planId as PlanId;
+  if (planId === "essentiel") {
+    return NextResponse.json({ error: "Le plan Essentiel est accessible sur demande uniquement, contactez GODAC." }, { status: 403 });
+  }
   const selected = new Set(parsed.data.selectedModuleKeys);
 
   const supabase = await createServerSupabaseClient();
@@ -48,6 +51,7 @@ export async function POST(req: Request) {
       enabled,
       pricing_mode: included ? ("included" as const) : ("a_la_carte" as const),
       effective_monthly_price: enabled ? Number(price?.monthly_price ?? 0) : 0,
+      effective_setup_price: enabled && !included ? Number(price?.setup_price ?? 0) : 0,
     };
   });
 

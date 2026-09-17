@@ -33,7 +33,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
   const router = useRouter();
   const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "org");
   const [organizationName, setOrganizationName] = useState("");
-  const [planId, setPlanId] = useState<PlanId>("essentiel");
+  const [planId, setPlanId] = useState<PlanId>(catalog.plans[0]?.id ?? "starter");
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
   const [drivers, setDrivers] = useState<DriverCsvRow[]>([]);
@@ -363,6 +363,7 @@ function SubscriptionSummary({
     .filter((x) => !x.price?.included && selected.has(x.module.key));
   const addonsTotal = addons.reduce((sum, a) => sum + Number(a.price?.monthly_price ?? 0), 0);
   const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
+  const setupTotal = (plan?.setup_price ?? 0) + addons.reduce((sum, a) => sum + Number(a.price?.setup_price ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-1 text-sm text-navy/70">
@@ -377,15 +378,29 @@ function SubscriptionSummary({
         </div>
       )}
       {addons.map((a) => (
-        <div key={a.module.key} className="flex justify-between">
-          <span>{a.module.name}</span>
-          <span>{a.price?.monthly_price ?? 0} €/mois</span>
+        <div key={a.module.key} className="flex flex-col">
+          <div className="flex justify-between">
+            <span>{a.module.name}</span>
+            <span>{a.price?.monthly_price ?? 0} €/mois</span>
+          </div>
+          {a.price && a.price.setup_price > 0 && (
+            <div className="flex justify-between text-navy/50">
+              <span>Mise en service — {a.module.name} (unique)</span>
+              <span>{a.price.setup_price} €</span>
+            </div>
+          )}
         </div>
       ))}
       <div className="mt-2 flex justify-between border-t border-navy/10 pt-2 text-lg text-navy">
         <span>Total</span>
         <span className="font-display font-extrabold text-teal-ink">{total.toFixed(2)} €/mois</span>
       </div>
+      {setupTotal > 0 && (
+        <div className="flex justify-between text-xs text-navy/40">
+          <span>Dont mise en service, une seule fois</span>
+          <span>{setupTotal.toFixed(2)} €</span>
+        </div>
+      )}
     </div>
   );
 }

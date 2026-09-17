@@ -59,16 +59,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: userError.message }, { status: 500 });
   }
 
-  // Seed the free/included baseline for the default ("essentiel")
-  // plan right away, so nav gating (getEnabledModuleKeys) never sees
-  // an org with zero rows — even if this user never reaches or
-  // completes the module-selection step of onboarding. Step 2
-  // (api/onboarding/modules) upserts over this once it runs.
+  // Seed the free/included baseline for the default ("starter", the
+  // cheapest *public* plan — see supabase/migrations/20260101000023,
+  // Essentiel is request-only) right away, so nav gating
+  // (getEnabledModuleKeys) never sees an org with zero rows — even if
+  // this user never reaches or completes the module-selection step of
+  // onboarding. Step 2 (api/onboarding/modules) upserts over this once
+  // it runs.
   const { modules, prices } = await getFullCatalog(admin);
   const baseline = modules
     .filter((m) => m.wave !== "v3")
     .map((m) => {
-      const included = priceFor(prices, m.key, "essentiel")?.included ?? false;
+      const included = priceFor(prices, m.key, "starter")?.included ?? false;
       return {
         organization_id: organization.id,
         module_key: m.key,

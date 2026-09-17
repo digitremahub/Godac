@@ -22,7 +22,10 @@ export default async function OnboardingPage({
   if (existing) redirect("/dashboard");
 
   const params = await searchParams;
-  const catalog = await getFullCatalog(supabase);
+  const { plans, modules, prices } = await getFullCatalog(supabase);
+  // Essentiel is request-only (see supabase/migrations/20260101000023) —
+  // self-serve onboarding only ever offers the public plans.
+  const catalog = { plans: plans.filter((p) => p.is_public), modules, prices };
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">

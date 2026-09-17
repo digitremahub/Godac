@@ -33,9 +33,9 @@ export function ModuleSelector({
     onChange(selected.includes(key) ? selected.filter((x) => x !== key) : [...selected, key]);
   }
 
-  const addonsTotal = addons
-    .filter((a) => selected.includes(a.module.key))
-    .reduce((sum, a) => sum + Number(a.price?.monthly_price ?? 0), 0);
+  const selectedAddons = addons.filter((a) => selected.includes(a.module.key));
+  const addonsTotal = selectedAddons.reduce((sum, a) => sum + Number(a.price?.monthly_price ?? 0), 0);
+  const addonsSetupTotal = selectedAddons.reduce((sum, a) => sum + Number(a.price?.setup_price ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -78,6 +78,9 @@ export function ModuleSelector({
                     </span>
                   </div>
                   <p className="text-sm text-navy/60">{module.description}</p>
+                  {price && price.setup_price > 0 && (
+                    <p className="text-xs text-navy/40">+ {price.setup_price} € de mise en service, une seule fois</p>
+                  )}
                 </button>
               );
             })}
@@ -90,6 +93,12 @@ export function ModuleSelector({
           <span>Modules complémentaires sélectionnés</span>
           <span>{addonsTotal.toFixed(2)} €/mois</span>
         </div>
+        {addonsSetupTotal > 0 && (
+          <div className="flex justify-between text-xs text-navy/40">
+            <span>Mise en service des modules, une seule fois</span>
+            <span>{addonsSetupTotal.toFixed(2)} €</span>
+          </div>
+        )}
       </Card>
     </div>
   );
