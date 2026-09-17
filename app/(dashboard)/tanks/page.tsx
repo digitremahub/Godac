@@ -1,14 +1,22 @@
+import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { TankPhotoCapture } from "@/components/tanks/TankPhotoCapture";
+import { TankEditPanel } from "@/components/tanks/TankEditPanel";
 
 export default async function TanksPage() {
+  const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
-  const { data: tanks } = await supabase
-    .from("tanks")
-    .select("id, name, fuel_type, capacity_liters, current_totalizer_index, last_reading_at, services(name)")
-    .order("name");
+  const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+
+  const [{ data: tanks }, { data: services }] = await Promise.all([
+    supabase
+      .from("tanks")
+      .select("id, name, fuel_type, capacity_liters, current_totalizer_index, last_reading_at, service_id, services(name)")
+      .order("name"),
+    supabase.from("services").select("id, name").order("name"),
+  ]);
 
   return (
     <div>
@@ -51,6 +59,16 @@ export default async function TanksPage() {
 
               <QrCodeBadge type="tank" id={tank.id} title={tank.name} subtitle="À coller sur la pompe" />
               <TankPhotoCapture tankId={tank.id} />
+              {canManage && (
+                <TankEditPanel
+                  tankId={tank.id}
+                  name={tank.name}
+                  fuelType={tank.fuel_type}
+                  capacityLiters={tank.capacity_liters}
+                  serviceId={tank.service_id}
+                  services={services ?? []}
+                />
+              )}
             </Card>
           ))}
         </div>

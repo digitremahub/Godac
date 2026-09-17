@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
+import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -22,7 +22,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, service_id, services(name)").eq("id", id).single(),
     supabase
       .from("vehicle_interventions")
-      .select("id, type, description, status, scheduled_at, completed_at, cost")
+      .select("id, type, description, urgency, status, scheduled_at, completed_at, cost")
       .eq("vehicle_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("services").select("id, name").order("name"),
@@ -53,7 +53,11 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <InterventionsPanel vehicleId={id} interventions={interventions ?? []} />
+          <InterventionsPanel
+            vehicleId={id}
+            interventions={interventions ?? []}
+            canManage={hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])}
+          />
         </div>
         <div className="flex flex-col items-center gap-4">
           <Card>
