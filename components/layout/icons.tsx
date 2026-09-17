@@ -170,3 +170,29 @@ export function IconUpload(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconClock(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </Svg>
+  );
+}
+
+export function IconShieldCheck(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z" />
+      <path d="M9 12l2 2 4-4" />
+    </Svg>
+  );
+}
+
+export function IconChartBar(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20V10M12 20V4M20 20v-7" />
+    </Svg>
+  );
+}
