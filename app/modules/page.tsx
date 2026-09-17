@@ -10,23 +10,22 @@ export const metadata = {
 const WAVE_LABELS: Record<string, string> = {
   v1: "Disponible aujourd'hui",
   v2: "Disponible aujourd'hui (upsell)",
-  v3: "Bientôt disponible",
 };
 
 /**
  * Public presentation page (no auth required): the 4 plans and the
- * full 21-module catalogue, both à la carte and per-plan. Numbers
- * here read live from plans/modules/module_plan_prices (see
+ * modules actually shipped today, both à la carte and per-plan.
+ * Numbers here read live from plans/modules/module_plan_prices (see
  * supabase/migrations/20260101000015_module_catalog.sql), the same
  * tables onboarding actually charges from — nothing to keep in sync
- * by hand.
+ * by hand. Unreleased (wave v3) modules are deliberately not shown
+ * here — this page only lists what a customer can actually use today.
  */
 export default async function ModulesPage() {
   const supabase = await createServerSupabaseClient();
   const { plans, modules, prices } = await getFullCatalog(supabase);
 
   const v1v2Modules = modules.filter((m) => m.wave === "v1" || m.wave === "v2");
-  const v3Modules = modules.filter((m) => m.wave === "v3");
   const planName = (id: PlanId | null) => (id ? plans.find((p) => p.id === id)?.name ?? id : null);
 
   return (
@@ -67,23 +66,6 @@ export default async function ModulesPage() {
             );
           })}
         </div>
-
-        {v3Modules.length > 0 && (
-          <>
-            <h2 className="mb-4 text-xl text-navy/80">{WAVE_LABELS.v3}</h2>
-            <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {v3Modules.map((m) => (
-                <div key={m.key} className="card flex flex-col gap-2 opacity-60">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base">{m.name}</h3>
-                    <span className="badge-neutral">Bientôt</span>
-                  </div>
-                  <p className="text-sm text-navy/50">{m.description}</p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
 
         <div className="text-center">
           <Link href="/sign-up" className="btn-primary">
