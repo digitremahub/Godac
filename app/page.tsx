@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
-import { ExplainerAnimation } from "@/components/marketing/ExplainerAnimation";
+import { ImageCarousel } from "@/components/marketing/ImageCarousel";
 import { HeroIllustration } from "@/components/marketing/HeroIllustration";
 import { IconDroplet, IconTruck, IconCalendar, IconFileText } from "@/components/layout/icons";
+
+const HOME_SLIDES = [
+  { src: "/home/scene-ravitaillement.png", alt: "Un chauffeur scanne son ticket de ravitaillement, le PMP est recalculé automatiquement" },
+  { src: "/home/scene-flotte.png", alt: "Tableau de bord de suivi de la flotte et des entretiens à prévoir" },
+  { src: "/home/scene-carburant.png", alt: "Tableau de bord carburant avec suivi des dépenses et du prix moyen pondéré" },
+  { src: "/home/scene-pilotage.png", alt: "Tableau de bord GODAC avec véhicules, chauffeurs et alertes en un coup d'œil" },
+  { src: "/home/scene-gestion.png", alt: "Gestion centralisée des demandes, entretiens et documents de la flotte" },
+];
 
 const FEATURES = [
   {
@@ -102,7 +110,7 @@ export default async function HomePage() {
             quotidien, réuni dans un seul outil.
           </p>
         </div>
-        <ExplainerAnimation />
+        <ImageCarousel slides={HOME_SLIDES} />
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-24">
