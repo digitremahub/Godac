@@ -72,7 +72,7 @@ export function EditVehicleForm({
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Modifier le véhicule</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       <div>
         <label className="label">Immatriculation</label>

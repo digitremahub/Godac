@@ -102,9 +102,9 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-3 text-sm text-orange">{error}</p>}
+      {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[820px] text-sm">
-        <thead className="text-left text-white/40">
+        <thead className="text-left text-navy/40">
           <tr>
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Type</th>
@@ -119,10 +119,10 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
           {requests.map((r) => {
             const isEditing = editingId === r.id;
             return (
-              <tr key={r.id} className="border-t border-white/5 align-top">
+              <tr key={r.id} className="border-t border-navy/5 align-top">
                 <td className="py-2">{r.vehicleRegistration}</td>
                 <td className="py-2">{isEditing ? <input className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} /> : r.type}</td>
-                <td className="py-2 text-white/60">
+                <td className="py-2 text-navy/60">
                   {isEditing ? (
                     <input className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
                   ) : (

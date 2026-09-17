@@ -47,7 +47,7 @@ export function FuelEntryForm({
 
   return (
     <Card className="flex flex-col gap-4">
-      {ocrNotice && <p className="rounded-lg bg-gold/10 p-3 text-sm text-gold">{ocrNotice}</p>}
+      {ocrNotice && <p className="rounded-lg bg-gold/10 p-3 text-sm text-gold-ink">{ocrNotice}</p>}
 
       <div>
         <label className="label">Date et heure</label>

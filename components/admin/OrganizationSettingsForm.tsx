@@ -77,8 +77,8 @@ export function OrganizationSettingsForm({
 
   return (
     <Card className="flex max-w-lg flex-col gap-4">
-      {error && <p className="text-sm text-orange">{error}</p>}
-      {saved && <p className="text-sm text-teal">Modifications enregistrées.</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {saved && <p className="text-sm text-teal-ink">Modifications enregistrées.</p>}
 
       <div>
         <label className="label">Nom de l&apos;organisation</label>
@@ -90,9 +90,9 @@ export function OrganizationSettingsForm({
         <div className="flex items-center gap-4">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-white/5 p-1" />
+            <img src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-navy/5 p-1" />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/5 text-xs text-white/30">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-navy/5 text-xs text-navy/30">
               Aucun
             </div>
           )}
@@ -114,18 +114,18 @@ export function OrganizationSettingsForm({
         <div className="flex items-center gap-3">
           <input
             type="color"
-            className="h-10 w-14 cursor-pointer rounded-lg border border-white/15 bg-transparent"
+            className="h-10 w-14 cursor-pointer rounded-lg border border-navy/15 bg-transparent"
             value={accent}
             onChange={(e) => setAccent(e.target.value)}
           />
-          <span className="text-sm text-white/50">{accent}</span>
+          <span className="text-sm text-navy/50">{accent}</span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-white/5 p-3">
+      <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
         <div>
           <p className="font-medium">Module OCR</p>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-navy/50">
             Activable/désactivable par organisation — désactivé, tous les
             ravitaillements passent en saisie 100% manuelle.
           </p>

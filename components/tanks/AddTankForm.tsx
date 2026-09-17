@@ -61,7 +61,7 @@ export function AddTankForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="mb-6 flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle cuve</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:items-end">
         <div className="col-span-2 sm:col-span-1">
           <label className="label">Nom</label>

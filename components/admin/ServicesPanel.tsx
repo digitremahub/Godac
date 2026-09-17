@@ -80,7 +80,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Services</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
@@ -97,18 +97,18 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
       </div>
 
       {services.length === 0 ? (
-        <p className="text-sm text-white/40">Aucun service configuré.</p>
+        <p className="text-sm text-navy/40">Aucun service configuré.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {services.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2">
+            <li key={s.id} className="flex items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
               <input
                 className="input flex-1 !py-1"
                 defaultValue={s.name}
                 onBlur={(e) => e.target.value !== s.name && renameService(s.id, e.target.value)}
                 disabled={busy}
               />
-              <span className="w-16 text-sm text-white/40">{s.code ?? "—"}</span>
+              <span className="w-16 text-sm text-navy/40">{s.code ?? "—"}</span>
               <button className="btn-danger !px-2 !py-1 text-xs" disabled={busy} onClick={() => deleteService(s.id)}>
                 Supprimer
               </button>

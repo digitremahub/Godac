@@ -9,9 +9,9 @@ export default function SignInPage() {
         <span className="font-display text-xl font-extrabold">GODAC</span>
       </Link>
       <AuthForm mode="sign-in" />
-      <p className="text-sm text-white/40">
+      <p className="text-sm text-navy/40">
         Pas encore de compte ?{" "}
-        <Link href="/sign-up" className="text-teal hover:underline">
+        <Link href="/sign-up" className="text-teal-ink hover:underline">
           Créer un compte
         </Link>
       </p>

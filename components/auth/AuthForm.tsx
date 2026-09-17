@@ -51,8 +51,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     return (
       <div className="card max-w-sm text-center">
         <p className="text-lg">📩 Vérifiez votre boîte mail</p>
-        <p className="mt-2 text-sm text-white/60">
-          Un lien de connexion a été envoyé à <span className="text-white">{email}</span>.
+        <p className="mt-2 text-sm text-navy/60">
+          Un lien de connexion a été envoyé à <span className="text-navy">{email}</span>.
           Cliquez dessus pour {mode === "sign-in" ? "vous connecter" : "créer votre compte"}.
         </p>
       </div>
@@ -63,7 +63,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
       <div>
         <h2 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h2>
-        <p className="mt-1 text-sm text-white/50">
+        <p className="mt-1 text-sm text-navy/50">
           {usePassword
             ? "Connectez-vous avec le mot de passe défini depuis votre compte."
             : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
@@ -92,14 +92,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           />
         </div>
       )}
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
       <button type="submit" className="btn-primary" disabled={busy || !email || (usePassword && !password)}>
         {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
       {mode === "sign-in" && (
         <button
           type="button"
-          className="text-sm text-white/50 hover:text-white hover:underline"
+          className="text-sm text-navy/50 hover:text-navy hover:underline"
           onClick={() => setUsePassword((v) => !v)}
         >
           {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}

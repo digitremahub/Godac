@@ -61,7 +61,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="flex flex-col items-center gap-4">
           <Card>
-            <p className="text-sm text-white/50">Capacité réservoir</p>
+            <p className="text-sm text-navy/50">Capacité réservoir</p>
             <p className="text-xl">{v.tank_capacity_liters ? `${v.tank_capacity_liters} L` : "Non renseignée"}</p>
           </Card>
           <QrCodeBadge

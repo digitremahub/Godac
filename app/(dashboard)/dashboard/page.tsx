@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg">Derniers ravitaillements</h2>
-            <Link href="/fuel" className="text-sm text-teal hover:underline">
+            <Link href="/fuel" className="text-sm text-teal-ink hover:underline">
               Voir tout
             </Link>
           </div>
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
             />
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-left text-white/40">
+              <thead className="text-left text-navy/40">
                 <tr>
                   <th className="pb-2">Date</th>
                   <th className="pb-2">Véhicule</th>
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
               </thead>
               <tbody>
                 {recentEntriesRes.data.map((entry: any) => (
-                  <tr key={entry.id} className="border-t border-white/5">
+                  <tr key={entry.id} className="border-t border-navy/5">
                     <td className="py-2">{new Date(entry.occurred_at).toLocaleDateString("fr-FR")}</td>
                     <td className="py-2">{entry.vehicles?.registration ?? "—"}</td>
                     <td className="py-2">{entry.liters} L</td>

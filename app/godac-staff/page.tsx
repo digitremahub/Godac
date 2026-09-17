@@ -41,7 +41,7 @@ export default async function GodacStaffPage() {
       />
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="text-left text-white/40">
+          <thead className="text-left text-navy/40">
             <tr>
               <th className="pb-2">Organisation</th>
               <th className="pb-2">Plan</th>
@@ -54,7 +54,7 @@ export default async function GodacStaffPage() {
           </thead>
           <tbody>
             {(organizations ?? []).map((org: any) => (
-              <tr key={org.id} className="border-t border-white/5">
+              <tr key={org.id} className="border-t border-navy/5">
                 <td className="py-2">{org.name}</td>
                 <td className="py-2 capitalize">{org.plan}</td>
                 <td className="py-2">

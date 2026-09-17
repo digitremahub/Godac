@@ -61,7 +61,7 @@ export function EditTankForm({
 
   return (
     <Card className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
       <div>
         <label className="label">Nom</label>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} />

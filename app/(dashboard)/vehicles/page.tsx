@@ -49,7 +49,7 @@ export default async function VehiclesPage() {
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="text-left text-white/40">
+            <thead className="text-left text-navy/40">
               <tr>
                 <th className="pb-2">Immatriculation</th>
                 <th className="pb-2">Type</th>
@@ -60,9 +60,9 @@ export default async function VehiclesPage() {
             </thead>
             <tbody>
               {vehicles.map((v: any) => (
-                <tr key={v.id} className="border-t border-white/5">
+                <tr key={v.id} className="border-t border-navy/5">
                   <td className="py-2">
-                    <Link href={`/vehicles/${v.id}`} className="text-teal hover:underline">
+                    <Link href={`/vehicles/${v.id}`} className="text-teal-ink hover:underline">
                       {v.registration}
                     </Link>
                   </td>

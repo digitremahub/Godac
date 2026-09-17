@@ -139,12 +139,12 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
           Inviter
         </button>
       </Card>
-      {error && <p className="text-sm text-orange">{error}</p>}
-      {sent && <p className="text-sm text-teal">Invitation envoyée par email.</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p className="text-sm text-teal-ink">Invitation envoyée par email.</p>}
 
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="text-left text-white/40">
+          <thead className="text-left text-navy/40">
             <tr>
               <th className="pb-2">Nom</th>
               <th className="pb-2">Email</th>
@@ -158,7 +158,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
             {users.map((u) => {
               const isEditing = editingId === u.id;
               return (
-                <tr key={u.id} className="border-t border-white/5">
+                <tr key={u.id} className="border-t border-navy/5">
                   <td className="py-2">
                     {isEditing ? (
                       <input className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />

@@ -164,7 +164,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
       <StepIndicator step={step} />
 
       {error && (
-        <Card className="mb-4 border-orange/40 bg-orange/10 text-orange">{error}</Card>
+        <Card className="mb-4 border-orange/40 bg-orange/10 text-orange-ink">{error}</Card>
       )}
 
       {step === "org" && (
@@ -187,11 +187,11 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
       {step === "modules" && (
         <div className="flex flex-col gap-6">
           <div>
-            <p className="mb-2 text-white/70">Choisissez votre plan.</p>
+            <p className="mb-2 text-navy/70">Choisissez votre plan.</p>
             <PlanPicker plans={catalog.plans} selected={planId} onChange={setPlanId} />
           </div>
           <div>
-            <p className="mb-2 text-white/70">
+            <p className="mb-2 text-navy/70">
               Ajoutez des modules complémentaires — vous pourrez les ajuster plus tard depuis
               les paramètres de votre organisation.
             </p>
@@ -221,7 +221,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               className="input"
               onChange={(e) => e.target.files?.[0] && handleFile("vehicles", e.target.files[0])}
             />
-            {vehicles.length > 0 && <p className="mt-1 text-sm text-teal">{vehicles.length} véhicule(s) prêt(s)</p>}
+            {vehicles.length > 0 && <p className="mt-1 text-sm text-teal-ink">{vehicles.length} véhicule(s) prêt(s)</p>}
           </div>
           <div>
             <p className="label">Chauffeurs / équipe (CSV: full_name, email, role, service)</p>
@@ -231,10 +231,10 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               className="input"
               onChange={(e) => e.target.files?.[0] && handleFile("drivers", e.target.files[0])}
             />
-            {drivers.length > 0 && <p className="mt-1 text-sm text-teal">{drivers.length} invitation(s) prête(s)</p>}
+            {drivers.length > 0 && <p className="mt-1 text-sm text-teal-ink">{drivers.length} invitation(s) prête(s)</p>}
           </div>
           {csvErrors.length > 0 && (
-            <ul className="list-disc pl-5 text-sm text-orange">
+            <ul className="list-disc pl-5 text-sm text-orange-ink">
               {csvErrors.map((e, i) => (
                 <li key={i}>{e}</li>
               ))}
@@ -253,7 +253,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
       {step === "tanks" && (
         <Card className="flex flex-col gap-4">
-          <p className="text-white/70">
+          <p className="text-navy/70">
             Vos véhicules partagent des cuves internes — c&apos;est sur l&apos;index de
             ces cuves que GODAC détecte les écarts de ravitaillement, pas sur le
             kilométrage.
@@ -365,13 +365,13 @@ function SubscriptionSummary({
   const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
 
   return (
-    <div className="flex flex-col gap-1 text-sm text-white/70">
+    <div className="flex flex-col gap-1 text-sm text-navy/70">
       <div className="flex justify-between">
         <span>Plan {plan?.name ?? planId}</span>
         <span>{plan?.monthly_base_price ?? 0} €/mois</span>
       </div>
       {plan && plan.setup_price > 0 && (
-        <div className="flex justify-between text-white/50">
+        <div className="flex justify-between text-navy/50">
           <span>Mise en service (unique)</span>
           <span>{plan.setup_price} €</span>
         </div>
@@ -382,9 +382,9 @@ function SubscriptionSummary({
           <span>{a.price?.monthly_price ?? 0} €/mois</span>
         </div>
       ))}
-      <div className="mt-2 flex justify-between border-t border-white/10 pt-2 text-lg text-white">
+      <div className="mt-2 flex justify-between border-t border-navy/10 pt-2 text-lg text-navy">
         <span>Total</span>
-        <span className="font-display font-extrabold text-teal">{total.toFixed(2)} €/mois</span>
+        <span className="font-display font-extrabold text-teal-ink">{total.toFixed(2)} €/mois</span>
       </div>
     </div>
   );

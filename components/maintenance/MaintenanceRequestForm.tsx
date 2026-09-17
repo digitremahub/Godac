@@ -51,14 +51,14 @@ export function MaintenanceRequestForm({ vehicles }: { vehicles: VehicleOption[]
   }
 
   if (vehicles.length === 0) {
-    return <Card className="text-sm text-white/50">Aucun véhicule disponible pour ouvrir une demande.</Card>;
+    return <Card className="text-sm text-navy/50">Aucun véhicule disponible pour ouvrir une demande.</Card>;
   }
 
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle demande d&apos;entretien</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
-      {sent && <p className="text-sm text-teal">Demande envoyée.</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p className="text-sm text-teal-ink">Demande envoyée.</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
         <div>

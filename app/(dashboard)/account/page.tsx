@@ -12,15 +12,15 @@ export default async function AccountPage() {
 
       <Card className="flex max-w-md flex-col gap-2">
         <div>
-          <p className="text-sm text-white/50">Nom</p>
+          <p className="text-sm text-navy/50">Nom</p>
           <p>{appUser.full_name}</p>
         </div>
         <div>
-          <p className="text-sm text-white/50">Email</p>
+          <p className="text-sm text-navy/50">Email</p>
           <p>{appUser.email}</p>
         </div>
         <div>
-          <p className="text-sm text-white/50">Rôle</p>
+          <p className="text-sm text-navy/50">Rôle</p>
           <p>{ROLE_LABELS[appUser.role]}</p>
         </div>
       </Card>

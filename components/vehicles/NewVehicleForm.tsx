@@ -44,7 +44,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
 
   return (
     <Card className="flex max-w-lg flex-col gap-4">
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
       <div>
         <label className="label">Immatriculation</label>
         <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} />

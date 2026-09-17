@@ -43,7 +43,7 @@ export default async function TanksPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-lg">{tank.name}</h3>
-                  <p className="text-sm text-white/50">{tank.services?.name ?? "Sans service"}</p>
+                  <p className="text-sm text-navy/50">{tank.services?.name ?? "Sans service"}</p>
                 </div>
                 <span className={tank.fuel_type === "diesel" ? "badge-teal" : "badge-gold"}>
                   {tank.fuel_type === "diesel" ? "Diesel" : "AdBlue"}
@@ -51,26 +51,26 @@ export default async function TanksPage() {
               </div>
 
               <div>
-                <p className="text-sm text-white/50">Index totaliseur courant</p>
-                <p className="font-display text-2xl font-extrabold text-teal">
+                <p className="text-sm text-navy/50">Index totaliseur courant</p>
+                <p className="font-display text-2xl font-extrabold text-teal-ink">
                   {tank.current_totalizer_index?.toLocaleString("fr-FR")} L
                 </p>
               </div>
 
               <div>
-                <div className="flex justify-between text-sm text-white/50">
+                <div className="flex justify-between text-sm text-navy/50">
                   <span>Stock estimé</span>
                   <span>{tank.capacity_liters?.toLocaleString("fr-FR")} L capacité</span>
                 </div>
-                <p className={`font-display text-xl font-extrabold ${tank.current_stock_liters < 0 ? "text-orange" : "text-gold"}`}>
+                <p className={`font-display text-xl font-extrabold ${tank.current_stock_liters < 0 ? "text-orange-ink" : "text-gold-ink"}`}>
                   {tank.current_stock_liters?.toLocaleString("fr-FR")} L
                 </p>
                 {tank.current_stock_liters < 0 && (
-                  <p className="text-xs text-orange">Négatif = approvisionnements manquants dans l&apos;historique.</p>
+                  <p className="text-xs text-orange-ink">Négatif = approvisionnements manquants dans l&apos;historique.</p>
                 )}
               </div>
 
-              <div className="flex justify-between text-sm text-white/50">
+              <div className="flex justify-between text-sm text-navy/50">
                 <span>
                   {tank.last_reading_at
                     ? `Dernier plein: ${new Date(tank.last_reading_at).toLocaleDateString("fr-FR")}`
@@ -96,7 +96,7 @@ export default async function TanksPage() {
         </div>
       )}
 
-      <Card className="mt-6 text-sm text-white/50">
+      <Card className="mt-6 text-sm text-navy/50">
         Le <b>stock estimé</b> augmente à chaque approvisionnement enregistré
         et diminue à chaque ravitaillement validé — c&apos;est une estimation
         qui part de 0 tant qu&apos;aucun approvisionnement initial n&apos;a été

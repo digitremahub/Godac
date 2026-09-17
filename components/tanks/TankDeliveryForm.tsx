@@ -50,7 +50,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {error && <p className="text-xs text-orange">{error}</p>}
+      {error && <p className="text-xs text-orange-ink">{error}</p>}
       <input className="input !py-1 text-sm" type="number" placeholder="Litres livrés" value={liters} onChange={(e) => setLiters(e.target.value)} />
       <input
         className="input !py-1 text-sm"

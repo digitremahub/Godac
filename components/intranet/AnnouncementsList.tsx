@@ -41,7 +41,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-lg">{a.title}</h3>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-navy/40">
                 {a.authorName} · {a.serviceName ?? "Toute l'organisation"} · {new Date(a.createdAt).toLocaleString("fr-FR")}
               </p>
             </div>
@@ -52,7 +52,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
               {a.readCount !== null && <span className="badge-neutral">{a.readCount} lecture(s)</span>}
             </div>
           </div>
-          <p className="whitespace-pre-wrap text-sm text-white/70">{a.body}</p>
+          <p className="whitespace-pre-wrap text-sm text-navy/70">{a.body}</p>
           {a.requiresAcknowledgement && !a.isRead && (
             <button className="btn-primary mt-3 !px-3 !py-1.5 text-sm" disabled={busyId === a.id} onClick={() => markRead(a.id)}>
               {busyId === a.id ? "…" : "Marquer comme lu"}

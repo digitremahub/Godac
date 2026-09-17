@@ -11,9 +11,9 @@ function initials(name: string) {
 
 export function TopBar({ fullName, role }: { fullName: string; role: UserRole }) {
   return (
-    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-navy/70 px-6 backdrop-blur-sm">
+    <header className="flex h-16 items-center justify-between border-b border-navy/10 bg-white/70 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal ring-1 ring-teal/20">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal-ink ring-1 ring-teal/20">
           {initials(fullName)}
         </div>
         <div>

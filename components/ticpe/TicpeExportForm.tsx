@@ -46,7 +46,7 @@ export function TicpeExportForm() {
       <button className="btn-primary" disabled={busy} onClick={generate}>
         {busy ? "Génération…" : "Générer l'export TICPE"}
       </button>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
     </Card>
   );
 }

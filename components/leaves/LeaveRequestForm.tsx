@@ -45,7 +45,7 @@ export function LeaveRequestForm({ services }: { services: ServiceOption[] }) {
 
   if (services.length === 0) {
     return (
-      <Card className="text-sm text-white/50">
+      <Card className="text-sm text-navy/50">
         Vous n&apos;êtes rattaché à aucun service — contactez votre direction pour pouvoir demander un congé.
       </Card>
     );
@@ -54,8 +54,8 @@ export function LeaveRequestForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle demande de congé</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
-      {sent && <p className="text-sm text-teal">Demande envoyée, en attente de validation.</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p className="text-sm text-teal-ink">Demande envoyée, en attente de validation.</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
         {services.length > 1 && (

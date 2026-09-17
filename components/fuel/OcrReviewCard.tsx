@@ -57,10 +57,10 @@ export function OcrReviewCard({ entry }: { entry: any }) {
           {entry.photoUrl ? (
             <img src={entry.photoUrl} alt="Ticket" className="max-h-96 w-full rounded-xl object-contain" />
           ) : (
-            <p className="text-sm text-white/40">Aucune photo disponible</p>
+            <p className="text-sm text-navy/40">Aucune photo disponible</p>
           )}
           {entry.ocr_confidence && (
-            <div className="mt-2 text-xs text-white/40">
+            <div className="mt-2 text-xs text-navy/40">
               Confiance OCR:{" "}
               {Object.entries(entry.ocr_confidence)
                 .filter(([, v]) => v !== null)
@@ -68,11 +68,11 @@ export function OcrReviewCard({ entry }: { entry: any }) {
                 .join(" · ") || "n/a"}
             </div>
           )}
-          {entry.ocr_error && <p className="mt-2 text-xs text-orange">{entry.ocr_error}</p>}
+          {entry.ocr_error && <p className="mt-2 text-xs text-orange-ink">{entry.ocr_error}</p>}
         </div>
 
         <div>
-          {error && <p className="mb-2 text-sm text-orange">{error}</p>}
+          {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
           <FuelEntryForm
             initialValues={{
               occurred_at: entry.occurred_at?.slice(0, 16),

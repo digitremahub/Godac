@@ -147,13 +147,13 @@ export function InterventionsPanel({
       </div>
 
       {interventions.length === 0 ? (
-        <p className="text-sm text-white/40">Aucune intervention enregistrée.</p>
+        <p className="text-sm text-navy/40">Aucune intervention enregistrée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {interventions.map((i) => {
             const isEditing = editingId === i.id;
             return (
-              <li key={i.id} className="rounded-lg bg-white/5 px-3 py-2 text-sm">
+              <li key={i.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
                 {isEditing ? (
                   <div className="flex flex-col gap-2">
                     <input className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} />
@@ -182,7 +182,7 @@ export function InterventionsPanel({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{i.type}</p>
-                      {i.description && <p className="text-white/50">{i.description}</p>}
+                      {i.description && <p className="text-navy/50">{i.description}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={URGENCY_BADGES[i.urgency]}>{URGENCY_LABELS[i.urgency]}</span>

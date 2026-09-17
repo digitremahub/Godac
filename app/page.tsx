@@ -41,7 +41,7 @@ export default async function HomePage() {
           <span className="font-display text-xl font-extrabold">GODAC</span>
         </div>
         <nav className="flex items-center gap-3">
-          <Link href="/modules" className="hidden text-sm text-white/60 hover:text-white sm:inline">
+          <Link href="/modules" className="hidden text-sm text-navy/60 hover:text-navy sm:inline">
             Modules & tarifs
           </Link>
           <Link href="/sign-in" className="btn-secondary !px-4 !py-2 text-sm">
@@ -53,9 +53,9 @@ export default async function HomePage() {
       <section className="mx-auto flex max-w-3xl flex-col items-center gap-7 px-6 pb-20 pt-16 text-center sm:pt-24">
         <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
         <h1 className="text-4xl leading-[1.1] sm:text-5xl md:text-6xl">
-          L&apos;OS de backoffice pour les <span className="text-teal">PME de transport</span>
+          L&apos;OS de backoffice pour les <span className="text-teal-ink">PME de transport</span>
         </h1>
-        <p className="max-w-xl text-lg text-white/60">
+        <p className="max-w-xl text-lg text-navy/60">
           Carburant, flotte, RH, planning et conformité TICPE — dans une seule
           plateforme pensée pour les PME de transport françaises.
         </p>
@@ -74,13 +74,13 @@ export default async function HomePage() {
           {FEATURES.map((feature) => (
             <div key={feature.title} className="card-hover flex flex-col gap-2">
               <h3 className="text-base">{feature.title}</h3>
-              <p className="text-sm text-white/55">{feature.description}</p>
+              <p className="text-sm text-navy/55">{feature.description}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-6 py-8 text-center text-sm text-white/35">
+      <footer className="border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/35">
         © {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.
       </footer>
     </main>

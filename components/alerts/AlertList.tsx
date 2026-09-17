@@ -49,7 +49,7 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
           <div>
             <div className="mb-1 flex items-center gap-2">
               <span className={SEVERITY_BADGE[alert.severity]}>{alert.severity}</span>
-              <span className="text-xs text-white/40">{new Date(alert.created_at).toLocaleString("fr-FR")}</span>
+              <span className="text-xs text-navy/40">{new Date(alert.created_at).toLocaleString("fr-FR")}</span>
               {!alert.notified_at && <span className="badge-neutral">Email non envoyé</span>}
             </div>
             <p className="text-sm">{alert.message}</p>

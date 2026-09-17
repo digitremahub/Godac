@@ -32,7 +32,7 @@ export default async function TicpePage() {
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[600px] text-sm">
-            <thead className="text-left text-white/40">
+            <thead className="text-left text-navy/40">
               <tr>
                 <th className="pb-2">Généré le</th>
                 <th className="pb-2">Période</th>
@@ -43,7 +43,7 @@ export default async function TicpePage() {
             </thead>
             <tbody>
               {exports.map((exp: any) => (
-                <tr key={exp.id} className="border-t border-white/5">
+                <tr key={exp.id} className="border-t border-navy/5">
                   <td className="py-2">{new Date(exp.created_at).toLocaleString("fr-FR")}</td>
                   <td className="py-2">
                     {exp.period_start} → {exp.period_end}
@@ -51,7 +51,7 @@ export default async function TicpePage() {
                   <td className="py-2">{exp.vehicle_count}</td>
                   <td className="py-2">{Number(exp.total_liters).toLocaleString("fr-FR")} L</td>
                   <td className="py-2">
-                    <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal hover:underline">
+                    <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">
                       Télécharger
                     </a>
                   </td>

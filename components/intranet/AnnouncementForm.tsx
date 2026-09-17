@@ -49,7 +49,7 @@ export function AnnouncementForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle annonce</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       <div>
         <label className="label">Titre</label>
@@ -71,7 +71,7 @@ export function AnnouncementForm({ services }: { services: ServiceOption[] }) {
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 text-sm text-white/70">
+        <label className="flex items-center gap-2 text-sm text-navy/70">
           <input type="checkbox" checked={requiresAck} onChange={(e) => setRequiresAck(e.target.checked)} />
           Accusé de lecture requis
         </label>

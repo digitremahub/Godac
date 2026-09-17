@@ -35,14 +35,14 @@ export default async function FuelHistoryPage({
         }
       />
 
-      {error && <Card className="mb-4 text-orange">{error.message}</Card>}
+      {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
 
       {!entries || entries.length === 0 ? (
         <EmptyState title="Aucun ravitaillement" description="Enregistrez votre premier plein pour le voir apparaître ici." />
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-white/40">
+            <thead className="text-left text-navy/40">
               <tr>
                 <th className="pb-2">Date</th>
                 <th className="pb-2">Véhicule</th>
@@ -55,7 +55,7 @@ export default async function FuelHistoryPage({
             </thead>
             <tbody>
               {entries.map((e: any) => (
-                <tr key={e.id} className="border-t border-white/5">
+                <tr key={e.id} className="border-t border-navy/5">
                   <td className="py-2">{new Date(e.occurred_at).toLocaleString("fr-FR")}</td>
                   <td className="py-2">{e.vehicles?.registration ?? "—"}</td>
                   <td className="py-2">{e.users?.full_name ?? "—"}</td>

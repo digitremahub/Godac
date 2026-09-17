@@ -124,7 +124,7 @@ export function NewFuelEntryWizard({
             />
           ) : (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-white/70">{driverLabel}</span>
+              <span className="text-sm text-navy/70">{driverLabel}</span>
               <button className="btn-secondary shrink-0" onClick={() => setScanTarget("driver")}>
                 📷 Borne partagée : scanner un badge
               </button>
@@ -147,7 +147,7 @@ export function NewFuelEntryWizard({
     return (
       <div className="flex flex-col gap-4">
         <Card>
-          <p className="text-sm text-white/60">
+          <p className="text-sm text-navy/60">
             {vehicle?.registration} · {tank?.name}
           </p>
         </Card>
@@ -268,7 +268,7 @@ export function NewFuelEntryWizard({
     return (
       <Card className="flex flex-col items-center gap-4 py-10 text-center">
         <p className="text-lg">✅ Ravitaillement enregistré</p>
-        {error && <p className="text-sm text-orange">{error}</p>}
+        {error && <p className="text-sm text-orange-ink">{error}</p>}
         <button className="btn-primary" onClick={() => router.push("/fuel")}>
           Voir l&apos;historique
         </button>
@@ -276,5 +276,5 @@ export function NewFuelEntryWizard({
     );
   }
 
-  return error ? <p className="text-sm text-orange">{error}</p> : null;
+  return error ? <p className="text-sm text-orange-ink">{error}</p> : null;
 }

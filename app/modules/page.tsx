@@ -34,7 +34,7 @@ export default async function ModulesPage() {
         <div className="mb-12 text-center">
           <span className="badge-teal mb-4 inline-block">4 plans + modules à la carte</span>
           <h1 className="text-4xl md:text-5xl">Choisissez votre plan, ajoutez ce dont vous avez besoin</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-white/60">
+          <p className="mx-auto mt-4 max-w-2xl text-navy/60">
             Chaque plan inclut un socle de modules ; tout module non inclus reste activable à la
             carte, au prix indiqué ci-dessous.
           </p>
@@ -52,33 +52,33 @@ export default async function ModulesPage() {
                   <span className="badge-teal absolute -top-3 left-1/2 -translate-x-1/2">Le plus choisi</span>
                 )}
                 <h2 className="text-xl">{plan.name}</h2>
-                <p className="font-display text-3xl font-extrabold text-teal">
-                  {plan.monthly_base_price} €<span className="text-sm font-normal text-white/40">/mois</span>
+                <p className="font-display text-3xl font-extrabold text-teal-ink">
+                  {plan.monthly_base_price} €<span className="text-sm font-normal text-navy/40">/mois</span>
                 </p>
                 {plan.setup_price > 0 && (
-                  <p className="text-xs text-white/40">+ {plan.setup_price} € de mise en service</p>
+                  <p className="text-xs text-navy/40">+ {plan.setup_price} € de mise en service</p>
                 )}
               </div>
             );
           })}
         </div>
 
-        <h2 className="mb-4 text-xl text-white/80">Modules — {WAVE_LABELS.v1}</h2>
+        <h2 className="mb-4 text-xl text-navy/80">Modules — {WAVE_LABELS.v1}</h2>
         <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {v1v2Modules.map((m) => {
             const includedPlan = planName(m.included_from_plan);
             return (
               <div key={m.key} className="card flex flex-col gap-3">
                 <h3 className="text-lg">{m.name}</h3>
-                <p className="flex-1 text-sm text-white/60">{m.description}</p>
+                <p className="flex-1 text-sm text-navy/60">{m.description}</p>
                 {includedPlan ? (
-                  <p className="text-sm text-teal">Inclus dès le plan {includedPlan}</p>
+                  <p className="text-sm text-teal-ink">Inclus dès le plan {includedPlan}</p>
                 ) : (
-                  <p className="text-sm text-white/40">Jamais inclus dans un plan — à la carte uniquement</p>
+                  <p className="text-sm text-navy/40">Jamais inclus dans un plan — à la carte uniquement</p>
                 )}
                 {m.base_price > 0 && (
-                  <p className="font-display text-xl font-extrabold text-gold">
-                    +{m.base_price} €<span className="text-sm font-normal text-white/40">/mois hors plan</span>
+                  <p className="font-display text-xl font-extrabold text-gold-ink">
+                    +{m.base_price} €<span className="text-sm font-normal text-navy/40">/mois hors plan</span>
                   </p>
                 )}
               </div>
@@ -88,7 +88,7 @@ export default async function ModulesPage() {
 
         {v3Modules.length > 0 && (
           <>
-            <h2 className="mb-4 text-xl text-white/80">{WAVE_LABELS.v3}</h2>
+            <h2 className="mb-4 text-xl text-navy/80">{WAVE_LABELS.v3}</h2>
             <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {v3Modules.map((m) => (
                 <div key={m.key} className="card flex flex-col gap-2 opacity-60">
@@ -96,7 +96,7 @@ export default async function ModulesPage() {
                     <h3 className="text-base">{m.name}</h3>
                     <span className="badge-neutral">Bientôt</span>
                   </div>
-                  <p className="text-sm text-white/50">{m.description}</p>
+                  <p className="text-sm text-navy/50">{m.description}</p>
                 </div>
               ))}
             </div>

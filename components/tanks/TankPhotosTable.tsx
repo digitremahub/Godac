@@ -60,9 +60,9 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-3 text-sm text-orange">{error}</p>}
+      {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[760px] text-sm">
-        <thead className="text-left text-white/40">
+        <thead className="text-left text-navy/40">
           <tr>
             <th className="pb-2">Cuve</th>
             <th className="pb-2">Envoyée par</th>
@@ -78,13 +78,13 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
           {photos.map((p) => {
             const isEditing = editingId === p.id;
             return (
-              <tr key={p.id} className="border-t border-white/5 align-top">
+              <tr key={p.id} className="border-t border-navy/5 align-top">
                 <td className="py-2">{p.tankName}</td>
                 <td className="py-2">{p.submittedByName}</td>
                 <td className="py-2">{new Date(p.createdAt).toLocaleString("fr-FR")}</td>
                 <td className="py-2">
                   {p.photoUrl ? (
-                    <a href={p.photoUrl} target="_blank" rel="noreferrer" className="text-teal hover:underline">
+                    <a href={p.photoUrl} target="_blank" rel="noreferrer" className="text-teal-ink hover:underline">
                       Voir
                     </a>
                   ) : (
@@ -98,7 +98,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
                     p.totalizerReading != null ? `${p.totalizerReading.toLocaleString("fr-FR")} L` : "—"
                   )}
                 </td>
-                <td className="py-2 text-white/60">
+                <td className="py-2 text-navy/60">
                   {isEditing ? (
                     <input className="input !py-1" value={note} onChange={(e) => setNote(e.target.value)} />
                   ) : (
@@ -120,7 +120,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
                         <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === p.id} onClick={() => saveEdit(p.id, false)}>
                           Enregistrer
                         </button>
-                        <button className="text-xs text-white/40" disabled={busyId === p.id} onClick={() => setEditingId(null)}>
+                        <button className="text-xs text-navy/40" disabled={busyId === p.id} onClick={() => setEditingId(null)}>
                           Annuler
                         </button>
                       </div>

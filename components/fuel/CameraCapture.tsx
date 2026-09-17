@@ -97,7 +97,7 @@ export function CameraCapture({
   return (
     <div className="flex flex-col items-center gap-4">
       {preview && (
-        <img src={preview} alt="Ticket capturé" className="max-h-64 rounded-xl border border-white/10" />
+        <img src={preview} alt="Ticket capturé" className="max-h-64 rounded-xl border border-navy/10" />
       )}
 
       <label className="btn-primary w-full cursor-pointer justify-center text-center">
@@ -114,7 +114,7 @@ export function CameraCapture({
         />
       </label>
 
-      {error && <p className="text-sm text-orange">{error} — vous pouvez continuer en saisie manuelle.</p>}
+      {error && <p className="text-sm text-orange-ink">{error} — vous pouvez continuer en saisie manuelle.</p>}
     </div>
   );
 }

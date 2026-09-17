@@ -99,7 +99,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Cuves</h3>
-      {error && <p className="text-sm text-orange">{error}</p>}
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:items-end">
         <div className="col-span-2 sm:col-span-1">
@@ -138,11 +138,11 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
       </button>
 
       {tanks.length === 0 ? (
-        <p className="text-sm text-white/40">Aucune cuve configurée.</p>
+        <p className="text-sm text-navy/40">Aucune cuve configurée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tanks.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-white/5 px-3 py-2">
+            <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
               <input
                 className="input flex-1 !py-1"
                 defaultValue={t.name}
@@ -152,7 +152,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
               <span className={t.fuel_type === "diesel" ? "badge-teal" : "badge-gold"}>
                 {t.fuel_type === "diesel" ? "Diesel" : "AdBlue"}
               </span>
-              <span className="text-sm text-white/40">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
+              <span className="text-sm text-navy/40">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
               <select
                 className="input !w-auto !py-1"
                 defaultValue={t.service_id ?? ""}

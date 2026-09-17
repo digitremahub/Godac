@@ -81,15 +81,15 @@ export function QrScanner({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className="text-sm text-white/70">{label}</p>
+      <p className="text-sm text-navy/70">{label}</p>
       {!manualInput && (
         <div className="relative w-full max-w-xs overflow-hidden rounded-xl border border-teal/40">
           <video ref={videoRef} className="w-full" muted playsInline />
           <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
-      {error && <p className="text-sm text-orange">{error}</p>}
-      <button className="text-xs text-white/50 underline" onClick={() => setManualInput((v) => !v)}>
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      <button className="text-xs text-navy/50 underline" onClick={() => setManualInput((v) => !v)}>
         {manualInput ? "Réessayer la caméra" : "Saisir le code manuellement"}
       </button>
       {manualInput && (
@@ -131,7 +131,7 @@ function ManualScanInput({
       >
         OK
       </button>
-      {localError && <p className="text-xs text-orange">{localError}</p>}
+      {localError && <p className="text-xs text-orange-ink">{localError}</p>}
     </div>
   );
 }
