@@ -4,6 +4,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { TankPhotoCapture } from "@/components/tanks/TankPhotoCapture";
 import { TankEditPanel } from "@/components/tanks/TankEditPanel";
+import { AddTankForm } from "@/components/tanks/AddTankForm";
 
 export default async function TanksPage() {
   const appUser = await requireAppUser();
@@ -25,8 +26,13 @@ export default async function TanksPage() {
         description="Index totaliseur en temps réel — la source de vérité pour la détection d'écarts."
       />
 
+      {canManage && <AddTankForm services={services ?? []} />}
+
       {!tanks || tanks.length === 0 ? (
-        <EmptyState title="Aucune cuve configurée" description="Ajoutez vos cuves depuis l'onboarding ou l'administration." />
+        <EmptyState
+          title="Aucune cuve configurée"
+          description={canManage ? "Ajoutez votre première cuve ci-dessus." : "Demandez à votre manager ou direction d'ajouter une cuve."}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tanks.map((tank: any) => (
