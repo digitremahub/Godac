@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
+import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
+import { PricingSimulator } from "@/components/modules/PricingSimulator";
 
 export const metadata = {
   title: "Modules & tarifs — GODAC",
@@ -40,30 +41,11 @@ export default async function ModulesPage() {
           </p>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-4">
-          {plans.map((plan) => {
-            const isPopular = plan.id === "pro";
-            return (
-              <div
-                key={plan.id}
-                className={`card-hover relative flex flex-col gap-2 ${isPopular ? "border-teal/40 bg-teal/[0.06]" : ""}`}
-              >
-                {isPopular && (
-                  <span className="badge-teal absolute -top-3 left-1/2 -translate-x-1/2">Le plus choisi</span>
-                )}
-                <h2 className="text-xl">{plan.name}</h2>
-                <p className="font-display text-3xl font-extrabold text-teal-ink">
-                  {plan.monthly_base_price} €<span className="text-sm font-normal text-navy/40">/mois</span>
-                </p>
-                {plan.setup_price > 0 && (
-                  <p className="text-xs text-navy/40">+ {plan.setup_price} € de mise en service</p>
-                )}
-              </div>
-            );
-          })}
+        <div className="mb-16">
+          <PricingSimulator plans={plans} modules={modules} prices={prices} />
         </div>
 
-        <h2 className="mb-4 text-xl text-navy/80">Modules — {WAVE_LABELS.v1}</h2>
+        <h2 className="mb-4 text-xl text-navy/80">Catalogue complet — {WAVE_LABELS.v1}</h2>
         <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {v1v2Modules.map((m) => {
             const includedPlan = planName(m.included_from_plan);
