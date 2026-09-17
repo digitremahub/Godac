@@ -11,7 +11,6 @@ import {
   IconClock,
   IconShieldCheck,
   IconChartBar,
-  IconBell,
 } from "@/components/layout/icons";
 
 const TRUST_STATS = [
@@ -70,48 +69,68 @@ export default async function HomePage() {
           <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
           <span className="font-display text-xl font-extrabold">GODAC</span>
         </div>
-        <nav className="flex items-center gap-3">
-          <Link href="/modules" className="hidden text-sm text-navy/60 hover:text-navy sm:inline">
+        <nav className="flex items-center gap-4">
+          <Link href="/modules" className="hidden text-sm font-medium text-navy/70 hover:text-navy sm:inline">
             Modules & tarifs
           </Link>
           {spaceHref ? (
-            <Link href={spaceHref} className="btn-secondary !px-4 !py-2 text-sm">
+            <Link href={spaceHref} className="btn-primary !px-5 !py-2 text-sm">
               Accéder à mon espace
             </Link>
           ) : (
-            <Link href="/sign-in" className="btn-secondary !px-4 !py-2 text-sm">
-              Connexion
-            </Link>
+            <>
+              <Link href="/sign-in" className="hidden text-sm font-medium text-navy/70 hover:text-navy sm:inline">
+                Se connecter
+              </Link>
+              <Link href="/sign-up" className="btn-primary !px-4 !py-2 text-sm sm:!px-5">
+                Essayer GODAC →
+              </Link>
+            </>
           )}
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 pb-20 pt-16 sm:pt-24 lg:grid-cols-[1fr_1fr] lg:gap-10">
-        <div className="flex flex-col items-center gap-7 text-center lg:items-start lg:text-left">
-          <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
-          <h1 className="text-4xl leading-[1.1] sm:text-5xl md:text-6xl">
-            L&apos;OS de backoffice pour les <span className="text-teal-ink">PME de transport</span>
-          </h1>
-          <p className="max-w-xl text-lg text-navy/60">
-            Carburant, flotte, RH, planning et conformité TICPE — dans une seule
-            plateforme pensée pour les PME de transport françaises.
+      {/* Desktop: photo hero with an opaque text panel over the left side —
+          only the right ~45% (truck/laptop/floating cards) stays visible as
+          the photo, so there's no overlap with real text underneath. */}
+      <section className="relative hidden overflow-hidden lg:block lg:min-h-[620px]">
+        <Image
+          src="/home/hero-crop.png"
+          alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
+          fill
+          priority
+          className="object-cover object-top"
+        />
+        <div className="absolute inset-y-0 left-0 w-[58%] bg-paper" />
+        <div className="absolute inset-y-0 left-[58%] w-28 bg-gradient-to-r from-paper to-transparent" />
+
+        <div className="relative mx-auto flex h-full max-w-6xl flex-col justify-center gap-6 px-6 py-16">
+          <p className="text-xs font-semibold uppercase tracking-widest text-navy/50">
+            Gestion de flotte • Carburant • Entretien • Documents • Équipes
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-5 lg:justify-start">
+          <h1 className="max-w-lg text-4xl leading-[1.1] xl:text-5xl">
+            Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
+          </h1>
+          <p className="max-w-md text-lg text-navy/60">
+            Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
+            chauffeurs, de vos entretiens, de votre carburant et de vos documents.
+          </p>
+          <div className="flex flex-wrap items-center gap-5">
             {spaceHref ? (
               <Link href={spaceHref} className="btn-primary !px-6 !py-3">
-                Accéder à mon espace
+                Accéder à mon espace →
               </Link>
             ) : (
               <Link href="/sign-up" className="btn-primary !px-6 !py-3">
-                Essayer GODAC
+                Essayer GODAC →
               </Link>
             )}
             <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy/[0.06]">▶</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">▶</span>
               Voir comment ça marche
             </a>
           </div>
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 pt-2 lg:justify-start">
+          <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
             {TRUST_STATS.map((stat) => (
               <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
                 <stat.icon className="h-4 w-4 text-teal-ink" />
@@ -120,35 +139,51 @@ export default async function HomePage() {
             ))}
           </div>
         </div>
-        <div className="relative flex justify-center lg:justify-end">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-navy/10 shadow-[0_30px_70px_-30px_rgba(10,15,30,0.35)]">
-            <Image
-              src="/home/scene-pilotage.png"
-              alt="Tableau de bord GODAC avec véhicules, chauffeurs et alertes en un coup d'œil"
-              width={1672}
-              height={941}
-              className="h-auto w-full object-cover"
-              priority
-            />
-          </div>
-          <div className="absolute -left-4 top-8 hidden items-center gap-2 rounded-xl border border-navy/10 bg-white px-4 py-3 shadow-lg lg:flex">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal/10 ring-1 ring-teal/25">
-              <IconDroplet className="h-4 w-4 text-teal-ink" />
-            </span>
-            <div className="text-sm">
-              <p className="font-semibold leading-tight">PMP à jour</p>
-              <p className="text-xs text-navy/50">Recalculé automatiquement</p>
+      </section>
+
+      {/* Mobile/tablet: same content, stacked — a photo-overlay hero this
+          narrow would leave no room for legible text over the image. */}
+      <section className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-6 pb-12 pt-2 text-center lg:hidden">
+        <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
+        <h1 className="text-4xl leading-[1.1] sm:text-5xl">
+          Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
+        </h1>
+        <p className="max-w-xl text-lg text-navy/60">
+          Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
+          chauffeurs, de vos entretiens, de votre carburant et de vos documents.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-5">
+          {spaceHref ? (
+            <Link href={spaceHref} className="btn-primary !px-6 !py-3">
+              Accéder à mon espace →
+            </Link>
+          ) : (
+            <Link href="/sign-up" className="btn-primary !px-6 !py-3">
+              Essayer GODAC →
+            </Link>
+          )}
+          <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy/[0.06]">▶</span>
+            Voir comment ça marche
+          </a>
+        </div>
+        <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
+          {TRUST_STATS.map((stat) => (
+            <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
+              <stat.icon className="h-4 w-4 text-teal-ink" />
+              {stat.label}
             </div>
-          </div>
-          <div className="absolute -bottom-5 -right-2 hidden items-center gap-2 rounded-xl border border-navy/10 bg-white px-4 py-3 shadow-lg sm:flex">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange/10 ring-1 ring-orange/25">
-              <IconBell className="h-4 w-4 text-orange-ink" />
-            </span>
-            <div className="text-sm">
-              <p className="font-semibold leading-tight">Alertes en temps réel</p>
-              <p className="text-xs text-navy/50">Écarts détectés au plus tôt</p>
-            </div>
-          </div>
+          ))}
+        </div>
+        <div className="mt-2 w-full overflow-hidden rounded-2xl border border-navy/10 shadow-[0_20px_60px_-25px_rgba(10,15,30,0.3)]">
+          <Image
+            src="/home/hero-crop.png"
+            alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
+            width={1536}
+            height={542}
+            className="h-auto w-full object-cover"
+            priority
+          />
         </div>
       </section>
 
