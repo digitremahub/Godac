@@ -59,13 +59,18 @@ export default async function ModulesPage() {
                 )}
                 {m.base_price > 0 && (
                   <p className="font-display text-xl font-extrabold text-gold-ink">
-                    +{m.base_price} €<span className="text-sm font-normal text-navy/40">/mois hors plan</span>
+                    +{m.base_price} €*<span className="text-sm font-normal text-navy/40">/mois hors plan</span>
                   </p>
                 )}
               </div>
             );
           })}
         </div>
+
+        <p className="mb-8 text-center text-xs text-navy/40">
+          * Tarifs mensuels, hors frais de mise en service éventuels (facturés une seule fois,
+          voir le détail sous chaque plan).
+        </p>
 
         <div className="text-center">
           <Link href="/sign-up" className="btn-primary">

@@ -51,10 +51,11 @@ export function PricingSimulator({
         <div>
           <p className="text-sm text-navy/60">Estimation pour le plan {plan?.name}</p>
           <p className="font-display text-3xl font-extrabold text-teal-ink">
-            {total.toFixed(2)} €<span className="text-base font-normal text-navy/40">/mois</span>
+            {total.toFixed(2)} €{plan && plan.setup_price > 0 ? "*" : ""}
+            <span className="text-base font-normal text-navy/40">/mois</span>
           </p>
           {plan && plan.setup_price > 0 && (
-            <p className="text-xs text-navy/40">+ {plan.setup_price} € de mise en service, une seule fois</p>
+            <p className="text-xs text-navy/40">* + {plan.setup_price} € de mise en service, une seule fois</p>
           )}
         </div>
         <Link href="/sign-up" className="btn-primary shrink-0">

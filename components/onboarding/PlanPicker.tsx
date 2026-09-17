@@ -26,10 +26,11 @@ export function PlanPicker({
           >
             <h3 className="text-base">{plan.name}</h3>
             <p className="font-display text-2xl font-extrabold text-teal-ink">
-              {plan.monthly_base_price} €<span className="text-sm font-normal text-navy/40">/mois</span>
+              {plan.monthly_base_price} €{plan.setup_price > 0 ? "*" : ""}
+              <span className="text-sm font-normal text-navy/40">/mois</span>
             </p>
             {plan.setup_price > 0 && (
-              <p className="text-xs text-navy/40">+ {plan.setup_price} € de mise en service</p>
+              <p className="text-xs text-navy/40">* + {plan.setup_price} € de mise en service, une seule fois</p>
             )}
           </button>
         );
