@@ -35,12 +35,13 @@ export async function tryAutoProvisionInvitedUser(): Promise<AppUser | null> {
         id: user.id,
         organization_id: organizationId,
         role: (user.app_metadata?.role as UserRole) ?? "chauffeur",
+        role_title: (user.app_metadata?.role_title as string) ?? null,
         full_name: (user.user_metadata?.full_name as string) ?? user.email ?? "Utilisateur",
         email: user.email!,
       },
       { onConflict: "id" },
     )
-    .select("id, organization_id, role, full_name, email, active")
+    .select("id, organization_id, role, role_title, full_name, email, active")
     .single();
 
   if (error) {

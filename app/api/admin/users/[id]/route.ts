@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
+  role_title: z.string().nullable().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
   service_id: z.string().uuid().nullable().optional(),
@@ -54,7 +55,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   let targetUser: { id: string; role: string } | null = null;
   if (Object.keys(userFields).length > 0) {
-    const { data, error } = await supabase.from("users").update(userFields).eq("id", id).select("id, role").single();
+    const { data, error } = await supabase.from("users").update(userFields).eq("id", id).select("id, role, role_title").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     targetUser = data;
   }

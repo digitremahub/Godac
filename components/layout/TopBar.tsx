@@ -9,7 +9,7 @@ function initials(name: string) {
   return (first + last).toUpperCase() || "?";
 }
 
-export function TopBar({ fullName, role }: { fullName: string; role: UserRole }) {
+export function TopBar({ fullName, role, roleTitle }: { fullName: string; role: UserRole; roleTitle?: string | null }) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-navy/10 bg-white/70 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-3">
@@ -18,7 +18,10 @@ export function TopBar({ fullName, role }: { fullName: string; role: UserRole })
         </div>
         <div>
           <p className="text-sm font-semibold leading-tight">{fullName}</p>
-          <span className="badge-teal mt-0.5">{ROLE_LABELS[role]}</span>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="badge-teal">{ROLE_LABELS[role]}</span>
+            {roleTitle && <span className="text-xs text-navy/40">{roleTitle}</span>}
+          </div>
         </div>
       </div>
       <SignOutButton />

@@ -40,7 +40,7 @@ export default async function DashboardLayout({
         accentColor={organization?.accent_color ?? null}
       />
       <div className="flex flex-1 flex-col">
-        <TopBar fullName={appUser.full_name} role={appUser.role} />
+        <TopBar fullName={appUser.full_name} role={appUser.role} roleTitle={appUser.role_title} />
         <main className="flex-1 overflow-y-auto p-6 sm:p-8">{children}</main>
       </div>
     </div>

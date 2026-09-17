@@ -7,6 +7,7 @@ const bodySchema = z.object({
   email: z.string().email(),
   full_name: z.string().min(1).optional(),
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]),
+  role_title: z.string().min(1).optional(),
   service_id: z.string().uuid().optional(),
 });
 
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
       email: parsed.data.email,
       fullName: parsed.data.full_name,
       role: parsed.data.role,
+      roleTitle: parsed.data.role_title,
       organizationId: appUser.organization_id,
       serviceId: parsed.data.service_id,
     });

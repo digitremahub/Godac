@@ -1,0 +1,12 @@
+-- GODAC V2 — custom role titles.
+--
+-- The 5 permission tiers (chauffeur/manager/manager_chauffeur/
+-- comptable/direction) stay exactly as they are — they're load-bearing
+-- for every RLS policy in the app, and re-architecting them into a
+-- fully custom per-organization permission system is a much bigger,
+-- separate undertaking. What this adds is smaller and safer: an
+-- optional display label direction can set per person (e.g. "Chef de
+-- dépôt", "Assistante RH"), shown instead of the generic role name in
+-- the UI, while `users.role` alone continues to decide what someone
+-- can actually do.
+alter table users add column role_title text;

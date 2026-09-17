@@ -5,7 +5,7 @@ import { UsersPanel } from "@/components/admin/UsersPanel";
 export default async function AdminUsersPage() {
   const supabase = await createServerSupabaseClient();
   const [{ data: users }, { data: services }, { data: userServices }] = await Promise.all([
-    supabase.from("users").select("id, full_name, email, role, active").order("full_name"),
+    supabase.from("users").select("id, full_name, email, role, role_title, active").order("full_name"),
     supabase.from("services").select("id, name").order("name"),
     supabase.from("user_services").select("user_id, service_id"),
   ]);
