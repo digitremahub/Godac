@@ -152,7 +152,7 @@ export default async function HomePage() {
           Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
           chauffeurs, de vos entretiens, de votre carburant et de vos documents.
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-5">
+        <div className="flex flex-wrap items-center justify-center gap-4">
           {spaceHref ? (
             <Link href={spaceHref} className="btn-primary !px-6 !py-3">
               Accéder à mon espace →
@@ -162,14 +162,14 @@ export default async function HomePage() {
               Essayer GODAC →
             </Link>
           )}
-          <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy/[0.06]">▶</span>
-            Voir comment ça marche
-          </a>
+          <Link href="/modules" className="btn-secondary !px-6 !py-3">
+            Voir les modules et les tarifs
+          </Link>
         </div>
-        <Link href="/modules" className="text-sm font-medium text-navy/60 underline underline-offset-4 hover:text-navy">
-          Voir les modules et les tarifs
-        </Link>
+        <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy/[0.06]">▶</span>
+          Voir comment ça marche
+        </a>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
           {TRUST_STATS.map((stat) => (
             <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
