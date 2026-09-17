@@ -1,25 +1,30 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
-import { redirect } from "next/navigation";
 import { ExplainerAnimation } from "@/components/marketing/ExplainerAnimation";
+import { HeroIllustration } from "@/components/marketing/HeroIllustration";
+import { IconDroplet, IconTruck, IconCalendar, IconFileText } from "@/components/layout/icons";
 
 const FEATURES = [
   {
     title: "Carburant & PMP",
     description: "Saisie manuelle ou OCR, prix moyen pondéré recalculé automatiquement, détection d'écart de totaliseur.",
+    icon: IconDroplet,
   },
   {
     title: "Flotte & entretien",
     description: "Fiches véhicules, interventions avec niveaux d'urgence, demandes chauffeur → gestionnaire.",
+    icon: IconTruck,
   },
   {
     title: "RH & planning",
     description: "Congés avec détection de chevauchement, dossiers employés, intranet et convocations.",
+    icon: IconCalendar,
   },
   {
     title: "Conformité TICPE",
     description: "Export Excel filtré PL/SPL en self-service pour le rôle comptable, jamais les véhicules légers.",
+    icon: IconFileText,
   },
 ];
 
@@ -29,10 +34,11 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) {
-    const appUser = await getCurrentAppUser();
-    redirect(appUser ? "/dashboard" : "/onboarding");
-  }
+  // Signed-in visitors can still browse the marketing homepage (e.g.
+  // coming back to "/" from a bookmark) — they just get a link to
+  // their own space instead of every sign-up prompt.
+  const appUser = user ? await getCurrentAppUser() : null;
+  const spaceHref = user ? (appUser ? "/dashboard" : "/onboarding") : null;
 
   return (
     <main className="min-h-screen">
@@ -45,28 +51,45 @@ export default async function HomePage() {
           <Link href="/modules" className="hidden text-sm text-navy/60 hover:text-navy sm:inline">
             Modules & tarifs
           </Link>
-          <Link href="/sign-in" className="btn-secondary !px-4 !py-2 text-sm">
-            Connexion
-          </Link>
+          {spaceHref ? (
+            <Link href={spaceHref} className="btn-secondary !px-4 !py-2 text-sm">
+              Accéder à mon espace
+            </Link>
+          ) : (
+            <Link href="/sign-in" className="btn-secondary !px-4 !py-2 text-sm">
+              Connexion
+            </Link>
+          )}
         </nav>
       </header>
 
-      <section className="mx-auto flex max-w-3xl flex-col items-center gap-7 px-6 pb-20 pt-16 text-center sm:pt-24">
-        <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
-        <h1 className="text-4xl leading-[1.1] sm:text-5xl md:text-6xl">
-          L&apos;OS de backoffice pour les <span className="text-teal-ink">PME de transport</span>
-        </h1>
-        <p className="max-w-xl text-lg text-navy/60">
-          Carburant, flotte, RH, planning et conformité TICPE — dans une seule
-          plateforme pensée pour les PME de transport françaises.
-        </p>
-        <div className="flex flex-wrap justify-center gap-4">
-          <Link href="/sign-up" className="btn-primary !px-6 !py-3">
-            Essayer GODAC
-          </Link>
-          <Link href="/modules" className="btn-secondary !px-6 !py-3">
-            Voir les modules et les tarifs
-          </Link>
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 pb-20 pt-16 sm:pt-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6">
+        <div className="flex flex-col items-center gap-7 text-center lg:items-start lg:text-left">
+          <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
+          <h1 className="text-4xl leading-[1.1] sm:text-5xl md:text-6xl">
+            L&apos;OS de backoffice pour les <span className="text-teal-ink">PME de transport</span>
+          </h1>
+          <p className="max-w-xl text-lg text-navy/60">
+            Carburant, flotte, RH, planning et conformité TICPE — dans une seule
+            plateforme pensée pour les PME de transport françaises.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4 lg:justify-start">
+            {spaceHref ? (
+              <Link href={spaceHref} className="btn-primary !px-6 !py-3">
+                Accéder à mon espace
+              </Link>
+            ) : (
+              <Link href="/sign-up" className="btn-primary !px-6 !py-3">
+                Essayer GODAC
+              </Link>
+            )}
+            <Link href="/modules" className="btn-secondary !px-6 !py-3">
+              Voir les modules et les tarifs
+            </Link>
+          </div>
+        </div>
+        <div className="flex justify-center lg:justify-end">
+          <HeroIllustration />
         </div>
       </section>
 
@@ -85,7 +108,10 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-6 pb-24">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((feature) => (
-            <div key={feature.title} className="card-hover flex flex-col gap-2">
+            <div key={feature.title} className="card-hover flex flex-col gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal/10 ring-1 ring-teal/25">
+                <feature.icon className="h-5 w-5 text-teal-ink" />
+              </span>
               <h3 className="text-base">{feature.title}</h3>
               <p className="text-sm text-navy/55">{feature.description}</p>
             </div>
