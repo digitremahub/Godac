@@ -20,6 +20,7 @@ import {
   IconCreditCard,
   IconUsers,
   IconUserCircle,
+  IconUpload,
 } from "@/components/layout/icons";
 
 interface NavItem {
@@ -75,6 +76,7 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/organizations", label: "Organisation", icon: IconBuilding, allow: ["direction"] },
       { href: "/admin/billing", label: "Abonnement", icon: IconCreditCard, allow: ["direction"] },
       { href: "/admin/users", label: "Utilisateurs", icon: IconUsers, allow: ["direction"] },
+      { href: "/admin/import", label: "Import en masse", icon: IconUpload, allow: ["direction"] },
     ],
   },
   {

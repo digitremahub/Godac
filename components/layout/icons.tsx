@@ -161,3 +161,12 @@ export function IconUserCircle(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconUpload(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 16V4M12 4l-4 4M12 4l4 4" />
+      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </Svg>
+  );
+}

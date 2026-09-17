@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getFullCatalog, priceFor } from "@/lib/organization/catalog";
 
 const bodySchema = z.object({ name: z.string().min(1) });
 
@@ -57,6 +58,26 @@ export async function POST(req: Request) {
   if (userError) {
     return NextResponse.json({ error: userError.message }, { status: 500 });
   }
+
+  // Seed the free/included baseline for the default ("essentiel")
+  // plan right away, so nav gating (getEnabledModuleKeys) never sees
+  // an org with zero rows — even if this user never reaches or
+  // completes the module-selection step of onboarding. Step 2
+  // (api/onboarding/modules) upserts over this once it runs.
+  const { modules, prices } = await getFullCatalog(admin);
+  const baseline = modules
+    .filter((m) => m.wave !== "v3")
+    .map((m) => {
+      const included = priceFor(prices, m.key, "essentiel")?.included ?? false;
+      return {
+        organization_id: organization.id,
+        module_key: m.key,
+        enabled: included,
+        pricing_mode: included ? ("included" as const) : ("a_la_carte" as const),
+        effective_monthly_price: 0,
+      };
+    });
+  await admin.from("organization_modules").upsert(baseline, { onConflict: "organization_id,module_key" });
 
   return NextResponse.json({ organizationId: organization.id });
 }
