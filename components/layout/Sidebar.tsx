@@ -21,6 +21,8 @@ import {
   IconUsers,
   IconUserCircle,
   IconUpload,
+  IconClock,
+  IconFlag,
 } from "@/components/layout/icons";
 import { textSafeVariant } from "@/lib/theme/contrast";
 
@@ -55,6 +57,9 @@ const SECTIONS: NavSection[] = [
       { href: "/tanks/photos", label: "Photos de cuves", icon: IconImage, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
       { href: "/maintenance", label: "Demandes d'entretien", icon: IconWrench, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
+      { href: "/tours/start", label: "Démarrer une tournée", icon: IconClock, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
+      { href: "/tours/end", label: "Terminer une tournée", icon: IconFlag, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
+      { href: "/planning", label: "Planning", icon: IconCalendar, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
     ],
   },
   {
@@ -67,7 +72,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "Pilotage",
     items: [
-      { href: "/alerts", label: "Alertes", icon: IconBell, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
+      { href: "/alerts", label: "Alertes", icon: IconBell, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
     ],
   },

@@ -33,18 +33,21 @@ export async function POST(req: Request) {
     severity: string;
     message: string;
     recipient_roles: UserRole[];
+    recipient_user_id: string | null;
   };
 
   const supabase = createAdminSupabaseClient();
 
   const [{ data: organization }, { data: recipients }] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", alert.organization_id).single(),
-    supabase
-      .from("users")
-      .select("email")
-      .eq("organization_id", alert.organization_id)
-      .eq("active", true)
-      .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
+    alert.recipient_user_id
+      ? supabase.from("users").select("email").eq("id", alert.recipient_user_id).eq("active", true)
+      : supabase
+          .from("users")
+          .select("email")
+          .eq("organization_id", alert.organization_id)
+          .eq("active", true)
+          .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
   ]);
 
   const { subject, html } = renderAlertEmail({

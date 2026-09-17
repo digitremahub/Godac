@@ -1,0 +1,337 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Card } from "@/components/ui";
+
+interface ServiceOption {
+  id: string;
+  name: string;
+}
+interface VehicleOption {
+  id: string;
+  registration: string;
+  service_id: string | null;
+}
+interface DriverOption {
+  id: string;
+  full_name: string;
+}
+interface PlanningEntry {
+  id: string;
+  service_id: string;
+  tour_number: string;
+  driver_id: string | null;
+  vehicle_id: string | null;
+  start_at: string;
+  status: string;
+  vehicles: { registration: string } | null;
+  users: { full_name: string } | null;
+}
+
+const DAY_LABELS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
+const STATUS_BADGE: Record<string, string> = {
+  planned: "badge-neutral",
+  in_progress: "badge-gold",
+  done: "badge-teal",
+};
+const STATUS_LABEL: Record<string, string> = {
+  planned: "Prévue",
+  in_progress: "En cours",
+  done: "Terminée",
+};
+
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export function PlanningGrid({
+  services,
+  filteredServices,
+  vehicles,
+  drivers,
+  entries,
+  weekStart,
+  prevWeek,
+  nextWeek,
+  selectedService,
+}: {
+  services: ServiceOption[];
+  filteredServices: ServiceOption[];
+  vehicles: VehicleOption[];
+  drivers: DriverOption[];
+  entries: PlanningEntry[];
+  weekStart: string;
+  prevWeek: string;
+  nextWeek: string;
+  selectedService: string;
+}) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formService, setFormService] = useState(filteredServices[0]?.id ?? services[0]?.id ?? "");
+  const [formDay, setFormDay] = useState(weekStart);
+  const [formTime, setFormTime] = useState("07:00");
+  const [formTourNumber, setFormTourNumber] = useState("");
+  const [formDriverId, setFormDriverId] = useState("");
+  const [formVehicleId, setFormVehicleId] = useState("");
+  const [formBusy, setFormBusy] = useState(false);
+
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  function navTo(week: string, service: string) {
+    const qs = new URLSearchParams();
+    qs.set("week", week);
+    if (service) qs.set("service", service);
+    router.push(`/planning?${qs.toString()}`);
+  }
+
+  async function moveEntry(entryId: string, targetServiceId: string, targetDay: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry || entry.status !== "planned") return;
+    const original = new Date(entry.start_at);
+    const target = new Date(`${targetDay}T00:00:00`);
+    target.setHours(original.getHours(), original.getMinutes(), 0, 0);
+
+    setBusyId(entryId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start_at: target.toISOString(), service_id: targetServiceId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeEntry(entryId: string) {
+    setBusyId(entryId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entryId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function createEntry() {
+    if (!formService || !formDriverId || !formVehicleId || !formTourNumber || !formTime) return;
+    const start = new Date(`${formDay}T${formTime}:00`);
+    setFormBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/planning/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: formService,
+          driver_id: formDriverId,
+          vehicle_id: formVehicleId,
+          tour_number: formTourNumber,
+          start_at: start.toISOString(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setFormOpen(false);
+      setFormTourNumber("");
+      setFormDriverId("");
+      setFormVehicleId("");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setFormBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          className="input !w-auto"
+          value={selectedService}
+          onChange={(e) => navTo(weekStart, e.target.value)}
+        >
+          <option value="">Tous les services</option>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(prevWeek, selectedService)}>
+            ← Semaine préc.
+          </button>
+          <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+          <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(nextWeek, selectedService)}>
+            Semaine suiv. →
+          </button>
+        </div>
+        <button className="btn-primary ml-auto !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
+          + Nouvelle affectation
+        </button>
+      </div>
+
+      {error && <p className="text-sm text-orange-ink">{error}</p>}
+
+      {formOpen && (
+        <Card className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
+          <div>
+            <label className="label">Service</label>
+            <select className="input !w-auto" value={formService} onChange={(e) => setFormService(e.target.value)}>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Jour</label>
+            <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
+              {days.map((d, i) => (
+                <option key={d} value={d}>
+                  {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Heure</label>
+            <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">N° de tournée</label>
+            <input
+              className="input !w-auto"
+              value={formTourNumber}
+              onChange={(e) => setFormTourNumber(e.target.value)}
+              placeholder="ex: T-042"
+            />
+          </div>
+          <div>
+            <label className="label">Chauffeur</label>
+            <select className="input !w-auto" value={formDriverId} onChange={(e) => setFormDriverId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {drivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Véhicule</label>
+            <select className="input !w-auto" value={formVehicleId} onChange={(e) => setFormVehicleId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {vehicles
+                .filter((v) => !formService || v.service_id === formService)
+                .map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.registration}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <button
+            className="btn-primary shrink-0"
+            disabled={formBusy || !formService || !formDriverId || !formVehicleId || !formTourNumber}
+            onClick={createEntry}
+          >
+            {formBusy ? "Envoi…" : "Ajouter"}
+          </button>
+        </Card>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-separate border-spacing-2">
+          <thead>
+            <tr>
+              <th className="w-40 text-left text-xs text-navy/40">Service</th>
+              {days.map((d, i) => (
+                <th key={d} className="text-left text-xs text-navy/40">
+                  {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredServices.map((service) => (
+              <tr key={service.id}>
+                <td className="align-top text-sm font-medium">{service.name}</td>
+                {days.map((day) => {
+                  const dayEntries = entries.filter(
+                    (e) => e.service_id === service.id && e.start_at.slice(0, 10) === day,
+                  );
+                  return (
+                    <td
+                      key={day}
+                      className="min-w-[140px] rounded-lg border border-dashed border-navy/10 align-top"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const entryId = e.dataTransfer.getData("text/plain");
+                        if (entryId) moveEntry(entryId, service.id, day);
+                      }}
+                    >
+                      <div className="flex flex-col gap-1 p-1">
+                        {dayEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            draggable={entry.status === "planned"}
+                            onDragStart={(e) => e.dataTransfer.setData("text/plain", entry.id)}
+                            className={`rounded-md border border-navy/10 bg-white p-1.5 text-xs shadow-sm ${
+                              entry.status === "planned" ? "cursor-move" : "opacity-80"
+                            } ${busyId === entry.id ? "opacity-40" : ""}`}
+                          >
+                            <div className="mb-0.5 flex items-center justify-between gap-1">
+                              <span className={STATUS_BADGE[entry.status] ?? "badge-neutral"}>
+                                {STATUS_LABEL[entry.status] ?? entry.status}
+                              </span>
+                              {entry.status === "planned" && (
+                                <button
+                                  className="text-navy/30 hover:text-orange-ink"
+                                  onClick={() => removeEntry(entry.id)}
+                                  aria-label="Supprimer"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                            <p className="font-medium">n°{entry.tour_number}</p>
+                            <p className="text-navy/60">{entry.users?.full_name ?? "—"}</p>
+                            <p className="text-navy/40">{entry.vehicles?.registration ?? "—"}</p>
+                            <p className="text-navy/40">
+                              {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

@@ -196,3 +196,12 @@ export function IconChartBar(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconFlag(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 3v18" />
+      <path d="M5 4h11l-2.5 3.5L16 11H5" />
+    </Svg>
+  );
+}
