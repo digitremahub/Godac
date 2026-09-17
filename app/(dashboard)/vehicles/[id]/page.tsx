@@ -4,9 +4,11 @@ import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import Link from "next/link";
 import { InterventionsPanel } from "@/components/vehicles/InterventionsPanel";
 import { VehicleEditPanel } from "@/components/vehicles/VehicleEditPanel";
 import { RoleGate } from "@/components/layout/RoleGate";
+import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +20,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
   }
 
-  const [{ data: vehicle }, { data: interventions }, { data: services }] = await Promise.all([
+  const [{ data: vehicle }, { data: interventions }, { data: services }, { data: fuelHistory }] = await Promise.all([
     supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, service_id, services(name)").eq("id", id).single(),
     supabase
       .from("vehicle_interventions")
@@ -26,6 +28,12 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       .eq("vehicle_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("services").select("id, name").order("name"),
+    supabase
+      .from("fuel_entries")
+      .select("id, occurred_at, liters, total_amount, status, gap_flagged, users!fuel_entries_driver_id_fkey(full_name)")
+      .eq("vehicle_id", id)
+      .order("occurred_at", { ascending: false })
+      .limit(15),
   ]);
 
   if (!vehicle) notFound();
@@ -58,6 +66,20 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             interventions={interventions ?? []}
             canManage={hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])}
           />
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-base">Historique des chauffeurs</h3>
+              <Link href={`/fuel?vehicle=${id}`} className="text-sm text-teal-ink hover:underline">
+                Voir tout l&apos;historique →
+              </Link>
+            </div>
+            <FuelHistoryTable
+              entries={(fuelHistory ?? []) as any}
+              showVehicle={false}
+              emptyDescription="Aucun ravitaillement enregistré pour ce véhicule."
+            />
+          </div>
         </div>
         <div className="flex flex-col items-center gap-4">
           <Card>

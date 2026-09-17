@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
@@ -201,7 +202,9 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     {isEditing ? (
                       <input className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
                     ) : (
-                      u.full_name
+                      <Link href={`/admin/users/${u.id}`} className="text-teal-ink hover:underline">
+                        {u.full_name}
+                      </Link>
                     )}
                   </td>
                   <td className="py-2 text-navy/60">
