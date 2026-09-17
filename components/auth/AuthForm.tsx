@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
@@ -97,13 +98,20 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
       {mode === "sign-in" && (
-        <button
-          type="button"
-          className="text-sm text-navy/50 hover:text-navy hover:underline"
-          onClick={() => setUsePassword((v) => !v)}
-        >
-          {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            className="text-sm text-navy/50 hover:text-navy hover:underline"
+            onClick={() => setUsePassword((v) => !v)}
+          >
+            {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}
+          </button>
+          {usePassword && (
+            <Link href="/forgot-password" className="text-sm text-navy/50 hover:text-navy hover:underline">
+              Mot de passe oublié ?
+            </Link>
+          )}
+        </div>
       )}
     </form>
   );

@@ -22,6 +22,17 @@ interface ServiceOption {
 
 const ROLES: UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"];
 
+/** API routes return either a plain string (thrown Error) or a zod .flatten() object — never {message}. */
+function apiErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const flat = error as { formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+    const messages = [...(flat.formErrors ?? []), ...Object.values(flat.fieldErrors ?? {}).flat()];
+    if (messages.length > 0) return messages.join(" ");
+  }
+  return "Erreur";
+}
+
 export function UsersPanel({ users, services }: { users: UserRow[]; services: ServiceOption[] }) {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
@@ -55,7 +66,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      if (!res.ok) throw new Error(apiErrorMessage(json.error));
       setSent(true);
       setEmail("");
       setFullName("");
@@ -77,7 +88,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         body: JSON.stringify({ role: newRole }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      if (!res.ok) throw new Error(apiErrorMessage(json.error));
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -104,7 +115,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         body: JSON.stringify({ full_name: editName, role_title: editRoleTitle || null, service_id: editServiceId || null }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      if (!res.ok) throw new Error(apiErrorMessage(json.error));
       setEditingId(null);
       router.refresh();
     } catch (e) {

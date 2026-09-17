@@ -29,6 +29,17 @@ export async function inviteOrganizationMember({
   const admin = createAdminSupabaseClient();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+  // A GODAC account is one email = one organization = one role — you
+  // can't invite an email that's already attached to a profile
+  // (including your own). Checking this ourselves gives a clear
+  // French error instead of Supabase's raw "user already registered"
+  // failure, which the invite form would otherwise show as a
+  // confusing dead end.
+  const { data: existingProfile } = await admin.from("users").select("id").eq("email", email).maybeSingle();
+  if (existingProfile) {
+    throw new Error(`${email} a déjà un compte GODAC — une même adresse ne peut pas être invitée une deuxième fois.`);
+  }
+
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: fullName ? { full_name: fullName } : undefined,
     redirectTo: `${appUrl}/auth/callback?next=/onboarding`,
