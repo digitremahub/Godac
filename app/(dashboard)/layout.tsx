@@ -41,7 +41,7 @@ export default async function DashboardLayout({
       />
       <div className="flex flex-1 flex-col">
         <TopBar fullName={appUser.full_name} role={appUser.role} />
-        <main className="flex-1 overflow-y-auto bg-navy p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6 sm:p-8">{children}</main>
       </div>
     </div>
   );

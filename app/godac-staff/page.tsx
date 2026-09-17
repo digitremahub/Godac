@@ -34,7 +34,7 @@ export default async function GodacStaffPage() {
   const ocrByOrg = new Map((ocrRows ?? []).map((r) => [r.organization_id as string, r.enabled as boolean]));
 
   return (
-    <main className="min-h-screen bg-navy p-6">
+    <main className="min-h-screen p-6">
       <PageHeader
         title="GODAC — Backoffice opérateur"
         description={`Connecté en tant que ${email}. Vue cross-tenant, hors RLS — usage interne uniquement.`}

@@ -29,7 +29,7 @@ export default async function ModulesPage() {
   const planName = (id: PlanId | null) => (id ? plans.find((p) => p.id === id)?.name ?? id : null);
 
   return (
-    <main className="min-h-screen bg-navy px-6 py-16">
+    <main className="min-h-screen px-6 py-16">
       <div className="mx-auto max-w-6xl">
         <div className="mb-12 text-center">
           <span className="badge-teal mb-4 inline-block">4 plans + modules à la carte</span>
@@ -41,17 +41,26 @@ export default async function ModulesPage() {
         </div>
 
         <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-4">
-          {plans.map((plan) => (
-            <div key={plan.id} className="card flex flex-col gap-2">
-              <h2 className="text-xl">{plan.name}</h2>
-              <p className="font-display text-3xl font-extrabold text-teal">
-                {plan.monthly_base_price} €<span className="text-sm font-normal text-white/40">/mois</span>
-              </p>
-              {plan.setup_price > 0 && (
-                <p className="text-xs text-white/40">+ {plan.setup_price} € de mise en service</p>
-              )}
-            </div>
-          ))}
+          {plans.map((plan) => {
+            const isPopular = plan.id === "pro";
+            return (
+              <div
+                key={plan.id}
+                className={`card-hover relative flex flex-col gap-2 ${isPopular ? "border-teal/40 bg-teal/[0.06]" : ""}`}
+              >
+                {isPopular && (
+                  <span className="badge-teal absolute -top-3 left-1/2 -translate-x-1/2">Le plus choisi</span>
+                )}
+                <h2 className="text-xl">{plan.name}</h2>
+                <p className="font-display text-3xl font-extrabold text-teal">
+                  {plan.monthly_base_price} €<span className="text-sm font-normal text-white/40">/mois</span>
+                </p>
+                {plan.setup_price > 0 && (
+                  <p className="text-xs text-white/40">+ {plan.setup_price} € de mise en service</p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <h2 className="mb-4 text-xl text-white/80">Modules — {WAVE_LABELS.v1}</h2>
