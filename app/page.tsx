@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
+import { ExplainerAnimation } from "@/components/marketing/ExplainerAnimation";
 
 const FEATURES = [
   {
@@ -67,6 +68,18 @@ export default async function HomePage() {
             Voir les modules et les tarifs
           </Link>
         </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 pb-24">
+        <div className="mb-14 text-center">
+          <span className="badge-teal mb-4 inline-block">Comment ça marche</span>
+          <h2 className="text-2xl sm:text-3xl">GODAC, en un coup d&apos;œil</h2>
+          <p className="mx-auto mt-3 max-w-xl text-navy/60">
+            De la pompe à la comptabilité, tout ce qu&apos;une PME de transport gère au
+            quotidien, réuni dans un seul outil.
+          </p>
+        </div>
+        <ExplainerAnimation />
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-24">
