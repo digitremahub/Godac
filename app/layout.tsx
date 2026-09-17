@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Syne, Inter } from "next/font/google";
+import { Poppins, Inter } from "next/font/google";
 import "./globals.css";
 
-const syne = Syne({
+const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["700", "800"],
-  variable: "--font-syne",
+  weight: ["600", "700", "800"],
+  variable: "--font-heading",
   display: "swap",
 });
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-body",
   display: "swap",
 });
 
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${syne.variable} ${inter.variable}`}>
+    <html lang="fr" className={`${poppins.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   );

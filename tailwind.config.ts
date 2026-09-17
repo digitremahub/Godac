@@ -23,8 +23,8 @@ const config: Config = {
         "gold-ink": "#92660A",
       },
       fontFamily: {
-        display: ["var(--font-syne)", "sans-serif"],
-        body: ["var(--font-inter)", "sans-serif"],
+        display: ["var(--font-heading)", "sans-serif"],
+        body: ["var(--font-body)", "sans-serif"],
       },
       borderRadius: {
         xl: "1rem",

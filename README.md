@@ -22,9 +22,11 @@ sont des projets indépendants dans le même repository.
 | Email transactionnel | Resend |
 | OCR tickets carburant | Mindee |
 
-Charte graphique : navy `#0A0F1E`, teal `#1BE4C1`, orange `#FF6B35`,
-gold `#F5C842`, police Syne ExtraBold pour les titres (voir
-`tailwind.config.ts` et `app/globals.css`).
+Charte graphique : fond clair (`paper` `#F6F7FB`), texte `navy`
+`#0A0F1E`, accents teal `#1BE4C1`, orange `#FF6B35`, gold `#F5C842`
+(variantes foncées `-ink` pour le texte, voir plus bas), police
+Poppins ExtraBold pour les titres et Inter pour le corps de texte
+(voir `tailwind.config.ts`, `app/layout.tsx` et `app/globals.css`).
 
 ---
 
