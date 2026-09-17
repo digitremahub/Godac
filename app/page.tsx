@@ -167,6 +167,9 @@ export default async function HomePage() {
             Voir comment ça marche
           </a>
         </div>
+        <Link href="/modules" className="text-sm font-medium text-navy/60 underline underline-offset-4 hover:text-navy">
+          Voir les modules et les tarifs
+        </Link>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
           {TRUST_STATS.map((stat) => (
             <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
