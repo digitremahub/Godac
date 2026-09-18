@@ -23,7 +23,11 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
   const [{ data: vehicle }, { data: interventions }, { data: services }, { data: fuelHistory }, { data: tours }] =
     await Promise.all([
-      supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, service_id, services(name)").eq("id", id).single(),
+      supabase
+        .from("vehicles")
+        .select("id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name)")
+        .eq("id", id)
+        .single(),
       supabase
         .from("vehicle_interventions")
         .select("id, type, description, urgency, status, scheduled_at, completed_at, cost, odometer_km, created_at")
@@ -48,6 +52,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const v = vehicle as any;
 
   const odometerReadings: OdometerReading[] = [
+    ...(v.initial_km !== null ? [{ at: v.created_at, km: v.initial_km, label: "Kilométrage initial" }] : []),
     ...(tours ?? []).flatMap((t: any) => [
       ...(t.start_km !== null ? [{ at: t.start_at, km: t.start_km, label: `Départ tournée n°${t.tour_number}` }] : []),
       ...(t.end_km !== null && t.end_at ? [{ at: t.end_at, km: t.end_km, label: `Retour tournée n°${t.tour_number}` }] : []),
@@ -69,6 +74,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               registration={v.registration}
               type={v.type}
               tankCapacity={v.tank_capacity_liters}
+              initialKm={v.initial_km}
               status={v.status}
               serviceId={v.service_id}
               services={services ?? []}

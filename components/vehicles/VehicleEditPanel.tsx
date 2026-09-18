@@ -13,6 +13,7 @@ export function VehicleEditPanel({
   registration,
   type,
   tankCapacity,
+  initialKm,
   status,
   serviceId,
   services,
@@ -21,6 +22,7 @@ export function VehicleEditPanel({
   registration: string;
   type: "VL" | "PL" | "SPL";
   tankCapacity: number | null;
+  initialKm: number | null;
   status: "active" | "maintenance" | "out_of_service";
   serviceId: string | null;
   services: ServiceOption[];
@@ -34,6 +36,7 @@ export function VehicleEditPanel({
         registration={registration}
         type={type}
         tankCapacity={tankCapacity}
+        initialKm={initialKm}
         status={status}
         serviceId={serviceId}
         services={services}

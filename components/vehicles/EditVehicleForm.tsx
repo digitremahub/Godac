@@ -20,6 +20,7 @@ export function EditVehicleForm({
   registration: initialRegistration,
   type: initialType,
   tankCapacity: initialTankCapacity,
+  initialKm: initialInitialKm,
   status: initialStatus,
   serviceId: initialServiceId,
   services,
@@ -29,6 +30,7 @@ export function EditVehicleForm({
   registration: string;
   type: "VL" | "PL" | "SPL";
   tankCapacity: number | null;
+  initialKm: number | null;
   status: "active" | "maintenance" | "out_of_service";
   serviceId: string | null;
   services: ServiceOption[];
@@ -38,6 +40,7 @@ export function EditVehicleForm({
   const [registration, setRegistration] = useState(initialRegistration);
   const [type, setType] = useState(initialType);
   const [tankCapacity, setTankCapacity] = useState(initialTankCapacity?.toString() ?? "");
+  const [initialKm, setInitialKm] = useState(initialInitialKm?.toString() ?? "");
   const [status, setStatus] = useState(initialStatus);
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [busy, setBusy] = useState(false);
@@ -54,6 +57,7 @@ export function EditVehicleForm({
           registration,
           type,
           tank_capacity_liters: tankCapacity ? Number(tankCapacity) : null,
+          initial_km: initialKm ? Number(initialKm) : null,
           status,
           service_id: serviceId || null,
         }),
@@ -89,6 +93,10 @@ export function EditVehicleForm({
       <div>
         <label className="label">Capacité réservoir (L)</label>
         <input className="input" type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} />
+      </div>
+      <div>
+        <label className="label">Kilométrage initial</label>
+        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} />
       </div>
       <div>
         <label className="label">Statut</label>

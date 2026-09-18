@@ -9,6 +9,7 @@ const bodySchema = z.object({
   tank_capacity_liters: z.coerce.number().positive().nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
   status: z.enum(["active", "maintenance", "out_of_service"]).optional(),
+  initial_km: z.coerce.number().min(0).nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

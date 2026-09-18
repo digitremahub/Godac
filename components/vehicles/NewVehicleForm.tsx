@@ -14,6 +14,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
   const [registration, setRegistration] = useState("");
   const [type, setType] = useState<"VL" | "PL" | "SPL">("PL");
   const [tankCapacity, setTankCapacity] = useState("");
+  const [initialKm, setInitialKm] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
           registration,
           type,
           tank_capacity_liters: tankCapacity ? Number(tankCapacity) : undefined,
+          initial_km: Number(initialKm),
           service_id: serviceId || undefined,
         }),
       });
@@ -62,6 +64,10 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
         <input className="input" type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} />
       </div>
       <div>
+        <label className="label">Kilométrage actuel *</label>
+        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} />
+      </div>
+      <div>
         <label className="label">Service</label>
         <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
           <option value="">Aucun</option>
@@ -72,7 +78,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
           ))}
         </select>
       </div>
-      <button className="btn-primary" disabled={busy || !registration} onClick={submit}>
+      <button className="btn-primary" disabled={busy || !registration || !initialKm} onClick={submit}>
         {busy ? "Création…" : "Créer le véhicule"}
       </button>
     </Card>

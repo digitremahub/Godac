@@ -8,6 +8,7 @@ const bodySchema = z.object({
   type: z.enum(["VL", "PL", "SPL"]),
   tank_capacity_liters: z.coerce.number().positive().optional(),
   service_id: z.string().uuid().optional().nullable(),
+  initial_km: z.coerce.number().min(0),
 });
 
 export async function POST(req: Request) {
