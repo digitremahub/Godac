@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-const bodySchema = z.object({ full_name: z.string().min(1) });
+const bodySchema = z.object({ full_name: z.string().min(1), phone: z.string().nullable().optional() });
 
 /**
  * Self-service profile edit — unlike app/api/admin/users/[id], which
@@ -19,7 +19,10 @@ export async function PATCH(req: Request) {
   }
 
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.from("users").update({ full_name: parsed.data.full_name }).eq("id", appUser.id);
+  const { error } = await supabase
+    .from("users")
+    .update({ full_name: parsed.data.full_name, ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}) })
+    .eq("id", appUser.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

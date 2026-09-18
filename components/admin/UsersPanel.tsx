@@ -11,6 +11,7 @@ interface UserRow {
   id: string;
   full_name: string;
   email: string;
+  phone: string | null;
   role: UserRole;
   role_title: string | null;
   active: boolean;
@@ -38,6 +39,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState<UserRole>("chauffeur");
   const [roleTitle, setRoleTitle] = useState("");
   const [serviceId, setServiceId] = useState("");
@@ -47,6 +49,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
   const [editRoleTitle, setEditRoleTitle] = useState("");
   const [editServiceId, setEditServiceId] = useState("");
 
@@ -61,6 +64,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         body: JSON.stringify({
           email,
           full_name: fullName || undefined,
+          phone: phone || undefined,
           role,
           role_title: roleTitle || undefined,
           service_id: serviceId || undefined,
@@ -71,6 +75,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       setSent(true);
       setEmail("");
       setFullName("");
+      setPhone("");
       setRoleTitle("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -123,6 +128,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   function startEdit(user: UserRow) {
     setEditingId(user.id);
     setEditName(user.full_name);
+    setEditPhone(user.phone ?? "");
     setEditRoleTitle(user.role_title ?? "");
     setEditServiceId(user.service_id ?? "");
     setError(null);
@@ -135,7 +141,12 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name: editName, role_title: editRoleTitle || null, service_id: editServiceId || null }),
+        body: JSON.stringify({
+          full_name: editName,
+          phone: editPhone || null,
+          role_title: editRoleTitle || null,
+          service_id: editServiceId || null,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(json.error));
@@ -159,6 +170,16 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
           <div className="flex-1">
             <label className="label">Email</label>
             <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="flex-1">
+            <label className="label">Téléphone (optionnel)</label>
+            <input
+              className="input"
+              type="tel"
+              placeholder="ex: 06 12 34 56 78"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </div>
           <div>
             <label className="label">Rôle (permissions)</label>
@@ -209,6 +230,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
               <th className="pb-2">Nom</th>
               <th className="pb-2">Titre</th>
               <th className="pb-2">Email</th>
+              <th className="pb-2">Téléphone</th>
               <th className="pb-2">Service</th>
               <th className="pb-2">Rôle (permissions)</th>
               <th className="pb-2">Statut</th>
@@ -242,6 +264,19 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     )}
                   </td>
                   <td className="py-2">{u.email}</td>
+                  <td className="py-2 text-navy/60">
+                    {isEditing ? (
+                      <input
+                        className="input !py-1"
+                        type="tel"
+                        placeholder="ex: 06 12 34 56 78"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                      />
+                    ) : (
+                      u.phone ?? "—"
+                    )}
+                  </td>
                   <td className="py-2">
                     {isEditing ? (
                       <select className="input !w-auto !py-1" value={editServiceId} onChange={(e) => setEditServiceId(e.target.value)}>

@@ -26,7 +26,23 @@ interface PlanningEntry {
   start_at: string;
   status: string;
   vehicles: { registration: string } | null;
-  users: { full_name: string } | null;
+  users: { full_name: string; phone: string | null; email: string | null } | null;
+}
+
+/** Best-effort French-number normalization: wa.me needs a full international number, no leading 0. */
+function toWhatsAppNumber(phone: string): string {
+  const digits = phone.replace(/[^0-9]/g, "");
+  return digits.startsWith("0") && digits.length === 10 ? `33${digits.slice(1)}` : digits;
+}
+
+function buildShareText(entry: PlanningEntry): string {
+  const date = new Date(entry.start_at);
+  const lines = [
+    `Tournée n°${entry.tour_number}`,
+    entry.vehicles ? `Véhicule : ${entry.vehicles.registration}` : null,
+    `Départ prévu : ${date.toLocaleDateString("fr-FR")} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`,
+  ];
+  return lines.filter((l): l is string => l !== null).join("\n");
 }
 
 const DAY_LABELS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
@@ -321,6 +337,30 @@ export function PlanningGrid({
                             <p className="text-navy/40">
                               {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                             </p>
+                            {entry.users && (entry.users.phone || entry.users.email) && (
+                              <div className="mt-1 flex gap-2 border-t border-navy/5 pt-1">
+                                {entry.users.phone && (
+                                  <a
+                                    href={`https://wa.me/${toWhatsAppNumber(entry.users.phone)}?text=${encodeURIComponent(buildShareText(entry))}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-teal-ink hover:underline"
+                                    title="Envoyer sur WhatsApp"
+                                  >
+                                    WhatsApp
+                                  </a>
+                                )}
+                                {entry.users.email && (
+                                  <a
+                                    href={`mailto:${entry.users.email}?subject=${encodeURIComponent(`Tournée n°${entry.tour_number}`)}&body=${encodeURIComponent(buildShareText(entry))}`}
+                                    className="text-teal-ink hover:underline"
+                                    title="Envoyer par email"
+                                  >
+                                    Email
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

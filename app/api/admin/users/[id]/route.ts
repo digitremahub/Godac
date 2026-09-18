@@ -8,6 +8,7 @@ const bodySchema = z.object({
   role_title: z.string().nullable().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
+  phone: z.string().nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
 });
 

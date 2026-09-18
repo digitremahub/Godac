@@ -19,7 +19,7 @@ export default async function AccountPage() {
         </div>
       </Card>
 
-      <NameForm currentName={appUser.full_name} />
+      <NameForm currentName={appUser.full_name} currentPhone={appUser.phone} />
       <EmailForm currentEmail={appUser.email} />
       <PasswordForm />
     </div>

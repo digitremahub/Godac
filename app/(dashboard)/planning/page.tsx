@@ -61,7 +61,7 @@ export default async function PlanningPage({
       supabase
         .from("planning_entries")
         .select(
-          "id, service_id, tour_number, driver_id, vehicle_id, start_at, status, vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
+          "id, service_id, tour_number, driver_id, vehicle_id, start_at, status, vehicles(registration), users!planning_entries_driver_id_fkey(full_name, phone, email)",
         )
         .gte("start_at", weekStartDate.toISOString())
         .lt("start_at", weekEndDate.toISOString())

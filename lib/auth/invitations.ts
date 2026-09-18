@@ -16,6 +16,7 @@ export async function inviteOrganizationMember({
   fullName,
   role,
   roleTitle,
+  phone,
   organizationId,
   serviceId,
 }: {
@@ -23,6 +24,7 @@ export async function inviteOrganizationMember({
   fullName?: string;
   role: UserRole;
   roleTitle?: string;
+  phone?: string;
   organizationId: string;
   serviceId?: string;
 }) {
@@ -47,7 +49,7 @@ export async function inviteOrganizationMember({
   if (inviteError) throw inviteError;
 
   const { error: metadataError } = await admin.auth.admin.updateUserById(invited.user.id, {
-    app_metadata: { organization_id: organizationId, role, role_title: roleTitle ?? null, service_id: serviceId ?? null },
+    app_metadata: { organization_id: organizationId, role, role_title: roleTitle ?? null, phone: phone ?? null, service_id: serviceId ?? null },
   });
   if (metadataError) throw metadataError;
 

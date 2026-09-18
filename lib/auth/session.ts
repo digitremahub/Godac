@@ -9,6 +9,7 @@ export interface AppUser {
   role_title: string | null;
   full_name: string;
   email: string;
+  phone: string | null;
   active: boolean;
 }
 
@@ -26,7 +27,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, organization_id, role, role_title, full_name, email, active")
+    .select("id, organization_id, role, role_title, full_name, email, phone, active")
     .eq("id", user.id)
     .maybeSingle();
 
