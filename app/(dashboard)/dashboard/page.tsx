@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
+import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { RoleGate } from "@/components/layout/RoleGate";
@@ -8,8 +8,9 @@ import Link from "next/link";
 export default async function DashboardPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
+  const isDriver = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
 
-  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes] = await Promise.all([
+  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes, openTourRes] = await Promise.all([
     supabase.from("vehicles").select("id", { count: "exact", head: true }),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase
@@ -21,7 +22,16 @@ export default async function DashboardPage() {
       .select("id, occurred_at, liters, unit_price, status, vehicles(registration)")
       .order("occurred_at", { ascending: false })
       .limit(6),
+    isDriver
+      ? supabase
+          .from("planning_entries")
+          .select("id, tour_number, start_at, vehicles(registration)")
+          .eq("driver_id", appUser.id)
+          .eq("status", "in_progress")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+  const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
 
   return (
     <div>
@@ -78,7 +88,33 @@ export default async function DashboardPage() {
         </Card>
 
         <RoleGate role={appUser.role} allow={["chauffeur", "manager_chauffeur"]}>
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Card className="w-full text-center">
+              {openTour ? (
+                <>
+                  <p className="mb-1 text-sm text-navy/60">
+                    Tournée n°{openTour.tour_number} en cours
+                    {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
+                  </p>
+                  <p className="mb-3 text-xs text-navy/40">
+                    Départ à {new Date(openTour.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                  <Link href="/tours/end" className="btn-primary block w-full text-center">
+                    🏁 Terminer la tournée
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="mb-3 text-sm text-navy/60">Aucune tournée en cours</p>
+                  <Link href="/tours/start" className="btn-primary block w-full text-center">
+                    🚚 Démarrer une tournée
+                  </Link>
+                </>
+              )}
+              <Link href="/planning/mine" className="mt-2 block text-xs text-teal-ink hover:underline">
+                Voir mon planning →
+              </Link>
+            </Card>
             <QrCodeBadge
               type="driver"
               id={appUser.id}
