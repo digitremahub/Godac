@@ -31,20 +31,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const supabase = await createServerSupabaseClient();
 
   // Guard against locking an organisation out of its own admin
-  // panel: since only `direction` can change roles, removing the
-  // last `direction` account (including demoting yourself) would
-  // leave nobody able to undo it from the UI.
-  if (parsed.data.role && parsed.data.role !== "direction") {
+  // panel: since only `direction` can change roles or deactivate
+  // accounts, demoting or deactivating the last `direction` account
+  // (including your own) would leave nobody able to undo it from the UI.
+  const demotesOrDeactivates = (parsed.data.role && parsed.data.role !== "direction") || parsed.data.active === false;
+  if (demotesOrDeactivates) {
     const { data: target } = await supabase.from("users").select("role").eq("id", id).single();
     if (target?.role === "direction") {
       const { count } = await supabase
         .from("users")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", appUser.organization_id)
-        .eq("role", "direction");
+        .eq("role", "direction")
+        .eq("active", true);
       if ((count ?? 0) <= 1) {
         return NextResponse.json(
-          { error: "Impossible de retirer le rôle direction du dernier compte direction de l'organisation." },
+          { error: "Impossible de retirer ou désactiver le dernier compte direction de l'organisation." },
           { status: 409 },
         );
       }

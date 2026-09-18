@@ -35,6 +35,15 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
     return null;
   }
 
+  // A deactivated account (Admin > Utilisateurs) keeps its row —
+  // fuel_entries.driver_id is `on delete restrict`, so a driver with
+  // any history can never be hard-deleted — but must actually lose
+  // access, not just disappear from active-only dropdowns.
+  if (data && !data.active) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
   return data as AppUser | null;
 }
 

@@ -98,6 +98,28 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
     }
   }
 
+  async function toggleActive(user: UserRow) {
+    if (user.active && !window.confirm(`Désactiver ${user.full_name} ? Son compte ne pourra plus se connecter.`)) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !user.active }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(apiErrorMessage(json.error));
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function startEdit(user: UserRow) {
     setEditingId(user.id);
     setEditName(user.full_name);
@@ -262,9 +284,18 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                         </button>
                       </div>
                     ) : (
-                      <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => startEdit(u)}>
-                        Modifier
-                      </button>
+                      <div className="flex gap-2">
+                        <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => startEdit(u)}>
+                          Modifier
+                        </button>
+                        <button
+                          className="btn-secondary !px-2 !py-1 text-xs text-orange-ink"
+                          disabled={busy}
+                          onClick={() => toggleActive(u)}
+                        >
+                          {u.active ? "Désactiver" : "Réactiver"}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

@@ -49,6 +49,15 @@ export async function tryAutoProvisionInvitedUser(): Promise<AppUser | null> {
     return null;
   }
 
+  // The upsert payload never touches `active`, so a previously
+  // deactivated account keeps its existing value here — this is the
+  // second (and only other) path that resolves a signed-in user's
+  // profile, so it needs the same access check as getCurrentAppUser.
+  if (!data.active) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
   const serviceId = user.app_metadata?.service_id as string | undefined;
   if (serviceId) {
     const { error: serviceLinkError } = await admin
