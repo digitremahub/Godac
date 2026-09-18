@@ -58,23 +58,37 @@ export async function POST(req: Request) {
   }
 
   const storagePath = `${appUser.organization_id}/${vehicle.id}/${randomUUID()}.jpg`;
+  const startFields = {
+    vehicle_id: vehicle.id,
+    service_id: vehicle.service_id,
+    start_at: new Date().toISOString(),
+    status: "in_progress" as const,
+    start_km: parsed.data.start_km,
+    start_km_photo_path: parsed.data.start_km_photo_path,
+    start_photo_path: storagePath,
+  };
 
-  const { data, error } = await supabase
+  // If a manager already planned this exact tour number for this
+  // driver (the /planning grid), turn that same row into the real
+  // one instead of creating a parallel record — this is what keeps
+  // a last-minute vehicle swap or delay reflected on the manager's
+  // planning rather than leaving a stale "planned" entry sitting next
+  // to a disconnected "in_progress" one.
+  const { data: plannedMatch } = await supabase
     .from("planning_entries")
-    .insert({
-      organization_id: appUser.organization_id,
-      service_id: vehicle.service_id,
-      tour_number: parsed.data.tour_number,
-      driver_id: appUser.id,
-      vehicle_id: vehicle.id,
-      start_at: new Date().toISOString(),
-      status: "in_progress",
-      start_km: parsed.data.start_km,
-      start_km_photo_path: parsed.data.start_km_photo_path,
-      start_photo_path: storagePath,
-    })
     .select("id")
-    .single();
+    .eq("driver_id", appUser.id)
+    .eq("tour_number", parsed.data.tour_number)
+    .eq("status", "planned")
+    .maybeSingle();
+
+  const { data, error } = plannedMatch
+    ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()
+    : await supabase
+        .from("planning_entries")
+        .insert({ organization_id: appUser.organization_id, tour_number: parsed.data.tour_number, driver_id: appUser.id, ...startFields })
+        .select("id")
+        .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ tourId: data.id, storagePath });
