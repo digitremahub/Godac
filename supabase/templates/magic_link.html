@@ -28,7 +28,7 @@
                   <tr>
                     <td style="border-radius:10px; background-color:#1BE4C1;">
                       <a
-                        href="{{ .ConfirmationURL }}"
+                        href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}"
                         style="display:inline-block; padding:14px 28px; font-size:15px; font-weight:700; color:#0A0F1E; text-decoration:none; border-radius:10px;"
                       >
                         Se connecter à GODAC
@@ -38,7 +38,7 @@
                 </table>
                 <p style="margin:28px 0 0; font-size:13px; line-height:1.6; color:rgba(10,15,30,0.45);">
                   Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br />
-                  <a href="{{ .ConfirmationURL }}" style="color:#0F766E; word-break:break-all;">{{ .ConfirmationURL }}</a>
+                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}" style="color:#0F766E; word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}</a>
                 </p>
               </td>
             </tr>

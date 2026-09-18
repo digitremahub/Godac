@@ -27,7 +27,7 @@ export function EmailForm({ currentEmail }: { currentEmail: string }) {
     try {
       const { error } = await supabase.auth.updateUser(
         { email },
-        { emailRedirectTo: `${window.location.origin}/auth/callback?next=/account` },
+        { emailRedirectTo: `${window.location.origin}/account` },
       );
       if (error) throw error;
       setSent(true);

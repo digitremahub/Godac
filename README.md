@@ -174,10 +174,27 @@ Ne jamais committer `.env.local`. `.gitignore` l'exclut déjà.
    ```
 3. Dans le dashboard Supabase → **Authentication → URL Configuration**,
    régler le Site URL et ajouter `<NEXT_PUBLIC_APP_URL>/auth/callback`
-   aux Redirect URLs (nécessaire pour que les liens magiques et les
-   invitations reviennent au bon endroit).
-4. Copier `.env.example` → `.env.local` et remplir les clés.
-5. `npm run dev`
+   et `<NEXT_PUBLIC_APP_URL>/auth/confirm` aux Redirect URLs (nécessaire
+   pour que les liens magiques et les invitations reviennent au bon
+   endroit).
+4. Dans **Authentication → Email Templates**, chaque template envoyé par
+   email (Confirm signup / **Magic Link** / **Invite user** / **Reset
+   Password** / **Change Email Address**) doit pointer vers
+   `app/auth/confirm/route.ts` avec un `token_hash` plutôt que vers
+   `{{ .ConfirmationURL }}` — sinon la vérification passe par le flux
+   implicite de Supabase (jeton dans le fragment `#` de l'URL, invisible
+   côté serveur) et la session n'est jamais créée. Remplacer le `href` du
+   bouton/lien par :
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<TYPE>&next={{ .RedirectTo }}
+   ```
+   avec `<TYPE>` = `email` (Magic Link / Confirm signup), `invite`
+   (Invite user), `recovery` (Reset Password) ou `email_change` (Change
+   Email Address). Le template Magic Link local
+   (`supabase/templates/magic_link.html`) suit déjà ce format — le
+   recopier tel quel dans le dashboard pour cette même template.
+5. Copier `.env.example` → `.env.local` et remplir les clés.
+6. `npm run dev`
 
 ```bash
 npm run typecheck   # tsc --noEmit

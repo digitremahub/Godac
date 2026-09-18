@@ -5,8 +5,8 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 /**
  * Standard Supabase password-recovery request: emails a one-time
- * link that lands on /auth/callback (already generic — it just
- * exchanges whatever code it's given for a session) and continues to
+ * link that lands on /auth/confirm (already generic — it just
+ * verifies whatever token_hash it's given) and continues to
  * /account, where PasswordForm lets the now-authenticated user set a
  * new password.
  */
@@ -23,7 +23,7 @@ export function ForgotPasswordForm() {
     setError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/account`,
+        redirectTo: `${window.location.origin}/account`,
       });
       if (error) throw error;
       setSent(true);

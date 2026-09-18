@@ -18,10 +18,10 @@ file_size_limit = "10MiB"
 
 [auth]
 enabled = true
-# Invited users land here after clicking the email link (see
-# app/auth/callback/route.ts and app/invite/complete/page.tsx).
+# Invited/magic-link/reset users land here after clicking the email
+# link (see app/auth/confirm/route.ts).
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/auth/confirm"]
 
 # Branded magic-link email for local development. This only affects
 # the local Supabase stack (`supabase start`) — the hosted/production

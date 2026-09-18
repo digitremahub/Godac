@@ -37,7 +37,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           // Only meaningful on sign-up (a returning user's metadata is
           // already set) — this is what
           // app/api/onboarding/create-organization/route.ts and

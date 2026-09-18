@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
- * Lands here after a magic-link / invite email click. Exchanges the
- * one-time `code` for a real session (stored in cookies by
- * lib/supabase/server.ts), then continues to `next` — the dashboard
- * layout takes it from there (auto-provisioning an invited user, or
- * sending an organic sign-up to /onboarding).
+ * Legacy/fallback handler for a ?code= PKCE exchange (e.g. an OAuth
+ * provider sign-in on the same browser that started it). Every email
+ * link (magic link, invite, password reset, email change) now points to
+ * app/auth/confirm/route.ts instead — PKCE needs a code_verifier stored
+ * in the browser that initiated the flow, which an email link opened on
+ * a different device/browser never has.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);

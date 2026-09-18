@@ -44,7 +44,7 @@ export async function inviteOrganizationMember({
 
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: fullName ? { full_name: fullName } : undefined,
-    redirectTo: `${appUrl}/auth/callback?next=/onboarding`,
+    redirectTo: `${appUrl}/onboarding`,
   });
   if (inviteError) throw inviteError;
 
