@@ -121,3 +121,56 @@ function field(raw: any): MindeeExtractionField<any> {
     confidence: typeof raw.confidence === "number" ? raw.confidence : null,
   };
 }
+
+export type MindeeTotalizerResult =
+  | { ok: true; reading: MindeeExtractionField<number>; raw: unknown }
+  | { ok: false; reason: string };
+
+/**
+ * Reads the tank/pump totalizer counter off a photo (taken before and
+ * again after a fill-up, see app/api/ocr/totalizer). A bare digit
+ * display isn't something Mindee's generic "financial_document" model
+ * has any concept of — unlike the ticket, where at least date/total
+ * come through on the generic model — so this only ever produces a
+ * real reading once a custom-trained model (MINDEE_TOTALIZER_MODEL_ID)
+ * exists. Without one it fails cleanly rather than guessing, and the
+ * caller falls back to manual entry, same as a failed ticket OCR.
+ */
+export async function extractTotalizerReading(imageBytes: Buffer, filename: string): Promise<MindeeTotalizerResult> {
+  const apiKey = process.env.MINDEE_API_KEY;
+  if (!apiKey) {
+    return { ok: false, reason: "MINDEE_API_KEY is not configured" };
+  }
+
+  const customModelId = process.env.MINDEE_TOTALIZER_MODEL_ID;
+  if (!customModelId) {
+    return { ok: false, reason: "MINDEE_TOTALIZER_MODEL_ID is not configured — saisie manuelle requise." };
+  }
+
+  const form = new FormData();
+  form.append("document", new Blob([new Uint8Array(imageBytes)]), filename);
+
+  let response: Response;
+  try {
+    response = await fetch(`https://api.mindee.net/v1/products/${customModelId}/predict`, {
+      method: "POST",
+      headers: { Authorization: `Token ${apiKey}` },
+      body: form,
+    });
+  } catch (err) {
+    return { ok: false, reason: `Mindee request failed: ${String(err)}` };
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    return { ok: false, reason: `Mindee returned HTTP ${response.status}: ${body.slice(0, 300)}` };
+  }
+
+  const json = await response.json();
+  const prediction = json?.document?.inference?.prediction;
+  if (!prediction) {
+    return { ok: false, reason: "Mindee response missing prediction payload" };
+  }
+
+  return { ok: true, raw: json, reading: field(prediction.reading) };
+}

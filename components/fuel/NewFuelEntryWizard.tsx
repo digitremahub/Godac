@@ -179,6 +179,8 @@ export function NewFuelEntryWizard({
           occurred_at: new Date(values.occurred_at).toISOString(),
           totalizer_before: values.totalizer_before ? Number(values.totalizer_before) : null,
           totalizer_after: Number(values.totalizer_after),
+          totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
+          totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
           liters: Number(values.liters),
           unit_price: Number(values.unit_price),
           station_name: values.station_name || undefined,
@@ -208,6 +210,8 @@ export function NewFuelEntryWizard({
           occurred_at: new Date(values.occurred_at).toISOString(),
           totalizer_before: values.totalizer_before ? Number(values.totalizer_before) : null,
           totalizer_after: Number(values.totalizer_after),
+          totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
+          totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
           liters: Number(values.liters),
           unit_price: Number(values.unit_price),
           station_name: values.station_name || undefined,
@@ -240,6 +244,7 @@ export function NewFuelEntryWizard({
           ocrNotice={`Extraction OCR impossible (${ocrResult.ocrError ?? "raison inconnue"}). Complétez manuellement — la photo reste attachée pour l'audit.`}
           submitLabel="Enregistrer"
           busy={busy}
+          totalizerOcrEnabled={ocrEnabled}
           onSubmit={(values) => submitOcrConfirmation(values, true)}
         />
       );
@@ -255,13 +260,14 @@ export function NewFuelEntryWizard({
         }}
         submitLabel="Valider et enregistrer"
         busy={busy}
+        totalizerOcrEnabled={ocrEnabled}
         onSubmit={(values) => submitOcrConfirmation(values)}
       />
     );
   }
 
   if (phase === "manual") {
-    return <FuelEntryForm submitLabel="Enregistrer" busy={busy} onSubmit={submitManual} />;
+    return <FuelEntryForm submitLabel="Enregistrer" busy={busy} totalizerOcrEnabled={ocrEnabled} onSubmit={submitManual} />;
   }
 
   if (phase === "submitted") {

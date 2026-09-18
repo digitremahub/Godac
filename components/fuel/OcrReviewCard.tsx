@@ -22,6 +22,8 @@ export function OcrReviewCard({ entry }: { entry: any }) {
           occurred_at: new Date(values.occurred_at).toISOString(),
           totalizer_before: values.totalizer_before ? Number(values.totalizer_before) : null,
           totalizer_after: Number(values.totalizer_after),
+          totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
+          totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
           liters: Number(values.liters),
           unit_price: Number(values.unit_price),
           station_name: values.station_name || undefined,
@@ -84,6 +86,7 @@ export function OcrReviewCard({ entry }: { entry: any }) {
             }}
             submitLabel="Valider"
             busy={busy}
+            totalizerOcrEnabled
             onSubmit={(v) => submit(v, entry.status === "ocr_failed")}
           />
         </div>

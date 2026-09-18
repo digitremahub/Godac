@@ -6,6 +6,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const patchSchema = z.object({
   totalizer_before: z.coerce.number().nullable().optional(),
   totalizer_after: z.coerce.number().optional(),
+  totalizer_before_photo_path: z.string().optional(),
+  totalizer_after_photo_path: z.string().optional(),
   liters: z.coerce.number().positive().optional(),
   unit_price: z.coerce.number().nonnegative().optional(),
   occurred_at: z.string().datetime().optional(),

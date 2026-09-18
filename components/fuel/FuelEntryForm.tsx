@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { TotalizerPhotoCapture } from "@/components/fuel/TotalizerPhotoCapture";
 
 export interface FuelEntryFormValues {
   occurred_at: string;
   totalizer_before: string;
   totalizer_after: string;
+  totalizer_before_photo_path: string;
+  totalizer_after_photo_path: string;
   liters: string;
   unit_price: string;
   station_name: string;
@@ -16,6 +19,8 @@ const EMPTY_VALUES: FuelEntryFormValues = {
   occurred_at: new Date().toISOString().slice(0, 16),
   totalizer_before: "",
   totalizer_after: "",
+  totalizer_before_photo_path: "",
+  totalizer_after_photo_path: "",
   liters: "",
   unit_price: "",
   station_name: "",
@@ -31,12 +36,15 @@ export function FuelEntryForm({
   submitLabel,
   busy,
   ocrNotice,
+  totalizerOcrEnabled = false,
   onSubmit,
 }: {
   initialValues?: Partial<FuelEntryFormValues>;
   submitLabel: string;
   busy?: boolean;
   ocrNotice?: string;
+  /** Offers a "photo du compteur" capture (Mindee OCR) next to each totalizer field instead of relying on typing alone. */
+  totalizerOcrEnabled?: boolean;
   onSubmit: (values: FuelEntryFormValues) => void;
 }) {
   const [values, setValues] = useState<FuelEntryFormValues>({ ...EMPTY_VALUES, ...initialValues });
@@ -69,6 +77,17 @@ export function FuelEntryForm({
             value={values.totalizer_before}
             onChange={(e) => set("totalizer_before", e.target.value)}
           />
+          {totalizerOcrEnabled && (
+            <div className="mt-1.5">
+              <TotalizerPhotoCapture
+                label="Photo compteur avant"
+                onCaptured={({ photoPath, reading }) => {
+                  set("totalizer_before_photo_path", photoPath);
+                  if (reading !== null) set("totalizer_before", String(reading));
+                }}
+              />
+            </div>
+          )}
         </div>
         <div>
           <label className="label">Index totaliseur après (L) *</label>
@@ -79,6 +98,17 @@ export function FuelEntryForm({
             value={values.totalizer_after}
             onChange={(e) => set("totalizer_after", e.target.value)}
           />
+          {totalizerOcrEnabled && (
+            <div className="mt-1.5">
+              <TotalizerPhotoCapture
+                label="Photo compteur après"
+                onCaptured={({ photoPath, reading }) => {
+                  set("totalizer_after_photo_path", photoPath);
+                  if (reading !== null) set("totalizer_after", String(reading));
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
