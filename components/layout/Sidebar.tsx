@@ -55,6 +55,7 @@ const SECTIONS: NavSection[] = [
       { href: "/ocr-review", label: "Revue OCR", icon: IconCamera, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "ocr" },
       { href: "/tanks", label: "Cuves", icon: IconCylinder, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/tanks/photos", label: "Photos de cuves", icon: IconImage, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
+      { href: "/tanks/deliveries", label: "Approvisionnements", icon: IconUpload, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
       { href: "/maintenance", label: "Demandes d'entretien", icon: IconWrench, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
       { href: "/tours/start", label: "Démarrer une tournée", icon: IconClock, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
@@ -130,7 +131,7 @@ export function Sidebar({
 
   return (
     <nav className="flex h-full w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-navy/10 bg-white/70 p-4 backdrop-blur-sm">
-      <div className="flex items-center gap-2.5 px-2 pt-1">
+      <Link href="/dashboard" title="Accueil" className="flex items-center gap-2.5 px-2 pt-1">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt={organizationName ?? "Logo"} className="h-9 w-9 rounded-lg object-contain ring-1 ring-navy/10" />
@@ -141,7 +142,7 @@ export function Sidebar({
           />
         )}
         <span className="truncate font-display text-lg font-extrabold leading-tight">{organizationName ?? "GODAC"}</span>
-      </div>
+      </Link>
 
       {sections.map((section, i) => (
         <div key={i} className="flex flex-col gap-1">

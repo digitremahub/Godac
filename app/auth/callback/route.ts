@@ -17,6 +17,16 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabaseClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // Covers an email-change confirmation link landing here just
+      // like any other: public.users.email is a plain copy set at
+      // invite/onboarding time, never auto-synced from auth.users, so
+      // it would otherwise go stale the moment a change is confirmed.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) {
+        await supabase.from("users").update({ email: user.email }).eq("id", user.id).neq("email", user.email);
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

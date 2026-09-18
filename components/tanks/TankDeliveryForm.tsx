@@ -2,13 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export function TankDeliveryForm({ tankId }: { tankId: string }) {
   const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
   const [open, setOpen] = useState(false);
   const [liters, setLiters] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,10 +30,27 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+
+      if (invoiceFile) {
+        const ext = invoiceFile.name.split(".").pop() || "pdf";
+        const initRes = await fetch(`/api/tank-deliveries/${json.delivery.id}/invoice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ext }),
+        });
+        const initJson = await initRes.json();
+        if (!initRes.ok) throw new Error(typeof initJson.error === "string" ? initJson.error : "Erreur facture");
+        const { error: uploadError } = await supabase.storage
+          .from("tank-invoices")
+          .upload(initJson.storagePath, invoiceFile, { contentType: invoiceFile.type });
+        if (uploadError) throw new Error(`Envoi de la facture échoué: ${uploadError.message}`);
+      }
+
       setLiters("");
       setUnitPrice("");
       setSupplier("");
+      setInvoiceFile(null);
       setOpen(false);
       router.refresh();
     } catch (e) {
@@ -65,6 +85,15 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         value={supplier}
         onChange={(e) => setSupplier(e.target.value)}
       />
+      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/50">
+        {invoiceFile ? invoiceFile.name : "📎 Joindre la facture (optionnel)"}
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          className="hidden"
+          onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
       <div className="flex gap-2">
         <button className="btn-primary flex-1 !py-1.5 text-sm" disabled={busy || !liters} onClick={submit}>
           {busy ? "Envoi…" : "Enregistrer"}
