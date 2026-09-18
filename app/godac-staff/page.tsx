@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
@@ -50,6 +51,7 @@ export default async function GodacStaffPage() {
               <th className="pb-2">Véhicules</th>
               <th className="pb-2">Utilisateurs</th>
               <th className="pb-2">Créée le</th>
+              <th className="pb-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -66,6 +68,11 @@ export default async function GodacStaffPage() {
                 <td className="py-2">{org.vehicles?.[0]?.count ?? 0}</td>
                 <td className="py-2">{org.users?.[0]?.count ?? 0}</td>
                 <td className="py-2">{new Date(org.created_at).toLocaleDateString("fr-FR")}</td>
+                <td className="py-2">
+                  <Link href={`/godac-staff/${org.id}`} className="text-teal-ink hover:underline">
+                    Utilisateurs / rôles
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
