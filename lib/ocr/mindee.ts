@@ -122,29 +122,30 @@ function field(raw: any): MindeeExtractionField<any> {
   };
 }
 
-export type MindeeTotalizerResult =
+export type MindeeCounterResult =
   | { ok: true; reading: MindeeExtractionField<number>; raw: unknown }
   | { ok: false; reason: string };
 
 /**
- * Reads the tank/pump totalizer counter off a photo (taken before and
- * again after a fill-up, see app/api/ocr/totalizer). A bare digit
- * display isn't something Mindee's generic "financial_document" model
- * has any concept of — unlike the ticket, where at least date/total
+ * Reads a bare digit display off a photo — a tank/pump totalizer
+ * (before/after a fill-up) or a vehicle odometer (before/after a
+ * tour, or at a maintenance request), see app/api/ocr/{totalizer,
+ * odometer}. Neither is something Mindee's generic "financial_document"
+ * model has any concept of — unlike a ticket, where at least date/total
  * come through on the generic model — so this only ever produces a
- * real reading once a custom-trained model (MINDEE_TOTALIZER_MODEL_ID)
- * exists. Without one it fails cleanly rather than guessing, and the
- * caller falls back to manual entry, same as a failed ticket OCR.
+ * real reading once the given custom-trained model exists. Without
+ * one it fails cleanly rather than guessing, and the caller falls
+ * back to manual entry, same as a failed ticket OCR.
  */
-export async function extractTotalizerReading(imageBytes: Buffer, filename: string): Promise<MindeeTotalizerResult> {
+async function extractCounterReading(imageBytes: Buffer, filename: string, modelEnvVar: string): Promise<MindeeCounterResult> {
   const apiKey = process.env.MINDEE_API_KEY;
   if (!apiKey) {
     return { ok: false, reason: "MINDEE_API_KEY is not configured" };
   }
 
-  const customModelId = process.env.MINDEE_TOTALIZER_MODEL_ID;
+  const customModelId = process.env[modelEnvVar];
   if (!customModelId) {
-    return { ok: false, reason: "MINDEE_TOTALIZER_MODEL_ID is not configured — saisie manuelle requise." };
+    return { ok: false, reason: `${modelEnvVar} is not configured — saisie manuelle requise.` };
   }
 
   const form = new FormData();
@@ -173,4 +174,12 @@ export async function extractTotalizerReading(imageBytes: Buffer, filename: stri
   }
 
   return { ok: true, raw: json, reading: field(prediction.reading) };
+}
+
+export function extractTotalizerReading(imageBytes: Buffer, filename: string): Promise<MindeeCounterResult> {
+  return extractCounterReading(imageBytes, filename, "MINDEE_TOTALIZER_MODEL_ID");
+}
+
+export function extractOdometerReading(imageBytes: Buffer, filename: string): Promise<MindeeCounterResult> {
+  return extractCounterReading(imageBytes, filename, "MINDEE_ODOMETER_MODEL_ID");
 }

@@ -10,6 +10,8 @@ const bodySchema = z.object({
   urgency: z.enum(["low", "normal", "high", "critical"]).default("normal"),
   scheduled_at: z.string().datetime().optional(),
   cost: z.coerce.number().nonnegative().optional(),
+  odometer_km: z.coerce.number().min(0).optional(),
+  odometer_photo_path: z.string().optional(),
 });
 
 /**

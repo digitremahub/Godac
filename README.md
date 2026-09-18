@@ -154,7 +154,8 @@ intégration :
   `NEXT_PUBLIC_STRIPE_PRICE_STARTER` / `_PRO`.
 - **Resend** : `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
 - **Mindee** : `MINDEE_API_KEY`, `MINDEE_FUEL_MODEL_ID` (optionnel),
-  `MINDEE_TOTALIZER_MODEL_ID` (optionnel).
+  `MINDEE_TOTALIZER_MODEL_ID` (optionnel), `MINDEE_ODOMETER_MODEL_ID`
+  (optionnel).
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
 

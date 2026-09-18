@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/fuel/QrScanner";
+import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { Card, EmptyState } from "@/components/ui";
 
 interface OpenTour {
@@ -27,6 +28,7 @@ export function EndTourFlow() {
   const [mismatch, setMismatch] = useState(false);
   const [none, setNone] = useState(false);
   const [endKm, setEndKm] = useState("");
+  const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export function EndTourFlow() {
         body: JSON.stringify({
           vehicle_id: vehicleId,
           end_km: endKm ? Number(endKm) : undefined,
+          end_km_photo_path: endKmPhotoPath || undefined,
           notes: notes || undefined,
         }),
       });
@@ -131,6 +134,18 @@ export function EndTourFlow() {
       <div>
         <label className="label">Kilométrage au retour</label>
         <input className="input" type="number" value={endKm} onChange={(e) => setEndKm(e.target.value)} />
+        <div className="mt-1.5">
+          <CounterPhotoCapture
+            label="Photo compteur kilométrique"
+            initUrl="/api/ocr/odometer/init"
+            processUrl="/api/ocr/odometer/process"
+            bucket="tour-photos"
+            onCaptured={({ photoPath, reading }) => {
+              setEndKmPhotoPath(photoPath);
+              if (reading !== null) setEndKm(String(reading));
+            }}
+          />
+        </div>
       </div>
       <div>
         <label className="label">Anomalies / incidents (optionnel)</label>

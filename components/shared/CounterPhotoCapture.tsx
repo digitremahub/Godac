@@ -4,18 +4,25 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 /**
- * Photographs the tank/pump totalizer counter (before or after a
- * fill-up) and tries to OCR-read the digits off it. Stateless w.r.t.
- * fuel_entries (no row may exist yet, see app/api/ocr/totalizer/init)
- * — the caller attaches the returned photo path to the eventual row
- * at submit time. Degrades to manual entry exactly like ticket OCR
- * does when extraction isn't available.
+ * Photographs a bare digit counter (tank/pump totalizer, vehicle
+ * odometer) and tries to OCR-read it. Stateless w.r.t. whatever row
+ * it's for — the caller attaches the returned photo path at submit
+ * time (see app/api/ocr/totalizer and app/api/ocr/odometer, the two
+ * init/process endpoint pairs this component can point at). Degrades
+ * to manual entry exactly like ticket OCR does when extraction isn't
+ * available.
  */
-export function TotalizerPhotoCapture({
+export function CounterPhotoCapture({
   label,
+  initUrl,
+  processUrl,
+  bucket,
   onCaptured,
 }: {
   label: string;
+  initUrl: string;
+  processUrl: string;
+  bucket: string;
   onCaptured: (result: { photoPath: string; reading: number | null }) => void;
 }) {
   const supabase = createBrowserSupabaseClient();
@@ -28,18 +35,16 @@ export function TotalizerPhotoCapture({
     setError(null);
     setStatus("uploading");
     try {
-      const initRes = await fetch("/api/ocr/totalizer/init", { method: "POST" });
+      const initRes = await fetch(initUrl, { method: "POST" });
       const initJson = await initRes.json();
       if (!initRes.ok) throw new Error(typeof initJson.error === "string" ? initJson.error : "Erreur d'initialisation");
       const { storagePath } = initJson as { storagePath: string };
 
-      const { error: uploadError } = await supabase.storage
-        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "fuel-tickets")
-        .upload(storagePath, file, { contentType: file.type });
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(storagePath, file, { contentType: file.type });
       if (uploadError) throw new Error(`Envoi échoué: ${uploadError.message}`);
 
       setStatus("extracting");
-      const processRes = await fetch("/api/ocr/totalizer/process", {
+      const processRes = await fetch(processUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storagePath }),

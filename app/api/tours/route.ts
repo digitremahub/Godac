@@ -8,6 +8,7 @@ const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
   tour_number: z.string().min(1),
   start_km: z.coerce.number().min(0).optional(),
+  start_km_photo_path: z.string().optional(),
 });
 
 /**
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
       start_at: new Date().toISOString(),
       status: "in_progress",
       start_km: parsed.data.start_km,
+      start_km_photo_path: parsed.data.start_km_photo_path,
       start_photo_path: storagePath,
     })
     .select("id")

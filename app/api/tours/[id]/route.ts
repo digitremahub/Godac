@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
   end_km: z.coerce.number().min(0).optional(),
+  end_km_photo_path: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -49,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update({
       end_at: new Date().toISOString(),
       end_km: parsed.data.end_km,
+      end_km_photo_path: parsed.data.end_km_photo_path,
       notes: parsed.data.notes || null,
       end_photo_path: storagePath,
       status: "done",

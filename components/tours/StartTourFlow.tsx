@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/fuel/QrScanner";
+import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { Card, EmptyState } from "@/components/ui";
 
 interface OpenTour {
@@ -27,6 +28,7 @@ export function StartTourFlow() {
   const [openTour, setOpenTour] = useState<OpenTour | null>(null);
   const [tourNumber, setTourNumber] = useState("");
   const [startKm, setStartKm] = useState("");
+  const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -59,6 +61,7 @@ export function StartTourFlow() {
           vehicle_id: vehicleId,
           tour_number: tourNumber,
           start_km: startKm ? Number(startKm) : undefined,
+          start_km_photo_path: startKmPhotoPath || undefined,
         }),
       });
       const initJson = await initRes.json();
@@ -121,6 +124,18 @@ export function StartTourFlow() {
       <div>
         <label className="label">Kilométrage au départ</label>
         <input className="input" type="number" value={startKm} onChange={(e) => setStartKm(e.target.value)} />
+        <div className="mt-1.5">
+          <CounterPhotoCapture
+            label="Photo compteur kilométrique"
+            initUrl="/api/ocr/odometer/init"
+            processUrl="/api/ocr/odometer/process"
+            bucket="tour-photos"
+            onCaptured={({ photoPath, reading }) => {
+              setStartKmPhotoPath(photoPath);
+              if (reading !== null) setStartKm(String(reading));
+            }}
+          />
+        </div>
       </div>
       <label
         className={`btn-primary w-full cursor-pointer justify-center text-center ${

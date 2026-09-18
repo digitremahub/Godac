@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui";
-import { TotalizerPhotoCapture } from "@/components/fuel/TotalizerPhotoCapture";
+import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 
 export interface FuelEntryFormValues {
   occurred_at: string;
@@ -79,8 +79,11 @@ export function FuelEntryForm({
           />
           {totalizerOcrEnabled && (
             <div className="mt-1.5">
-              <TotalizerPhotoCapture
+              <CounterPhotoCapture
                 label="Photo compteur avant"
+                initUrl="/api/ocr/totalizer/init"
+                processUrl="/api/ocr/totalizer/process"
+                bucket={process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "fuel-tickets"}
                 onCaptured={({ photoPath, reading }) => {
                   set("totalizer_before_photo_path", photoPath);
                   if (reading !== null) set("totalizer_before", String(reading));
@@ -100,8 +103,11 @@ export function FuelEntryForm({
           />
           {totalizerOcrEnabled && (
             <div className="mt-1.5">
-              <TotalizerPhotoCapture
+              <CounterPhotoCapture
                 label="Photo compteur après"
+                initUrl="/api/ocr/totalizer/init"
+                processUrl="/api/ocr/totalizer/process"
+                bucket={process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "fuel-tickets"}
                 onCaptured={({ photoPath, reading }) => {
                   set("totalizer_after_photo_path", photoPath);
                   if (reading !== null) set("totalizer_after", String(reading));

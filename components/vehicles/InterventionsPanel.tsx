@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 
 interface Intervention {
   id: string;
@@ -56,6 +57,8 @@ export function InterventionsPanel({
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<Intervention["urgency"]>("normal");
+  const [odometerKm, setOdometerKm] = useState("");
+  const [odometerPhotoPath, setOdometerPhotoPath] = useState("");
   const [busy, setBusy] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -70,11 +73,20 @@ export function InterventionsPanel({
       await fetch("/api/vehicle-interventions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicle_id: vehicleId, type, description: description || undefined, urgency }),
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          type,
+          description: description || undefined,
+          urgency,
+          odometer_km: odometerKm ? Number(odometerKm) : undefined,
+          odometer_photo_path: odometerPhotoPath || undefined,
+        }),
       });
       setType("");
       setDescription("");
       setUrgency("normal");
+      setOdometerKm("");
+      setOdometerPhotoPath("");
       router.refresh();
     } finally {
       setBusy(false);
@@ -126,7 +138,7 @@ export function InterventionsPanel({
     <Card>
       <h3 className="mb-3 text-lg">Interventions / entretiens</h3>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-start gap-2">
         <input className="input" placeholder="Type (ex: Vidange)" value={type} onChange={(e) => setType(e.target.value)} />
         <input
           className="input"
@@ -141,6 +153,25 @@ export function InterventionsPanel({
             </option>
           ))}
         </select>
+        <input
+          className="input !w-32"
+          type="number"
+          placeholder="Km (optionnel)"
+          value={odometerKm}
+          onChange={(e) => setOdometerKm(e.target.value)}
+        />
+        <div className="w-44">
+          <CounterPhotoCapture
+            label="Photo compteur"
+            initUrl="/api/ocr/odometer/init"
+            processUrl="/api/ocr/odometer/process"
+            bucket="tour-photos"
+            onCaptured={({ photoPath, reading }) => {
+              setOdometerPhotoPath(photoPath);
+              if (reading !== null) setOdometerKm(String(reading));
+            }}
+          />
+        </div>
         <button className="btn-secondary shrink-0" disabled={busy || !type} onClick={addIntervention}>
           + Ajouter
         </button>

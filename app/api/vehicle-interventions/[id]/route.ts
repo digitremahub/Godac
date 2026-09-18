@@ -11,6 +11,8 @@ const bodySchema = z.object({
   status: z.enum(["scheduled", "in_progress", "done", "cancelled"]).optional(),
   completed_at: z.string().datetime().nullable().optional(),
   cost: z.coerce.number().nonnegative().nullable().optional(),
+  odometer_km: z.coerce.number().min(0).nullable().optional(),
+  odometer_photo_path: z.string().nullable().optional(),
 });
 
 /**
