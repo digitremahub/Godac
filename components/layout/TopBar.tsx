@@ -22,6 +22,14 @@ export function TopBar({ fullName, role, roleTitle }: { fullName: string; role: 
         >
           <IconGrid className="h-5 w-5" />
         </Link>
+        <Link
+          href="/"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden text-sm text-navy/40 transition-colors hover:text-navy sm:inline"
+        >
+          Site vitrine ↗
+        </Link>
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal-ink ring-1 ring-teal/20">
             {initials(fullName)}

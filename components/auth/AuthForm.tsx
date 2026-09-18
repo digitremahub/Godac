@@ -14,6 +14,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
  */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const supabase = createBrowserSupabaseClient();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [usePassword, setUsePassword] = useState(false);
@@ -37,6 +38,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // Only meaningful on sign-up (a returning user's metadata is
+          // already set) — this is what
+          // app/api/onboarding/create-organization/route.ts and
+          // lib/auth/provisioning.ts read as the profile's full_name;
+          // without it, both silently fell back to the email address.
+          ...(mode === "sign-up" && fullName ? { data: { full_name: fullName } } : {}),
         },
       });
       if (error) throw error;
@@ -70,6 +77,19 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
         </p>
       </div>
+      {mode === "sign-up" && (
+        <div>
+          <label className="label">Nom et prénom</label>
+          <input
+            type="text"
+            required
+            className="input"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Jean Dupont"
+          />
+        </div>
+      )}
       <div>
         <label className="label">Email professionnel</label>
         <input
@@ -94,7 +114,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </div>
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
-      <button type="submit" className="btn-primary" disabled={busy || !email || (usePassword && !password)}>
+      <button
+        type="submit"
+        className="btn-primary"
+        disabled={busy || !email || (usePassword && !password) || (mode === "sign-up" && !fullName)}
+      >
         {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
       {mode === "sign-in" && (
