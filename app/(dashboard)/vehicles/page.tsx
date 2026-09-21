@@ -4,6 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { RoleGate } from "@/components/layout/RoleGate";
+import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Actif",
@@ -44,8 +45,14 @@ export default async function VehiclesPage() {
         }
       />
 
+      <RoleGate role={appUser.role} allow={["direction"]}>
+        <div className="mb-4">
+          <VehicleImportPanel />
+        </div>
+      </RoleGate>
+
       {!vehicles || vehicles.length === 0 ? (
-        <EmptyState title="Aucun véhicule" description="Importez votre flotte depuis l'onboarding ou ajoutez un véhicule." />
+        <EmptyState title="Aucun véhicule" description="Importez votre flotte depuis un fichier ou ajoutez un véhicule." />
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">

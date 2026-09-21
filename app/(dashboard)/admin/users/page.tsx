@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { UsersPanel } from "@/components/admin/UsersPanel";
+import { UserImportPanel } from "@/components/admin/UserImportPanel";
 
 export default async function AdminUsersPage() {
   const supabase = await createServerSupabaseClient();
@@ -19,6 +20,9 @@ export default async function AdminUsersPage() {
   return (
     <div>
       <PageHeader title="Utilisateurs" description="Invitations et gestion des rôles GODAC." />
+      <div className="mb-4">
+        <UserImportPanel />
+      </div>
       <UsersPanel users={usersWithService} services={services ?? []} />
     </div>
   );

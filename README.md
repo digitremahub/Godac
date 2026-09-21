@@ -132,11 +132,11 @@ lib/
   supabase/            # clients server / browser / admin (service role)
   auth/                # session, invitations, provisioning des comptes invités
   ocr/                 # client Mindee + pipeline d'extraction
-  import/              # extraction de tableau CSV/Excel/PDF (import véhicules/chauffeurs)
+  import/              # extraction de tableau CSV/Excel (import véhicules/chauffeurs)
   email/               # Resend + templates
   stripe/              # client + plans
   qr/                  # génération/parsing des payloads QR
-  utils/               # validation import (CSV/Excel/PDF), Excel (export TICPE)
+  utils/               # validation import (CSV/Excel), Excel (export TICPE)
 components/            # UI par domaine (fuel, vehicles, admin, qr, layout, ui)
 supabase/migrations/   # schéma versionné (voir ci-dessus)
 ```
@@ -254,7 +254,7 @@ placeholder silencieux :
 ## État d'avancement des modules
 
 ### MVP — fait
-- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import véhicules/chauffeurs depuis CSV/Excel/PDF, config cuves, choix plan Stripe, invitations par email)
+- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import véhicules/chauffeurs depuis CSV/Excel (aussi disponible sur les pages Flotte et Utilisateurs), config cuves, choix plan Stripe, invitations par email)
 - Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection d'écart, historique, vue cuves)
 - Module 3 — OCR (capture photo mobile-first, pipeline Mindee, validation humaine obligatoire, revue manager, mode dégradé, QR badges véhicule/pompe/chauffeur)
 - Module 4 — Gestion de Flotte (fiche véhicule, interventions/entretien avec workflow de statut)
