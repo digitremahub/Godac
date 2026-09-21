@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import {
-  parseCsv,
+  parseImportFile,
   vehicleCsvRowSchema,
   driverCsvRowSchema,
   type VehicleCsvRow,
@@ -31,16 +31,19 @@ export function BulkImportPanel() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
   async function handleFile(kind: "vehicles" | "drivers", file: File) {
-    const text = await file.text();
     setSummary(null);
+    setError(null);
     if (kind === "vehicles") {
-      const { rows, errors } = parseCsv(text, vehicleCsvRowSchema);
+      const { rows, errors } = await parseImportFile(file, vehicleCsvRowSchema);
       setVehicles(rows);
-      setCsvErrors(errors.map((e) => `Véhicules L${e.row}: ${e.message}`));
+      setCsvErrors(errors.map((e) => (e.row ? `Véhicules L${e.row}: ${e.message}` : `Véhicules: ${e.message}`)));
     } else {
-      const { rows, errors } = parseCsv(text, driverCsvRowSchema);
+      const { rows, errors } = await parseImportFile(file, driverCsvRowSchema);
       setDrivers(rows);
-      setCsvErrors((prev) => [...prev.filter((e) => !e.startsWith("Chauffeurs")), ...errors.map((e) => `Chauffeurs L${e.row}: ${e.message}`)]);
+      setCsvErrors((prev) => [
+        ...prev.filter((e) => !e.startsWith("Chauffeurs")),
+        ...errors.map((e) => (e.row ? `Chauffeurs L${e.row}: ${e.message}` : `Chauffeurs: ${e.message}`)),
+      ]);
     }
   }
 
@@ -68,24 +71,33 @@ export function BulkImportPanel() {
   return (
     <Card className="flex flex-col gap-6">
       <div>
-        <p className="label">Véhicules (CSV: registration, type, tank_capacity_liters, service)</p>
+        <p className="label">
+          Véhicules — CSV, Excel ou PDF (colonnes : immatriculation, type, capacité cuve,
+          kilométrage, service)
+        </p>
         <input
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls,.pdf"
           className="input"
           onChange={(e) => e.target.files?.[0] && handleFile("vehicles", e.target.files[0])}
         />
         {vehicles.length > 0 && <p className="mt-1 text-sm text-teal-ink">{vehicles.length} véhicule(s) prêt(s)</p>}
       </div>
       <div>
-        <p className="label">Chauffeurs / équipe (CSV: full_name, email, role, service)</p>
+        <p className="label">
+          Chauffeurs / équipe — CSV, Excel ou PDF (colonnes : nom, email, rôle, téléphone, service)
+        </p>
         <input
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls,.pdf"
           className="input"
           onChange={(e) => e.target.files?.[0] && handleFile("drivers", e.target.files[0])}
         />
         {drivers.length > 0 && <p className="mt-1 text-sm text-teal-ink">{drivers.length} invitation(s) prête(s)</p>}
+        <p className="mt-1 text-xs text-navy/40">
+          Pour un PDF : un tableau texte fonctionne (export Word/Excel imprimé en PDF) — un PDF
+          scanné (image) n&apos;est pas supporté.
+        </p>
       </div>
 
       {csvErrors.length > 0 && (

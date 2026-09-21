@@ -123,19 +123,20 @@ app/
   (dashboard)/        # layout authentifié : sidebar/topbar par rôle
     dashboard/         fuel/  fuel/new/  ocr-review/  tanks/
     vehicles/           alerts/  ticpe/  admin/{organizations,billing,users}
-  onboarding/          # Module 1 : création org, import CSV, cuves, plan Stripe
+  onboarding/          # Module 1 : création org, import véhicules/chauffeurs, cuves, plan Stripe
   scan/[type]/[id]/    # atterrissage d'un QR scanné par l'appareil photo natif
   godac-staff/         # backoffice opérateur GODAC (cross-tenant, hors RLS)
-  api/                 # route handlers (webhooks, OCR, TICPE, admin, stripe…)
+  api/                 # route handlers (webhooks, OCR, TICPE, admin, stripe, import…)
 lib/
   business/            # PMP, écart totaliseur, TICPE, congés (+ tests)
   supabase/            # clients server / browser / admin (service role)
   auth/                # session, invitations, provisioning des comptes invités
   ocr/                 # client Mindee + pipeline d'extraction
+  import/              # extraction de tableau CSV/Excel/PDF (import véhicules/chauffeurs)
   email/               # Resend + templates
   stripe/              # client + plans
   qr/                  # génération/parsing des payloads QR
-  utils/               # CSV (onboarding), Excel (export TICPE)
+  utils/               # validation import (CSV/Excel/PDF), Excel (export TICPE)
 components/            # UI par domaine (fuel, vehicles, admin, qr, layout, ui)
 supabase/migrations/   # schéma versionné (voir ci-dessus)
 ```
@@ -253,7 +254,7 @@ placeholder silencieux :
 ## État d'avancement des modules
 
 ### MVP — fait
-- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import CSV véhicules/chauffeurs, config cuves, choix plan Stripe, invitations par email)
+- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import véhicules/chauffeurs depuis CSV/Excel/PDF, config cuves, choix plan Stripe, invitations par email)
 - Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection d'écart, historique, vue cuves)
 - Module 3 — OCR (capture photo mobile-first, pipeline Mindee, validation humaine obligatoire, revue manager, mode dégradé, QR badges véhicule/pompe/chauffeur)
 - Module 4 — Gestion de Flotte (fiche véhicule, interventions/entretien avec workflow de statut)
