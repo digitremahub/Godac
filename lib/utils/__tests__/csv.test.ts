@@ -29,6 +29,21 @@ describe("validateRows", () => {
     expect(rows[0]).toMatchObject({ full_name: "Jean Dupont", email: "jean@example.com", phone: "0612345678" });
   });
 
+  it("combines separate Prénom/Nom columns into full_name", () => {
+    const { rows, errors } = validateRows(
+      [{ "Prénom (obligatoire)": "Valentin", "Nom (obligatoire)": "ANGLES", "Email*(obligatoire)": "v@example.com" }],
+      driverCsvRowSchema,
+    );
+    expect(errors).toHaveLength(0);
+    expect(rows[0]).toMatchObject({ full_name: "Valentin ANGLES", email: "v@example.com" });
+  });
+
+  it("still treats a lone Nom column as the full display name", () => {
+    const { rows, errors } = validateRows([{ Nom: "Jean Dupont", Email: "jean@example.com" }], driverCsvRowSchema);
+    expect(errors).toHaveLength(0);
+    expect(rows[0]).toMatchObject({ full_name: "Jean Dupont" });
+  });
+
   it("reports a row-level error for an invalid value, keeping the row index", () => {
     const { rows, errors } = validateRows(
       [

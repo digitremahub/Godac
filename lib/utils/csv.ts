@@ -52,7 +52,12 @@ const HEADER_ALIASES: Record<string, string> = {
   compteur: "initial_km",
   depot: "service",
   agence: "service",
-  nom: "full_name",
+  // "nom" alone (no separate first-name column) is treated as the
+  // whole display name — but when a "prenom" column also exists (a
+  // common split in HR export templates), validateRows()'s merge step
+  // below combines the two into full_name instead.
+  nom: "last_name",
+  prenom: "first_name",
   nom_complet: "full_name",
   nom_prenom: "full_name",
   nom_et_prenom: "full_name",
@@ -71,6 +76,10 @@ const HEADER_ALIASES: Record<string, string> = {
 
 function normalizeKey(raw: string): string {
   const cleaned = raw
+    // Drop a trailing "(obligatoire)" / "*(facultatif)" / "* requis"
+    // annotation — common in HR/onboarding form templates — before
+    // normalizing, so "Prénom (obligatoire)" still matches "prenom".
+    .replace(/[*(].*$/, "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // strip accents (é -> e, etc.)
     .trim()
@@ -85,6 +94,13 @@ function normalizeRow(raw: Record<string, unknown>): Record<string, string> {
   for (const [key, value] of Object.entries(raw)) {
     if (value === null || value === undefined) continue;
     out[normalizeKey(key)] = String(value).trim();
+  }
+  // A file with separate "Prénom"/"Nom" columns has no single
+  // full_name column at all — combine them the same way a manual
+  // "Nom complet" field would read, rather than dropping the first
+  // name into an unvalidated `first_name` key the schema never sees.
+  if (!out.full_name && (out.first_name || out.last_name)) {
+    out.full_name = [out.first_name, out.last_name].filter(Boolean).join(" ");
   }
   return out;
 }

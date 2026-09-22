@@ -58,4 +58,22 @@ describe("parseTableFile", () => {
     const file = new File(["hello"], "vehicules.docx");
     await expect(parseTableFile(file)).rejects.toThrow(/Format non supporté/);
   });
+
+  it("skips a leading instructions sheet and reads the real data sheet", async () => {
+    const wb = new ExcelJS.Workbook();
+    const instructions = wb.addWorksheet("Comment remplir");
+    instructions.addRow([]);
+    instructions.addRow([null, null, "Comment bien remplir ce fichier ?"]);
+    instructions.addRow([null, null, "Suivez les instructions ci-dessous."]);
+
+    const data = wb.addWorksheet("EXCEL entreprise");
+    data.addRow(["Prénom (obligatoire)", "Nom (obligatoire)", "Email*(obligatoire)"]);
+    data.addRow(["Valentin", "ANGLES", "valentin@example.com"]);
+    data.addRow(["Théo", "BOITEL", "theo@example.com"]);
+
+    const rows = await parseTableFile(await fileFromWorkbook(wb, "employes.xlsx"));
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ "Prénom (obligatoire)": "Valentin", "Nom (obligatoire)": "ANGLES" });
+  });
 });

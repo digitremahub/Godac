@@ -52,10 +52,38 @@ function cellToString(value: ExcelJS.CellValue): string {
   return String(value).trim();
 }
 
+/**
+ * Many exports (HR tools especially) ship a first "read me" tab full
+ * of instructions before the actual data tab — reading worksheets[0]
+ * unconditionally would parse that prose as if it were the header/data
+ * rows. Picking the sheet with the most rows that look tabular (2+
+ * filled cells) instead of always the first one handles that without
+ * needing to know anything about the file's origin.
+ */
+function pickDataWorksheet(workbook: ExcelJS.Workbook): ExcelJS.Worksheet | undefined {
+  let best: ExcelJS.Worksheet | undefined;
+  let bestScore = -1;
+  for (const ws of workbook.worksheets) {
+    let denseRows = 0;
+    ws.eachRow((row) => {
+      let nonEmpty = 0;
+      row.eachCell({ includeEmpty: false }, () => {
+        nonEmpty += 1;
+      });
+      if (nonEmpty >= 2) denseRows += 1;
+    });
+    if (denseRows > bestScore) {
+      bestScore = denseRows;
+      best = ws;
+    }
+  }
+  return best;
+}
+
 async function parseExcelBuffer(buffer: Buffer): Promise<Record<string, string>[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
-  const worksheet = workbook.worksheets[0];
+  const worksheet = pickDataWorksheet(workbook);
   if (!worksheet) throw new Error("Ce fichier Excel ne contient aucune feuille.");
 
   const headerRow = worksheet.getRow(1);
