@@ -25,6 +25,8 @@ export type DriverCsvRow = z.infer<typeof driverCsvRowSchema>;
 export interface CsvParseResult<T> {
   rows: T[];
   errors: { row: number; message: string }[];
+  /** Set when the normal column-matching parser found nothing usable and an AI fallback extracted the rows instead. */
+  aiExtracted?: boolean;
 }
 
 /**
@@ -107,9 +109,10 @@ function normalizeRow(raw: Record<string, unknown>): Record<string, string> {
 
 /**
  * Validates raw {header: value} rows (already extracted from
- * whatever file format — see lib/import/parse-table.ts for CSV/Excel/
- * PDF extraction, which all funnel through this same validation so
- * every source produces identical errors).
+ * whatever file format — see lib/import/parse-table.ts for CSV/Excel
+ * extraction, or lib/import/ai-extract.ts for the AI fallback — both
+ * funnel through this same validation so every source produces
+ * identical errors).
  */
 export function validateRows<S extends z.ZodType<any, any, any>>(
   rawRows: Record<string, unknown>[],
@@ -135,18 +138,23 @@ export function validateRows<S extends z.ZodType<any, any, any>>(
 }
 
 /**
- * Extracts rows from any supported file (CSV, Excel, PDF — see
+ * Extracts rows from any supported file (CSV or Excel — see
  * app/api/import/parse-file/route.ts) and validates them against
- * `schema`. The actual file parsing runs server-side: Excel/PDF need
- * Node-only libraries, and keeping CSV there too means every format
- * shares one code path and one set of error messages.
+ * `schema`. The actual file parsing runs server-side: Excel needs a
+ * Node-only library, and keeping CSV there too means every format
+ * shares one code path and one set of error messages. `kind` tells the
+ * server which schema this is for, so its AI fallback (only used when
+ * the normal column-matching parser finds nothing) knows what to
+ * extract.
  */
 export async function parseImportFile<S extends z.ZodType<any, any, any>>(
   file: File,
   schema: S,
+  kind: "vehicles" | "drivers",
 ): Promise<CsvParseResult<z.infer<S>>> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("kind", kind);
 
   const res = await fetch("/api/import/parse-file", { method: "POST", body: formData });
   const json = await res.json();
@@ -154,5 +162,6 @@ export async function parseImportFile<S extends z.ZodType<any, any, any>>(
     return { rows: [], errors: [{ row: 0, message: json.error ?? "Fichier illisible" }] };
   }
 
-  return validateRows(json.rows as Record<string, unknown>[], schema);
+  const result = validateRows(json.rows as Record<string, unknown>[], schema);
+  return { ...result, aiExtracted: json.source === "ai" };
 }

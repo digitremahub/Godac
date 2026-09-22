@@ -157,6 +157,10 @@ intégration :
 - **Mindee** : `MINDEE_API_KEY`, `MINDEE_FUEL_MODEL_ID` (optionnel),
   `MINDEE_TOTALIZER_MODEL_ID` (optionnel), `MINDEE_ODOMETER_MODEL_ID`
   (optionnel).
+- **Anthropic** : `ANTHROPIC_API_KEY` (optionnel) — fallback IA de
+  l'import véhicules/chauffeurs (app/api/import/parse-file/route.ts) :
+  quand le fichier importé ne suit aucun format de colonnes reconnu,
+  Claude lit son contenu brut pour en extraire les lignes lui-même.
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
 

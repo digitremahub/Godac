@@ -25,13 +25,15 @@ export function UserImportPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [aiExtracted, setAiExtracted] = useState(false);
 
   async function handleFile(file: File) {
     setSummary(null);
     setError(null);
-    const { rows, errors } = await parseImportFile(file, driverCsvRowSchema);
+    const { rows, errors, aiExtracted } = await parseImportFile(file, driverCsvRowSchema, "drivers");
     setDrivers(rows);
     setFileErrors(errors.map((e) => (e.row ? `L${e.row} : ${e.message}` : e.message)));
+    setAiExtracted(!!aiExtracted);
   }
 
   async function submitImport() {
@@ -82,7 +84,12 @@ export function UserImportPanel() {
         className="input"
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
-      {drivers.length > 0 && <p className="text-sm text-teal-ink">{drivers.length} invitation(s) prête(s)</p>}
+      {drivers.length > 0 && (
+        <p className="text-sm text-teal-ink">
+          {drivers.length} invitation(s) prête(s)
+          {aiExtracted && " — extraites par IA, ce fichier ne suivait pas un format de colonnes standard"}
+        </p>
+      )}
       {fileErrors.length > 0 && (
         <ul className="list-disc pl-5 text-sm text-orange-ink">
           {fileErrors.map((e, i) => (

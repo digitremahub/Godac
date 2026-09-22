@@ -25,13 +25,15 @@ export function VehicleImportPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [aiExtracted, setAiExtracted] = useState(false);
 
   async function handleFile(file: File) {
     setSummary(null);
     setError(null);
-    const { rows, errors } = await parseImportFile(file, vehicleCsvRowSchema);
+    const { rows, errors, aiExtracted } = await parseImportFile(file, vehicleCsvRowSchema, "vehicles");
     setVehicles(rows);
     setFileErrors(errors.map((e) => (e.row ? `L${e.row} : ${e.message}` : e.message)));
+    setAiExtracted(!!aiExtracted);
   }
 
   async function submitImport() {
@@ -81,7 +83,12 @@ export function VehicleImportPanel() {
         className="input"
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
-      {vehicles.length > 0 && <p className="text-sm text-teal-ink">{vehicles.length} véhicule(s) prêt(s)</p>}
+      {vehicles.length > 0 && (
+        <p className="text-sm text-teal-ink">
+          {vehicles.length} véhicule(s) prêt(s)
+          {aiExtracted && " — extraits par IA, ce fichier ne suivait pas un format de colonnes standard"}
+        </p>
+      )}
       {fileErrors.length > 0 && (
         <ul className="list-disc pl-5 text-sm text-orange-ink">
           {fileErrors.map((e, i) => (

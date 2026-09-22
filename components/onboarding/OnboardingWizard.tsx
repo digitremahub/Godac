@@ -84,11 +84,11 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
   async function handleFile(kind: "vehicles" | "drivers", file: File) {
     if (kind === "vehicles") {
-      const { rows, errors } = await parseImportFile(file, vehicleCsvRowSchema);
+      const { rows, errors } = await parseImportFile(file, vehicleCsvRowSchema, kind);
       setVehicles(rows);
       setCsvErrors(errors.map((e) => (e.row ? `Véhicules L${e.row}: ${e.message}` : `Véhicules: ${e.message}`)));
     } else {
-      const { rows, errors } = await parseImportFile(file, driverCsvRowSchema);
+      const { rows, errors } = await parseImportFile(file, driverCsvRowSchema, kind);
       setDrivers(rows);
       setCsvErrors((prev) => [
         ...prev,

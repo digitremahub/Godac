@@ -110,3 +110,36 @@ async function parseExcelBuffer(buffer: Buffer): Promise<Record<string, string>[
   return rows;
 }
 
+/**
+ * A raw text dump of every sheet/row/cell, with none of parseTableFile's
+ * assumptions (best-guess sheet, row 1 = header) — used to hand the AI
+ * fallback (lib/import/ai-extract.ts) the full picture when a layout
+ * the deterministic parser can't handle (a pivoted table, several
+ * mini-tables side by side, ...) makes it come back empty.
+ */
+export async function dumpRawTableText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (name.endsWith(".csv") || name.endsWith(".txt")) {
+    return buffer.toString("utf-8");
+  }
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    const parts: string[] = [];
+    for (const ws of workbook.worksheets) {
+      parts.push(`=== Feuille: ${ws.name} ===`);
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        const cells: string[] = [];
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cells.push(cellToString(cell.value));
+        });
+        parts.push(`L${rowNumber}\t${cells.join("\t")}`);
+      });
+    }
+    return parts.join("\n");
+  }
+  throw new Error("Format non supporté — utilisez un fichier CSV ou Excel (.xlsx).");
+}
+
