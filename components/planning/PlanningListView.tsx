@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
+import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
 
 interface ServiceOption {
   id: string;
@@ -53,11 +54,18 @@ export function PlanningListView({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openDriverSheet, setOpenDriverSheet] = useState<{ id: string; full_name: string } | null>(null);
 
   function navTo(nextWeekStart: string) {
     const qs = new URLSearchParams({ view: "list", week: nextWeekStart });
     if (selectedService) qs.set("service", selectedService);
     router.push(`/planning?${qs.toString()}`);
+  }
+
+  function toDatetimeLocal(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   async function patch(entryId: string, fields: Record<string, string>) {
@@ -114,29 +122,78 @@ export function PlanningListView({
               {sorted.map((e) => (
                 <tr key={e.id} className={`border-t border-navy/5 ${busyId === e.id ? "opacity-40" : ""}`}>
                   <td className="py-2">
-                    {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}{" "}
-                    {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    {e.status === "planned" ? (
+                      <input
+                        key={e.id}
+                        className="input !w-auto !py-1"
+                        type="datetime-local"
+                        defaultValue={toDatetimeLocal(e.start_at)}
+                        disabled={busyId === e.id}
+                        onBlur={(ev) => {
+                          const next = ev.target.value;
+                          if (!next) return;
+                          const iso = new Date(next).toISOString();
+                          if (iso !== e.start_at) patch(e.id, { start_at: iso });
+                        }}
+                      />
+                    ) : (
+                      <>
+                        {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}{" "}
+                        {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </>
+                    )}
                   </td>
                   <td className="py-2">{serviceNameById.get(e.service_id) ?? "—"}</td>
-                  <td className="py-2">n°{e.tour_number}</td>
                   <td className="py-2">
                     {e.status === "planned" ? (
-                      <select
+                      <input
+                        key={e.id}
                         className="input !w-auto !py-1"
-                        value={e.driver_id ?? ""}
+                        defaultValue={e.tour_number}
                         disabled={busyId === e.id}
-                        onChange={(ev) => patch(e.id, { driver_id: ev.target.value })}
-                      >
-                        <option value="">—</option>
-                        {drivers.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.full_name}
-                          </option>
-                        ))}
-                      </select>
+                        onBlur={(ev) => {
+                          const next = ev.target.value.trim();
+                          if (next && next !== e.tour_number) patch(e.id, { tour_number: next });
+                        }}
+                      />
                     ) : (
-                      (drivers.find((d) => d.id === e.driver_id)?.full_name ?? "—")
+                      `n°${e.tour_number}`
                     )}
+                  </td>
+                  <td className="py-2">
+                    <div className="flex items-center gap-1.5">
+                      {e.status === "planned" ? (
+                        <select
+                          className="input !w-auto !py-1"
+                          value={e.driver_id ?? ""}
+                          disabled={busyId === e.id}
+                          onChange={(ev) => patch(e.id, { driver_id: ev.target.value })}
+                        >
+                          <option value="">—</option>
+                          {drivers.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        (drivers.find((d) => d.id === e.driver_id)?.full_name ?? "—")
+                      )}
+                      {e.driver_id && (
+                        <button
+                          type="button"
+                          className="text-navy/30 hover:text-teal-ink"
+                          title="Fiche chauffeur"
+                          aria-label="Fiche chauffeur"
+                          onClick={() => {
+                            const d = drivers.find((d) => d.id === e.driver_id);
+                            if (d) setOpenDriverSheet(d);
+                          }}
+                        >
+                          👤
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2">
                     {e.status === "planned" ? (
@@ -163,6 +220,17 @@ export function PlanningListView({
             </tbody>
           </table>
         </Card>
+      )}
+
+      {openDriverSheet && (
+        <DriverWeekSheet
+          driver={openDriverSheet}
+          weekStart={weekStart}
+          services={services}
+          vehicles={vehicles}
+          entries={entries}
+          onClose={() => setOpenDriverSheet(null)}
+        />
       )}
     </div>
   );

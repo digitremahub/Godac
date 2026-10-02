@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { addDays } from "@/lib/planning/dates";
+import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
 
 interface ServiceOption {
   id: string;
@@ -57,12 +59,6 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Terminée",
 };
 
-function addDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
 export function PlanningGrid({
   services,
   filteredServices,
@@ -103,6 +99,9 @@ export function PlanningGrid({
   const [formWholeWeek, setFormWholeWeek] = useState(false);
   const [formDays, setFormDays] = useState<Set<number>>(new Set([0, 1, 2, 3, 4, 5, 6]));
   const [bulkSummary, setBulkSummary] = useState<string | null>(null);
+  const [openDriverSheet, setOpenDriverSheet] = useState<{ id: string; full_name: string } | null>(null);
+  const [duplicatingEntryId, setDuplicatingEntryId] = useState<string | null>(null);
+  const [duplicateTargetDate, setDuplicateTargetDate] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTourNumber, setEditTourNumber] = useState("");
   const [editDriverId, setEditDriverId] = useState("");
@@ -190,13 +189,27 @@ export function PlanningGrid({
     }
   }
 
-  async function duplicateEntry(entryId: string) {
+  function openDuplicatePicker(entry: PlanningEntry) {
+    setDuplicatingEntryId(entry.id);
+    setDuplicateTargetDate(addDays(entry.start_at.slice(0, 10), 7));
+  }
+
+  function cancelDuplicatePicker() {
+    setDuplicatingEntryId(null);
+  }
+
+  async function confirmDuplicateEntry(entryId: string) {
     setBusyId(entryId);
     setError(null);
     try {
-      const res = await fetch(`/api/planning/entries/${entryId}/duplicate`, { method: "POST" });
+      const res = await fetch(`/api/planning/entries/${entryId}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_date: duplicateTargetDate || undefined }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setDuplicatingEntryId(null);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -479,7 +492,7 @@ export function PlanningGrid({
                         {dayEntries.map((entry) => (
                           <div
                             key={entry.id}
-                            draggable={entry.status === "planned" && editingId !== entry.id}
+                            draggable={entry.status === "planned" && editingId !== entry.id && duplicatingEntryId !== entry.id}
                             onDragStart={(e) => e.dataTransfer.setData("text/plain", entry.id)}
                             className={`rounded-md border border-navy/10 bg-white p-1.5 text-xs shadow-sm ${
                               entry.status === "planned" ? "cursor-move" : "opacity-80"
@@ -500,14 +513,16 @@ export function PlanningGrid({
                                     ✎
                                   </button>
                                 )}
-                                <button
-                                  className="text-navy/30 hover:text-teal-ink"
-                                  onClick={() => duplicateEntry(entry.id)}
-                                  aria-label="Dupliquer la semaine prochaine"
-                                  title="Dupliquer la semaine prochaine"
-                                >
-                                  ⧉
-                                </button>
+                                {duplicatingEntryId !== entry.id && (
+                                  <button
+                                    className="text-navy/30 hover:text-teal-ink"
+                                    onClick={() => openDuplicatePicker(entry)}
+                                    aria-label="Dupliquer"
+                                    title="Dupliquer"
+                                  >
+                                    ⧉
+                                  </button>
+                                )}
                                 {entry.status === "planned" && (
                                   <button
                                     className="text-navy/30 hover:text-orange-ink"
@@ -572,17 +587,52 @@ export function PlanningGrid({
                                   </button>
                                 </div>
                               </div>
+                            ) : duplicatingEntryId === entry.id ? (
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[10px] text-navy/40">Dupliquer vers le</label>
+                                <input
+                                  className="input !h-7 !py-0.5 !text-xs"
+                                  type="date"
+                                  value={duplicateTargetDate}
+                                  onChange={(e) => setDuplicateTargetDate(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    disabled={!duplicateTargetDate || busyId === entry.id}
+                                    onClick={() => confirmDuplicateEntry(entry.id)}
+                                  >
+                                    OK
+                                  </button>
+                                  <button
+                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    onClick={cancelDuplicatePicker}
+                                  >
+                                    Annuler
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <>
                                 <p className="font-medium">n°{entry.tour_number}</p>
-                                <p className="text-navy/60">{entry.users?.full_name ?? "—"}</p>
+                                {entry.driver_id && entry.users ? (
+                                  <button
+                                    type="button"
+                                    className="text-navy/60 underline-offset-2 hover:underline"
+                                    onClick={() => setOpenDriverSheet({ id: entry.driver_id!, full_name: entry.users!.full_name })}
+                                  >
+                                    {entry.users.full_name}
+                                  </button>
+                                ) : (
+                                  <p className="text-navy/60">—</p>
+                                )}
                                 <p className="text-navy/40">{entry.vehicles?.registration ?? "—"}</p>
                                 <p className="text-navy/40">
                                   {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                                 </p>
                               </>
                             )}
-                            {editingId !== entry.id && entry.users && (entry.users.phone || entry.users.email) && (
+                            {editingId !== entry.id && duplicatingEntryId !== entry.id && entry.users && (entry.users.phone || entry.users.email) && (
                               <div className="mt-1 flex gap-2 border-t border-navy/5 pt-1">
                                 {entry.users.phone && (
                                   <a
@@ -617,6 +667,17 @@ export function PlanningGrid({
           </tbody>
         </table>
       </div>
+
+      {openDriverSheet && (
+        <DriverWeekSheet
+          driver={openDriverSheet}
+          weekStart={weekStart}
+          services={services}
+          vehicles={vehicles}
+          entries={entries}
+          onClose={() => setOpenDriverSheet(null)}
+        />
+      )}
     </div>
   );
 }
