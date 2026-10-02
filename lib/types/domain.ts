@@ -12,6 +12,9 @@ export type UserRole =
   | "comptable"
   | "direction";
 
+/** 'pin' = Lot 7's QR-badge chauffeur login (no email), see lib/auth/driver-pin.ts. */
+export type UserAuthMethod = "email" | "pin";
+
 export type VehicleType = "VL" | "PL" | "SPL";
 
 export type VehicleStatus = "active" | "maintenance" | "out_of_service";

@@ -6,7 +6,10 @@ import { UserImportPanel } from "@/components/admin/UserImportPanel";
 export default async function AdminUsersPage() {
   const supabase = await createServerSupabaseClient();
   const [{ data: users }, { data: services }, { data: userServices }] = await Promise.all([
-    supabase.from("users").select("id, full_name, email, phone, role, role_title, active").order("full_name"),
+    supabase
+      .from("users")
+      .select("id, full_name, email, phone, role, role_title, active, auth_method, pin_set_at")
+      .order("full_name"),
     supabase.from("services").select("id, name").order("name"),
     supabase.from("user_services").select("user_id, service_id"),
   ]);

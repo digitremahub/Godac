@@ -83,7 +83,7 @@ borne partagée pour s'identifier avant de saisir un ravitaillement.
 
 Voir `supabase/migrations/*.sql` pour le détail exact. Les 13 premières
 posent le socle (schéma 1-13, détaillées ci-dessous) ; le schéma va
-aujourd'hui jusqu'à la migration **43**, appliquées dans l'ordre par
+aujourd'hui jusqu'à la migration **44**, appliquées dans l'ordre par
 `supabase db push` — toujours des ajouts, jamais une modification
 d'une migration déjà passée en prod.
 
@@ -130,6 +130,14 @@ le détail — chacune documente son "pourquoi" en commentaire SQL) :
   (seuil configurable par organisation), calculée depuis les litres de
   gasoil et les relevés kilométriques existants (il n'y a pas de champ
   kilométrage sur `fuel_entries` elle-même).
+- **Connexion des chauffeurs sans email** (44) — `users.auth_method`
+  ('email' | 'pin') et `users.pin_set_at` : un compte `pin` est créé
+  par la direction (nom/rôle/service seulement, email interne
+  fabriqué, jamais montré), le chauffeur choisit son propre code PIN
+  en scannant son badge QR à la première connexion (`/driver-pin/[id]`,
+  public par nécessité — voir `middleware.ts`), via
+  `signInWithPassword` standard — aucun pont d'authentification
+  parallèle à Supabase Auth.
 
 Logique métier critique (implémentée deux fois volontairement : en
 trigger Postgres comme source de vérité, et en TypeScript pur pour
@@ -147,6 +155,8 @@ prévisualisation UI + tests unitaires) :
   écart de trajet anormal) — `lib/business/odometer.ts`
 - **Consommation carburant** (L/100km, détection de surconsommation) —
   `lib/business/consumption.ts`
+- **Format du code PIN chauffeur** (rejette les PIN trop simples) —
+  `lib/business/driver-pin.ts`
 
 ```bash
 npm test        # lance la suite vitest sur toute la logique métier
@@ -372,10 +382,11 @@ placeholder silencieux :
   compléter — voir placeholders `[À COMPLÉTER : ...]`), manifeste
   web + icônes pour l'installation sur écran d'accueil, en-têtes de
   sécurité (`next.config.mjs`)
+- Connexion des chauffeurs sans email : badge QR + code PIN créé par
+  le chauffeur lui-même à la première connexion (Admin > Utilisateurs
+  > "Chauffeur sans email")
 
 ### À faire
-- Connexion des chauffeurs sans email (plan proposé, pas encore
-  validé — voir la description de la pull request)
 - Amendes (`fines`, table + RLS prêtes, aucune UI)
 - Tarification Stripe modulaire par chauffeur
 - Intégration Pennylane (facturation électronique)

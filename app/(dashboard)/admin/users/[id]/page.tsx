@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
+import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 /**
  * A driver's "fiche" — profile info plus their vehicle-usage history
@@ -25,7 +26,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const [{ data: user }, { data: fuelHistory }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, email, role, role_title, active, user_services(services(name))")
+      .select("id, full_name, email, role, role_title, active, auth_method, pin_set_at, user_services(services(name))")
       .eq("id", id)
       .single(),
     supabase
@@ -46,8 +47,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <p className="text-sm text-navy/50">Email</p>
-          <p>{u.email}</p>
+          <p className="text-sm text-navy/50">{u.auth_method === "pin" ? "Connexion" : "Email"}</p>
+          <p>{u.auth_method === "pin" ? (u.pin_set_at ? "Badge + PIN" : "Badge — PIN non créé") : u.email}</p>
         </Card>
         <Card>
           <p className="text-sm text-navy/50">Titre affiché</p>
@@ -62,6 +63,17 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           <span className={u.active ? "badge-teal" : "badge-neutral"}>{u.active ? "Actif" : "Inactif"}</span>
         </Card>
       </div>
+
+      {u.auth_method === "pin" && (
+        <div className="mb-6 flex justify-center">
+          <QrCodeBadge
+            type="driver"
+            id={u.id}
+            title={u.full_name}
+            subtitle={u.pin_set_at ? "Badge de connexion" : "Scannez pour créer votre code PIN"}
+          />
+        </div>
+      )}
 
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-base">Historique des véhicules utilisés</h3>

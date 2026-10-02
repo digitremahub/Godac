@@ -10,6 +10,9 @@ const bodySchema = z.object({
   full_name: z.string().min(1).optional(),
   phone: z.string().nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
+  // Lot 7: forgets their PIN → direction clears it, next badge scan
+  // offers "créez votre code" again instead of "entrez votre code".
+  reset_pin: z.boolean().optional(),
 });
 
 /**
@@ -54,11 +57,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { service_id, ...userFields } = parsed.data;
+  const { service_id, reset_pin, ...userFields } = parsed.data;
+  const updateFields: Record<string, unknown> = { ...userFields };
+
+  if (reset_pin) {
+    const { data: target } = await supabase.from("users").select("auth_method").eq("id", id).single();
+    if (target?.auth_method !== "pin") {
+      return NextResponse.json({ error: "Ce compte ne se connecte pas par code PIN." }, { status: 409 });
+    }
+    updateFields.pin_set_at = null;
+  }
 
   let targetUser: { id: string; role: string } | null = null;
-  if (Object.keys(userFields).length > 0) {
-    const { data, error } = await supabase.from("users").update(userFields).eq("id", id).select("id, role, role_title").single();
+  if (Object.keys(updateFields).length > 0) {
+    const { data, error } = await supabase.from("users").update(updateFields).eq("id", id).select("id, role, role_title").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     targetUser = data;
   }
