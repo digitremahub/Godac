@@ -36,6 +36,12 @@ const GUIDES: HelpGuide[] = [
   },
   { slug: "conges", title: "Poser un congé", roles: ALL_ROLES, file: "conges.md" },
   {
+    slug: "historique",
+    title: "Voir mes tournées passées et les rapports",
+    roles: ["chauffeur", "manager", "manager_chauffeur", "direction"],
+    file: "historique.md",
+  },
+  {
     slug: "alertes",
     title: "Lire et traiter une alerte",
     roles: ["manager", "manager_chauffeur", "direction", "comptable"],
