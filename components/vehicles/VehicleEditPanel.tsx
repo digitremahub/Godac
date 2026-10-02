@@ -8,6 +8,11 @@ interface ServiceOption {
   name: string;
 }
 
+interface DriverOption {
+  id: string;
+  full_name: string;
+}
+
 export function VehicleEditPanel({
   vehicleId,
   registration,
@@ -17,6 +22,8 @@ export function VehicleEditPanel({
   status,
   serviceId,
   services,
+  assignedDriverId,
+  drivers,
 }: {
   vehicleId: string;
   registration: string;
@@ -26,6 +33,8 @@ export function VehicleEditPanel({
   status: "active" | "maintenance" | "out_of_service";
   serviceId: string | null;
   services: ServiceOption[];
+  assignedDriverId: string | null;
+  drivers: DriverOption[];
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -40,6 +49,8 @@ export function VehicleEditPanel({
         status={status}
         serviceId={serviceId}
         services={services}
+        assignedDriverId={assignedDriverId}
+        drivers={drivers}
         onClose={() => setEditing(false)}
       />
     );

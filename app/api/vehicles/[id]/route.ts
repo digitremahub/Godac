@@ -10,6 +10,7 @@ const bodySchema = z.object({
   service_id: z.string().uuid().nullable().optional(),
   status: z.enum(["active", "maintenance", "out_of_service"]).optional(),
   initial_km: z.coerce.number().min(0).nullable().optional(),
+  assigned_driver_id: z.string().uuid().nullable().optional(),
 });
 
 /** Minimal lookup for flows that only have a vehicle_id (QR scan, tour start/end) and need its label. */

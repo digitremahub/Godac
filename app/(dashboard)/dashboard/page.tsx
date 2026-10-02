@@ -15,7 +15,14 @@ export default async function DashboardPage() {
   const isDriver = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
   const isManagerLike = hasRole(appUser.role, MANAGER_LIKE_ROLES);
 
-  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes, openTourRes, fleetVehiclesRes] = await Promise.all([
+  const isDirection = appUser.role === "direction";
+  let myServiceIds: string[] | null = null;
+  if (isManagerLike && !isDirection) {
+    const { data: myServices } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
+    myServiceIds = (myServices ?? []).map((s) => s.service_id);
+  }
+
+  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes, openTourRes, fleetVehiclesRes, ongoingToursRes] = await Promise.all([
     supabase.from("vehicles").select("id", { count: "exact", head: true }),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase
@@ -38,8 +45,28 @@ export default async function DashboardPage() {
     isManagerLike
       ? supabase.from("vehicles").select("id, registration").eq("status", "active")
       : Promise.resolve({ data: null }),
+    isManagerLike
+      ? (() => {
+          let q = supabase
+            .from("planning_entries")
+            .select("id, tour_number, start_at, vehicles(registration), users!planning_entries_driver_id_fkey(full_name)")
+            .eq("status", "in_progress")
+            .order("start_at", { ascending: true });
+          if (myServiceIds !== null) {
+            q = q.in("service_id", myServiceIds.length > 0 ? myServiceIds : ["00000000-0000-0000-0000-000000000000"]);
+          }
+          return q;
+        })()
+      : Promise.resolve({ data: null }),
   ]);
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
+  const ongoingTours = (ongoingToursRes.data ?? []) as any as {
+    id: string;
+    tour_number: string;
+    start_at: string;
+    vehicles: { registration: string } | null;
+    users: { full_name: string } | null;
+  }[];
 
   const consumptionRanking = isManagerLike
     ? (
@@ -110,6 +137,28 @@ export default async function DashboardPage() {
             </div>
           )}
         </Card>
+
+        <RoleGate role={appUser.role} allow={MANAGER_LIKE_ROLES}>
+          <Card className="lg:col-span-2">
+            <h2 className="mb-3 text-lg">Tournées en cours</h2>
+            {ongoingTours.length === 0 ? (
+              <p className="text-sm text-navy/40">Aucune tournée en cours actuellement.</p>
+            ) : (
+              <ul className="flex flex-col gap-2 text-sm">
+                {ongoingTours.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                    <span>
+                      {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
+                    </span>
+                    <span className="text-xs text-navy/40">
+                      depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </RoleGate>
 
         <RoleGate role={appUser.role} allow={MANAGER_LIKE_ROLES}>
           <Card>

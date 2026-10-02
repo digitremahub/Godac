@@ -35,10 +35,13 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     { data: washes },
     consumption30d,
     consumption90d,
+    { data: drivers },
   ] = await Promise.all([
       supabase
         .from("vehicles")
-        .select("id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name)")
+        .select(
+          "id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name), assigned_driver_id, users!vehicles_assigned_driver_id_fkey(full_name)",
+        )
         .eq("id", id)
         .single(),
       supabase
@@ -71,6 +74,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         : Promise.resolve({ data: null }),
       getVehicleConsumption(supabase, id, 30),
       getVehicleConsumption(supabase, id, 90),
+      supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
     ]);
 
   if (!vehicle) notFound();
@@ -116,6 +120,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               status={v.status}
               serviceId={v.service_id}
               services={services ?? []}
+              assignedDriverId={v.assigned_driver_id}
+              drivers={drivers ?? []}
             />
           </RoleGate>
         }
@@ -160,6 +166,10 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <Card>
             <p className="text-sm text-navy/50">Capacité réservoir</p>
             <p className="text-xl">{v.tank_capacity_liters ? `${v.tank_capacity_liters} L` : "Non renseignée"}</p>
+          </Card>
+          <Card>
+            <p className="text-sm text-navy/50">Chauffeur assigné</p>
+            <p className="text-xl">{v.users?.full_name ?? "Aucun"}</p>
           </Card>
           <Card className="w-full">
             <p className="mb-2 text-sm text-navy/50">Consommation moyenne</p>

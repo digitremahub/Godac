@@ -9,6 +9,11 @@ interface ServiceOption {
   name: string;
 }
 
+interface DriverOption {
+  id: string;
+  full_name: string;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   active: "Actif",
   maintenance: "Entretien",
@@ -24,6 +29,8 @@ export function EditVehicleForm({
   status: initialStatus,
   serviceId: initialServiceId,
   services,
+  assignedDriverId: initialAssignedDriverId,
+  drivers,
   onClose,
 }: {
   vehicleId: string;
@@ -34,6 +41,8 @@ export function EditVehicleForm({
   status: "active" | "maintenance" | "out_of_service";
   serviceId: string | null;
   services: ServiceOption[];
+  assignedDriverId: string | null;
+  drivers: DriverOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -43,6 +52,7 @@ export function EditVehicleForm({
   const [initialKm, setInitialKm] = useState(initialInitialKm?.toString() ?? "");
   const [status, setStatus] = useState(initialStatus);
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
+  const [assignedDriverId, setAssignedDriverId] = useState(initialAssignedDriverId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +70,7 @@ export function EditVehicleForm({
           initial_km: initialKm ? Number(initialKm) : null,
           status,
           service_id: serviceId || null,
+          assigned_driver_id: assignedDriverId || null,
         }),
       });
       const json = await res.json();
@@ -118,6 +129,21 @@ export function EditVehicleForm({
             </option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="label">Chauffeur assigné</label>
+        <select className="input" value={assignedDriverId} onChange={(e) => setAssignedDriverId(e.target.value)}>
+          <option value="">Aucun</option>
+          {drivers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.full_name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-navy/40">
+          C&apos;est ce véhicule que le chauffeur retrouve dans &quot;Mon véhicule&quot;. Il peut aussi prendre
+          lui-même un véhicule non assigné.
+        </p>
       </div>
 
       <div className="flex gap-2">

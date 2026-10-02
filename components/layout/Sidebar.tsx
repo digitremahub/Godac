@@ -58,6 +58,7 @@ const SECTIONS: NavSection[] = [
       { href: "/tanks/photos", label: "Photos de cuves", icon: IconImage, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
       { href: "/tanks/deliveries", label: "Approvisionnements", icon: IconUpload, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
+      { href: "/my-vehicle", label: "Mon véhicule", icon: IconTruck, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/qr-codes", label: "Badges QR", icon: IconQrCode, allow: ["manager", "manager_chauffeur", "direction"] },
       { href: "/maintenance", label: "Demandes d'entretien", icon: IconWrench, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
       { href: "/tours/start", label: "Démarrer une tournée", icon: IconClock, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },

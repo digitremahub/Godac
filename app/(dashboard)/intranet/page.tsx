@@ -4,6 +4,8 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { AnnouncementForm } from "@/components/intranet/AnnouncementForm";
 import { AnnouncementsList } from "@/components/intranet/AnnouncementsList";
+import { MeetingRequestForm } from "@/components/intranet/MeetingRequestForm";
+import { MeetingRequestsList } from "@/components/intranet/MeetingRequestsList";
 
 export default async function IntranetPage() {
   const appUser = await requireAppUser();
@@ -20,8 +22,9 @@ export default async function IntranetPage() {
   }
 
   const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const canRequestMeeting = appUser.role !== "direction";
 
-  const [{ data: announcements }, { data: myReads }, { data: services }] = await Promise.all([
+  const [{ data: announcements }, { data: myReads }, { data: services }, { data: meetingRequests }] = await Promise.all([
     supabase
       .from("announcements")
       .select(
@@ -30,6 +33,10 @@ export default async function IntranetPage() {
       .order("created_at", { ascending: false }),
     supabase.from("announcement_reads").select("announcement_id").eq("user_id", appUser.id),
     supabase.from("services").select("id, name").order("name"),
+    supabase
+      .from("meeting_requests")
+      .select("id, reason, preferred_date, status, created_at, requested_by, users!meeting_requests_requested_by_fkey(full_name)")
+      .order("created_at", { ascending: false }),
   ]);
 
   const rows = (announcements ?? []) as any[];
@@ -68,6 +75,23 @@ export default async function IntranetPage() {
           readCount: isManagerLike && a.requires_acknowledgement ? readCountByAnnouncement.get(a.id) ?? 0 : null,
         }))}
       />
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg">Rendez-vous</h2>
+        {canRequestMeeting && <MeetingRequestForm />}
+        <MeetingRequestsList
+          canManage={isManagerLike}
+          requests={((meetingRequests ?? []) as any[]).map((r) => ({
+            id: r.id,
+            requesterName: r.users?.full_name ?? "—",
+            reason: r.reason,
+            preferredDate: r.preferred_date,
+            status: r.status,
+            createdAt: r.created_at,
+            isOwn: r.requested_by === appUser.id,
+          }))}
+        />
+      </div>
     </div>
   );
 }
