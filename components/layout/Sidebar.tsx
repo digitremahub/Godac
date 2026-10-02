@@ -100,12 +100,18 @@ export function Sidebar({
   organizationName,
   logoUrl,
   accentColor,
+  open = false,
+  onNavigate,
 }: {
   role: UserRole;
   enabledModuleKeys: string[];
   organizationName?: string;
   logoUrl?: string | null;
   accentColor?: string | null;
+  /** Mobile drawer state (ignored at `lg` and above, where the sidebar is always visible). */
+  open?: boolean;
+  /** Called when a nav link is tapped — the mobile shell closes the drawer on it. */
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname() ?? "";
   const enabled = new Set(enabledModuleKeys);
@@ -129,8 +135,12 @@ export function Sidebar({
     .sort((a, b) => b.length - a.length)[0];
 
   return (
-    <nav className="flex h-full w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-navy/10 bg-white/70 p-4 backdrop-blur-sm">
-      <Link href="/dashboard" title="Accueil" className="flex items-center gap-2.5 px-2 pt-1">
+    <nav
+      className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-navy/10 bg-white/95 p-4 backdrop-blur-sm transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:bg-white/70 ${
+        open ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
+      <Link href="/dashboard" title="Accueil" className="flex items-center gap-2.5 px-2 pt-1" onClick={onNavigate}>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt={organizationName ?? "Logo"} className="h-9 w-9 rounded-lg object-contain ring-1 ring-navy/10" />
@@ -153,7 +163,8 @@ export function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
+                onClick={onNavigate}
+                className={`group relative flex min-h-[44px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
                   active ? "bg-navy/[0.08]" : "text-navy/60 hover:bg-navy/[0.05] hover:text-navy"
                 }`}
                 style={active ? { color: accentText } : undefined}

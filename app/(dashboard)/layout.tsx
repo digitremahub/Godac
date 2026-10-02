@@ -3,8 +3,7 @@ import { getCurrentAppUser } from "@/lib/auth/session";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { TopBar } from "@/components/layout/TopBar";
+import { DashboardShell } from "@/components/layout/DashboardShell";
 
 export default async function DashboardLayout({
   children,
@@ -25,24 +24,27 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabaseClient();
-  const [enabledModuleKeys, { data: organization }] = await Promise.all([
+  const isFieldRole = appUser.role === "chauffeur" || appUser.role === "manager_chauffeur";
+  const [enabledModuleKeys, { data: organization }, activeTour] = await Promise.all([
     getEnabledModuleKeys(supabase, appUser.organization_id),
     supabase.from("organizations").select("name, logo_url, accent_color").eq("id", appUser.organization_id).single(),
+    isFieldRole
+      ? supabase.from("planning_entries").select("id").eq("driver_id", appUser.id).eq("status", "in_progress").maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar
-        role={appUser.role}
-        enabledModuleKeys={enabledModuleKeys}
-        organizationName={organization?.name ?? "GODAC"}
-        logoUrl={organization?.logo_url ?? null}
-        accentColor={organization?.accent_color ?? null}
-      />
-      <div className="flex flex-1 flex-col">
-        <TopBar fullName={appUser.full_name} role={appUser.role} roleTitle={appUser.role_title} />
-        <main className="flex-1 overflow-y-auto p-6 sm:p-8">{children}</main>
-      </div>
-    </div>
+    <DashboardShell
+      role={appUser.role}
+      enabledModuleKeys={enabledModuleKeys}
+      organizationName={organization?.name ?? "GODAC"}
+      logoUrl={organization?.logo_url ?? null}
+      accentColor={organization?.accent_color ?? null}
+      fullName={appUser.full_name}
+      roleTitle={appUser.role_title}
+      hasActiveTour={Boolean(activeTour.data)}
+    >
+      {children}
+    </DashboardShell>
   );
 }

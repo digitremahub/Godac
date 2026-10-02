@@ -60,30 +60,32 @@ export default async function DashboardPage() {
               description="Les ravitaillements saisis manuellement ou via OCR apparaîtront ici."
             />
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-navy/40">
-                <tr>
-                  <th className="pb-2">Date</th>
-                  <th className="pb-2">Véhicule</th>
-                  <th className="pb-2">Litres</th>
-                  <th className="pb-2">Prix/L</th>
-                  <th className="pb-2">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentEntriesRes.data.map((entry: any) => (
-                  <tr key={entry.id} className="border-t border-navy/5">
-                    <td className="py-2">{new Date(entry.occurred_at).toLocaleDateString("fr-FR")}</td>
-                    <td className="py-2">{entry.vehicles?.registration ?? "—"}</td>
-                    <td className="py-2">{entry.liters} L</td>
-                    <td className="py-2">{entry.unit_price} €</td>
-                    <td className="py-2">
-                      <StatusBadge status={entry.status} />
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead className="text-left text-navy/40">
+                  <tr>
+                    <th className="pb-2">Date</th>
+                    <th className="pb-2">Véhicule</th>
+                    <th className="pb-2">Litres</th>
+                    <th className="pb-2">Prix/L</th>
+                    <th className="pb-2">Statut</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentEntriesRes.data.map((entry: any) => (
+                    <tr key={entry.id} className="border-t border-navy/5">
+                      <td className="py-2">{new Date(entry.occurred_at).toLocaleDateString("fr-FR")}</td>
+                      <td className="py-2">{entry.vehicles?.registration ?? "—"}</td>
+                      <td className="py-2">{entry.liters} L</td>
+                      <td className="py-2">{entry.unit_price} €</td>
+                      <td className="py-2">
+                        <StatusBadge status={entry.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 

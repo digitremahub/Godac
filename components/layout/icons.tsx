@@ -205,3 +205,28 @@ export function IconFlag(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconMenu(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </Svg>
+  );
+}
+
+export function IconX(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}
+
+export function IconWashing(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="13" r="7" />
+      <path d="M9 13a3 3 0 0 1 6 0M12 6V3M8 4.5l1 2M16 4.5l-1 2" />
+    </Svg>
+  );
+}
