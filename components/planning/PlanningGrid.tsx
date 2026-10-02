@@ -73,6 +73,7 @@ export function PlanningGrid({
   prevWeek,
   nextWeek,
   selectedService,
+  lastTourByDriver = {},
 }: {
   services: ServiceOption[];
   filteredServices: ServiceOption[];
@@ -83,10 +84,14 @@ export function PlanningGrid({
   prevWeek: string;
   nextWeek: string;
   selectedService: string;
+  /** Each driver's most recent tour (any week) — pre-fills the form below so re-typing the same weekly route isn't needed every time. */
+  lastTourByDriver?: Record<string, { vehicleId: string; tourNumber: string }>;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateSummary, setDuplicateSummary] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formService, setFormService] = useState(filteredServices[0]?.id ?? services[0]?.id ?? "");
   const [formDay, setFormDay] = useState(weekStart);
@@ -95,6 +100,44 @@ export function PlanningGrid({
   const [formDriverId, setFormDriverId] = useState("");
   const [formVehicleId, setFormVehicleId] = useState("");
   const [formBusy, setFormBusy] = useState(false);
+
+  function selectDriver(driverId: string) {
+    setFormDriverId(driverId);
+    const last = lastTourByDriver[driverId];
+    if (last) {
+      if (!formVehicleId) setFormVehicleId(last.vehicleId);
+      if (!formTourNumber) setFormTourNumber(last.tourNumber);
+    }
+  }
+
+  async function duplicatePreviousWeek() {
+    setDuplicating(true);
+    setError(null);
+    setDuplicateSummary(null);
+    try {
+      const res = await fetch("/api/planning/duplicate-week", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_week_start: prevWeek,
+          target_week_start: weekStart,
+          service_id: selectedService || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setDuplicateSummary(
+        json.created > 0
+          ? `${json.created} affectation(s) copiée(s) depuis la semaine précédente.`
+          : "Rien à copier (semaine précédente vide, ou déjà dupliquée).",
+      );
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setDuplicating(false);
+    }
+  }
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -200,12 +243,16 @@ export function PlanningGrid({
             Semaine suiv. →
           </button>
         </div>
-        <button className="btn-primary ml-auto !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
+        <button className="btn-secondary ml-auto !px-3 !py-1.5 text-sm" disabled={duplicating} onClick={duplicatePreviousWeek}>
+          {duplicating ? "Copie…" : "📋 Dupliquer la semaine préc."}
+        </button>
+        <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
           + Nouvelle affectation
         </button>
       </div>
 
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {duplicateSummary && <p className="text-sm text-teal-ink">{duplicateSummary}</p>}
 
       {formOpen && (
         <Card className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
@@ -244,13 +291,17 @@ export function PlanningGrid({
           </div>
           <div>
             <label className="label">Chauffeur</label>
-            <select className="input !w-auto" value={formDriverId} onChange={(e) => setFormDriverId(e.target.value)}>
+            <select className="input !w-auto" value={formDriverId} onChange={(e) => selectDriver(e.target.value)}>
               <option value="">Choisir…</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.full_name}
-                </option>
-              ))}
+              {drivers.map((d) => {
+                const last = lastTourByDriver[d.id];
+                return (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name}
+                    {last ? ` (dernière: n°${last.tourNumber})` : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
