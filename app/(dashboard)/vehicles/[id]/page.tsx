@@ -10,18 +10,22 @@ import { VehicleEditPanel } from "@/components/vehicles/VehicleEditPanel";
 import { RoleGate } from "@/components/layout/RoleGate";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { OdometerHistory, type OdometerReading } from "@/components/vehicles/OdometerHistory";
+import { WashHistory, type WashRecord } from "@/components/vehicles/WashHistory";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
 
-  const fleetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fleet");
+  const [fleetEnabled, washesEnabled] = await Promise.all([
+    isModuleEnabled(supabase, appUser.organization_id, "fleet"),
+    isModuleEnabled(supabase, appUser.organization_id, "washes"),
+  ]);
   if (!fleetEnabled) {
     return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
   }
 
-  const [{ data: vehicle }, { data: interventions }, { data: services }, { data: fuelHistory }, { data: tours }] =
+  const [{ data: vehicle }, { data: interventions }, { data: services }, { data: fuelHistory }, { data: tours }, { data: washes }] =
     await Promise.all([
       supabase
         .from("vehicles")
@@ -46,6 +50,14 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         .eq("vehicle_id", id)
         .order("start_at", { ascending: false })
         .limit(20),
+      washesEnabled
+        ? supabase
+            .from("vehicle_washes")
+            .select("id, created_at, washed_exterior, washed_cabin_interior, washed_trailer, users(full_name)")
+            .eq("vehicle_id", id)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: null }),
     ]);
 
   if (!vehicle) notFound();
@@ -104,6 +116,19 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               emptyDescription="Aucun ravitaillement enregistré pour ce véhicule."
             />
           </div>
+
+          {washesEnabled && (
+            <WashHistory
+              washes={(washes ?? []).map((w: any) => ({
+                id: w.id,
+                created_at: w.created_at,
+                washed_exterior: w.washed_exterior,
+                washed_cabin_interior: w.washed_cabin_interior,
+                washed_trailer: w.washed_trailer,
+                driverName: w.users?.full_name ?? "—",
+              })) as WashRecord[]}
+            />
+          )}
         </div>
         <div className="flex flex-col items-center gap-4">
           <Card>
