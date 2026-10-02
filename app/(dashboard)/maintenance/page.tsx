@@ -7,9 +7,14 @@ import { MaintenanceRequestsList } from "@/components/maintenance/MaintenanceReq
 
 const URGENCY_RANK: Record<string, number> = { critical: 0, high: 1, normal: 2, low: 3 };
 
-export default async function MaintenancePage() {
+export default async function MaintenancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vehicle?: string }>;
+}) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
+  const { vehicle } = await searchParams;
 
   const maintenanceEnabled = await isModuleEnabled(supabase, appUser.organization_id, "maintenance_requests");
   if (!maintenanceEnabled) {
@@ -41,7 +46,7 @@ export default async function MaintenancePage() {
         description="Signalement chauffeur → gestionnaire, avec niveau d'urgence."
       />
 
-      <MaintenanceRequestForm vehicles={vehicles ?? []} />
+      <MaintenanceRequestForm vehicles={vehicles ?? []} initialVehicleId={vehicle} />
 
       <MaintenanceRequestsList
         requests={rows.map((r) => ({

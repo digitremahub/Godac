@@ -2,8 +2,13 @@ import { requireAppUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/ui";
 import { StartTourFlow } from "@/components/tours/StartTourFlow";
 
-export default async function StartTourPage() {
+export default async function StartTourPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vehicle?: string }>;
+}) {
   await requireAppUser();
+  const { vehicle } = await searchParams;
   return (
     <div>
       <PageHeader
@@ -11,7 +16,7 @@ export default async function StartTourPage() {
         description="Scannez le véhicule, indiquez le numéro de tournée et le kilométrage, puis prenez en photo la feuille de départ."
       />
       <div className="mx-auto max-w-md">
-        <StartTourFlow />
+        <StartTourFlow initialVehicleId={vehicle} />
       </div>
     </div>
   );

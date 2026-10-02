@@ -16,9 +16,15 @@ const URGENCY_LABELS: Record<string, string> = {
   critical: "Critique",
 };
 
-export function MaintenanceRequestForm({ vehicles }: { vehicles: VehicleOption[] }) {
+export function MaintenanceRequestForm({
+  vehicles,
+  initialVehicleId,
+}: {
+  vehicles: VehicleOption[];
+  initialVehicleId?: string;
+}) {
   const router = useRouter();
-  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? "");
+  const [vehicleId, setVehicleId] = useState(initialVehicleId ?? vehicles[0]?.id ?? "");
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState("normal");

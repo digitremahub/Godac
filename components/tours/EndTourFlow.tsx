@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/fuel/QrScanner";
@@ -19,7 +19,7 @@ interface OpenTour {
  * tournée ouverte du chauffeur → kilométrage retour + anomalies →
  * photo du rapport. end_at est pris automatiquement à l'envoi.
  */
-export function EndTourFlow() {
+export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } = {}) {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -33,6 +33,13 @@ export function EndTourFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  // Same shortcut as StartTourFlow: a vehicle already identified by
+  // /v/[id] doesn't need a second scan to run the same open-tour check.
+  useEffect(() => {
+    if (initialVehicleId) handleScan(initialVehicleId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVehicleId]);
 
   async function handleScan(id: string) {
     setVehicleId(id);

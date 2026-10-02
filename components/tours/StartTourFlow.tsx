@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/fuel/QrScanner";
 import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
@@ -20,7 +20,7 @@ interface OpenTour {
  * → photo de la feuille papier. Départ/heure sont pris automatiquement
  * au moment de l'envoi (start_at), pas de saisie manuelle nécessaire.
  */
-export function StartTourFlow() {
+export function StartTourFlow({ initialVehicleId }: { initialVehicleId?: string } = {}) {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -32,6 +32,14 @@ export function StartTourFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  // Arriving from the vehicle's own QR landing page (/v/[id]) already
+  // identifies the vehicle — skip straight to the same check the
+  // scanner would have triggered instead of asking for a second scan.
+  useEffect(() => {
+    if (initialVehicleId) handleScan(initialVehicleId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVehicleId]);
 
   async function handleScan(id: string) {
     setVehicleId(id);
