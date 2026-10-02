@@ -7,13 +7,24 @@ import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
 import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
 
+const reportFieldsSchema = z.object({
+  tour_number: z.string().nullable(),
+  bl_number: z.string().nullable(),
+  stops_total: z.number().int().nonnegative().nullable(),
+  packages_count: z.number().int().nonnegative().nullable(),
+  priority_count: z.number().int().nonnegative().nullable(),
+});
+
 const bodySchema = z
   .object({
     vehicle_id: z.string().uuid(),
     tour_number: z.string().min(1).optional(),
     start_km: z.coerce.number().min(0),
     start_km_photo_path: z.string().optional(),
-    has_sheet_photo: z.boolean().optional().default(false),
+    // Already uploaded via TourReportPhotoCapture (app/api/ocr/tour-report/init+process),
+    // unlike the problem photo below which is still uploaded after this insert returns its id.
+    sheet_photo_path: z.string().optional(),
+    report_fields: reportFieldsSchema.partial().optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
   })
@@ -83,7 +94,7 @@ export async function POST(req: Request) {
   }
 
   const tourNumber = parsed.data.tour_number?.trim() || generateTourNumber(vehicle.registration);
-  const storagePath = `${appUser.organization_id}/${vehicle.id}/${randomUUID()}.jpg`;
+  const reportFields = parsed.data.report_fields;
   const startFields = {
     vehicle_id: vehicle.id,
     service_id: vehicle.service_id,
@@ -91,8 +102,17 @@ export async function POST(req: Request) {
     status: "in_progress" as const,
     start_km: parsed.data.start_km,
     start_km_photo_path: parsed.data.start_km_photo_path,
-    start_photo_path: parsed.data.has_sheet_photo ? storagePath : null,
+    start_photo_path: parsed.data.sheet_photo_path ?? null,
     start_vehicle_ok: parsed.data.vehicle_ok,
+    ...(reportFields
+      ? {
+          report_bl_number: reportFields.bl_number ?? null,
+          report_stops_total: reportFields.stops_total ?? null,
+          report_packages_count: reportFields.packages_count ?? null,
+          report_priority_count: reportFields.priority_count ?? null,
+          report_ocr_raw: { start: reportFields },
+        }
+      : {}),
   };
 
   // If a manager already planned this exact tour number for this
@@ -141,5 +161,5 @@ export async function POST(req: Request) {
     if (interventionError) return NextResponse.json({ error: interventionError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ tourId: data.id, tourNumber, storagePath, problemPhotoStoragePath });
+  return NextResponse.json({ tourId: data.id, tourNumber, problemPhotoStoragePath });
 }

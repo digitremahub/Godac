@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { QrScanner } from "@/components/fuel/QrScanner";
 import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
+import { TourReportPhotoCapture } from "@/components/shared/TourReportPhotoCapture";
 import { Card, EmptyState } from "@/components/ui";
+import type { TourReportFields } from "@/lib/ocr/tour-report";
 
 interface OpenTour {
   id: string;
@@ -39,7 +41,8 @@ export function EndTourFlow({
   const [endKm, setEndKm] = useState("");
   const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
   const [notes, setNotes] = useState("");
-  const [sheetPhotoFile, setSheetPhotoFile] = useState<File | null>(null);
+  const [sheetPhotoPath, setSheetPhotoPath] = useState("");
+  const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
   const [problemPhotoFile, setProblemPhotoFile] = useState<File | null>(null);
@@ -102,7 +105,8 @@ export function EndTourFlow({
           vehicle_id: vehicleId,
           end_km: Number(endKm),
           end_km_photo_path: endKmPhotoPath || undefined,
-          has_sheet_photo: Boolean(sheetPhotoFile),
+          sheet_photo_path: sheetPhotoPath || undefined,
+          report_fields: reportFields ?? undefined,
           notes: notes || undefined,
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
@@ -111,16 +115,7 @@ export function EndTourFlow({
       const patchJson = await patchRes.json();
       if (!patchRes.ok) throw new Error(typeof patchJson.error === "string" ? patchJson.error : "Erreur");
 
-      const { storagePath, problemPhotoStoragePath } = patchJson as {
-        storagePath: string;
-        problemPhotoStoragePath: string | null;
-      };
-      if (sheetPhotoFile) {
-        const { error: uploadError } = await supabase.storage
-          .from("tour-photos")
-          .upload(storagePath, sheetPhotoFile, { contentType: sheetPhotoFile.type });
-        if (uploadError) throw new Error(`Envoi de la photo du rapport échoué: ${uploadError.message}`);
-      }
+      const { problemPhotoStoragePath } = patchJson as { problemPhotoStoragePath: string | null };
       if (problemPhotoFile && problemPhotoStoragePath) {
         const { error: uploadError } = await supabase.storage
           .from("tour-photos")
@@ -237,16 +232,25 @@ export function EndTourFlow({
         <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      <label className="btn-secondary w-full cursor-pointer justify-center text-center">
-        {sheetPhotoFile ? "Photo du rapport sélectionnée ✓" : "📷 Photo du rapport de retour (optionnel)"}
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => setSheetPhotoFile(e.target.files?.[0] ?? null)}
-        />
-      </label>
+      <TourReportPhotoCapture
+        label="Photo du compte-rendu de tournée (optionnel — lecture auto)"
+        onCaptured={({ photoPath, fields }) => {
+          setSheetPhotoPath(photoPath);
+          setReportFields(fields);
+        }}
+      />
+      {reportFields && (
+        <p className="text-xs text-teal-ink">
+          Lu automatiquement :{" "}
+          {[
+            reportFields.stops_delivered !== null && `${reportFields.stops_delivered} arrêts livrés`,
+            reportFields.packages_missing !== null && `${reportFields.packages_missing} colis manquants`,
+            reportFields.pickups !== null && `${reportFields.pickups} ramasses`,
+          ]
+            .filter(Boolean)
+            .join(" · ") || "aucune donnée exploitable sur cette photo"}
+        </p>
+      )}
 
       <label className="flex min-h-[44px] items-center gap-2 text-sm">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
