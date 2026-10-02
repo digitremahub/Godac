@@ -10,11 +10,13 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
  *
  * A vehicle sticker lands on its own quick-actions page (/v/[id]) —
  * tank badges still go straight into the fuel-entry wizard. A driver
- * badge is the odd one out since Lot 7: for most drivers it behaves
- * like before (identify yourself at a shared terminal, straight into
- * the fuel wizard — middleware.ts gates it behind sign-in same as
- * ever), but for a `pin`-auth driver scanned while signed out, this
- * badge *is* how they log in — middleware.ts lets `/scan/driver/*`
+ * badge has three distinct destinations: scanning *your own* badge
+ * while signed in opens your profile (/account, where that same badge
+ * is displayed — this is "show me my badge again", not an
+ * identification scan); scanning *someone else's* driver badge (a
+ * shared terminal at the pump) goes to the fuel wizard with them
+ * pre-filled, same as before; scanned signed-out, it's how a
+ * `pin`-auth driver logs in — middleware.ts lets `/scan/driver/*`
  * through unauthenticated specifically so this check can run.
  */
 export default async function ScanRedirectPage({
@@ -40,6 +42,9 @@ export default async function ScanRedirectPage({
       redirect(`/sign-in?redirect_to=${encodeURIComponent(`/scan/driver/${id}`)}`);
     }
 
+    if (user.id === id) {
+      redirect("/account");
+    }
     redirect(`/fuel/new?driver=${id}`);
   }
 
