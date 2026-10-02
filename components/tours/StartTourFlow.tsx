@@ -17,6 +17,13 @@ interface OpenTour {
   vehicles: { id: string; registration: string } | null;
 }
 
+interface PlannedToday {
+  id: string;
+  tour_number: string;
+  start_at: string;
+  vehicles: { id: string; registration: string } | null;
+}
+
 /**
  * Départ de tournée: scan véhicule → numéro de tournée (facultatif) +
  * kilométrage (obligatoire) + état du véhicule (obligatoire, jamais
@@ -38,6 +45,7 @@ export function StartTourFlow({
   const [registration, setRegistration] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [openTour, setOpenTour] = useState<OpenTour | null>(null);
+  const [plannedToday, setPlannedToday] = useState<PlannedToday | null>(null);
   const [tourNumber, setTourNumber] = useState("");
   const [startKm, setStartKm] = useState("");
   const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
@@ -68,6 +76,8 @@ export function StartTourFlow({
       const openJson = await openRes.json();
       if (!openRes.ok) throw new Error(typeof openJson.error === "string" ? openJson.error : "Erreur");
       setOpenTour(openJson.tour);
+      setPlannedToday(openJson.plannedToday ?? null);
+      if (openJson.plannedToday && !tourNumber) setTourNumber(openJson.plannedToday.tour_number);
       const vehicleJson = await vehicleRes.json();
       if (vehicleRes.ok) setRegistration(vehicleJson.vehicle?.registration ?? null);
     } catch (e) {
@@ -96,6 +106,7 @@ export function StartTourFlow({
         body: JSON.stringify({
           vehicle_id: vehicleId,
           tour_number: tourNumber || undefined,
+          planned_entry_id: plannedToday?.id,
           start_km: Number(startKm),
           start_km_photo_path: startKmPhotoPath || undefined,
           sheet_photo_path: sheetPhotoPath || undefined,
@@ -154,6 +165,13 @@ export function StartTourFlow({
   return (
     <Card className="flex flex-col gap-3">
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+
+      {plannedToday && (
+        <p className="rounded-lg bg-teal/10 px-3 py-2 text-xs text-teal-ink">
+          Tournée n°{plannedToday.tour_number} prévue aujourd&apos;hui
+          {plannedToday.vehicles ? ` — véhicule ${plannedToday.vehicles.registration}` : ""}. Le planning sera mis à jour automatiquement.
+        </p>
+      )}
 
       <div>
         <label className="label">Numéro de tournée (optionnel)</label>

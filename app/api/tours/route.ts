@@ -19,6 +19,12 @@ const bodySchema = z
   .object({
     vehicle_id: z.string().uuid(),
     tour_number: z.string().min(1).optional(),
+    // From GET /api/tours/open's plannedToday, round-tripped by
+    // StartTourFlow — links this start directly to the row a manager
+    // already planned, rather than the fragile tour_number text match
+    // below (which still runs as a fallback for a driver who typed a
+    // tour number without ever seeing a plannedToday suggestion).
+    planned_entry_id: z.string().uuid().optional(),
     start_km: z.coerce.number().min(0),
     start_km_photo_path: z.string().optional(),
     // Already uploaded via TourReportPhotoCapture (app/api/ocr/tour-report/init+process),
@@ -115,25 +121,36 @@ export async function POST(req: Request) {
       : {}),
   };
 
-  // If a manager already planned this exact tour number for this
-  // driver (the /planning grid), turn that same row into the real
-  // one instead of creating a parallel record — this is what keeps
-  // a last-minute vehicle swap or delay reflected on the manager's
-  // planning rather than leaving a stale "planned" entry sitting next
-  // to a disconnected "in_progress" one. Only looked up when the
-  // driver actually typed a tour number — a server-generated one has
-  // nothing planned to match against.
-  const plannedMatch = parsed.data.tour_number
+  // If a manager already planned a tour for this driver, turn that
+  // same row into the real one instead of creating a parallel record
+  // — this is what keeps a last-minute vehicle swap or delay
+  // reflected on the manager's planning rather than leaving a stale
+  // "planned" entry sitting next to a disconnected "in_progress" one.
+  // Prefer the explicit id round-tripped from plannedToday (reliable,
+  // doesn't depend on the driver typing anything); fall back to a
+  // tour-number text match for a driver who typed one without ever
+  // being shown a plannedToday suggestion (e.g. an older client).
+  const plannedMatch = parsed.data.planned_entry_id
     ? (
         await supabase
           .from("planning_entries")
           .select("id")
+          .eq("id", parsed.data.planned_entry_id)
           .eq("driver_id", appUser.id)
-          .eq("tour_number", parsed.data.tour_number)
           .eq("status", "planned")
           .maybeSingle()
       ).data
-    : null;
+    : parsed.data.tour_number
+      ? (
+          await supabase
+            .from("planning_entries")
+            .select("id")
+            .eq("driver_id", appUser.id)
+            .eq("tour_number", parsed.data.tour_number)
+            .eq("status", "planned")
+            .maybeSingle()
+        ).data
+      : null;
 
   const { data, error } = plannedMatch
     ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()

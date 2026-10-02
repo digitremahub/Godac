@@ -66,6 +66,7 @@ const SECTIONS: NavSection[] = [
       { href: "/tours/end", label: "Terminer une tournée", icon: IconFlag, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/planning/mine", label: "Mon planning", icon: IconCalendar, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/planning", label: "Planning", icon: IconCalendar, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
+      { href: "/tours/history", label: "Historique des tournées", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
     ],
   },
   {

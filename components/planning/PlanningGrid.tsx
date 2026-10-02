@@ -100,6 +100,23 @@ export function PlanningGrid({
   const [formDriverId, setFormDriverId] = useState("");
   const [formVehicleId, setFormVehicleId] = useState("");
   const [formBusy, setFormBusy] = useState(false);
+  const [formWholeWeek, setFormWholeWeek] = useState(false);
+  const [formDays, setFormDays] = useState<Set<number>>(new Set([0, 1, 2, 3, 4, 5, 6]));
+  const [bulkSummary, setBulkSummary] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTourNumber, setEditTourNumber] = useState("");
+  const [editDriverId, setEditDriverId] = useState("");
+  const [editVehicleId, setEditVehicleId] = useState("");
+  const [editTime, setEditTime] = useState("07:00");
+
+  function toggleFormDay(offset: number) {
+    setFormDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(offset)) next.delete(offset);
+      else next.add(offset);
+      return next;
+    });
+  }
 
   function selectDriver(driverId: string) {
     setFormDriverId(driverId);
@@ -188,6 +205,46 @@ export function PlanningGrid({
     }
   }
 
+  function startEdit(entry: PlanningEntry) {
+    setEditingId(entry.id);
+    setEditTourNumber(entry.tour_number);
+    setEditDriverId(entry.driver_id ?? "");
+    setEditVehicleId(entry.vehicle_id ?? "");
+    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function saveEdit(entry: PlanningEntry) {
+    if (!editTourNumber || !editDriverId || !editVehicleId || !editTime) return;
+    const day = entry.start_at.slice(0, 10);
+    const start = new Date(`${day}T${editTime}:00`);
+    setBusyId(entry.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tour_number: editTourNumber,
+          driver_id: editDriverId,
+          vehicle_id: editVehicleId,
+          start_at: start.toISOString(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setEditingId(null);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function removeEntry(entryId: string) {
     setBusyId(entryId);
     setError(null);
@@ -205,23 +262,48 @@ export function PlanningGrid({
 
   async function createEntry() {
     if (!formService || !formDriverId || !formVehicleId || !formTourNumber || !formTime) return;
-    const start = new Date(`${formDay}T${formTime}:00`);
+    if (formWholeWeek && formDays.size === 0) return;
     setFormBusy(true);
     setError(null);
+    setBulkSummary(null);
     try {
-      const res = await fetch("/api/planning/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: formService,
-          driver_id: formDriverId,
-          vehicle_id: formVehicleId,
-          tour_number: formTourNumber,
-          start_at: start.toISOString(),
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (formWholeWeek) {
+        const res = await fetch("/api/planning/entries/bulk-week", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            service_id: formService,
+            driver_id: formDriverId,
+            vehicle_id: formVehicleId,
+            tour_number: formTourNumber,
+            week_start: weekStart,
+            time: formTime,
+            days: Array.from(formDays),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+        setBulkSummary(
+          json.created > 0
+            ? `${json.created} jour(s) affecté(s)${json.skipped > 0 ? ` (${json.skipped} déjà occupé(s), ignoré(s))` : ""}.`
+            : "Rien à créer (tous les jours sélectionnés ont déjà une affectation).",
+        );
+      } else {
+        const start = new Date(`${formDay}T${formTime}:00`);
+        const res = await fetch("/api/planning/entries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            service_id: formService,
+            driver_id: formDriverId,
+            vehicle_id: formVehicleId,
+            tour_number: formTourNumber,
+            start_at: start.toISOString(),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      }
       setFormOpen(false);
       setFormTourNumber("");
       setFormDriverId("");
@@ -256,6 +338,7 @@ export function PlanningGrid({
 
       {error && <p className="text-sm text-orange-ink">{error}</p>}
       {duplicateSummary && <p className="text-sm text-teal-ink">{duplicateSummary}</p>}
+      {bulkSummary && <p className="text-sm text-teal-ink">{bulkSummary}</p>}
 
       {formOpen && (
         <Card className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
@@ -269,16 +352,40 @@ export function PlanningGrid({
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">Jour</label>
-            <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
-              {days.map((d, i) => (
-                <option key={d} value={d}>
-                  {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
-                </option>
-              ))}
-            </select>
-          </div>
+          <label className="flex min-h-[44px] items-center gap-2 text-sm">
+            <input type="checkbox" checked={formWholeWeek} onChange={(e) => setFormWholeWeek(e.target.checked)} />
+            Toute la semaine
+          </label>
+          {formWholeWeek ? (
+            <div className="flex flex-col gap-1">
+              <label className="label">Jours</label>
+              <div className="flex gap-1">
+                {DAY_LABELS.map((label, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`rounded-md px-2 py-1 text-xs ${
+                      formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/5 text-navy/40"
+                    }`}
+                    onClick={() => toggleFormDay(i)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="label">Jour</label>
+              <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
+                {days.map((d, i) => (
+                  <option key={d} value={d}>
+                    {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="label">Heure</label>
             <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} />
@@ -322,10 +429,17 @@ export function PlanningGrid({
           </div>
           <button
             className="btn-primary shrink-0"
-            disabled={formBusy || !formService || !formDriverId || !formVehicleId || !formTourNumber}
+            disabled={
+              formBusy ||
+              !formService ||
+              !formDriverId ||
+              !formVehicleId ||
+              !formTourNumber ||
+              (formWholeWeek && formDays.size === 0)
+            }
             onClick={createEntry}
           >
-            {formBusy ? "Envoi…" : "Ajouter"}
+            {formBusy ? "Envoi…" : formWholeWeek ? "Ajouter la semaine" : "Ajouter"}
           </button>
         </Card>
       )}
@@ -365,7 +479,7 @@ export function PlanningGrid({
                         {dayEntries.map((entry) => (
                           <div
                             key={entry.id}
-                            draggable={entry.status === "planned"}
+                            draggable={entry.status === "planned" && editingId !== entry.id}
                             onDragStart={(e) => e.dataTransfer.setData("text/plain", entry.id)}
                             className={`rounded-md border border-navy/10 bg-white p-1.5 text-xs shadow-sm ${
                               entry.status === "planned" ? "cursor-move" : "opacity-80"
@@ -376,6 +490,16 @@ export function PlanningGrid({
                                 {STATUS_LABEL[entry.status] ?? entry.status}
                               </span>
                               <span className="flex items-center gap-1">
+                                {entry.status === "planned" && editingId !== entry.id && (
+                                  <button
+                                    className="text-navy/30 hover:text-teal-ink"
+                                    onClick={() => startEdit(entry)}
+                                    aria-label="Modifier"
+                                    title="Modifier"
+                                  >
+                                    ✎
+                                  </button>
+                                )}
                                 <button
                                   className="text-navy/30 hover:text-teal-ink"
                                   onClick={() => duplicateEntry(entry.id)}
@@ -395,13 +519,70 @@ export function PlanningGrid({
                                 )}
                               </span>
                             </div>
-                            <p className="font-medium">n°{entry.tour_number}</p>
-                            <p className="text-navy/60">{entry.users?.full_name ?? "—"}</p>
-                            <p className="text-navy/40">{entry.vehicles?.registration ?? "—"}</p>
-                            <p className="text-navy/40">
-                              {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                            </p>
-                            {entry.users && (entry.users.phone || entry.users.email) && (
+                            {editingId === entry.id ? (
+                              <div className="flex flex-col gap-1">
+                                <input
+                                  className="input !h-7 !py-0.5 !text-xs"
+                                  value={editTourNumber}
+                                  onChange={(e) => setEditTourNumber(e.target.value)}
+                                  placeholder="N° tournée"
+                                />
+                                <select
+                                  className="input !h-7 !py-0.5 !text-xs"
+                                  value={editDriverId}
+                                  onChange={(e) => setEditDriverId(e.target.value)}
+                                >
+                                  <option value="">Chauffeur…</option>
+                                  {drivers.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.full_name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  className="input !h-7 !py-0.5 !text-xs"
+                                  value={editVehicleId}
+                                  onChange={(e) => setEditVehicleId(e.target.value)}
+                                >
+                                  <option value="">Véhicule…</option>
+                                  {vehicles.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                      {v.registration}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  className="input !h-7 !py-0.5 !text-xs"
+                                  type="time"
+                                  value={editTime}
+                                  onChange={(e) => setEditTime(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    onClick={() => saveEdit(entry)}
+                                  >
+                                    OK
+                                  </button>
+                                  <button
+                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    onClick={cancelEdit}
+                                  >
+                                    Annuler
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="font-medium">n°{entry.tour_number}</p>
+                                <p className="text-navy/60">{entry.users?.full_name ?? "—"}</p>
+                                <p className="text-navy/40">{entry.vehicles?.registration ?? "—"}</p>
+                                <p className="text-navy/40">
+                                  {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </>
+                            )}
+                            {editingId !== entry.id && entry.users && (entry.users.phone || entry.users.email) && (
                               <div className="mt-1 flex gap-2 border-t border-navy/5 pt-1">
                                 {entry.users.phone && (
                                   <a
