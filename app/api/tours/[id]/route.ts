@@ -3,13 +3,27 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 
-const bodySchema = z.object({
-  vehicle_id: z.string().uuid(),
-  end_km: z.coerce.number().min(0).optional(),
-  end_km_photo_path: z.string().optional(),
-  notes: z.string().optional(),
-});
+const bodySchema = z
+  .object({
+    vehicle_id: z.string().uuid(),
+    end_km: z.coerce.number().min(0),
+    end_km_photo_path: z.string().optional(),
+    has_sheet_photo: z.boolean().optional().default(false),
+    notes: z.string().optional(),
+    vehicle_ok: z.boolean(),
+    problem_description: z.string().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.vehicle_ok && !data.problem_description) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La description du problème est obligatoire.",
+        path: ["problem_description"],
+      });
+    }
+  });
 
 /**
  * Closes out a tour the moment a driver scans their vehicle again at
@@ -30,7 +44,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { data: tour, error: tourError } = await supabase
     .from("planning_entries")
-    .select("id, vehicle_id, driver_id, status")
+    .select("id, vehicle_id, driver_id, status, tour_number, start_km")
     .eq("id", id)
     .single();
   if (tourError || !tour) {
@@ -43,6 +57,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Cette tournée concerne un autre véhicule." }, { status: 409 });
   }
 
+  // "retour < départ" is rejected outright; a very large gap is
+  // accepted but flagged for a manager (see the
+  // planning_entries_after_odometer_check trigger that fires on this
+  // same update, mirroring lib/business/odometer.ts's checkTourDistanceGap).
+  const regressionCheck = checkOdometerNotRegressing(
+    parsed.data.end_km,
+    tour.start_km !== null ? Number(tour.start_km) : null,
+    "le kilométrage de départ de cette tournée",
+  );
+  if (!regressionCheck.ok) {
+    return NextResponse.json({ error: regressionCheck.message }, { status: 422 });
+  }
+
   const storagePath = `${appUser.organization_id}/${tour.vehicle_id}/${randomUUID()}.jpg`;
 
   const { error } = await supabase
@@ -52,11 +79,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       end_km: parsed.data.end_km,
       end_km_photo_path: parsed.data.end_km_photo_path,
       notes: parsed.data.notes || null,
-      end_photo_path: storagePath,
+      end_photo_path: parsed.data.has_sheet_photo ? storagePath : null,
+      end_vehicle_ok: parsed.data.vehicle_ok,
       status: "done",
     })
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ storagePath });
+
+  let problemPhotoStoragePath: string | null = null;
+  if (!parsed.data.vehicle_ok) {
+    problemPhotoStoragePath = `${appUser.organization_id}/${tour.vehicle_id}/${randomUUID()}.jpg`;
+    const { error: interventionError } = await supabase.from("vehicle_interventions").insert({
+      organization_id: appUser.organization_id,
+      vehicle_id: tour.vehicle_id,
+      type: "Signalement automatique (retour de tournée)",
+      description: parsed.data.problem_description,
+      urgency: "normal",
+      requested_by: appUser.id,
+      planning_entry_id: tour.id,
+      photo_path: problemPhotoStoragePath,
+    });
+    if (interventionError) return NextResponse.json({ error: interventionError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ storagePath, problemPhotoStoragePath });
 }

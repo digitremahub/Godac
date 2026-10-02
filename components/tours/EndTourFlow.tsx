@@ -16,10 +16,19 @@ interface OpenTour {
 
 /**
  * Retour de tournée: scan véhicule → vérifie que ça correspond à la
- * tournée ouverte du chauffeur → kilométrage retour + anomalies →
- * photo du rapport. end_at est pris automatiquement à l'envoi.
+ * tournée ouverte du chauffeur → kilométrage retour (obligatoire) +
+ * état du véhicule (obligatoire, jamais précoché) → validation
+ * explicite. La photo du rapport et celle du compteur (sauf réglage
+ * d'organisation contraire) restent facultatives et ne bloquent
+ * jamais l'envoi. end_at est pris automatiquement à l'envoi.
  */
-export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } = {}) {
+export function EndTourFlow({
+  initialVehicleId,
+  requireOdometerPhoto = false,
+}: {
+  initialVehicleId?: string;
+  requireOdometerPhoto?: boolean;
+} = {}) {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -30,6 +39,11 @@ export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } 
   const [endKm, setEndKm] = useState("");
   const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
   const [notes, setNotes] = useState("");
+  const [sheetPhotoFile, setSheetPhotoFile] = useState<File | null>(null);
+  const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
+  const [problemDescription, setProblemDescription] = useState("");
+  const [problemPhotoFile, setProblemPhotoFile] = useState<File | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -67,8 +81,17 @@ export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } 
     }
   }
 
-  async function handlePhoto(file: File) {
-    if (!vehicleId || !openTour) return;
+  const canSubmit =
+    Boolean(vehicleId) &&
+    Boolean(openTour) &&
+    Boolean(endKm) &&
+    (!requireOdometerPhoto || Boolean(endKmPhotoPath)) &&
+    vehicleOk !== null &&
+    (vehicleOk || problemDescription.trim().length > 0) &&
+    confirmed;
+
+  async function submit() {
+    if (!vehicleId || !openTour || vehicleOk === null) return;
     setBusy(true);
     setError(null);
     try {
@@ -77,19 +100,33 @@ export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vehicle_id: vehicleId,
-          end_km: endKm ? Number(endKm) : undefined,
+          end_km: Number(endKm),
           end_km_photo_path: endKmPhotoPath || undefined,
+          has_sheet_photo: Boolean(sheetPhotoFile),
           notes: notes || undefined,
+          vehicle_ok: vehicleOk,
+          problem_description: vehicleOk ? undefined : problemDescription,
         }),
       });
       const patchJson = await patchRes.json();
       if (!patchRes.ok) throw new Error(typeof patchJson.error === "string" ? patchJson.error : "Erreur");
 
-      const { storagePath } = patchJson as { storagePath: string };
-      const { error: uploadError } = await supabase.storage
-        .from("tour-photos")
-        .upload(storagePath, file, { contentType: file.type });
-      if (uploadError) throw new Error(`Envoi échoué: ${uploadError.message}`);
+      const { storagePath, problemPhotoStoragePath } = patchJson as {
+        storagePath: string;
+        problemPhotoStoragePath: string | null;
+      };
+      if (sheetPhotoFile) {
+        const { error: uploadError } = await supabase.storage
+          .from("tour-photos")
+          .upload(storagePath, sheetPhotoFile, { contentType: sheetPhotoFile.type });
+        if (uploadError) throw new Error(`Envoi de la photo du rapport échoué: ${uploadError.message}`);
+      }
+      if (problemPhotoFile && problemPhotoStoragePath) {
+        const { error: uploadError } = await supabase.storage
+          .from("tour-photos")
+          .upload(problemPhotoStoragePath, problemPhotoFile, { contentType: problemPhotoFile.type });
+        if (uploadError) throw new Error(`Envoi de la photo du problème échoué: ${uploadError.message}`);
+      }
 
       setDone(true);
       router.refresh();
@@ -138,12 +175,13 @@ export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } 
       <p className="text-sm text-navy/60">
         Tournée n°{openTour?.tour_number} — {openTour?.vehicles?.registration}
       </p>
+
       <div>
-        <label className="label">Kilométrage au retour</label>
+        <label className="label">Kilométrage au retour *</label>
         <input className="input" type="number" value={endKm} onChange={(e) => setEndKm(e.target.value)} />
         <div className="mt-1.5">
           <CounterPhotoCapture
-            label="Photo compteur kilométrique"
+            label={`Photo compteur kilométrique${requireOdometerPhoto ? " (obligatoire)" : " (optionnel)"}`}
             initUrl="/api/ocr/odometer/init"
             processUrl="/api/ocr/odometer/process"
             bucket="tour-photos"
@@ -154,25 +192,70 @@ export function EndTourFlow({ initialVehicleId }: { initialVehicleId?: string } 
           />
         </div>
       </div>
+
       <div>
-        <label className="label">Anomalies / incidents (optionnel)</label>
-        <textarea className="input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <label className="label">État du véhicule *</label>
+        <div className="flex flex-col gap-2">
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+            <input type="radio" name="vehicle-ok" checked={vehicleOk === true} onChange={() => setVehicleOk(true)} />
+            Aucun problème nouveau
+          </label>
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+            <input type="radio" name="vehicle-ok" checked={vehicleOk === false} onChange={() => setVehicleOk(false)} />
+            Problème apparu pendant la tournée
+          </label>
+        </div>
       </div>
-      <label
-        className={`btn-primary w-full cursor-pointer justify-center text-center ${
-          busy ? "pointer-events-none opacity-50" : ""
-        }`}
-      >
-        {busy ? "Envoi…" : "📷 Photo du rapport de retour"}
+
+      {vehicleOk === false && (
+        <div className="flex flex-col gap-2 rounded-lg border border-orange-ink/20 bg-orange-ink/5 p-3">
+          <div>
+            <label className="label">Description du problème *</label>
+            <textarea
+              className="input"
+              rows={3}
+              value={problemDescription}
+              onChange={(e) => setProblemDescription(e.target.value)}
+            />
+          </div>
+          <label className="btn-secondary w-full cursor-pointer justify-center text-center text-xs">
+            {problemPhotoFile ? "Photo sélectionnée ✓" : "📷 Photo du problème (optionnel)"}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => setProblemPhotoFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <p className="text-xs text-orange-ink">Un signalement sera créé automatiquement pour les gestionnaires.</p>
+        </div>
+      )}
+
+      <div>
+        <label className="label">Remarques (optionnel)</label>
+        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+
+      <label className="btn-secondary w-full cursor-pointer justify-center text-center">
+        {sheetPhotoFile ? "Photo du rapport sélectionnée ✓" : "📷 Photo du rapport de retour (optionnel)"}
         <input
           type="file"
           accept="image/*"
           capture="environment"
           className="hidden"
-          disabled={busy}
-          onChange={(e) => e.target.files?.[0] && handlePhoto(e.target.files[0])}
+          onChange={(e) => setSheetPhotoFile(e.target.files?.[0] ?? null)}
         />
       </label>
+
+      <label className="flex min-h-[44px] items-center gap-2 text-sm">
+        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+        Je confirme terminer la tournée avec le véhicule{openTour?.vehicles ? ` ${openTour.vehicles.registration}` : ""}.
+      </label>
+
+      <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>
+        {busy ? "Envoi…" : "Valider mon retour"}
+      </button>
     </Card>
   );
 }

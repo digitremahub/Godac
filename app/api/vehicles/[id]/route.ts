@@ -12,6 +12,20 @@ const bodySchema = z.object({
   initial_km: z.coerce.number().min(0).nullable().optional(),
 });
 
+/** Minimal lookup for flows that only have a vehicle_id (QR scan, tour start/end) and need its label. */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await requireAppUser();
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("vehicles")
+    .select("id, registration, type, status")
+    .eq("id", id)
+    .single();
+  if (error || !data) return NextResponse.json({ error: "Véhicule introuvable." }, { status: 404 });
+  return NextResponse.json({ vehicle: data });
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireAppUser();

@@ -29,7 +29,9 @@ export type AlertType =
   | "price_anomaly"
   | "totalizer_gap"
   | "tank_overflow"
-  | "ocr_failure";
+  | "ocr_failure"
+  | "maintenance_request"
+  | "odometer_anomaly";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
@@ -39,6 +41,7 @@ export interface Organization {
   plan: string;
   logo_url: string | null;
   accent_color: string | null;
+  require_odometer_photo: boolean;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   subscription_status: "trialing" | "active" | "past_due" | "canceled" | "incomplete";

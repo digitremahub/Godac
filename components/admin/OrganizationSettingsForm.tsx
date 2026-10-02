@@ -14,18 +14,21 @@ export function OrganizationSettingsForm({
   ocrEnabled,
   logoUrl,
   accentColor,
+  requireOdometerPhoto,
 }: {
   organizationId: string;
   name: string;
   ocrEnabled: boolean;
   logoUrl: string | null;
   accentColor: string | null;
+  requireOdometerPhoto: boolean;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
   const [ocr, setOcr] = useState(ocrEnabled);
   const [logo, setLogo] = useState(logoUrl);
   const [accent, setAccent] = useState(accentColor ?? DEFAULT_ACCENT);
+  const [odometerPhotoRequired, setOdometerPhotoRequired] = useState(requireOdometerPhoto);
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,13 @@ export function OrganizationSettingsForm({
       const res = await fetch("/api/admin/organization", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: orgName, ocr_enabled: ocr, logo_url: logo, accent_color: accent }),
+        body: JSON.stringify({
+          name: orgName,
+          ocr_enabled: ocr,
+          logo_url: logo,
+          accent_color: accent,
+          require_odometer_photo: odometerPhotoRequired,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
@@ -148,6 +157,21 @@ export function OrganizationSettingsForm({
           onClick={() => setOcr((v) => !v)}
         >
           {ocr ? "Activé" : "Désactivé"}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
+        <div>
+          <p className="font-medium">Photo du compteur kilométrique obligatoire</p>
+          <p className="text-sm text-navy/50">
+            Activé, un chauffeur ne peut plus valider un départ/retour de tournée sans photo du compteur.
+          </p>
+        </div>
+        <button
+          className={odometerPhotoRequired ? "btn-primary !px-3 !py-1.5" : "btn-secondary !px-3 !py-1.5"}
+          onClick={() => setOdometerPhotoRequired((v) => !v)}
+        >
+          {odometerPhotoRequired ? "Activé" : "Désactivé"}
         </button>
       </div>
 

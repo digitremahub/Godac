@@ -10,7 +10,11 @@ export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const [{ data: organization }, ocrEnabled, { data: services }, { data: tanks }] = await Promise.all([
-    supabase.from("organizations").select("name, logo_url, accent_color").eq("id", appUser.organization_id).single(),
+    supabase
+      .from("organizations")
+      .select("name, logo_url, accent_color, require_odometer_photo")
+      .eq("id", appUser.organization_id)
+      .single(),
     isModuleEnabled(supabase, appUser.organization_id, "ocr"),
     supabase.from("services").select("id, name, code").order("name"),
     supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
@@ -25,6 +29,7 @@ export default async function OrganizationSettingsPage() {
         ocrEnabled={ocrEnabled}
         logoUrl={organization?.logo_url ?? null}
         accentColor={organization?.accent_color ?? null}
+        requireOdometerPhoto={organization?.require_odometer_photo ?? false}
       />
       <ServicesPanel services={services ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />

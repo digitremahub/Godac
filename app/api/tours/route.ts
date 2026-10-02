@@ -3,13 +3,29 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { checkOdometerNotRegressing } from "@/lib/business/odometer";
+import { generateTourNumber } from "@/lib/business/tour-number";
+import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
 
-const bodySchema = z.object({
-  vehicle_id: z.string().uuid(),
-  tour_number: z.string().min(1),
-  start_km: z.coerce.number().min(0).optional(),
-  start_km_photo_path: z.string().optional(),
-});
+const bodySchema = z
+  .object({
+    vehicle_id: z.string().uuid(),
+    tour_number: z.string().min(1).optional(),
+    start_km: z.coerce.number().min(0),
+    start_km_photo_path: z.string().optional(),
+    has_sheet_photo: z.boolean().optional().default(false),
+    vehicle_ok: z.boolean(),
+    problem_description: z.string().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.vehicle_ok && !data.problem_description) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La description du problème est obligatoire.",
+        path: ["problem_description"],
+      });
+    }
+  });
 
 /**
  * Opens a tour the moment a driver scans their vehicle — the digital
@@ -57,6 +73,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // Coherence check against the vehicle's own history — not just
+  // "is this a sane number", applied here (not only in the form) so
+  // it can't be bypassed by a client bug.
+  const referenceKm = await getVehicleLastKnownKm(supabase, vehicle.id);
+  const regressionCheck = checkOdometerNotRegressing(parsed.data.start_km, referenceKm, "le dernier kilométrage connu de ce véhicule");
+  if (!regressionCheck.ok) {
+    return NextResponse.json({ error: regressionCheck.message }, { status: 422 });
+  }
+
+  const tourNumber = parsed.data.tour_number?.trim() || generateTourNumber(vehicle.registration);
   const storagePath = `${appUser.organization_id}/${vehicle.id}/${randomUUID()}.jpg`;
   const startFields = {
     vehicle_id: vehicle.id,
@@ -65,7 +91,8 @@ export async function POST(req: Request) {
     status: "in_progress" as const,
     start_km: parsed.data.start_km,
     start_km_photo_path: parsed.data.start_km_photo_path,
-    start_photo_path: storagePath,
+    start_photo_path: parsed.data.has_sheet_photo ? storagePath : null,
+    start_vehicle_ok: parsed.data.vehicle_ok,
   };
 
   // If a manager already planned this exact tour number for this
@@ -73,23 +100,46 @@ export async function POST(req: Request) {
   // one instead of creating a parallel record — this is what keeps
   // a last-minute vehicle swap or delay reflected on the manager's
   // planning rather than leaving a stale "planned" entry sitting next
-  // to a disconnected "in_progress" one.
-  const { data: plannedMatch } = await supabase
-    .from("planning_entries")
-    .select("id")
-    .eq("driver_id", appUser.id)
-    .eq("tour_number", parsed.data.tour_number)
-    .eq("status", "planned")
-    .maybeSingle();
+  // to a disconnected "in_progress" one. Only looked up when the
+  // driver actually typed a tour number — a server-generated one has
+  // nothing planned to match against.
+  const plannedMatch = parsed.data.tour_number
+    ? (
+        await supabase
+          .from("planning_entries")
+          .select("id")
+          .eq("driver_id", appUser.id)
+          .eq("tour_number", parsed.data.tour_number)
+          .eq("status", "planned")
+          .maybeSingle()
+      ).data
+    : null;
 
   const { data, error } = plannedMatch
     ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()
     : await supabase
         .from("planning_entries")
-        .insert({ organization_id: appUser.organization_id, tour_number: parsed.data.tour_number, driver_id: appUser.id, ...startFields })
+        .insert({ organization_id: appUser.organization_id, tour_number: tourNumber, driver_id: appUser.id, ...startFields })
         .select("id")
         .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ tourId: data.id, storagePath });
+
+  let problemPhotoStoragePath: string | null = null;
+  if (!parsed.data.vehicle_ok) {
+    problemPhotoStoragePath = `${appUser.organization_id}/${vehicle.id}/${randomUUID()}.jpg`;
+    const { error: interventionError } = await supabase.from("vehicle_interventions").insert({
+      organization_id: appUser.organization_id,
+      vehicle_id: vehicle.id,
+      type: "Signalement automatique (départ de tournée)",
+      description: parsed.data.problem_description,
+      urgency: "normal",
+      requested_by: appUser.id,
+      planning_entry_id: data.id,
+      photo_path: problemPhotoStoragePath,
+    });
+    if (interventionError) return NextResponse.json({ error: interventionError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ tourId: data.id, tourNumber, storagePath, problemPhotoStoragePath });
 }
