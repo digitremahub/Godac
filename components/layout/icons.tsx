@@ -241,3 +241,13 @@ export function IconQrCode(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconLifeBuoy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M5.5 5.5l3.3 3.3M18.5 5.5l-3.3 3.3M5.5 18.5l3.3-3.3M18.5 18.5l-3.3-3.3" />
+    </Svg>
+  );
+}

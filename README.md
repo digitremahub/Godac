@@ -83,9 +83,12 @@ borne partagée pour s'identifier avant de saisir un ravitaillement.
 
 Voir `supabase/migrations/*.sql` pour le détail exact. Les 13 premières
 posent le socle (schéma 1-13, détaillées ci-dessous) ; le schéma va
-aujourd'hui jusqu'à la migration **44**, appliquées dans l'ordre par
+aujourd'hui jusqu'à la migration **55**, appliquées dans l'ordre par
 `supabase db push` — toujours des ajouts, jamais une modification
-d'une migration déjà passée en prod.
+d'une migration déjà passée en prod. (45-49 — connexion par badge en
+self-service, tournées en cours, rendez-vous, affectation véhicule —
+ne sont pas encore détaillées ci-dessous ; voir directement le
+contenu de chaque fichier.)
 
 **Socle (1-13)** :
 
@@ -138,6 +141,17 @@ le détail — chacune documente son "pourquoi" en commentaire SQL) :
   public par nécessité — voir `middleware.ts`), via
   `signInWithPassword` standard — aucun pont d'authentification
   parallèle à Supabase Auth.
+- **Fiche véhicule par IA** (50) — `vehicles.brand/model/model_year/
+  gearbox/fuel_type/ptac_kg/reference_consumption_l_100km/
+  adblue_capacity_liters/spec_sources`, table `ai_spec_requests`
+  (rate-limit) — voir `lib/vehicles/ai-specs.ts`.
+- **Lecture OCR du rapport de tournée** (51) — colonnes
+  `report_*`/`report_ocr_raw` sur `planning_entries` — voir
+  `lib/ocr/tour-report.ts`.
+- **Assistant & relais humain** (52-55) — catalogue du module
+  `assistant` (désactivé par défaut), `assistant_notes`,
+  `assistant_conversations`, `assistant_messages`, `support_requests`,
+  type `alert_type` étendu avec `support_request` — voir `lib/assistant/`.
 
 Logique métier critique (implémentée deux fois volontairement : en
 trigger Postgres comme source de vérité, et en TypeScript pur pour
@@ -179,13 +193,16 @@ lib/
   business/            # PMP, écart totaliseur, TICPE, congés (+ tests)
   supabase/            # clients server / browser / admin (service role)
   auth/                # session, invitations, provisioning des comptes invités
-  ocr/                 # client Mindee + pipeline d'extraction
+  ocr/                 # client Mindee + pipeline d'extraction + lecture rapport de tournée (Lot C)
+  vehicles/            # consommation, référence kilométrique, spécifications IA (Lot A)
+  assistant/           # Lot B : sources, routage du relais, rate-limit, appels IA (+ tests)
   import/              # extraction de tableau CSV/Excel (import véhicules/chauffeurs)
   email/               # Resend + templates
   stripe/              # client + plans
   qr/                  # génération/parsing des payloads QR
   utils/               # validation import (CSV/Excel), Excel (export TICPE)
-components/            # UI par domaine (fuel, vehicles, admin, qr, layout, ui)
+components/            # UI par domaine (fuel, vehicles, admin, qr, layout, ui, assistant)
+content/help/          # guide d'utilisation (Markdown) servant de source à l'assistant (Lot B)
 supabase/migrations/   # schéma versionné (voir ci-dessus)
 ```
 
@@ -205,10 +222,17 @@ intégration :
 - **Mindee** : `MINDEE_API_KEY`, `MINDEE_FUEL_MODEL_ID` (optionnel),
   `MINDEE_TOTALIZER_MODEL_ID` (optionnel), `MINDEE_ODOMETER_MODEL_ID`
   (optionnel).
-- **Anthropic** : `ANTHROPIC_API_KEY` (optionnel) — fallback IA de
-  l'import véhicules/chauffeurs (app/api/import/parse-file/route.ts) :
-  quand le fichier importé ne suit aucun format de colonnes reconnu,
-  Claude lit son contenu brut pour en extraire les lignes lui-même.
+- **Anthropic** : `ANTHROPIC_API_KEY` (optionnel) — alimente trois
+  fonctionnalités indépendantes, chacune dégradant proprement en son
+  absence : le fallback IA de l'import véhicules/chauffeurs
+  (`app/api/import/parse-file/route.ts`, format de colonnes non
+  reconnu), la fiche véhicule complétée par IA (Lot A,
+  `lib/vehicles/ai-specs.ts` — le bouton "Compléter par IA" disparaît
+  sans la clé), la lecture OCR du rapport de tournée (Lot C,
+  `lib/ocr/tour-report.ts` — la photo reste une simple pièce jointe) et
+  l'assistant d'aide + relais humain (Lot B, `lib/assistant/` — le
+  bouton flottant n'apparaît pas du tout sans la clé, voir
+  `app/(dashboard)/layout.tsx`).
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
 
@@ -336,6 +360,13 @@ placeholder silencieux :
   utilisateurs).
 - **Stripe tarification modulaire par chauffeur** : Phase 2, prix
   fixe par organisation pour l'instant (`lib/stripe/plans.ts`).
+- **Purge 90 jours des conversations de l'assistant (Lot B)** : la
+  fonction SQL `public.cleanup_old_assistant_conversations()` existe
+  (migration `20260101000053_assistant_tables.sql`) mais n'est
+  appelée par aucun cron — à planifier une fois `pg_cron` activé sur le
+  projet Supabase (`select cron.schedule('assistant-cleanup', '0 3 * * *',
+  'select public.cleanup_old_assistant_conversations()')`) ou via un
+  job externe planifié.
 
 ---
 
@@ -385,6 +416,22 @@ placeholder silencieux :
 - Connexion des chauffeurs sans email : badge QR + code PIN créé par
   le chauffeur lui-même à la première connexion (Admin > Utilisateurs
   > "Chauffeur sans email")
+- Fiche véhicule complétée par IA (Lot A) : marque/modèle/année/boîte,
+  bouton "Compléter par IA" (type, carburant, réservoir, AdBlue, PTAC,
+  consommation de référence) avec niveau de confiance par champ et
+  gestion des modèles ambigus, traçabilité par champ
+  (`vehicles.spec_sources`), garde-fou TICPE sur un type non confirmé,
+  et complétion par lots depuis l'import CSV/Excel
+- Lecture OCR du rapport de tournée (Lot C) : photo du rapport au
+  départ/retour (écran de terminal portable ou compte-rendu imprimé)
+  qui pré-remplit numéro de tournée, BL, arrêts, colis — en plus de
+  l'OCR déjà existant pour les compteurs kilométriques/totaliseur
+- Module `assistant` (Lot B, désactivé par défaut) : chatbot d'aide
+  contextuelle (guide d'utilisation + consignes internes gérées par la
+  direction), ne répond qu'à partir de ces sources, jamais d'accès aux
+  données métier, relais automatique vers un gestionnaire ou le
+  support GODAC (`/support`) sur trois déclencheurs (besoin détecté par
+  l'IA, bouton "Parler à quelqu'un", deux retours "pas utile" de suite)
 
 ### À faire
 - Amendes (`fines`, table + RLS prêtes, aucune UI)

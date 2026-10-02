@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import { PageHeader, Card } from "@/components/ui";
+import { StaffSupportRequestsList } from "@/components/godac-staff/StaffSupportRequestsList";
 
 /**
  * GODAC's own cross-tenant backoffice (Module 9): every client
@@ -25,12 +26,18 @@ export default async function GodacStaffPage() {
   }
 
   const supabase = createAdminSupabaseClient();
-  const [{ data: organizations }, { data: ocrRows }] = await Promise.all([
+  const [{ data: organizations }, { data: ocrRows }, { data: supportRequests }] = await Promise.all([
     supabase
       .from("organizations")
       .select("id, name, plan, subscription_status, created_at, vehicles(count), users(count)")
       .order("created_at", { ascending: false }),
     supabase.from("organization_modules").select("organization_id, enabled").eq("module_key", "ocr"),
+    supabase
+      .from("support_requests")
+      .select("id, question, status, created_at, organizations(name)")
+      .eq("recipient", "support_godac")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
   const ocrByOrg = new Map((ocrRows ?? []).map((r) => [r.organization_id as string, r.enabled as boolean]));
 
@@ -78,6 +85,19 @@ export default async function GodacStaffPage() {
           </tbody>
         </table>
       </Card>
+
+      <div className="mt-6">
+        <h2 className="mb-2 text-lg">Demandes d&apos;assistance transmises au support GODAC</h2>
+        <StaffSupportRequestsList
+          requests={(supportRequests ?? []).map((r: any) => ({
+            id: r.id,
+            question: r.question,
+            status: r.status,
+            createdAt: r.created_at,
+            organizationName: r.organizations?.name ?? "—",
+          }))}
+        />
+      </div>
     </main>
   );
 }
