@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
 import { VehicleActionsPanel } from "@/components/vehicles/VehicleActionsPanel";
+import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "En service",
@@ -35,6 +36,7 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
   ]);
 
   if (!vehicle) notFound();
+  const hasActiveTourHere = Boolean(activeTour);
 
   return (
     <div className="mx-auto max-w-md">
@@ -44,8 +46,19 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
         vehicleType={vehicle.type}
         role={appUser.role}
         enabledModuleKeys={enabledModuleKeys}
-        hasActiveTourHere={Boolean(activeTour)}
+        hasActiveTourHere={hasActiveTourHere}
       />
+      {/* Only the driver currently on tour with this vehicle (not just
+          anyone who scanned it) sees its badge here — matches the
+          same in_progress query used for hasActiveTourHere above, so
+          this can never show for a vehicle the signed-in user isn't
+          actually assigned to right now. */}
+      {hasActiveTourHere && (
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <p className="label">Badge véhicule</p>
+          <QrCodeBadge type="vehicle" id={vehicle.id} title={vehicle.registration} subtitle="À coller sur le tableau de bord" />
+        </div>
+      )}
     </div>
   );
 }
