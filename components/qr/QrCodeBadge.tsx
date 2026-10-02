@@ -22,11 +22,14 @@ export function QrCodeBadge({
   id,
   title,
   subtitle,
+  code,
 }: {
   type: ScanEntityType;
   id: string;
   title: string;
   subtitle?: string;
+  /** Driver's fallback code (lib/auth/session) — read aloud or typed in at a shared pump when the badge isn't on hand. */
+  code?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -44,6 +47,11 @@ export function QrCodeBadge({
       <canvas ref={canvasRef} />
       <p className="text-center font-display text-sm font-extrabold">{title}</p>
       {subtitle && <p className="text-center text-xs text-navy/60">{subtitle}</p>}
+      {code && (
+        <p className="text-center text-xs text-navy/50">
+          Code de secours : <span className="font-mono font-semibold tracking-widest text-navy">{code}</span>
+        </p>
+      )}
       <span className="badge-neutral !bg-navy/10 !text-navy">{TYPE_LABELS[type]} · GODAC</span>
     </div>
   );

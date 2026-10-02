@@ -6,6 +6,7 @@ import { AnnouncementForm } from "@/components/intranet/AnnouncementForm";
 import { AnnouncementsList } from "@/components/intranet/AnnouncementsList";
 import { MeetingRequestForm } from "@/components/intranet/MeetingRequestForm";
 import { MeetingRequestsList } from "@/components/intranet/MeetingRequestsList";
+import { ConvocationsList } from "@/components/intranet/ConvocationsList";
 
 export default async function IntranetPage() {
   const appUser = await requireAppUser();
@@ -24,20 +25,31 @@ export default async function IntranetPage() {
   const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
   const canRequestMeeting = appUser.role !== "direction";
 
-  const [{ data: announcements }, { data: myReads }, { data: services }, { data: meetingRequests }] = await Promise.all([
-    supabase
-      .from("announcements")
-      .select(
-        "id, title, body, service_id, requires_acknowledgement, created_at, users!announcements_created_by_fkey(full_name), services(name)",
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("announcement_reads").select("announcement_id").eq("user_id", appUser.id),
-    supabase.from("services").select("id, name").order("name"),
-    supabase
-      .from("meeting_requests")
-      .select("id, reason, preferred_date, status, created_at, requested_by, users!meeting_requests_requested_by_fkey(full_name)")
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: announcements }, { data: myReads }, { data: services }, { data: meetingRequests }, { data: convocations }] =
+    await Promise.all([
+      supabase
+        .from("announcements")
+        .select(
+          "id, title, body, service_id, requires_acknowledgement, created_at, users!announcements_created_by_fkey(full_name), services(name)",
+        )
+        .order("created_at", { ascending: false }),
+      supabase.from("announcement_reads").select("announcement_id").eq("user_id", appUser.id),
+      supabase.from("services").select("id, name").order("name"),
+      supabase
+        .from("meeting_requests")
+        .select("id, reason, preferred_date, status, created_at, requested_by, users!meeting_requests_requested_by_fkey(full_name)")
+        .order("created_at", { ascending: false }),
+      isManagerLike
+        ? supabase
+            .from("convocations")
+            .select("id, reason, scheduled_at, location, status, employee_id, users!convocations_employee_id_fkey(full_name)")
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("convocations")
+            .select("id, reason, scheduled_at, location, status, employee_id")
+            .eq("employee_id", appUser.id)
+            .order("created_at", { ascending: false }),
+    ]);
 
   const rows = (announcements ?? []) as any[];
   const myReadIds = new Set((myReads ?? []).map((r) => r.announcement_id));
@@ -89,6 +101,22 @@ export default async function IntranetPage() {
             status: r.status,
             createdAt: r.created_at,
             isOwn: r.requested_by === appUser.id,
+          }))}
+        />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg">Convocations</h2>
+        <ConvocationsList
+          canManage={isManagerLike}
+          convocations={((convocations ?? []) as any[]).map((c) => ({
+            id: c.id,
+            employeeName: c.users?.full_name ?? "—",
+            reason: c.reason,
+            scheduledAt: c.scheduled_at,
+            location: c.location,
+            status: c.status,
+            isOwn: c.employee_id === appUser.id,
           }))}
         />
       </div>

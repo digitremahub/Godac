@@ -108,29 +108,66 @@ function ManualScanInput({
 }) {
   const [value, setValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [driverCode, setDriverCode] = useState("");
+  const [lookingUp, setLookingUp] = useState(false);
+
+  async function lookupByDriverCode() {
+    setLookingUp(true);
+    setLocalError(null);
+    try {
+      const res = await fetch(`/api/drivers/lookup-code?code=${encodeURIComponent(driverCode.trim())}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Code introuvable.");
+      onScan({ type: "driver", id: json.id });
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   return (
-    <div className="flex w-full max-w-xs gap-2">
-      <input
-        className="input"
-        placeholder="Coller le contenu du QR ou l'identifiant"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      <button
-        className="btn-secondary"
-        onClick={() => {
-          const payload = parseScanPayload(value) ?? (isUuid(value) ? { type: expected, id: value } : null);
-          if (!payload || payload.type !== expected) {
-            setLocalError("Code invalide pour ce type d'élément.");
-            return;
-          }
-          setLocalError(null);
-          onScan(payload);
-        }}
-      >
-        OK
-      </button>
+    <div className="flex w-full max-w-xs flex-col gap-3">
+      <div className="flex gap-2">
+        <input
+          className="input"
+          placeholder="Coller le contenu du QR ou l'identifiant"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button
+          className="btn-secondary"
+          onClick={() => {
+            const payload = parseScanPayload(value) ?? (isUuid(value) ? { type: expected, id: value } : null);
+            if (!payload || payload.type !== expected) {
+              setLocalError("Code invalide pour ce type d'élément.");
+              return;
+            }
+            setLocalError(null);
+            onScan(payload);
+          }}
+        >
+          OK
+        </button>
+      </div>
+      {expected === "driver" && (
+        <div className="flex flex-col gap-1.5 border-t border-navy/10 pt-3">
+          <p className="text-xs text-navy/50">Pas de badge sous la main ? Le chauffeur peut donner son code à 6 chiffres :</p>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="Code chauffeur"
+              value={driverCode}
+              onChange={(e) => setDriverCode(e.target.value.replace(/\D/g, ""))}
+            />
+            <button className="btn-secondary shrink-0" disabled={lookingUp || driverCode.length !== 6} onClick={lookupByDriverCode}>
+              {lookingUp ? "…" : "Valider"}
+            </button>
+          </div>
+        </div>
+      )}
       {localError && <p className="text-xs text-orange-ink">{localError}</p>}
     </div>
   );

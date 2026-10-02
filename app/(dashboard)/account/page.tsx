@@ -13,10 +13,12 @@ export default async function AccountPage() {
   const isFieldRole = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
 
   let pinAlreadySet = false;
+  let driverCode: string | null = null;
   if (isFieldRole) {
     const supabase = await createServerSupabaseClient();
-    const { data } = await supabase.from("users").select("pin_set_at").eq("id", appUser.id).maybeSingle();
+    const { data } = await supabase.from("users").select("pin_set_at, driver_code").eq("id", appUser.id).maybeSingle();
     pinAlreadySet = Boolean(data?.pin_set_at);
+    driverCode = data?.driver_code ?? null;
   }
 
   return (
@@ -39,6 +41,7 @@ export default async function AccountPage() {
               id={appUser.id}
               title={appUser.full_name}
               subtitle={pinAlreadySet ? "Scannez pour vous connecter" : "À présenter à la pompe"}
+              code={driverCode ?? undefined}
             />
           </div>
           <DriverPinForm pinAlreadySet={pinAlreadySet} />
