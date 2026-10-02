@@ -129,7 +129,7 @@ export default async function PlanningPage({
         title="Planning"
         description="Tous les services, véhicules et chauffeurs — glissez une affectation vers un autre jour pour la déplacer."
       />
-      <PlanningViewTabs view={view} selectedService={params.service ?? ""} />
+      <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
       {view === "week" && (
         <PlanningGrid
           {...commonProps}

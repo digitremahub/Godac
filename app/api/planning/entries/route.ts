@@ -43,6 +43,14 @@ export async function POST(req: Request) {
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "Une affectation existe déjà pour ce service, ce numéro de tournée et cette date/heure." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ id: data.id });
 }

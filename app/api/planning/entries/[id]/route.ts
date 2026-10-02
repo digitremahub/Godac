@@ -34,7 +34,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id")
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "Une affectation existe déjà pour ce service, ce numéro de tournée et cette date/heure." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
   return NextResponse.json({ id: data.id });
 }

@@ -235,6 +235,12 @@ intégration :
   `app/(dashboard)/layout.tsx`).
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
+- **CRON_SECRET** : requise pour le digest hebdomadaire de planning
+  (`app/api/cron/weekly-planning-digest/route.ts`, déclenché par
+  `vercel.json` tous les samedis). Vercel ajoute automatiquement
+  l'en-tête `Authorization: Bearer <CRON_SECRET>` sur ses propres appels
+  cron dès que cette variable est définie — la route répond 500 tant
+  qu'elle ne l'est pas, plutôt que de tourner sans protection.
 
 Ne jamais committer `.env.local`. `.gitignore` l'exclut déjà.
 
@@ -299,6 +305,8 @@ Variables), au minimum :
   (optionnel) — sinon OCR et import bascule proprement en saisie
   manuelle.
 - `GODAC_STAFF_EMAILS`, `SUPABASE_DB_WEBHOOK_SECRET`.
+- `CRON_SECRET` (obligatoire pour le digest hebdomadaire de planning —
+  voir `## Variables d'environnement` ci-dessous).
 
 Voir `.env.example` pour la liste exhaustive et `## Variables
 d'environnement` ci-dessous pour le détail par intégration — toutes

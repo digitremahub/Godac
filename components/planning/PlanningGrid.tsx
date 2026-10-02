@@ -173,6 +173,21 @@ export function PlanningGrid({
     }
   }
 
+  async function duplicateEntry(entryId: string) {
+    setBusyId(entryId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entryId}/duplicate`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function removeEntry(entryId: string) {
     setBusyId(entryId);
     setError(null);
@@ -222,18 +237,6 @@ export function PlanningGrid({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          className="input !w-auto"
-          value={selectedService}
-          onChange={(e) => navTo(weekStart, e.target.value)}
-        >
-          <option value="">Tous les services</option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
         <div className="flex items-center gap-2">
           <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(prevWeek, selectedService)}>
             ← Semaine préc.
@@ -372,15 +375,25 @@ export function PlanningGrid({
                               <span className={STATUS_BADGE[entry.status] ?? "badge-neutral"}>
                                 {STATUS_LABEL[entry.status] ?? entry.status}
                               </span>
-                              {entry.status === "planned" && (
+                              <span className="flex items-center gap-1">
                                 <button
-                                  className="text-navy/30 hover:text-orange-ink"
-                                  onClick={() => removeEntry(entry.id)}
-                                  aria-label="Supprimer"
+                                  className="text-navy/30 hover:text-teal-ink"
+                                  onClick={() => duplicateEntry(entry.id)}
+                                  aria-label="Dupliquer la semaine prochaine"
+                                  title="Dupliquer la semaine prochaine"
                                 >
-                                  ×
+                                  ⧉
                                 </button>
-                              )}
+                                {entry.status === "planned" && (
+                                  <button
+                                    className="text-navy/30 hover:text-orange-ink"
+                                    onClick={() => removeEntry(entry.id)}
+                                    aria-label="Supprimer"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </span>
                             </div>
                             <p className="font-medium">n°{entry.tour_number}</p>
                             <p className="text-navy/60">{entry.users?.full_name ?? "—"}</p>

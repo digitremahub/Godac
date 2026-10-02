@@ -1,7 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { todayISO, currentMonth } from "@/lib/planning/dates";
+
+interface ServiceOption {
+  id: string;
+  name: string;
+}
 
 const VIEWS: { key: string; label: string }[] = [
   { key: "week", label: "Semaine" },
@@ -11,9 +16,23 @@ const VIEWS: { key: string; label: string }[] = [
   { key: "list", label: "Liste" },
 ];
 
-/** Shared view switcher + "Aujourd'hui" reset, rendered once above whichever view component is active. */
-export function PlanningViewTabs({ view, selectedService }: { view: string; selectedService: string }) {
+/**
+ * Shared view switcher + "Aujourd'hui" reset + service filter, rendered
+ * once above whichever view component is active — the single place the
+ * service filter lives, so all five views get it instead of each
+ * reimplementing their own <select> (only the week grid used to have one).
+ */
+export function PlanningViewTabs({
+  view,
+  selectedService,
+  services = [],
+}: {
+  view: string;
+  selectedService: string;
+  services?: ServiceOption[];
+}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   function goTo(nextView: string) {
     const qs = new URLSearchParams();
@@ -29,6 +48,16 @@ export function PlanningViewTabs({ view, selectedService }: { view: string; sele
     qs.set("day", todayISO());
     qs.set("month", currentMonth());
     if (selectedService) qs.set("service", selectedService);
+    router.push(`/planning?${qs.toString()}`);
+  }
+
+  // Changing the service filter keeps whatever date the user is
+  // currently looking at (week/day/month) instead of resetting it —
+  // unlike goTo/goToday, which intentionally jump to a fresh default.
+  function setService(serviceId: string) {
+    const qs = new URLSearchParams(searchParams.toString());
+    if (serviceId) qs.set("service", serviceId);
+    else qs.delete("service");
     router.push(`/planning?${qs.toString()}`);
   }
 
@@ -50,6 +79,16 @@ export function PlanningViewTabs({ view, selectedService }: { view: string; sele
       <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={goToday}>
         Aujourd&apos;hui
       </button>
+      {services.length > 0 && (
+        <select className="input !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
+          <option value="">Tous les services</option>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

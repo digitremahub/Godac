@@ -46,27 +46,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0 });
   }
 
+  // Keyed on the same columns as planning_entries' real unique
+  // constraint (organization_id, service_id, tour_number, start_at) —
+  // this used to be keyed on driver_id:day instead, which both let a
+  // same-service/same-tour-number collision from a different driver
+  // through to the DB (raw 409) and silently dropped a same-driver
+  // entry that used a *different* tour number on a day that already
+  // had something else of theirs.
   const { data: existingTarget } = await supabase
     .from("planning_entries")
-    .select("driver_id, start_at")
+    .select("service_id, tour_number, start_at")
     .gte("start_at", `${parsed.data.target_week_start}T00:00:00`)
     .lt("start_at", `${targetEnd}T00:00:00`);
-  const existingSlots = new Set((existingTarget ?? []).map((e) => `${e.driver_id}:${e.start_at.slice(0, 10)}`));
+  const existingSlots = new Set((existingTarget ?? []).map((e) => `${e.service_id}:${e.tour_number}:${e.start_at}`));
 
   const toInsert = sourceEntries
     .filter((e) => e.driver_id && e.vehicle_id)
     .map((e) => {
       const sourceStart = new Date(e.start_at);
       const targetStart = new Date(sourceStart.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      const targetStartIso = targetStart.toISOString();
       return {
         organization_id: appUser.organization_id,
         service_id: e.service_id,
         tour_number: e.tour_number,
         driver_id: e.driver_id,
         vehicle_id: e.vehicle_id,
-        start_at: targetStart.toISOString(),
+        start_at: targetStartIso,
         status: "planned" as const,
-        slotKey: `${e.driver_id}:${targetStart.toISOString().slice(0, 10)}`,
+        slotKey: `${e.service_id}:${e.tour_number}:${targetStartIso}`,
       };
     })
     .filter((e) => !existingSlots.has(e.slotKey))
@@ -77,7 +85,15 @@ export async function POST(req: Request) {
   }
 
   const { error: insertError, count } = await supabase.from("planning_entries").insert(toInsert, { count: "exact" });
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return NextResponse.json(
+        { error: "Certaines affectations existent déjà pour cette semaine (numéro de tournée déjà utilisé à cette date)." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ created: count ?? toInsert.length });
 }
