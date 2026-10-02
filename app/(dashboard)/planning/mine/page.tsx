@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { mondayOf, toISODate, addDays } from "@/lib/planning/dates";
 
 const DAY_LABELS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const STATUS_BADGE: Record<string, string> = {
@@ -15,19 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
   in_progress: "En cours",
   done: "Terminée",
 };
-
-function mondayOf(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * Read-only, own-tours-only counterpart to the manager-facing
@@ -56,38 +44,31 @@ export default async function MyPlanningPage({
     );
   }
 
-  const weekStart = mondayOf(params.week && !Number.isNaN(Date.parse(params.week)) ? new Date(params.week) : new Date());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const prevWeek = new Date(weekStart);
-  prevWeek.setDate(prevWeek.getDate() - 7);
-  const nextWeek = new Date(weekStart);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  const weekStart = toISODate(mondayOf(params.week && !Number.isNaN(Date.parse(params.week)) ? new Date(params.week) : new Date()));
+  const weekEnd = addDays(weekStart, 7);
+  const prevWeek = addDays(weekStart, -7);
+  const nextWeek = addDays(weekStart, 7);
 
   const { data: entries } = await supabase
     .from("planning_entries")
     .select("id, tour_number, start_at, end_at, status, vehicles(registration), services(name)")
     .eq("driver_id", appUser.id)
-    .gte("start_at", weekStart.toISOString())
-    .lt("start_at", weekEnd.toISOString())
+    .gte("start_at", `${weekStart}T00:00:00`)
+    .lt("start_at", `${weekEnd}T00:00:00`)
     .order("start_at");
 
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
     <div>
       <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées, semaine par semaine." />
 
       <div className="mb-4 flex items-center gap-3">
-        <Link href={`/planning/mine?week=${toISODate(prevWeek)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <Link href={`/planning/mine?week=${prevWeek}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           ← Semaine préc.
         </Link>
-        <span className="text-sm text-navy/60">Semaine du {toISODate(weekStart).split("-").reverse().join("/")}</span>
-        <Link href={`/planning/mine?week=${toISODate(nextWeek)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+        <Link href={`/planning/mine?week=${nextWeek}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           Semaine suiv. →
         </Link>
       </div>
@@ -96,8 +77,7 @@ export default async function MyPlanningPage({
         <EmptyState title="Aucune tournée cette semaine" description="Rien ne vous est encore assigné pour cette période." />
       ) : (
         <div className="flex flex-col gap-4">
-          {days.map((day, i) => {
-            const dayISO = toISODate(day);
+          {days.map((dayISO, i) => {
             const dayEntries = (entries ?? []).filter((e: any) => e.start_at.slice(0, 10) === dayISO);
             if (dayEntries.length === 0) return null;
             return (

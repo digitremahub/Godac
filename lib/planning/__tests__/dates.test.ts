@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mondayOf, addDays, toISODate, firstOfMonth, addMonths, monthCalendarDays } from "../dates";
+import { afterEach, describe, expect, it } from "vitest";
+import { mondayOf, addDays, toISODate, todayISO, firstOfMonth, addMonths, monthCalendarDays } from "../dates";
 
 describe("mondayOf", () => {
   it("returns the same date when already a Monday", () => {
@@ -12,6 +12,26 @@ describe("mondayOf", () => {
 
   it("rolls back a Sunday to the Monday before it (not the next one)", () => {
     expect(toISODate(mondayOf(new Date("2026-03-08T08:00:00")))).toBe("2026-03-02");
+  });
+});
+
+describe("timezone independence", () => {
+  const originalTZ = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTZ;
+  });
+
+  it("addDays/mondayOf/todayISO agree with the UTC calendar day regardless of the process timezone", () => {
+    // Regression test: this used to mix local-time Date construction
+    // with toISOString() (always UTC), so every result came out one
+    // day early for a process running ahead of UTC — exactly what a
+    // French user's own browser is (UTC+1/+2), which is how the
+    // planning grid's whole row of day columns ended up mislabeled by
+    // one day for real users despite passing in CI (UTC).
+    process.env.TZ = "Europe/Paris";
+    expect(addDays("2026-09-28", 0)).toBe("2026-09-28");
+    expect(toISODate(mondayOf(new Date("2026-10-02T22:48:00Z")))).toBe("2026-09-28");
+    expect(todayISO()).toBe(toISODate(new Date()));
   });
 });
 
