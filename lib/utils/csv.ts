@@ -6,6 +6,10 @@ export const vehicleCsvRowSchema = z.object({
   tank_capacity_liters: z.coerce.number().positive().optional(),
   initial_km: z.coerce.number().min(0).optional(),
   service: z.string().optional().default(""),
+  // Optional — present only if the source file has them. Lot A's
+  // "compléter par IA" needs at least brand+model to look anything up.
+  brand: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export type VehicleCsvRow = z.infer<typeof vehicleCsvRowSchema>;
@@ -42,6 +46,8 @@ const HEADER_ALIASES: Record<string, string> = {
   immat: "registration",
   plaque: "registration",
   categorie: "type",
+  marque: "brand",
+  modele: "model",
   capacite: "tank_capacity_liters",
   capacite_l: "tank_capacity_liters",
   capacite_reservoir: "tank_capacity_liters",

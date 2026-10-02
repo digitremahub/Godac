@@ -33,6 +33,12 @@ export default async function DashboardLayout({
       : Promise.resolve({ data: null }),
   ]);
 
+  // Lot B: absent (not just visually hidden) the moment either the
+  // org hasn't enabled the module or the server has no Anthropic key
+  // configured — never a client-side check, so there's no flash of a
+  // button that would then fail on first use.
+  const assistantAvailable = enabledModuleKeys.includes("assistant") && Boolean(process.env.ANTHROPIC_API_KEY);
+
   return (
     <DashboardShell
       role={appUser.role}
@@ -43,6 +49,7 @@ export default async function DashboardLayout({
       fullName={appUser.full_name}
       roleTitle={appUser.role_title}
       hasActiveTour={Boolean(activeTour.data)}
+      assistantAvailable={assistantAvailable}
     >
       {children}
     </DashboardShell>

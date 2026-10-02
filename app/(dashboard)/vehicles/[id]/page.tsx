@@ -13,6 +13,19 @@ import { OdometerHistory, type OdometerReading } from "@/components/vehicles/Odo
 import { WashHistory, type WashRecord } from "@/components/vehicles/WashHistory";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 
+type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
+
+/** Small provenance tag under a spec field — "Estimé par IA" until a human confirms or edits it (Lot A). */
+function SpecProvenance({ field, specSources, label }: { field: string; specSources: SpecSources; label?: string }) {
+  const source = specSources?.[field];
+  if (!source || source.origin !== "ia") return null;
+  return (
+    <p className="text-[11px] text-gold-ink">
+      {label ? `${label} : ` : ""}🤖 Estimé par IA{source.confirmed ? ", confirmé" : " — à vérifier"}
+    </p>
+  );
+}
+
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const appUser = await requireAppUser();
@@ -40,7 +53,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       supabase
         .from("vehicles")
         .select(
-          "id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name), assigned_driver_id, users!vehicles_assigned_driver_id_fkey(full_name)",
+          "id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name), assigned_driver_id, users!vehicles_assigned_driver_id_fkey(full_name), brand, model, model_year, gearbox, fuel_type, adblue_capacity_liters, ptac_kg, reference_consumption_l_100km, spec_sources",
         )
         .eq("id", id)
         .single(),
@@ -122,6 +135,15 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               services={services ?? []}
               assignedDriverId={v.assigned_driver_id}
               drivers={drivers ?? []}
+              brand={v.brand}
+              model={v.model}
+              modelYear={v.model_year}
+              gearbox={v.gearbox}
+              fuelType={v.fuel_type}
+              adblueCapacity={v.adblue_capacity_liters}
+              ptac={v.ptac_kg}
+              referenceConsumption={v.reference_consumption_l_100km}
+              specSources={v.spec_sources ?? {}}
             />
           </RoleGate>
         }
@@ -163,9 +185,46 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           )}
         </div>
         <div className="flex flex-col items-center gap-4">
+          {(v.brand || v.model) && (
+            <Card className="w-full">
+              <p className="text-sm text-navy/50">Modèle</p>
+              <p className="text-lg">
+                {[v.brand, v.model].filter(Boolean).join(" ")}
+                {v.model_year ? ` (${v.model_year})` : ""}
+              </p>
+              {v.gearbox && <p className="text-xs text-navy/40">Boîte {v.gearbox}</p>}
+            </Card>
+          )}
           <Card>
             <p className="text-sm text-navy/50">Capacité réservoir</p>
             <p className="text-xl">{v.tank_capacity_liters ? `${v.tank_capacity_liters} L` : "Non renseignée"}</p>
+            <SpecProvenance field="tank_capacity_liters" specSources={v.spec_sources} />
+          </Card>
+          <Card className="w-full">
+            <p className="mb-2 text-sm text-navy/50">Caractéristiques techniques</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-navy/40">Carburant</p>
+                <p>{v.fuel_type ?? "—"}</p>
+                <SpecProvenance field="fuel_type" specSources={v.spec_sources} />
+              </div>
+              <div>
+                <p className="text-navy/40">AdBlue</p>
+                <p>{v.adblue_capacity_liters ? `${v.adblue_capacity_liters} L` : "—"}</p>
+                <SpecProvenance field="adblue_capacity_liters" specSources={v.spec_sources} />
+              </div>
+              <div>
+                <p className="text-navy/40">PTAC</p>
+                <p>{v.ptac_kg ? `${v.ptac_kg} kg` : "—"}</p>
+                <SpecProvenance field="ptac_kg" specSources={v.spec_sources} />
+              </div>
+              <div>
+                <p className="text-navy/40">Conso. référence</p>
+                <p>{v.reference_consumption_l_100km ? `${v.reference_consumption_l_100km} L/100km` : "—"}</p>
+                <SpecProvenance field="reference_consumption_l_100km" specSources={v.spec_sources} />
+              </div>
+            </div>
+            <SpecProvenance field="type" specSources={v.spec_sources} label="Type" />
           </Card>
           <Card>
             <p className="text-sm text-navy/50">Chauffeur assigné</p>

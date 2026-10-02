@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // lib/assistant/help-content.ts reads content/help/*.md via a
+  // runtime-built path (the filename comes from a data array, not a
+  // string literal at the fs.readFileSync call site) — Next's static
+  // file tracing can't follow that, so the directory is force-included
+  // for the one route that needs it at runtime (Vercel).
+  outputFileTracingIncludes: {
+    "/api/assistant/message": ["./content/help/**"],
+  },
   images: {
     remotePatterns: [
       {

@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { filterTicpeEligibleVehicles } from "@/lib/business/ticpe";
+import { filterTicpeEligibleVehicles, isTicpeSafeToInclude } from "@/lib/business/ticpe";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
   const { data: entries, error } = await supabase
     .from("fuel_entries")
-    .select("liters, unit_price, total_amount, vehicles!inner(registration, type)")
+    .select("liters, unit_price, total_amount, vehicles!inner(registration, type, spec_sources)")
     .in("status", ["manual", "validated"]) // only trusted, validated data feeds a fiscal export
     .gte("occurred_at", `${period_start}T00:00:00Z`)
     .lte("occurred_at", `${period_end}T23:59:59Z`);
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 
   const eligibleEntries = filterTicpeEligibleVehicles(
     (entries ?? []).map((e: any) => ({ ...e, type: e.vehicles.type })),
-  );
+  ).filter((e: any) => isTicpeSafeToInclude(e.type, e.vehicles.spec_sources));
 
   const byVehicle = new Map<
     string,

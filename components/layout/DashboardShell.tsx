@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileActionBar } from "@/components/layout/MobileActionBar";
+import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import type { UserRole } from "@/lib/types/domain";
 
 export function DashboardShell({
@@ -15,6 +16,7 @@ export function DashboardShell({
   fullName,
   roleTitle,
   hasActiveTour,
+  assistantAvailable,
   children,
 }: {
   role: UserRole;
@@ -25,6 +27,8 @@ export function DashboardShell({
   fullName: string;
   roleTitle?: string | null;
   hasActiveTour: boolean;
+  /** Module enabled AND ANTHROPIC_API_KEY configured — resolved server-side so the widget is absent, not just hidden, otherwise. */
+  assistantAvailable: boolean;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -66,6 +70,7 @@ export function DashboardShell({
         </main>
       </div>
       {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} />}
+      {assistantAvailable && <AssistantWidget />}
     </div>
   );
 }

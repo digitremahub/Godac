@@ -5,12 +5,21 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 
+const reportFieldsSchema = z.object({
+  bl_number: z.string().nullable(),
+  stops_delivered: z.number().int().nonnegative().nullable(),
+  packages_missing: z.number().int().nonnegative().nullable(),
+  pickups: z.number().int().nonnegative().nullable(),
+});
+
 const bodySchema = z
   .object({
     vehicle_id: z.string().uuid(),
     end_km: z.coerce.number().min(0),
     end_km_photo_path: z.string().optional(),
-    has_sheet_photo: z.boolean().optional().default(false),
+    // Already uploaded via TourReportPhotoCapture, see app/api/tours/route.ts's POST for the same change on the departure side.
+    sheet_photo_path: z.string().optional(),
+    report_fields: reportFieldsSchema.partial().optional(),
     notes: z.string().optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
@@ -44,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { data: tour, error: tourError } = await supabase
     .from("planning_entries")
-    .select("id, vehicle_id, driver_id, status, tour_number, start_km")
+    .select("id, vehicle_id, driver_id, status, tour_number, start_km, report_ocr_raw")
     .eq("id", id)
     .single();
   if (tourError || !tour) {
@@ -70,7 +79,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: regressionCheck.message }, { status: 422 });
   }
 
-  const storagePath = `${appUser.organization_id}/${tour.vehicle_id}/${randomUUID()}.jpg`;
+  const reportFields = parsed.data.report_fields;
 
   const { error } = await supabase
     .from("planning_entries")
@@ -79,9 +88,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       end_km: parsed.data.end_km,
       end_km_photo_path: parsed.data.end_km_photo_path,
       notes: parsed.data.notes || null,
-      end_photo_path: parsed.data.has_sheet_photo ? storagePath : null,
+      end_photo_path: parsed.data.sheet_photo_path ?? null,
       end_vehicle_ok: parsed.data.vehicle_ok,
       status: "done",
+      ...(reportFields
+        ? {
+            report_bl_number: reportFields.bl_number ?? undefined,
+            report_stops_delivered: reportFields.stops_delivered ?? null,
+            report_packages_missing: reportFields.packages_missing ?? null,
+            report_pickups: reportFields.pickups ?? null,
+            report_ocr_raw: { ...((tour.report_ocr_raw as object) ?? {}), end: reportFields },
+          }
+        : {}),
     })
     .eq("id", id);
 
@@ -103,5 +121,5 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (interventionError) return NextResponse.json({ error: interventionError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ storagePath, problemPhotoStoragePath });
+  return NextResponse.json({ problemPhotoStoragePath });
 }

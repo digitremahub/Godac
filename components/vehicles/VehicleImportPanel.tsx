@@ -26,6 +26,9 @@ export function VehicleImportPanel() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [aiExtracted, setAiExtracted] = useState(false);
+  const [importedVehicleIds, setImportedVehicleIds] = useState<string[]>([]);
+  const [completing, setCompleting] = useState(false);
+  const [completeSummary, setCompleteSummary] = useState<string | null>(null);
 
   async function handleFile(file: File) {
     setSummary(null);
@@ -48,6 +51,8 @@ export function VehicleImportPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(json.error));
       setSummary(`${json.insertedVehicles} véhicule(s) ajouté(s).`);
+      setImportedVehicleIds((json.insertedVehicleIds as string[] | undefined) ?? []);
+      setCompleteSummary(null);
       setVehicles([]);
       setFileErrors([]);
       router.refresh();
@@ -55,6 +60,39 @@ export function VehicleImportPanel() {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Lot A: fills tank capacity/PTAC/etc. for the vehicles just imported, 10 at a time (the bulk endpoint's own cap). */
+  async function completeByAi() {
+    setCompleting(true);
+    setCompleteSummary(null);
+    setError(null);
+    try {
+      let updatedCount = 0;
+      let skippedCount = 0;
+      for (let i = 0; i < importedVehicleIds.length; i += 10) {
+        const batch = importedVehicleIds.slice(i, i + 10);
+        const res = await fetch("/api/vehicles/ai-specs/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vehicle_ids: batch }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(apiErrorMessage(json.error));
+        for (const r of json.results as { updated: string[]; error?: string }[]) {
+          if (r.updated.length > 0) updatedCount += 1;
+          else skippedCount += 1;
+        }
+      }
+      setCompleteSummary(
+        `${updatedCount} véhicule(s) complété(s) par IA${skippedCount > 0 ? `, ${skippedCount} ignoré(s) (marque/modèle manquant ou déjà complet)` : ""}.`,
+      );
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -71,7 +109,7 @@ export function VehicleImportPanel() {
       <div className="flex items-start justify-between gap-3">
         <p className="label">
           Fichier CSV ou Excel — colonnes : immatriculation, type, capacité cuve, kilométrage,
-          service
+          service, marque, modèle (optionnel)
         </p>
         <button className="shrink-0 text-sm text-navy/50 hover:text-navy" onClick={() => setOpen(false)}>
           Fermer
@@ -98,6 +136,15 @@ export function VehicleImportPanel() {
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
       {summary && <p className="text-sm text-teal-ink">{summary}</p>}
+      {importedVehicleIds.length > 0 && !completeSummary && (
+        <div className="flex items-center justify-between rounded-lg bg-gold/10 p-3">
+          <p className="text-sm text-gold-ink">Compléter automatiquement les champs vides (réservoir, PTAC…) pour les véhicules importés ?</p>
+          <button className="btn-secondary shrink-0 !px-3 !py-1.5 text-xs" disabled={completing} onClick={completeByAi}>
+            {completing ? "En cours…" : "🤖 Compléter par IA"}
+          </button>
+        </div>
+      )}
+      {completeSummary && <p className="text-sm text-teal-ink">{completeSummary}</p>}
       <div className="flex justify-end">
         <button className="btn-primary" disabled={busy || vehicles.length === 0} onClick={submitImport}>
           {busy ? "Import en cours…" : "Importer"}
