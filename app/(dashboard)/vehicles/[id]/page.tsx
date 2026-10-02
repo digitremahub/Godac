@@ -34,7 +34,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         .single(),
       supabase
         .from("vehicle_interventions")
-        .select("id, type, description, urgency, status, scheduled_at, completed_at, cost, odometer_km, created_at")
+        .select(
+          "id, type, description, urgency, status, scheduled_at, completed_at, cost, odometer_km, appointment_needed, photo_paths, created_at",
+        )
         .eq("vehicle_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("services").select("id, name").order("name"),
@@ -62,6 +64,19 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
   if (!vehicle) notFound();
   const v = vehicle as any;
+
+  const interventionsWithPhotos = await Promise.all(
+    (interventions ?? []).map(async (i: any) => {
+      const paths: string[] = i.photo_paths ?? [];
+      const photoUrls = await Promise.all(
+        paths.map(async (path) => {
+          const { data } = await supabase.storage.from("intervention-photos").createSignedUrl(path, 600);
+          return data?.signedUrl ?? null;
+        }),
+      );
+      return { ...i, photoUrls: photoUrls.filter((u): u is string => Boolean(u)) };
+    }),
+  );
 
   const odometerReadings: OdometerReading[] = [
     ...(v.initial_km !== null ? [{ at: v.created_at, km: v.initial_km, label: "Kilométrage initial" }] : []),
@@ -99,7 +114,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col gap-4 lg:col-span-2">
           <InterventionsPanel
             vehicleId={id}
-            interventions={interventions ?? []}
+            interventions={interventionsWithPhotos}
             canManage={hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])}
           />
 

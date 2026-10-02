@@ -15,6 +15,7 @@ export function OrganizationSettingsForm({
   logoUrl,
   accentColor,
   requireOdometerPhoto,
+  emergencyPhone,
 }: {
   organizationId: string;
   name: string;
@@ -22,6 +23,7 @@ export function OrganizationSettingsForm({
   logoUrl: string | null;
   accentColor: string | null;
   requireOdometerPhoto: boolean;
+  emergencyPhone: string | null;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -29,6 +31,7 @@ export function OrganizationSettingsForm({
   const [logo, setLogo] = useState(logoUrl);
   const [accent, setAccent] = useState(accentColor ?? DEFAULT_ACCENT);
   const [odometerPhotoRequired, setOdometerPhotoRequired] = useState(requireOdometerPhoto);
+  const [emergencyPhoneValue, setEmergencyPhoneValue] = useState(emergencyPhone ?? "");
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +75,7 @@ export function OrganizationSettingsForm({
           logo_url: logo,
           accent_color: accent,
           require_odometer_photo: odometerPhotoRequired,
+          emergency_phone: emergencyPhoneValue.trim() || null,
         }),
       });
       const json = await res.json();
@@ -173,6 +177,20 @@ export function OrganizationSettingsForm({
         >
           {odometerPhotoRequired ? "Activé" : "Désactivé"}
         </button>
+      </div>
+
+      <div>
+        <label className="label">Numéro à appeler en cas d&apos;accident</label>
+        <input
+          className="input"
+          type="tel"
+          placeholder="ex: 06 12 34 56 78"
+          value={emergencyPhoneValue}
+          onChange={(e) => setEmergencyPhoneValue(e.target.value)}
+        />
+        <p className="mt-1 text-sm text-navy/50">
+          Affiché aux chauffeurs sur le formulaire de signalement. Laissez vide pour masquer le bandeau.
+        </p>
       </div>
 
       <button className="btn-primary" disabled={busy || uploadingLogo} onClick={save}>

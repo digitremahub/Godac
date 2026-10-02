@@ -11,6 +11,9 @@ interface RequestRow {
   description: string | null;
   urgency: "low" | "normal" | "high" | "critical";
   status: "scheduled" | "in_progress" | "done" | "cancelled";
+  odometerKm: number | null;
+  appointmentNeeded: boolean;
+  photoUrls: string[];
   requesterName: string;
   createdAt: string;
 }
@@ -103,12 +106,14 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
   return (
     <Card className="overflow-x-auto">
       {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
-      <table className="w-full min-w-[820px] text-sm">
+      <table className="w-full min-w-[1000px] text-sm">
         <thead className="text-left text-navy/40">
           <tr>
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Type</th>
             <th className="pb-2">Description</th>
+            <th className="pb-2">Km</th>
+            <th className="pb-2">Photos</th>
             <th className="pb-2">Urgence</th>
             <th className="pb-2">Demandeur</th>
             <th className="pb-2">Statut</th>
@@ -127,6 +132,22 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
                     <input className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
                   ) : (
                     r.description ?? "—"
+                  )}
+                  {r.appointmentNeeded && <span className="badge-gold ml-2">RDV garage à prévoir</span>}
+                </td>
+                <td className="py-2 text-navy/60">{r.odometerKm ?? "—"}</td>
+                <td className="py-2">
+                  {r.photoUrls.length > 0 ? (
+                    <div className="flex gap-1">
+                      {r.photoUrls.map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="Photo du signalement" className="h-10 w-10 rounded object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    "—"
                   )}
                 </td>
                 <td className="py-2">

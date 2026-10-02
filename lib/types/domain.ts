@@ -42,6 +42,7 @@ export interface Organization {
   logo_url: string | null;
   accent_color: string | null;
   require_odometer_photo: boolean;
+  emergency_phone: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   subscription_status: "trialing" | "active" | "past_due" | "canceled" | "incomplete";

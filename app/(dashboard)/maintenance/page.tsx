@@ -26,18 +26,32 @@ export default async function MaintenancePage({
     );
   }
 
-  const [{ data: vehicles }, { data: requests }] = await Promise.all([
+  const [{ data: vehicles }, { data: requests }, { data: organization }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active").order("registration"),
     supabase
       .from("vehicle_interventions")
       .select(
-        "id, type, description, urgency, status, created_at, vehicles(registration), users!vehicle_interventions_requested_by_fkey(full_name)",
+        "id, type, description, urgency, status, odometer_km, appointment_needed, photo_paths, created_at, vehicles(registration), users!vehicle_interventions_requested_by_fkey(full_name)",
       )
       .order("created_at", { ascending: false }),
+    supabase.from("organizations").select("emergency_phone").eq("id", appUser.organization_id).single(),
   ]);
 
   const rows = (requests ?? []) as any[];
   rows.sort((a, b) => (URGENCY_RANK[a.urgency] ?? 2) - (URGENCY_RANK[b.urgency] ?? 2));
+
+  const rowsWithPhotos = await Promise.all(
+    rows.map(async (r) => {
+      const paths: string[] = r.photo_paths ?? [];
+      const photoUrls = await Promise.all(
+        paths.map(async (path) => {
+          const { data } = await supabase.storage.from("intervention-photos").createSignedUrl(path, 600);
+          return data?.signedUrl ?? null;
+        }),
+      );
+      return { ...r, photoUrls: photoUrls.filter((u): u is string => Boolean(u)) };
+    }),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,16 +60,19 @@ export default async function MaintenancePage({
         description="Signalement chauffeur → gestionnaire, avec niveau d'urgence."
       />
 
-      <MaintenanceRequestForm vehicles={vehicles ?? []} initialVehicleId={vehicle} />
+      <MaintenanceRequestForm vehicles={vehicles ?? []} initialVehicleId={vehicle} emergencyPhone={organization?.emergency_phone} />
 
       <MaintenanceRequestsList
-        requests={rows.map((r) => ({
+        requests={rowsWithPhotos.map((r) => ({
           id: r.id,
           vehicleRegistration: r.vehicles?.registration ?? "—",
           type: r.type,
           description: r.description,
           urgency: r.urgency,
           status: r.status,
+          odometerKm: r.odometer_km,
+          appointmentNeeded: r.appointment_needed,
+          photoUrls: r.photoUrls,
           requesterName: r.users?.full_name ?? "—",
           createdAt: r.created_at,
         }))}

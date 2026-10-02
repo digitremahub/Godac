@@ -14,6 +14,9 @@ interface Intervention {
   scheduled_at: string | null;
   completed_at: string | null;
   cost: number | null;
+  odometer_km: number | null;
+  appointment_needed: boolean;
+  photoUrls: string[];
 }
 
 const STATUS_FLOW: Record<Intervention["status"], Intervention["status"] | null> = {
@@ -214,6 +217,18 @@ export function InterventionsPanel({
                     <div>
                       <p className="font-medium">{i.type}</p>
                       {i.description && <p className="text-navy/50">{i.description}</p>}
+                      {i.odometer_km !== null && <p className="text-xs text-navy/40">{i.odometer_km} km</p>}
+                      {i.appointment_needed && <span className="badge-gold">RDV garage à prévoir</span>}
+                      {i.photoUrls.length > 0 && (
+                        <div className="mt-1 flex gap-1">
+                          {i.photoUrls.map((url, idx) => (
+                            <a key={idx} href={url} target="_blank" rel="noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt="Photo de l'intervention" className="h-10 w-10 rounded object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={URGENCY_BADGES[i.urgency]}>{URGENCY_LABELS[i.urgency]}</span>
