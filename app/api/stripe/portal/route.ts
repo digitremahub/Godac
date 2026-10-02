@@ -5,6 +5,13 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /** Module 9: opens the Stripe-hosted billing portal for the org's subscription. */
 export async function POST() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json(
+      { error: "La facturation Stripe n'est pas configurée sur cet environnement. Contactez un administrateur GODAC." },
+      { status: 503 },
+    );
+  }
+
   const appUser = await requireAppUser();
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut gérer l'abonnement" }, { status: 403 });

@@ -16,9 +16,9 @@ const STATUS_MAP: Record<Stripe.Subscription.Status, string> = {
 
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error("STRIPE_WEBHOOK_SECRET is not configured");
-    return NextResponse.json({ error: "webhook not configured" }, { status: 500 });
+  if (!webhookSecret || !process.env.STRIPE_SECRET_KEY) {
+    console.error("Stripe webhook received but STRIPE_WEBHOOK_SECRET/STRIPE_SECRET_KEY is not configured");
+    return NextResponse.json({ error: "webhook not configured" }, { status: 503 });
   }
 
   const signature = req.headers.get("stripe-signature");

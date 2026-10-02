@@ -81,13 +81,19 @@ borne partagée pour s'identifier avant de saisir un ravitaillement.
 
 ## Modèle de données
 
-Voir `supabase/migrations/*.sql`, dans l'ordre :
+Voir `supabase/migrations/*.sql` pour le détail exact. Les 13 premières
+posent le socle (schéma 1-13, détaillées ci-dessous) ; le schéma va
+aujourd'hui jusqu'à la migration **43**, appliquées dans l'ordre par
+`supabase db push` — toujours des ajouts, jamais une modification
+d'une migration déjà passée en prod.
+
+**Socle (1-13)** :
 
 1. `20260101000001_extensions_and_enums.sql` — enums partagés
 2. `20260101000002_core_tables.sql` — organizations, services, users, vehicles, tanks
 3. `20260101000003_fuel_tables.sql` — fuel_entries, fuel_price_history
 4. `20260101000004_alerts.sql`
-5. `20260101000005_planning_rh.sql` — planning_entries, vehicle_interventions, fines, leave_requests (Phase 2)
+5. `20260101000005_planning_rh.sql` — planning_entries, vehicle_interventions, fines, leave_requests
 6. `20260101000006_ticpe.sql`
 7. `20260101000007_marketplace_stub.sql` — Module 10 (Phase 3), tables présentes mais RLS ferme tout, aucune UI
 8. `20260101000008_auth_helpers.sql` — fonctions de résolution `auth.uid()` → org/rôle
@@ -96,6 +102,34 @@ Voir `supabase/migrations/*.sql`, dans l'ordre :
 11. `20260101000011_storage.sql` — bucket `fuel-tickets`
 12. `20260101000012_ticpe_storage.sql` — bucket `ticpe-exports`
 13. `20260101000013_alerts_notified.sql` — traçabilité de l'envoi email
+
+**Depuis la 14, par thème** (voir le fichier de chaque migration pour
+le détail — chacune documente son "pourquoi" en commentaire SQL) :
+
+- **Catalogue de modules** (14-16, 22-23, 28) — `modules`,
+  `module_plan_prices`, `organization_modules` : le switchboard qui
+  pilote quelles fonctionnalités sont activées par organisation (voir
+  `lib/organization/modules.ts`), les prix par plan, et les
+  corrections de vagues/tarifs successives.
+- **RH & Intranet** (17) — congés, annonces.
+- **Demandes d'entretien / signalement** (19, 24-26, 41) — urgence,
+  alerte email, puis (Lot 4 de la mission terrain) catégorie fixe,
+  kilométrage, photos, RDV garage à prévoir.
+- **Photos cuve/tournée** (18, 20, 33-34) — photos de cuve, livraisons
+  de carburant + facture, photo de totaliseur avec OCR.
+- **Planning & tournées** (27-32, 35-36, 38-40) — numéro de tournée,
+  km et photos de départ/retour, alertes d'affectation, suivi
+  kilométrique (tours + interventions + km initial), réglage
+  "photo de compteur obligatoire", état du véhicule obligatoire au
+  départ/retour avec signalement automatique en cas de problème,
+  alerte `odometer_anomaly` sur écart de trajet > 1500 km.
+- **Lavage** (37) — module `washes` (désactivé par défaut), table
+  `vehicle_washes`.
+- **Consommation carburant** (42-43) — alerte `consumption_anomaly`
+  quand un véhicule dépasse sa propre moyenne 90 jours de plus de X %
+  (seuil configurable par organisation), calculée depuis les litres de
+  gasoil et les relevés kilométriques existants (il n'y a pas de champ
+  kilométrage sur `fuel_entries` elle-même).
 
 Logique métier critique (implémentée deux fois volontairement : en
 trigger Postgres comme source de vérité, et en TypeScript pur pour
@@ -108,7 +142,11 @@ prévisualisation UI + tests unitaires) :
 - **TICPE** — éligibilité strictement PL/SPL, jamais VL — `lib/business/ticpe.ts`
 - **TVA récupérable** (VL 80% / PL+SPL 100%) — implémentée en fonction
   pure prête à l'emploi, non branchée dans une UI (hors périmètre MVP)
-- **Chevauchement de congés** — `lib/business/leave-overlap.ts` (Phase 2)
+- **Chevauchement de congés** — `lib/business/leave-overlap.ts`
+- **Cohérence kilométrique** (régression vs. dernier relevé connu,
+  écart de trajet anormal) — `lib/business/odometer.ts`
+- **Consommation carburant** (L/100km, détection de surconsommation) —
+  `lib/business/consumption.ts`
 
 ```bash
 npm test        # lance la suite vitest sur toute la logique métier
@@ -209,6 +247,42 @@ npm run build       # build de production (validé dans ce repo)
 
 ---
 
+## Mise en production (Vercel)
+
+Variables à configurer dans Vercel (Project Settings → Environment
+Variables), au minimum :
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL` (obligatoires).
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `NEXT_PUBLIC_STRIPE_PRICE_STARTER`/`_PRO` si la facturation est
+  activée — sinon les routes `/api/stripe/*` répondent proprement avec
+  un message clair plutôt qu'une erreur serveur.
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL` pour les emails d'alerte —
+  sinon les alertes restent visibles dans le centre d'alertes in-app
+  mais ne sont jamais envoyées par email.
+- `MINDEE_API_KEY` (+ les `MINDEE_*_MODEL_ID` optionnels), `ANTHROPIC_API_KEY`
+  (optionnel) — sinon OCR et import bascule proprement en saisie
+  manuelle.
+- `GODAC_STAFF_EMAILS`, `SUPABASE_DB_WEBHOOK_SECRET`.
+
+Voir `.env.example` pour la liste exhaustive et `## Variables
+d'environnement` ci-dessous pour le détail par intégration — toutes
+celles marquées optionnelles dégradent proprement (message clair,
+jamais d'erreur 500) quand elles sont absentes.
+
+Réglages manuels hors variables d'environnement, à faire une fois sur
+le projet Supabase de production (détaillés dans `## Intégrations non
+branchées` ci-dessous) : Authentication → URL Configuration,
+Authentication → Email Templates, Database → Webhooks.
+
+Avant l'ouverture au public, compléter les trois pages légales
+(`/mentions-legales`, `/cgu`, `/confidentialite`) — chaque placeholder
+`[À COMPLÉTER : ...]` doit être rempli (raison sociale, SIRET,
+hébergeur, contact) et idéalement relu par un professionnel du droit.
+
+---
+
 ## Intégrations non branchées (à faire avant la prod)
 
 Documenté explicitement, comme demandé — rien n'est masqué derrière un
@@ -257,23 +331,57 @@ placeholder silencieux :
 
 ## État d'avancement des modules
 
-### MVP — fait
-- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de passe, création d'organisation, import véhicules/chauffeurs depuis CSV/Excel (aussi disponible sur les pages Flotte et Utilisateurs), config cuves, choix plan Stripe, invitations par email)
-- Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection d'écart, historique, vue cuves)
-- Module 3 — OCR (capture photo mobile-first, pipeline Mindee, validation humaine obligatoire, revue manager, mode dégradé, QR badges véhicule/pompe/chauffeur)
-- Module 4 — Gestion de Flotte (fiche véhicule, interventions/entretien avec workflow de statut)
-- Module 7 — Export TICPE (filtré PL/SPL strictement, Excel, rôle comptable)
-- Module 8 — Alertes & Notifications (centre in-app + email Resend, écarts/anomalies/échecs OCR)
-- Module 9 — Administration & Multi-tenant (paramètres org, gestion des rôles, facturation Stripe, backoffice opérateur GODAC)
+### Fait
+- Module 1 — Authentification & Onboarding (Supabase Auth sans mot de
+  passe, création d'organisation, import véhicules/chauffeurs depuis
+  CSV/Excel avec repli IA pour les fichiers au format inhabituel,
+  config cuves, choix plan Stripe, invitations par email)
+- Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection
+  d'écart de totaliseur, historique, vue cuves, livraisons de
+  carburant + facture)
+- Module 3 — OCR (capture photo mobile-first, pipeline Mindee,
+  validation humaine obligatoire, revue manager, mode dégradé, OCR
+  compteur totaliseur/odomètre, QR badges véhicule/pompe/chauffeur)
+- Module 4 — Gestion de Flotte (fiche véhicule, consommation L/100km
+  sur 30/90 jours + classement dashboard, historique kilométrique
+  consolidé, lavage)
+- Module 5 — Planning / Tournées (grille hebdomadaire glisser-déposer,
+  notifications d'affectation, départ/retour de tournée par le
+  chauffeur avec km et état du véhicule obligatoires, numéro de
+  tournée optionnel généré automatiquement, signalement automatique en
+  cas de problème, détection d'écart kilométrique anormal)
+- Demandes d'entretien / signalement (catégorie fixe, kilométrage,
+  jusqu'à 4 photos, RDV garage à prévoir, bandeau d'urgence
+  accident si un numéro est configuré)
+- Lavage (module `washes`, désactivé par défaut)
+- RH légère — congés (détection de chevauchement, UI de demande/
+  validation) et intranet (annonces)
+- Module 7 — Export TICPE (filtré PL/SPL strictement, Excel, rôle
+  comptable)
+- Module 8 — Alertes & Notifications (centre in-app + email Resend,
+  écarts de totaliseur, anomalies de prix/kilométrage/consommation,
+  échecs OCR, demandes d'entretien)
+- Module 9 — Administration & Multi-tenant (paramètres org dont seuils
+  d'alerte et numéro d'urgence, gestion des rôles, facturation Stripe
+  — dégrade proprement si `STRIPE_SECRET_KEY` n'est pas défini, au
+  lieu de renvoyer une 500 — backoffice opérateur GODAC)
+- Interface mobile (tiroir de navigation + barre d'actions sous `lg`,
+  aucun défilement horizontal à 360px), fiche véhicule par scan QR
+  (`/v/[id]`) avec actions contextuelles selon rôle/modules activés
+- Pages publiques mentions légales / CGU / confidentialité (contenu à
+  compléter — voir placeholders `[À COMPLÉTER : ...]`), manifeste
+  web + icônes pour l'installation sur écran d'accueil, en-têtes de
+  sécurité (`next.config.mjs`)
 
-### Phase 2 — à faire
-- Module 5 — Planning / Tournées (tables déjà en place : `planning_entries`, RLS déjà écrite ; UI à construire)
-- Module 6 — RH légère : congés (détection de chevauchement déjà implémentée en logique pure, `lib/business/leave-overlap.ts`, UI à construire) + amendes (`fines`, table + RLS prêtes)
+### À faire
+- Connexion des chauffeurs sans email (plan proposé, pas encore
+  validé — voir la description de la pull request)
+- Amendes (`fines`, table + RLS prêtes, aucune UI)
 - Tarification Stripe modulaire par chauffeur
-- Suivi des livraisons de carburant (pour un niveau de cuve réel, pas seulement l'index cumulé)
 - Intégration Pennylane (facturation électronique)
-
-### Phase 3 — à faire
-- Module 10 — GODAC Hub / marketplace de fret (tables `freight_offers`/`freight_bids` posées et verrouillées par RLS, aucune UI ni logique)
+- Module 10 — GODAC Hub / marketplace de fret (tables
+  `freight_offers`/`freight_bids` posées et verrouillées par RLS,
+  aucune UI ni logique)
 - Module 11 — BI / Reporting avancé
-- Tachygraphe, application mobile native, RGPD avancé
+- Mode hors-ligne, notifications push, tachygraphe, application mobile
+  native, RGPD avancé

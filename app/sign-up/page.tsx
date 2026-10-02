@@ -15,6 +15,17 @@ export default function SignUpPage() {
           Se connecter
         </Link>
       </p>
+      <div className="flex gap-3 text-xs text-navy/30">
+        <Link href="/mentions-legales" className="hover:underline">
+          Mentions légales
+        </Link>
+        <Link href="/cgu" className="hover:underline">
+          CGU
+        </Link>
+        <Link href="/confidentialite" className="hover:underline">
+          Confidentialité
+        </Link>
+      </div>
     </main>
   );
 }

@@ -244,8 +244,19 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/35">
-        © {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.
+      <footer className="flex flex-col items-center gap-2 border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/35">
+        <p>© {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.</p>
+        <div className="flex gap-4">
+          <Link href="/mentions-legales" className="hover:text-navy/60 hover:underline">
+            Mentions légales
+          </Link>
+          <Link href="/cgu" className="hover:text-navy/60 hover:underline">
+            CGU
+          </Link>
+          <Link href="/confidentialite" className="hover:text-navy/60 hover:underline">
+            Confidentialité
+          </Link>
+        </div>
       </footer>
     </main>
   );

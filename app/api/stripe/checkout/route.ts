@@ -13,6 +13,13 @@ import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
  * per-org total isn't one of a fixed set of Stripe Prices.
  */
 export async function POST() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json(
+      { error: "La facturation Stripe n'est pas configurée sur cet environnement. Contactez un administrateur GODAC." },
+      { status: 503 },
+    );
+  }
+
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
 
