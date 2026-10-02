@@ -21,6 +21,25 @@ export function filterTicpeEligibleVehicles<T extends Pick<Vehicle, "type">>(
   return vehicles.filter((v) => isTicpeEligible(v.type));
 }
 
+/**
+ * Lot A guard rail: a vehicle's `type` can now come from an AI
+ * estimate (lib/vehicles/ai-specs.ts) instead of a human typing it
+ * in. An unconfirmed AI guess is excluded from the TICPE export even
+ * when it reads PL/SPL — a fiscal export must never rely on a value
+ * nobody has verified. Missing/legacy `spec_sources` (every vehicle
+ * created before Lot A) is treated as human-entered, since that's
+ * exactly what it was.
+ */
+export function isTicpeSafeToInclude(
+  vehicleType: VehicleType,
+  specSources: Record<string, { origin: string; confirmed: boolean } | undefined> | null | undefined,
+): boolean {
+  if (!isTicpeEligible(vehicleType)) return false;
+  const typeSource = specSources?.type;
+  if (!typeSource) return true;
+  return typeSource.origin !== "ia" || typeSource.confirmed;
+}
+
 export interface RecoverableVatInput {
   vehicleType: VehicleType;
   amountExclVat: number;

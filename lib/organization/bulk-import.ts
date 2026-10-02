@@ -5,6 +5,7 @@ import type { VehicleCsvRow, DriverCsvRow } from "@/lib/utils/csv";
 
 export interface BulkImportResult {
   insertedVehicles: number;
+  insertedVehicleIds: string[];
   invitationsSent: number;
   invitationFailures: { email: string; error: string }[];
 }
@@ -54,8 +55,9 @@ export async function bulkImportVehiclesAndDrivers(
   }
 
   let insertedVehicles = 0;
+  let insertedVehicleIds: string[] = [];
   if (vehicles.length > 0) {
-    const { error, count } = await supabase
+    const { data, error } = await supabase
       .from("vehicles")
       .insert(
         vehicles.map((v) => ({
@@ -65,13 +67,16 @@ export async function bulkImportVehiclesAndDrivers(
           tank_capacity_liters: v.tank_capacity_liters ?? null,
           initial_km: v.initial_km ?? null,
           service_id: v.service ? serviceIdByName.get(v.service) ?? null : null,
+          brand: v.brand ?? null,
+          model: v.model ?? null,
         })),
-        { count: "exact" },
-      );
+      )
+      .select("id");
     if (error) {
       throw new Error(`Import véhicules échoué: ${error.message}`);
     }
-    insertedVehicles = count ?? vehicles.length;
+    insertedVehicleIds = (data ?? []).map((v) => v.id as string);
+    insertedVehicles = insertedVehicleIds.length;
   }
 
   const invitationResults = await Promise.allSettled(
@@ -94,6 +99,7 @@ export async function bulkImportVehiclesAndDrivers(
 
   return {
     insertedVehicles,
+    insertedVehicleIds,
     invitationsSent: invitationResults.length - invitationFailures.length,
     invitationFailures,
   };

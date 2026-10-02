@@ -13,6 +13,8 @@ interface DriverOption {
   full_name: string;
 }
 
+type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined>;
+
 export function VehicleEditPanel({
   vehicleId,
   registration,
@@ -24,6 +26,15 @@ export function VehicleEditPanel({
   services,
   assignedDriverId,
   drivers,
+  brand,
+  model,
+  modelYear,
+  gearbox,
+  fuelType,
+  adblueCapacity,
+  ptac,
+  referenceConsumption,
+  specSources,
 }: {
   vehicleId: string;
   registration: string;
@@ -35,6 +46,15 @@ export function VehicleEditPanel({
   services: ServiceOption[];
   assignedDriverId: string | null;
   drivers: DriverOption[];
+  brand: string | null;
+  model: string | null;
+  modelYear: number | null;
+  gearbox: string | null;
+  fuelType: string | null;
+  adblueCapacity: number | null;
+  ptac: number | null;
+  referenceConsumption: number | null;
+  specSources: SpecSources;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -51,6 +71,15 @@ export function VehicleEditPanel({
         services={services}
         assignedDriverId={assignedDriverId}
         drivers={drivers}
+        brand={brand}
+        model={model}
+        modelYear={modelYear}
+        gearbox={gearbox}
+        fuelType={fuelType}
+        adblueCapacity={adblueCapacity}
+        ptac={ptac}
+        referenceConsumption={referenceConsumption}
+        specSources={specSources}
         onClose={() => setEditing(false)}
       />
     );

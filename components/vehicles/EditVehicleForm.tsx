@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import type { AiVehicleSpecs } from "@/lib/vehicles/ai-specs";
 
 interface ServiceOption {
   id: string;
@@ -20,6 +21,10 @@ const STATUS_LABELS: Record<string, string> = {
   out_of_service: "Hors service",
 };
 
+const CONFIDENCE_LABELS: Record<string, string> = { élevé: "confiance élevée", moyen: "confiance moyenne", faible: "confiance faible" };
+
+type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined>;
+
 export function EditVehicleForm({
   vehicleId,
   registration: initialRegistration,
@@ -31,6 +36,15 @@ export function EditVehicleForm({
   services,
   assignedDriverId: initialAssignedDriverId,
   drivers,
+  brand: initialBrand,
+  model: initialModel,
+  modelYear: initialModelYear,
+  gearbox: initialGearbox,
+  fuelType: initialFuelType,
+  adblueCapacity: initialAdblueCapacity,
+  ptac: initialPtac,
+  referenceConsumption: initialReferenceConsumption,
+  specSources: initialSpecSources,
   onClose,
 }: {
   vehicleId: string;
@@ -43,6 +57,15 @@ export function EditVehicleForm({
   services: ServiceOption[];
   assignedDriverId: string | null;
   drivers: DriverOption[];
+  brand: string | null;
+  model: string | null;
+  modelYear: number | null;
+  gearbox: string | null;
+  fuelType: string | null;
+  adblueCapacity: number | null;
+  ptac: number | null;
+  referenceConsumption: number | null;
+  specSources: SpecSources;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -53,13 +76,99 @@ export function EditVehicleForm({
   const [status, setStatus] = useState(initialStatus);
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [assignedDriverId, setAssignedDriverId] = useState(initialAssignedDriverId ?? "");
+  const [brand, setBrand] = useState(initialBrand ?? "");
+  const [model, setModel] = useState(initialModel ?? "");
+  const [year, setYear] = useState(initialModelYear?.toString() ?? "");
+  const [gearbox, setGearbox] = useState(initialGearbox ?? "");
+  const [fuelType, setFuelType] = useState(initialFuelType ?? "");
+  const [adblueCapacity, setAdblueCapacity] = useState(initialAdblueCapacity?.toString() ?? "");
+  const [ptac, setPtac] = useState(initialPtac?.toString() ?? "");
+  const [referenceConsumption, setReferenceConsumption] = useState(initialReferenceConsumption?.toString() ?? "");
+  const [specSources, setSpecSources] = useState<SpecSources>(initialSpecSources ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [variants, setVariants] = useState<AiVehicleSpecs["variants"]>([]);
+
+  function markAi(field: string) {
+    setSpecSources((prev) => ({ ...prev, [field]: { origin: "ia", confirmed: false } }));
+  }
+  function clearAi(field: string) {
+    setSpecSources((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+  function confirmAi(field: string) {
+    setSpecSources((prev) => (prev[field] ? { ...prev, [field]: { ...prev[field]!, confirmed: true } } : prev));
+  }
+
+  async function completeByAi() {
+    setAiBusy(true);
+    setAiError(null);
+    setVariants([]);
+    try {
+      const res = await fetch("/api/vehicles/ai-specs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand, model, year: year || undefined, gearbox: gearbox || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      const specs = json.specs as AiVehicleSpecs;
+
+      if (specs.type.value) {
+        setType(specs.type.value);
+        markAi("type");
+      }
+      if (specs.fuel_type.value && !fuelType) {
+        setFuelType(specs.fuel_type.value);
+        markAi("fuel_type");
+      }
+      if (specs.tank_capacity_liters.value && !tankCapacity) {
+        setTankCapacity(String(specs.tank_capacity_liters.value));
+        markAi("tank_capacity_liters");
+      }
+      if (specs.adblue_capacity_liters.value && !adblueCapacity) {
+        setAdblueCapacity(String(specs.adblue_capacity_liters.value));
+        markAi("adblue_capacity_liters");
+      }
+      if (specs.ptac_kg.value && !ptac) {
+        setPtac(String(specs.ptac_kg.value));
+        markAi("ptac_kg");
+      }
+      if (specs.reference_consumption_l_100km.value && !referenceConsumption) {
+        setReferenceConsumption(String(specs.reference_consumption_l_100km.value));
+        markAi("reference_consumption_l_100km");
+      }
+      if (specs.variants.length > 0) setVariants(specs.variants);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  function applyVariant(v: AiVehicleSpecs["variants"][number]) {
+    if (v.tank_capacity_liters) {
+      setTankCapacity(String(v.tank_capacity_liters));
+      markAi("tank_capacity_liters");
+    }
+    if (v.ptac_kg) {
+      setPtac(String(v.ptac_kg));
+      markAi("ptac_kg");
+    }
+    setVariants([]);
+  }
 
   async function save() {
     setBusy(true);
     setError(null);
     try {
+      const cleanedSpecSources = Object.fromEntries(Object.entries(specSources).filter(([, v]) => v));
       const res = await fetch(`/api/vehicles/${vehicleId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -71,6 +180,15 @@ export function EditVehicleForm({
           status,
           service_id: serviceId || null,
           assigned_driver_id: assignedDriverId || null,
+          brand: brand || null,
+          model: model || null,
+          model_year: year ? Number(year) : null,
+          gearbox: gearbox || null,
+          fuel_type: fuelType || null,
+          adblue_capacity_liters: adblueCapacity ? Number(adblueCapacity) : null,
+          ptac_kg: ptac ? Number(ptac) : null,
+          reference_consumption_l_100km: referenceConsumption ? Number(referenceConsumption) : null,
+          spec_sources: cleanedSpecSources,
         }),
       });
       const json = await res.json();
@@ -84,6 +202,21 @@ export function EditVehicleForm({
     }
   }
 
+  function AiBadge({ field }: { field: string }) {
+    const state = specSources[field];
+    if (!state || state.origin !== "ia") return null;
+    return (
+      <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-gold-ink">
+        🤖 Estimé par IA
+        {!state.confirmed && (
+          <button type="button" className="underline" onClick={() => confirmAi(field)}>
+            confirmer
+          </button>
+        )}
+      </span>
+    );
+  }
+
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Modifier le véhicule</h3>
@@ -93,18 +226,146 @@ export function EditVehicleForm({
         <label className="label">Immatriculation</label>
         <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} />
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Marque</label>
+          <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Modèle</label>
+          <input className="input" value={model} onChange={(e) => setModel(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Année</label>
+          <input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Boîte de vitesses</label>
+          <select className="input" value={gearbox} onChange={(e) => setGearbox(e.target.value)}>
+            <option value="">Non précisé</option>
+            <option value="manuelle">Manuelle</option>
+            <option value="automatique">Automatique</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <button type="button" className="btn-secondary self-start" disabled={aiBusy || !brand || !model} onClick={completeByAi}>
+          {aiBusy ? "Estimation en cours…" : "🤖 Compléter les champs vides par IA"}
+        </button>
+        {aiError && <p className="text-xs text-orange-ink">{aiError}</p>}
+        {variants.length > 0 && (
+          <div className="mt-1 flex flex-col gap-1 rounded-lg bg-gold/10 p-3 text-sm">
+            <p className="text-gold-ink">Plusieurs versions possibles — choisissez la vôtre :</p>
+            {variants.map((v, i) => (
+              <button
+                key={i}
+                type="button"
+                className="rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-navy/5"
+                onClick={() => applyVariant(v)}
+              >
+                {v.label}
+                {v.tank_capacity_liters ? ` — réservoir ${v.tank_capacity_liters} L` : ""}
+                {v.ptac_kg ? ` — PTAC ${v.ptac_kg} kg` : ""}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div>
         <label className="label">Type</label>
-        <select className="input" value={type} onChange={(e) => setType(e.target.value as "VL" | "PL" | "SPL")}>
+        <select
+          className="input"
+          value={type}
+          onChange={(e) => {
+            setType(e.target.value as "VL" | "PL" | "SPL");
+            clearAi("type");
+          }}
+        >
           <option value="VL">VL (véhicule léger)</option>
           <option value="PL">PL (poids lourd)</option>
           <option value="SPL">SPL (semi-remorque)</option>
         </select>
+        <AiBadge field="type" />
       </div>
+
       <div>
-        <label className="label">Capacité réservoir (L)</label>
-        <input className="input" type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} />
+        <label className="label">Carburant</label>
+        <input
+          className="input"
+          value={fuelType}
+          onChange={(e) => {
+            setFuelType(e.target.value);
+            clearAi("fuel_type");
+          }}
+        />
+        <AiBadge field="fuel_type" />
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Capacité réservoir (L)</label>
+          <input
+            className="input"
+            type="number"
+            value={tankCapacity}
+            onChange={(e) => {
+              setTankCapacity(e.target.value);
+              clearAi("tank_capacity_liters");
+            }}
+          />
+          <AiBadge field="tank_capacity_liters" />
+        </div>
+        <div>
+          <label className="label">Capacité AdBlue (L)</label>
+          <input
+            className="input"
+            type="number"
+            value={adblueCapacity}
+            onChange={(e) => {
+              setAdblueCapacity(e.target.value);
+              clearAi("adblue_capacity_liters");
+            }}
+          />
+          <AiBadge field="adblue_capacity_liters" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">PTAC (kg)</label>
+          <input
+            className="input"
+            type="number"
+            value={ptac}
+            onChange={(e) => {
+              setPtac(e.target.value);
+              clearAi("ptac_kg");
+            }}
+          />
+          <AiBadge field="ptac_kg" />
+        </div>
+        <div>
+          <label className="label">Consommation de référence (L/100km)</label>
+          <input
+            className="input"
+            type="number"
+            step="0.1"
+            value={referenceConsumption}
+            onChange={(e) => {
+              setReferenceConsumption(e.target.value);
+              clearAi("reference_consumption_l_100km");
+            }}
+          />
+          <AiBadge field="reference_consumption_l_100km" />
+        </div>
+      </div>
+
       <div>
         <label className="label">Kilométrage initial</label>
         <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} />
