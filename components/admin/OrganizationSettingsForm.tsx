@@ -16,6 +16,7 @@ export function OrganizationSettingsForm({
   accentColor,
   requireOdometerPhoto,
   emergencyPhone,
+  consumptionAnomalyThresholdPercent,
 }: {
   organizationId: string;
   name: string;
@@ -24,6 +25,7 @@ export function OrganizationSettingsForm({
   accentColor: string | null;
   requireOdometerPhoto: boolean;
   emergencyPhone: string | null;
+  consumptionAnomalyThresholdPercent: number;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -32,6 +34,7 @@ export function OrganizationSettingsForm({
   const [accent, setAccent] = useState(accentColor ?? DEFAULT_ACCENT);
   const [odometerPhotoRequired, setOdometerPhotoRequired] = useState(requireOdometerPhoto);
   const [emergencyPhoneValue, setEmergencyPhoneValue] = useState(emergencyPhone ?? "");
+  const [consumptionThreshold, setConsumptionThreshold] = useState(String(consumptionAnomalyThresholdPercent));
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +79,7 @@ export function OrganizationSettingsForm({
           accent_color: accent,
           require_odometer_photo: odometerPhotoRequired,
           emergency_phone: emergencyPhoneValue.trim() || null,
+          consumption_anomaly_threshold_percent: Number(consumptionThreshold) || 20,
         }),
       });
       const json = await res.json();
@@ -191,6 +195,21 @@ export function OrganizationSettingsForm({
         <p className="mt-1 text-sm text-navy/50">
           Affiché aux chauffeurs sur le formulaire de signalement. Laissez vide pour masquer le bandeau.
         </p>
+      </div>
+
+      <div>
+        <label className="label">Seuil d&apos;alerte de surconsommation</label>
+        <div className="flex items-center gap-2">
+          <input
+            className="input !w-24"
+            type="number"
+            min={1}
+            max={200}
+            value={consumptionThreshold}
+            onChange={(e) => setConsumptionThreshold(e.target.value)}
+          />
+          <span className="text-sm text-navy/50">% au-dessus de la moyenne 90 jours du véhicule</span>
+        </div>
       </div>
 
       <button className="btn-primary" disabled={busy || uploadingLogo} onClick={save}>

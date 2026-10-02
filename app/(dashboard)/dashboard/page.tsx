@@ -4,13 +4,18 @@ import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { RoleGate } from "@/components/layout/RoleGate";
 import Link from "next/link";
+import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import type { UserRole } from "@/lib/types/domain";
+
+const MANAGER_LIKE_ROLES: UserRole[] = ["manager", "manager_chauffeur", "direction"];
 
 export default async function DashboardPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const isDriver = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
+  const isManagerLike = hasRole(appUser.role, MANAGER_LIKE_ROLES);
 
-  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes, openTourRes] = await Promise.all([
+  const [vehiclesRes, openAlertsRes, pendingOcrRes, recentEntriesRes, openTourRes, fleetVehiclesRes] = await Promise.all([
     supabase.from("vehicles").select("id", { count: "exact", head: true }),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase
@@ -30,8 +35,25 @@ export default async function DashboardPage() {
           .eq("status", "in_progress")
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    isManagerLike
+      ? supabase.from("vehicles").select("id, registration").eq("status", "active")
+      : Promise.resolve({ data: null }),
   ]);
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
+
+  const consumptionRanking = isManagerLike
+    ? (
+        await Promise.all(
+          ((fleetVehiclesRes.data ?? []) as { id: string; registration: string }[]).map(async (v) => ({
+            registration: v.registration,
+            consumption: await getVehicleConsumption(supabase, v.id, 30),
+          })),
+        )
+      )
+        .filter((v): v is { registration: string; consumption: number } => v.consumption !== null)
+        .sort((a, b) => b.consumption - a.consumption)
+        .slice(0, 5)
+    : [];
 
   return (
     <div>
@@ -88,6 +110,24 @@ export default async function DashboardPage() {
             </div>
           )}
         </Card>
+
+        <RoleGate role={appUser.role} allow={MANAGER_LIKE_ROLES}>
+          <Card>
+            <h2 className="mb-3 text-lg">Consommation (30 jours)</h2>
+            {consumptionRanking.length === 0 ? (
+              <p className="text-sm text-navy/40">Pas assez de données pour établir un classement.</p>
+            ) : (
+              <ul className="flex flex-col gap-2 text-sm">
+                {consumptionRanking.map((v) => (
+                  <li key={v.registration} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                    <span>{v.registration}</span>
+                    <span className="font-medium">{v.consumption} L/100km</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </RoleGate>
 
         <RoleGate role={appUser.role} allow={["chauffeur", "manager_chauffeur"]}>
           <div className="flex flex-col items-center gap-4">

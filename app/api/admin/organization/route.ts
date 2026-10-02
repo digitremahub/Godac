@@ -14,6 +14,7 @@ const bodySchema = z.object({
     .optional(),
   require_odometer_photo: z.boolean().optional(),
   emergency_phone: z.string().trim().min(1).nullable().optional(),
+  consumption_anomaly_threshold_percent: z.coerce.number().int().min(1).max(200).optional(),
 });
 
 /** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
@@ -23,16 +24,26 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { name, ocr_enabled, logo_url, accent_color, require_odometer_photo, emergency_phone } = parsed.data;
+  const {
+    name,
+    ocr_enabled,
+    logo_url,
+    accent_color,
+    require_odometer_photo,
+    emergency_phone,
+    consumption_anomaly_threshold_percent,
+  } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
 
-  const profileFields: Record<string, string | null | boolean> = {};
+  const profileFields: Record<string, string | null | boolean | number> = {};
   if (name !== undefined) profileFields.name = name;
   if (logo_url !== undefined) profileFields.logo_url = logo_url;
   if (accent_color !== undefined) profileFields.accent_color = accent_color;
   if (require_odometer_photo !== undefined) profileFields.require_odometer_photo = require_odometer_photo;
   if (emergency_phone !== undefined) profileFields.emergency_phone = emergency_phone;
+  if (consumption_anomaly_threshold_percent !== undefined)
+    profileFields.consumption_anomaly_threshold_percent = consumption_anomaly_threshold_percent;
 
   if (Object.keys(profileFields).length > 0) {
     const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
@@ -53,7 +64,7 @@ export async function PATCH(req: Request) {
 
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, logo_url, accent_color, require_odometer_photo, emergency_phone")
+    .select("id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent")
     .eq("id", appUser.organization_id)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -11,6 +11,7 @@ import { RoleGate } from "@/components/layout/RoleGate";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { OdometerHistory, type OdometerReading } from "@/components/vehicles/OdometerHistory";
 import { WashHistory, type WashRecord } from "@/components/vehicles/WashHistory";
+import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,8 +26,16 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
   }
 
-  const [{ data: vehicle }, { data: interventions }, { data: services }, { data: fuelHistory }, { data: tours }, { data: washes }] =
-    await Promise.all([
+  const [
+    { data: vehicle },
+    { data: interventions },
+    { data: services },
+    { data: fuelHistory },
+    { data: tours },
+    { data: washes },
+    consumption30d,
+    consumption90d,
+  ] = await Promise.all([
       supabase
         .from("vehicles")
         .select("id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name)")
@@ -60,6 +69,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             .order("created_at", { ascending: false })
             .limit(20)
         : Promise.resolve({ data: null }),
+      getVehicleConsumption(supabase, id, 30),
+      getVehicleConsumption(supabase, id, 90),
     ]);
 
   if (!vehicle) notFound();
@@ -149,6 +160,22 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <Card>
             <p className="text-sm text-navy/50">Capacité réservoir</p>
             <p className="text-xl">{v.tank_capacity_liters ? `${v.tank_capacity_liters} L` : "Non renseignée"}</p>
+          </Card>
+          <Card className="w-full">
+            <p className="mb-2 text-sm text-navy/50">Consommation moyenne</p>
+            <div className="flex justify-around text-center">
+              <div>
+                <p className="text-xl">{consumption30d !== null ? `${consumption30d} L/100km` : "—"}</p>
+                <p className="text-xs text-navy/40">30 derniers jours</p>
+              </div>
+              <div>
+                <p className="text-xl">{consumption90d !== null ? `${consumption90d} L/100km` : "—"}</p>
+                <p className="text-xs text-navy/40">90 derniers jours</p>
+              </div>
+            </div>
+            {consumption30d === null && consumption90d === null && (
+              <p className="mt-2 text-xs text-navy/40">Pas assez de relevés kilométriques pour calculer la consommation.</p>
+            )}
           </Card>
           <div className="w-full">
             <OdometerHistory readings={odometerReadings} />
