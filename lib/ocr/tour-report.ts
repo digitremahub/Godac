@@ -24,6 +24,16 @@ export const tourReportSchema = z.object({
   stops_delivered: fieldSchema(z.number().int().nonnegative()),
   packages_missing: fieldSchema(z.number().int().nonnegative()),
   pickups: fieldSchema(z.number().int().nonnegative()),
+  // Printed on the bordereau itself — distinct from start_at/end_at,
+  // which are stamped by the app at the moment of the QR scan.
+  departure_time: fieldSchema(z.string()),
+  return_time: fieldSchema(z.string()),
+  // Package-level counts beyond "pickups" (which is a STOP count —
+  // "Stop(s) ramasse"): how many packages were actually collected,
+  // brought back undelivered, or dropped at a relay point.
+  packages_picked_up: fieldSchema(z.number().int().nonnegative()),
+  packages_returned: fieldSchema(z.number().int().nonnegative()),
+  packages_relay: fieldSchema(z.number().int().nonnegative()),
 });
 
 export type TourReportFields = z.infer<typeof tourReportSchema>;
@@ -32,7 +42,7 @@ export type TourReportOcrResult =
   | { ok: true; fields: TourReportFields; raw: unknown }
   | { ok: false; reason: string };
 
-const SYSTEM_PROMPT = `Tu lis une photo d'un rapport de tournée de livraison (écran de terminal portable type Honeywell, ou compte-rendu imprimé type DPD/transporteur). Extrais uniquement les chiffres et références explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Les champs correspondent typiquement à : numéro de tournée ("Num Tour", "Tournée"), numéro de bordereau/BL ("Num BL", "Bordereau"), nombre total d'arrêts/stops, nombre de colis, nombre de colis prioritaires ("Prio"), nombre d'arrêts livrés ("Livré"), nombre de colis non livrés/manquants, nombre de ramasses ("Stop(s) ramasse"). Un rapport ne contient pas forcément tous ces champs — renvoie null pour ceux qui sont absents.`;
+const SYSTEM_PROMPT = `Tu lis une photo d'un rapport de tournée de livraison (écran de terminal portable type Honeywell, ou compte-rendu imprimé type DPD/transporteur). Extrais uniquement les chiffres et références explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Les champs correspondent typiquement à : numéro de tournée ("Num Tour", "Tournée"), numéro de bordereau/BL ("Num BL", "Bordereau"), nombre total d'arrêts/stops, nombre de colis, nombre de colis prioritaires ("Prio"), nombre d'arrêts livrés ("Livré"), nombre de colis non livrés/manquants, nombre de stops de ramasse ("Stop(s) ramasse"), heure de départ, heure de retour, nombre de colis ramassés (collectés chez un client, distinct du nombre de stops de ramasse), nombre de colis ramenés au dépôt (non livrés, rapportés physiquement), nombre de colis déposés en point relais. Un rapport ne contient pas forcément tous ces champs — renvoie null pour ceux qui sont absents.`;
 
 const imageMediaTypeFromFilename = (filename: string): string => {
   if (filename.endsWith(".png")) return "image/png";
@@ -57,6 +67,11 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
       stops_delivered: { anyOf: [{ type: "integer" }, { type: "null" }] },
       packages_missing: { anyOf: [{ type: "integer" }, { type: "null" }] },
       pickups: { anyOf: [{ type: "integer" }, { type: "null" }] },
+      departure_time: { anyOf: [{ type: "string" }, { type: "null" }] },
+      return_time: { anyOf: [{ type: "string" }, { type: "null" }] },
+      packages_picked_up: { anyOf: [{ type: "integer" }, { type: "null" }] },
+      packages_returned: { anyOf: [{ type: "integer" }, { type: "null" }] },
+      packages_relay: { anyOf: [{ type: "integer" }, { type: "null" }] },
     },
     required: [
       "tour_number",
@@ -67,6 +82,11 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
       "stops_delivered",
       "packages_missing",
       "pickups",
+      "departure_time",
+      "return_time",
+      "packages_picked_up",
+      "packages_returned",
+      "packages_relay",
     ],
   };
 

@@ -10,6 +10,10 @@ const reportFieldsSchema = z.object({
   stops_delivered: z.number().int().nonnegative().nullable(),
   packages_missing: z.number().int().nonnegative().nullable(),
   pickups: z.number().int().nonnegative().nullable(),
+  return_time: z.string().nullable(),
+  packages_picked_up: z.number().int().nonnegative().nullable(),
+  packages_returned: z.number().int().nonnegative().nullable(),
+  packages_relay: z.number().int().nonnegative().nullable(),
 });
 
 const bodySchema = z
@@ -97,6 +101,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             report_stops_delivered: reportFields.stops_delivered ?? null,
             report_packages_missing: reportFields.packages_missing ?? null,
             report_pickups: reportFields.pickups ?? null,
+            report_return_time: reportFields.return_time ?? null,
+            report_packages_picked_up: reportFields.packages_picked_up ?? null,
+            report_packages_returned: reportFields.packages_returned ?? null,
+            report_packages_relay: reportFields.packages_relay ?? null,
             report_ocr_raw: { ...((tour.report_ocr_raw as object) ?? {}), end: reportFields },
           }
         : {}),

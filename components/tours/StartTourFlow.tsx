@@ -253,6 +253,7 @@ export function StartTourFlow({
           {[
             reportFields.tour_number && `tournée n°${reportFields.tour_number}`,
             reportFields.bl_number && `BL ${reportFields.bl_number}`,
+            reportFields.departure_time && `départ ${reportFields.departure_time}`,
             reportFields.stops_total !== null && `${reportFields.stops_total} arrêts`,
             reportFields.packages_count !== null && `${reportFields.packages_count} colis`,
           ]

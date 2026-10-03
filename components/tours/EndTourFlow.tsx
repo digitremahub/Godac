@@ -243,9 +243,13 @@ export function EndTourFlow({
         <p className="text-xs text-teal-ink">
           Lu automatiquement :{" "}
           {[
+            reportFields.return_time && `retour ${reportFields.return_time}`,
             reportFields.stops_delivered !== null && `${reportFields.stops_delivered} arrêts livrés`,
             reportFields.packages_missing !== null && `${reportFields.packages_missing} colis manquants`,
-            reportFields.pickups !== null && `${reportFields.pickups} ramasses`,
+            reportFields.pickups !== null && `${reportFields.pickups} stops de ramasse`,
+            reportFields.packages_picked_up !== null && `${reportFields.packages_picked_up} colis ramassés`,
+            reportFields.packages_returned !== null && `${reportFields.packages_returned} colis ramenés au dépôt`,
+            reportFields.packages_relay !== null && `${reportFields.packages_relay} colis en relais`,
           ]
             .filter(Boolean)
             .join(" · ") || "aucune donnée exploitable sur cette photo"}

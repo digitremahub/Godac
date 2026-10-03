@@ -21,6 +21,11 @@ function validFields(overrides: Partial<Record<string, unknown>> = {}) {
     stops_delivered: null,
     packages_missing: null,
     pickups: null,
+    departure_time: null,
+    return_time: null,
+    packages_picked_up: null,
+    packages_returned: null,
+    packages_relay: null,
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ const reportFieldsSchema = z.object({
   stops_total: z.number().int().nonnegative().nullable(),
   packages_count: z.number().int().nonnegative().nullable(),
   priority_count: z.number().int().nonnegative().nullable(),
+  departure_time: z.string().nullable(),
 });
 
 const bodySchema = z
@@ -116,6 +117,7 @@ export async function POST(req: Request) {
           report_stops_total: reportFields.stops_total ?? null,
           report_packages_count: reportFields.packages_count ?? null,
           report_priority_count: reportFields.priority_count ?? null,
+          report_departure_time: reportFields.departure_time ?? null,
           report_ocr_raw: { start: reportFields },
         }
       : {}),
