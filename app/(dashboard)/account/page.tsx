@@ -14,11 +14,13 @@ export default async function AccountPage() {
 
   let pinAlreadySet = false;
   let driverCode: string | null = null;
+  let address: string | null = null;
   if (isFieldRole) {
     const supabase = await createServerSupabaseClient();
-    const { data } = await supabase.from("users").select("pin_set_at, driver_code").eq("id", appUser.id).maybeSingle();
+    const { data } = await supabase.from("users").select("pin_set_at, driver_code, address").eq("id", appUser.id).maybeSingle();
     pinAlreadySet = Boolean(data?.pin_set_at);
     driverCode = data?.driver_code ?? null;
+    address = data?.address ?? null;
   }
 
   return (
@@ -48,7 +50,7 @@ export default async function AccountPage() {
         </>
       )}
 
-      <NameForm currentName={appUser.full_name} currentPhone={appUser.phone} />
+      <NameForm currentName={appUser.full_name} currentPhone={appUser.phone} currentAddress={address} showAddress={isFieldRole} />
       <EmailForm currentEmail={appUser.email} />
       <PasswordForm />
     </div>

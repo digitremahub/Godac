@@ -17,6 +17,7 @@ export function OrganizationSettingsForm({
   requireOdometerPhoto,
   emergencyPhone,
   consumptionAnomalyThresholdPercent,
+  depotAddress,
 }: {
   organizationId: string;
   name: string;
@@ -26,6 +27,7 @@ export function OrganizationSettingsForm({
   requireOdometerPhoto: boolean;
   emergencyPhone: string | null;
   consumptionAnomalyThresholdPercent: number;
+  depotAddress: string | null;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -35,6 +37,7 @@ export function OrganizationSettingsForm({
   const [odometerPhotoRequired, setOdometerPhotoRequired] = useState(requireOdometerPhoto);
   const [emergencyPhoneValue, setEmergencyPhoneValue] = useState(emergencyPhone ?? "");
   const [consumptionThreshold, setConsumptionThreshold] = useState(String(consumptionAnomalyThresholdPercent));
+  const [depotAddressValue, setDepotAddressValue] = useState(depotAddress ?? "");
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export function OrganizationSettingsForm({
           require_odometer_photo: odometerPhotoRequired,
           emergency_phone: emergencyPhoneValue.trim() || null,
           consumption_anomaly_threshold_percent: Number(consumptionThreshold) || 20,
+          depot_address: depotAddressValue.trim() || null,
         }),
       });
       const json = await res.json();
@@ -194,6 +198,20 @@ export function OrganizationSettingsForm({
         />
         <p className="mt-1 text-sm text-navy/50">
           Affiché aux chauffeurs sur le formulaire de signalement. Laissez vide pour masquer le bandeau.
+        </p>
+      </div>
+
+      <div>
+        <label className="label">Adresse du dépôt</label>
+        <input
+          className="input"
+          placeholder="ex: 1 rue du Dépôt, 69007 Lyon"
+          value={depotAddressValue}
+          onChange={(e) => setDepotAddressValue(e.target.value)}
+        />
+        <p className="mt-1 text-sm text-navy/50">
+          Sert à estimer la distance d&apos;un retour direct à domicile par rapport au retour habituel au dépôt
+          (rentabilité carburant).
         </p>
       </div>
 

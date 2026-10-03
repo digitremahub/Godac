@@ -4,8 +4,10 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TourHistoryFilters } from "@/components/tours/TourHistoryFilters";
 import { addDays, todayISO } from "@/lib/planning/dates";
+import { estimateReturnDistanceDeltaKm } from "@/lib/business/fuel-profitability";
 
 const STATUS_LABEL: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
+const RETURN_TYPE_LABEL: Record<string, string> = { depot: "Dépôt", domicile: "Domicile" };
 
 interface HistoryRow {
   id: string;
@@ -15,9 +17,10 @@ interface HistoryRow {
   status: string;
   start_km: number | null;
   end_km: number | null;
+  return_type: "depot" | "domicile" | null;
   services: { name: string } | null;
   vehicles: { registration: string } | null;
-  users: { full_name: string } | null;
+  users: { full_name: string; address_lat: number | null; address_lng: number | null } | null;
 }
 
 /**
@@ -55,7 +58,7 @@ export default async function TourHistoryPage({
   const to = params.to && !Number.isNaN(Date.parse(params.to)) ? params.to : todayISO();
   const toExclusive = addDays(to, 1);
 
-  const [{ data: allServices }, { data: myServiceRows }, { data: drivers }] = await Promise.all([
+  const [{ data: allServices }, { data: myServiceRows }, { data: drivers }, { data: organization }] = await Promise.all([
     isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
     isDirection || isChauffeur
       ? Promise.resolve({ data: null })
@@ -63,7 +66,13 @@ export default async function TourHistoryPage({
     isChauffeur
       ? Promise.resolve({ data: null })
       : supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    supabase.from("organizations").select("depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
   ]);
+
+  const depotCoords =
+    organization?.depot_lat !== null && organization?.depot_lng !== null && organization
+      ? { lat: Number(organization.depot_lat), lng: Number(organization.depot_lng) }
+      : null;
 
   const services = isDirection ? (allServices ?? []) : ((myServiceRows ?? []) as any[]).map((r) => r.services).filter(Boolean);
   const myServiceIds = services.map((s: any) => s.id);
@@ -71,7 +80,7 @@ export default async function TourHistoryPage({
   let query = supabase
     .from("planning_entries")
     .select(
-      "id, tour_number, start_at, end_at, status, start_km, end_km, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
+      "id, tour_number, start_at, end_at, status, start_km, end_km, return_type, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name, address_lat, address_lng)",
     )
     .in("status", ["in_progress", "done"])
     .gte("start_at", `${from}T00:00:00`)
@@ -126,25 +135,41 @@ export default async function TourHistoryPage({
                 <th className="pb-2">Véhicule</th>
                 <th className="pb-2">Tournée</th>
                 <th className="pb-2">Km</th>
+                <th className="pb-2">Retour</th>
                 <th className="pb-2">Statut</th>
               </tr>
             </thead>
             <tbody>
-              {history.map((r) => (
-                <tr key={r.id} className="border-t border-navy/5">
-                  <td className="py-2">
-                    {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                  </td>
-                  {!isChauffeur && <td className="py-2">{r.users?.full_name ?? "—"}</td>}
-                  <td className="py-2">{r.services?.name ?? "—"}</td>
-                  <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
-                  <td className="py-2">n°{r.tour_number}</td>
-                  <td className="py-2">
-                    {r.start_km !== null ? `${r.start_km}${r.end_km !== null ? ` → ${r.end_km}` : ""} km` : "—"}
-                  </td>
-                  <td className="py-2">{STATUS_LABEL[r.status] ?? r.status}</td>
-                </tr>
-              ))}
+              {history.map((r) => {
+                const homeCoords =
+                  r.users?.address_lat !== null && r.users?.address_lng !== null && r.users
+                    ? { lat: Number(r.users.address_lat), lng: Number(r.users.address_lng) }
+                    : null;
+                const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, depotCoords, homeCoords);
+                return (
+                  <tr key={r.id} className="border-t border-navy/5">
+                    <td className="py-2">
+                      {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                    </td>
+                    {!isChauffeur && <td className="py-2">{r.users?.full_name ?? "—"}</td>}
+                    <td className="py-2">{r.services?.name ?? "—"}</td>
+                    <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
+                    <td className="py-2">n°{r.tour_number}</td>
+                    <td className="py-2">
+                      {r.start_km !== null ? `${r.start_km}${r.end_km !== null ? ` → ${r.end_km}` : ""} km` : "—"}
+                    </td>
+                    <td className="py-2">
+                      {r.return_type ? RETURN_TYPE_LABEL[r.return_type] : "—"}
+                      {r.return_type === "domicile" && (
+                        <span className="ml-1 text-xs text-navy/40">
+                          {returnDelta !== null ? `(≈${returnDelta} km vs dépôt)` : "(adresse manquante)"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2">{STATUS_LABEL[r.status] ?? r.status}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>
