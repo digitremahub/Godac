@@ -10,6 +10,14 @@ const bodySchema = z.object({
   full_name: z.string().min(1).optional(),
   phone: z.string().nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
+  // Richer replacement for service_id above — several qualified
+  // services per driver, each with its own status (titulaire/
+  // formation/remplacement). Sent by DriverServicesPanel; service_id
+  // stays for the admin table's quick single-service edit. Only one
+  // of the two is expected per request.
+  services: z
+    .array(z.object({ service_id: z.string().uuid(), status: z.enum(["titulaire", "formation", "remplacement"]) }))
+    .optional(),
   // Lot 7: forgets their PIN → direction clears it, next badge scan
   // offers "créez votre code" again instead of "entrez votre code".
   reset_pin: z.boolean().optional(),
@@ -57,7 +65,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { service_id, reset_pin, ...userFields } = parsed.data;
+  const { service_id, services, reset_pin, ...userFields } = parsed.data;
   const updateFields: Record<string, unknown> = { ...userFields };
 
   if (reset_pin) {
@@ -75,10 +83,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     targetUser = data;
   }
 
-  // A user has at most one service through this admin panel (the
-  // invite flow itself only ever sets one) — replace rather than
-  // accumulate rows in the underlying many-to-many table.
-  if (service_id !== undefined) {
+  if (services !== undefined) {
+    // Full replace: a driver qualified on several services, each with
+    // its own status (titulaire/formation/remplacement) — see
+    // DriverServicesPanel.
+    const { error: clearError } = await supabase.from("user_services").delete().eq("user_id", id);
+    if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
+    if (services.length > 0) {
+      const { error: insertError } = await supabase
+        .from("user_services")
+        .insert(services.map((s) => ({ user_id: id, service_id: s.service_id, status: s.status })));
+      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+  } else if (service_id !== undefined) {
+    // A user has at most one service through the admin table's quick
+    // edit — replace rather than accumulate rows in the underlying
+    // many-to-many table.
     const { error: clearError } = await supabase.from("user_services").delete().eq("user_id", id);
     if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
     if (service_id) {

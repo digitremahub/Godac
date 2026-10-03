@@ -53,6 +53,7 @@ export function DriverWeekSheet({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [bulkService, setBulkService] = useState(services[0]?.id ?? "");
@@ -86,6 +87,7 @@ export function DriverWeekSheet({
     if (!bulkService || !bulkVehicle || !bulkTour || !bulkTime || bulkDays.size === 0) return;
     setBusy(true);
     setError(null);
+    setWarning(null);
     setBulkSummary(null);
     try {
       const res = await fetch("/api/planning/entries/bulk-week", {
@@ -103,6 +105,7 @@ export function DriverWeekSheet({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setBulkSummary(
         json.created > 0
           ? `${json.created} jour(s) affecté(s)${json.skipped > 0 ? ` (${json.skipped} déjà occupé(s), ignoré(s))` : ""}.`
@@ -130,6 +133,7 @@ export function DriverWeekSheet({
     const start = new Date(`${day}T${editTime}:00`);
     setRowBusyId(entry.id);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entry.id}`, {
         method: "PATCH",
@@ -138,6 +142,7 @@ export function DriverWeekSheet({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setEditingId(null);
       router.refresh();
     } catch (e) {
@@ -179,6 +184,7 @@ export function DriverWeekSheet({
         </div>
 
         {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+        {warning && <p className="mb-2 text-sm text-gold-ink">⚠️ {warning}</p>}
 
         <div className="mb-4 flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
           <p className="text-sm font-medium">Affecter toute la semaine</p>

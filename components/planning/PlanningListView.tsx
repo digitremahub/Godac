@@ -54,6 +54,7 @@ export function PlanningListView({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [openDriverSheet, setOpenDriverSheet] = useState<{ id: string; full_name: string } | null>(null);
 
   function navTo(nextWeekStart: string) {
@@ -71,6 +72,7 @@ export function PlanningListView({
   async function patch(entryId: string, fields: Record<string, string>) {
     setBusyId(entryId);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entryId}`, {
         method: "PATCH",
@@ -79,6 +81,7 @@ export function PlanningListView({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -102,6 +105,7 @@ export function PlanningListView({
         </button>
       </div>
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
 
       {sorted.length === 0 ? (
         <EmptyState title="Aucune affectation cette semaine" />

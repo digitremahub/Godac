@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const patchSchema = z.object({
   start_at: z.string().datetime().optional(),
@@ -19,7 +20,7 @@ const patchSchema = z.object({
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireAppUser();
+  const appUser = await requireAppUser();
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -31,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update(parsed.data)
     .eq("id", id)
     .eq("status", "planned")
-    .select("id")
+    .select("id, driver_id, start_at")
     .maybeSingle();
 
   if (error) {
@@ -44,7 +45,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
-  return NextResponse.json({ id: data.id });
+
+  const warning = data.driver_id
+    ? await warnIfDriverDoubleBooked(supabase, {
+        organizationId: appUser.organization_id,
+        driverId: data.driver_id,
+        startAt: data.start_at,
+        excludeEntryId: data.id,
+      })
+    : null;
+
+  return NextResponse.json({ id: data.id, warning });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

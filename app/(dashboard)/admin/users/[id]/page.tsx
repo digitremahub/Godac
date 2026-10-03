@@ -7,6 +7,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { ConvocationButton } from "@/components/intranet/ConvocationButton";
+import { DriverServicesPanel } from "@/components/admin/DriverServicesPanel";
 
 /**
  * A driver's "fiche" — profile info plus their vehicle-usage history
@@ -24,10 +25,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   }
 
   const supabase = await createServerSupabaseClient();
-  const [{ data: user }, { data: fuelHistory }] = await Promise.all([
+  const [{ data: user }, { data: fuelHistory }, { data: orgServices }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, email, role, role_title, active, auth_method, pin_set_at, driver_code, user_services(services(name))")
+      .select(
+        "id, full_name, email, role, role_title, active, auth_method, pin_set_at, driver_code, user_services(service_id, status, services(name))",
+      )
       .eq("id", id)
       .single(),
     supabase
@@ -36,11 +39,17 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       .eq("driver_id", id)
       .order("occurred_at", { ascending: false })
       .limit(15),
+    appUser.role === "direction" ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
   ]);
 
   if (!user) notFound();
   const u = user as any;
-  const serviceNames = (u.user_services ?? []).map((us: any) => us.services?.name).filter(Boolean).join(", ");
+  const STATUS_LABELS: Record<string, string> = { titulaire: "Titulaire", formation: "Formation", remplacement: "Remplacement" };
+  const serviceNames = (u.user_services ?? [])
+    .filter((us: any) => us.services?.name)
+    .map((us: any) => `${us.services.name} (${STATUS_LABELS[us.status] ?? us.status})`)
+    .join(", ");
+  const serviceAssignments = (u.user_services ?? []).map((us: any) => ({ service_id: us.service_id, status: us.status }));
 
   const isFieldRole = u.role === "chauffeur" || u.role === "manager_chauffeur";
   const canConvene = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) && id !== appUser.id;
@@ -83,6 +92,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             }
             code={u.driver_code}
           />
+        </div>
+      )}
+
+      {appUser.role === "direction" && (
+        <div className="mb-6">
+          <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const bodySchema = z.object({ target_date: z.string().date().optional() });
 
@@ -72,5 +73,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: data.id });
+  const warning = source.driver_id
+    ? await warnIfDriverDoubleBooked(supabase, {
+        organizationId: appUser.organization_id,
+        driverId: source.driver_id,
+        startAt: targetStart.toISOString(),
+        excludeEntryId: data.id,
+      })
+    : null;
+
+  return NextResponse.json({ id: data.id, warning });
 }

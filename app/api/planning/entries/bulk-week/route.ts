@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0, skipped });
   }
 
-  const { error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" });
+  const { data: inserted, error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" }).select("id, start_at");
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json(
@@ -78,5 +79,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ created: count ?? rows.length, skipped });
+  const warnings = (
+    await Promise.all(
+      (inserted ?? []).map((row) =>
+        warnIfDriverDoubleBooked(supabase, {
+          organizationId: appUser.organization_id,
+          driverId: driver_id,
+          startAt: row.start_at,
+          excludeEntryId: row.id,
+        }),
+      ),
+    )
+  ).filter((w): w is string => w !== null);
+
+  return NextResponse.json({ created: count ?? rows.length, skipped, warning: warnings[0] ?? null });
 }

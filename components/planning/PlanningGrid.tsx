@@ -86,6 +86,7 @@ export function PlanningGrid({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateSummary, setDuplicateSummary] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -129,6 +130,7 @@ export function PlanningGrid({
   async function duplicatePreviousWeek() {
     setDuplicating(true);
     setError(null);
+    setWarning(null);
     setDuplicateSummary(null);
     try {
       const res = await fetch("/api/planning/duplicate-week", {
@@ -142,6 +144,7 @@ export function PlanningGrid({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setDuplicateSummary(
         json.created > 0
           ? `${json.created} affectation(s) copiée(s) depuis la semaine précédente.`
@@ -173,6 +176,7 @@ export function PlanningGrid({
 
     setBusyId(entryId);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entryId}`, {
         method: "PATCH",
@@ -181,6 +185,7 @@ export function PlanningGrid({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -201,6 +206,7 @@ export function PlanningGrid({
   async function confirmDuplicateEntry(entryId: string) {
     setBusyId(entryId);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entryId}/duplicate`, {
         method: "POST",
@@ -209,6 +215,7 @@ export function PlanningGrid({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setDuplicatingEntryId(null);
       router.refresh();
     } catch (e) {
@@ -236,6 +243,7 @@ export function PlanningGrid({
     const start = new Date(`${day}T${editTime}:00`);
     setBusyId(entry.id);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entry.id}`, {
         method: "PATCH",
@@ -249,6 +257,7 @@ export function PlanningGrid({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setEditingId(null);
       router.refresh();
     } catch (e) {
@@ -278,6 +287,7 @@ export function PlanningGrid({
     if (formWholeWeek && formDays.size === 0) return;
     setFormBusy(true);
     setError(null);
+    setWarning(null);
     setBulkSummary(null);
     try {
       if (formWholeWeek) {
@@ -296,6 +306,7 @@ export function PlanningGrid({
         });
         const json = await res.json();
         if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+        if (json.warning) setWarning(json.warning);
         setBulkSummary(
           json.created > 0
             ? `${json.created} jour(s) affecté(s)${json.skipped > 0 ? ` (${json.skipped} déjà occupé(s), ignoré(s))` : ""}.`
@@ -316,6 +327,7 @@ export function PlanningGrid({
         });
         const json = await res.json();
         if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+        if (json.warning) setWarning(json.warning);
       }
       setFormOpen(false);
       setFormTourNumber("");
@@ -350,6 +362,7 @@ export function PlanningGrid({
       </div>
 
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
       {duplicateSummary && <p className="text-sm text-teal-ink">{duplicateSummary}</p>}
       {bulkSummary && <p className="text-sm text-teal-ink">{bulkSummary}</p>}
 

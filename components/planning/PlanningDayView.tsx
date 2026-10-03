@@ -53,6 +53,7 @@ export function PlanningDayView({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTourNumber, setEditTourNumber] = useState("");
   const [editDriverId, setEditDriverId] = useState("");
@@ -82,6 +83,7 @@ export function PlanningDayView({
     const start = new Date(`${day}T${editTime}:00`);
     setBusyId(entry.id);
     setError(null);
+    setWarning(null);
     try {
       const res = await fetch(`/api/planning/entries/${entry.id}`, {
         method: "PATCH",
@@ -95,6 +97,7 @@ export function PlanningDayView({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       setEditingId(null);
       router.refresh();
     } catch (e) {
@@ -118,6 +121,7 @@ export function PlanningDayView({
         </button>
       </div>
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
 
       {sorted.length === 0 ? (
         <EmptyState title="Aucune tournée ce jour-là" />

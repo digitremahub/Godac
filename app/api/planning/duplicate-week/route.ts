@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const bodySchema = z.object({
   source_week_start: z.string().date(),
@@ -84,7 +85,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0 });
   }
 
-  const { error: insertError, count } = await supabase.from("planning_entries").insert(toInsert, { count: "exact" });
+  const { data: inserted, error: insertError, count } = await supabase
+    .from("planning_entries")
+    .insert(toInsert, { count: "exact" })
+    .select("id, driver_id, start_at");
   if (insertError) {
     if (insertError.code === "23505") {
       return NextResponse.json(
@@ -95,5 +99,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ created: count ?? toInsert.length });
+  const warnings = (
+    await Promise.all(
+      (inserted ?? [])
+        .filter((row) => row.driver_id)
+        .map((row) =>
+          warnIfDriverDoubleBooked(supabase, {
+            organizationId: appUser.organization_id,
+            driverId: row.driver_id as string,
+            startAt: row.start_at,
+            excludeEntryId: row.id,
+          }),
+        ),
+    )
+  ).filter((w): w is string => w !== null);
+
+  return NextResponse.json({ created: count ?? toInsert.length, warning: warnings[0] ?? null });
 }
