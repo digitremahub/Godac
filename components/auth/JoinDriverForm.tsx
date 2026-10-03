@@ -16,6 +16,7 @@ interface ServiceOption {
  */
 export function JoinDriverForm({ token, services }: { token: string; services: ServiceOption[] }) {
   const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,6 +33,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
         body: JSON.stringify({
           token,
           full_name: fullName,
+          company_name: companyName,
           phone: phone || undefined,
           service_id: serviceId || undefined,
         }),
@@ -60,6 +62,17 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
           <input className="input" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </div>
         <div>
+          <label className="label">Entreprise pour laquelle vous travaillez</label>
+          <input
+            className="input"
+            required
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="Nom de votre entreprise"
+          />
+          <p className="mt-1 text-xs text-navy/40">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
+        </div>
+        <div>
           <label className="label">Téléphone (optionnel)</label>
           <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
@@ -77,7 +90,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
           </div>
         )}
         {error && <p className="text-sm text-orange-ink">{error}</p>}
-        <button type="submit" className="btn-primary" disabled={busy || !fullName}>
+        <button type="submit" className="btn-primary" disabled={busy || !fullName || !companyName}>
           {busy ? "Création…" : "Créer mon compte"}
         </button>
       </form>
