@@ -6,6 +6,7 @@ import { OrganizationSettingsForm } from "@/components/admin/OrganizationSetting
 import { ServicesPanel } from "@/components/admin/ServicesPanel";
 import { TanksPanel } from "@/components/admin/TanksPanel";
 import { AssistantNotesPanel } from "@/components/admin/AssistantNotesPanel";
+import { JoinLinkCard } from "@/components/admin/JoinLinkCard";
 
 export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
@@ -13,7 +14,7 @@ export default async function OrganizationSettingsPage() {
   const [{ data: organization }, ocrEnabled, assistantEnabled, { data: services }, { data: tanks }, { data: notes }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent")
+      .select("name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token")
       .eq("id", appUser.organization_id)
       .single(),
     isModuleEnabled(supabase, appUser.organization_id, "ocr"),
@@ -39,6 +40,9 @@ export default async function OrganizationSettingsPage() {
       <ServicesPanel services={services ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />
       {assistantEnabled && <AssistantNotesPanel notes={(notes ?? []) as any} />}
+      {appUser.role === "direction" && organization?.driver_signup_token && (
+        <JoinLinkCard token={organization.driver_signup_token} />
+      )}
     </div>
   );
 }

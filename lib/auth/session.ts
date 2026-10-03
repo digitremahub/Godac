@@ -11,6 +11,7 @@ export interface AppUser {
   email: string;
   phone: string | null;
   active: boolean;
+  pending_approval: boolean;
 }
 
 /**
@@ -27,7 +28,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, organization_id, role, role_title, full_name, email, phone, active")
+    .select("id, organization_id, role, role_title, full_name, email, phone, active, pending_approval")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -41,6 +42,14 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
   // any history can never be hard-deleted — but must actually lose
   // access, not just disappear from active-only dropdowns.
   if (data && !data.active) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
+  // Self-registered via app/join/[token] — can set their PIN (that
+  // route only checks auth_method/active) but not actually use the
+  // app until a manager-like/direction approves from /driver-signups.
+  if (data && data.pending_approval) {
     await supabase.auth.signOut();
     return null;
   }

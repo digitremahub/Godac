@@ -23,6 +23,10 @@ const PUBLIC_PREFIXES = [
   "/driver-pin",
   "/api/auth/driver-pin",
   "/scan/driver",
+  // Self-service driver signup (app/join/[token]) — a chauffeur who
+  // has no account yet scans this before ever signing in.
+  "/join",
+  "/api/public/driver-signup",
 ];
 
 function isPublicPath(pathname: string): boolean {

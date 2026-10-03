@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui";
+import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 /**
  * The two faces of the same badge scan: a driver who has never set a
@@ -10,23 +11,34 @@ import { Card } from "@/components/ui";
  * code". Both end the same way — a real Supabase Auth session via
  * signInWithPassword, exactly like AuthForm.tsx's password path, just
  * with a PIN playing the password's role.
+ *
+ * A third case, pendingApproval (app/join/[token] self-signup, not
+ * yet approved by a manager-like/direction from /driver-signups):
+ * never attempts signInWithPassword at all — requireAppUser would
+ * just sign it straight back out (lib/auth/session.ts) and redirect
+ * to a dead end. Setting a PIN is still allowed so there's no second
+ * visit needed once approved; logging in isn't, so that path shows
+ * the waiting state instead of the PIN form.
  */
 export function DriverPinFlow({
   id,
   fullName,
   email,
   needsSetup,
+  pendingApproval,
 }: {
   id: string;
   fullName: string;
   email: string;
   needsSetup: boolean;
+  pendingApproval: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinJustCreated, setPinJustCreated] = useState(false);
 
   async function signIn(withPin: string) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: withPin });
@@ -46,7 +58,12 @@ export function DriverPinFlow({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-      await signIn(pin);
+      if (pendingApproval) {
+        setPinJustCreated(true);
+        setBusy(false);
+      } else {
+        await signIn(pin);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
       setBusy(false);
@@ -63,6 +80,21 @@ export function DriverPinFlow({
       setError(e instanceof Error ? e.message : "Erreur inattendue");
       setBusy(false);
     }
+  }
+
+  if (pendingApproval && (pinJustCreated || !needsSetup)) {
+    return (
+      <Card className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
+        <div>
+          <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
+          <p className="mt-1 text-sm text-navy/50">
+            {pinJustCreated ? "Votre code est créé. " : ""}Votre compte doit encore être validé par un responsable avant que
+            vous puissiez vous connecter — vous serez prévenu.
+          </p>
+        </div>
+        <QrCodeBadge type="driver" id={id} title={fullName} subtitle="Badge de connexion — à conserver" />
+      </Card>
+    );
   }
 
   if (needsSetup) {
@@ -101,7 +133,7 @@ export function DriverPinFlow({
           </div>
           {error && <p className="text-sm text-orange-ink">{error}</p>}
           <button type="submit" className="btn-primary" disabled={busy || !pin || !confirmPin}>
-            {busy ? "Création…" : "Créer mon code et me connecter"}
+            {busy ? "Création…" : pendingApproval ? "Créer mon code" : "Créer mon code et me connecter"}
           </button>
         </form>
       </Card>

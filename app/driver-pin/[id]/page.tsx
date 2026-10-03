@@ -15,7 +15,7 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
   const admin = createAdminSupabaseClient();
   const { data: user } = await admin
     .from("users")
-    .select("full_name, email, auth_method, pin_set_at, active")
+    .select("full_name, email, auth_method, pin_set_at, active, pending_approval")
     .eq("id", id)
     .maybeSingle();
 
@@ -36,7 +36,13 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
         <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
         <span className="font-display text-xl font-extrabold">GODAC</span>
       </div>
-      <DriverPinFlow id={id} fullName={user.full_name} email={user.email} needsSetup={!user.pin_set_at} />
+      <DriverPinFlow
+        id={id}
+        fullName={user.full_name}
+        email={user.email}
+        needsSetup={!user.pin_set_at}
+        pendingApproval={user.pending_approval}
+      />
     </main>
   );
 }

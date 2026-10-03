@@ -21,6 +21,7 @@ export async function createPinDriver({
   phone,
   organizationId,
   serviceId,
+  pendingApproval,
 }: {
   fullName: string;
   role: UserRole;
@@ -28,6 +29,8 @@ export async function createPinDriver({
   phone?: string;
   organizationId: string;
   serviceId?: string;
+  /** Self-service signup (app/join/[token]) — created active=true but unable to sign in (lib/auth/session.ts) until a manager-like/direction approves. */
+  pendingApproval?: boolean;
 }): Promise<{ id: string }> {
   const admin = createAdminSupabaseClient();
   const internalEmail = `chauffeur-${randomUUID()}@${organizationId}.godac.local`;
@@ -50,6 +53,7 @@ export async function createPinDriver({
     email: internalEmail,
     phone: phone ?? null,
     auth_method: "pin",
+    pending_approval: pendingApproval ?? false,
   });
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);

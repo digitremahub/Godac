@@ -75,6 +75,7 @@ const SECTIONS: NavSection[] = [
       { href: "/leaves", label: "Congés & Absences", icon: IconCalendar, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "leave_management" },
       { href: "/leaves/planning", label: "Planning congés", icon: IconCalendar, allow: ["direction"], moduleKey: "leave_management" },
       { href: "/intranet", label: "Intranet & Convocations", icon: IconMegaphone, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "intranet" },
+      { href: "/driver-signups", label: "Chauffeurs à valider", icon: IconUsers, allow: ["manager", "manager_chauffeur", "direction"] },
     ],
   },
   {
