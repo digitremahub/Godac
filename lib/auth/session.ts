@@ -1,0 +1,74 @@
+import "server-only";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { UserRole } from "@/lib/types/domain";
+
+export interface AppUser {
+  id: string;
+  organization_id: string;
+  role: UserRole;
+  role_title: string | null;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  active: boolean;
+  pending_approval: boolean;
+}
+
+/**
+ * The 5 GODAC roles are domain-specific and live in our own `users`
+ * table, keyed by the Supabase Auth user id (see
+ * supabase/migrations/20260101000002_core_tables.sql).
+ */
+export async function getCurrentAppUser(): Promise<AppUser | null> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, organization_id, role, role_title, full_name, email, phone, active, pending_approval")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getCurrentAppUser: supabase error", error);
+    return null;
+  }
+
+  // A deactivated account (Admin > Utilisateurs) keeps its row —
+  // fuel_entries.driver_id is `on delete restrict`, so a driver with
+  // any history can never be hard-deleted — but must actually lose
+  // access, not just disappear from active-only dropdowns.
+  if (data && !data.active) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
+  // Self-registered via app/join/[token] — can set their PIN (that
+  // route only checks auth_method/active) but not actually use the
+  // app until a manager-like/direction approves from /driver-signups.
+  if (data && data.pending_approval) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
+  return data as AppUser | null;
+}
+
+export async function requireAppUser(): Promise<AppUser> {
+  const user = await getCurrentAppUser();
+  if (!user) {
+    throw new Error(
+      "No GODAC user profile found for the signed-in account. Has onboarding / invite acceptance completed yet?",
+    );
+  }
+  return user;
+}
+
+export function hasRole(role: UserRole, allowed: UserRole[]): boolean {
+  return allowed.includes(role);
+}
+
+export { ROLE_LABELS } from "@/lib/roles/labels";
