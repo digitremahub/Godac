@@ -16,7 +16,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
 
   const { data: organization } = await admin
     .from("organizations")
-    .select("id, name, logo_url, services(id, name)")
+    .select("id, name, services(id, name)")
     .eq("driver_signup_token", token)
     .maybeSingle();
 
@@ -31,14 +31,17 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
       <div className="flex items-center gap-2.5">
-        {organization.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={organization.logo_url} alt={organization.name} className="h-9 w-9 rounded-lg object-contain" />
-        ) : (
-          <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
-        )}
-        <span className="font-display text-xl font-extrabold">{organization.name}</span>
+        <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
+        <span className="font-display text-xl font-extrabold">GODAC</span>
       </div>
+      {/*
+        The org's own name/logo is deliberately NOT shown here — the
+        company-name field in JoinDriverForm is a genuine check (the
+        driver types what they believe their employer is called,
+        compared server-side against what the token actually
+        resolves to) rather than the driver just copying back a name
+        already displayed on screen, which would catch nothing.
+      */}
       <JoinDriverForm token={token} services={(organization.services as { id: string; name: string }[]) ?? []} />
     </main>
   );

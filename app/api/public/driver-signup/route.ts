@@ -6,17 +6,30 @@ import { createPinDriver } from "@/lib/auth/driver-pin";
 const bodySchema = z.object({
   token: z.string().uuid(),
   full_name: z.string().min(1),
+  company_name: z.string().min(1),
   phone: z.string().optional(),
   service_id: z.string().uuid().optional(),
 });
 
+function normalizeCompanyName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 /**
  * Public by necessity — same reasoning as app/api/auth/driver-pin/
  * [id]/set: no session exists yet. The token only ever resolves an
- * organization_id (app/join/[token]/page.tsx already showed the same
- * lookup's result to the driver before this call) — it carries no
- * more power than that, and the account it creates can't sign in
- * until approved (pending_approval, see lib/auth/session.ts).
+ * organization_id — it carries no more power than that, and the
+ * account it creates can't sign in until approved (pending_approval,
+ * see lib/auth/session.ts).
+ *
+ * company_name is a genuine independent check: app/join/[token]/page
+ * deliberately never shows the org's real name, so a match here means
+ * the driver actually knows (not just read back) who owns this link.
  */
 export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
@@ -27,11 +40,18 @@ export async function POST(req: Request) {
   const admin = createAdminSupabaseClient();
   const { data: organization } = await admin
     .from("organizations")
-    .select("id")
+    .select("id, name")
     .eq("driver_signup_token", parsed.data.token)
     .maybeSingle();
   if (!organization) {
     return NextResponse.json({ error: "Lien invalide." }, { status: 404 });
+  }
+
+  if (normalizeCompanyName(parsed.data.company_name) !== normalizeCompanyName(organization.name)) {
+    return NextResponse.json(
+      { error: "Le nom d'entreprise indiqué ne correspond pas à celui associé à ce lien. Vérifiez auprès de votre responsable." },
+      { status: 422 },
+    );
   }
 
   try {
