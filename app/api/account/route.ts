@@ -8,6 +8,7 @@ const bodySchema = z.object({
   full_name: z.string().min(1),
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  contact_email: z.string().email().nullable().optional(),
 });
 
 /**
@@ -45,6 +46,7 @@ export async function PATCH(req: Request) {
     .update({
       full_name: parsed.data.full_name,
       ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),
+      ...(parsed.data.contact_email !== undefined ? { contact_email: parsed.data.contact_email } : {}),
       ...addressFields,
     })
     .eq("id", appUser.id);

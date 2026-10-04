@@ -19,27 +19,43 @@ import { Card } from "@/components/ui";
  * domicile" vs. the habitual depot return (lib/business/
  * fuel-profitability.ts), never shown to anyone but the driver
  * themselves and never used for anything else.
+ *
+ * Contact email is only shown for auth_method='pin' drivers — their
+ * real users.email is a never-delivered fabricated address used only
+ * as their Supabase Auth identifier (see lib/auth/driver-pin.ts), so
+ * without this they could never actually receive an alert/digest/
+ * convocation email. Kept separate from EmailForm (which changes the
+ * login identity itself) on purpose.
  */
 export function NameForm({
   currentName,
   currentPhone,
   currentAddress,
   showAddress = false,
+  currentContactEmail,
+  showContactEmail = false,
 }: {
   currentName: string;
   currentPhone: string | null;
   currentAddress?: string | null;
   showAddress?: boolean;
+  currentContactEmail?: string | null;
+  showContactEmail?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(currentName);
   const [phone, setPhone] = useState(currentPhone ?? "");
   const [address, setAddress] = useState(currentAddress ?? "");
+  const [contactEmail, setContactEmail] = useState(currentContactEmail ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const dirty = name !== currentName || phone !== (currentPhone ?? "") || address !== (currentAddress ?? "");
+  const dirty =
+    name !== currentName ||
+    phone !== (currentPhone ?? "") ||
+    address !== (currentAddress ?? "") ||
+    contactEmail !== (currentContactEmail ?? "");
 
   async function save() {
     setBusy(true);
@@ -53,6 +69,7 @@ export function NameForm({
           full_name: name,
           phone: phone || null,
           ...(showAddress ? { address: address || null } : {}),
+          ...(showContactEmail ? { contact_email: contactEmail || null } : {}),
         }),
       });
       const json = await res.json();
@@ -85,6 +102,22 @@ export function NameForm({
           onChange={(e) => setPhone(e.target.value)}
         />
       </div>
+      {showContactEmail && (
+        <div>
+          <label className="label">Email de notification (optionnel)</label>
+          <input
+            className="input"
+            type="email"
+            placeholder="votre-email@exemple.fr"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-navy/40">
+            Votre connexion par badge/PIN reste inchangée — cette adresse sert uniquement à recevoir les alertes et
+            convocations par email.
+          </p>
+        </div>
+      )}
       {showAddress && (
         <div>
           <label className="label">Adresse du domicile (optionnel)</label>
