@@ -58,17 +58,48 @@ export function StartTourFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+  const [vehicleChanged, setVehicleChanged] = useState(false);
+  const [changeReason, setChangeReason] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
 
-  // Arriving from the vehicle's own QR landing page (/v/[id]) already
-  // identifies the vehicle — skip straight to the same check the
-  // scanner would have triggered instead of asking for a second scan.
+  // Loaded up front, before any scan, so a driver whose tour was
+  // already planned with a vehicle can confirm it in one tap — the QR
+  // scanner is only shown for the no-plan case or an explicit "ce
+  // n'est pas le bon véhicule" swap (handleScan below, re-run against
+  // whatever was actually scanned).
   useEffect(() => {
-    if (initialVehicleId) handleScan(initialVehicleId);
+    if (initialVehicleId) {
+      handleScan(initialVehicleId);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch("/api/tours/open");
+        const json = await res.json();
+        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+        setOpenTour(json.tour);
+        setPlannedToday(json.plannedToday ?? null);
+        if (json.plannedToday && !tourNumber) setTourNumber(json.plannedToday.tour_number);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      } finally {
+        setLoadingPlan(false);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialVehicleId]);
 
+  function confirmPlannedVehicle() {
+    if (!plannedToday?.vehicles) return;
+    setVehicleId(plannedToday.vehicles.id);
+    setRegistration(plannedToday.vehicles.registration);
+    setVehicleChanged(false);
+  }
+
   async function handleScan(id: string) {
     setVehicleId(id);
+    setShowScanner(false);
     setChecking(true);
     setError(null);
     try {
@@ -78,12 +109,14 @@ export function StartTourFlow({
       setOpenTour(openJson.tour);
       setPlannedToday(openJson.plannedToday ?? null);
       if (openJson.plannedToday && !tourNumber) setTourNumber(openJson.plannedToday.tour_number);
+      setVehicleChanged(Boolean(openJson.plannedToday?.vehicles && openJson.plannedToday.vehicles.id !== id));
       const vehicleJson = await vehicleRes.json();
       if (vehicleRes.ok) setRegistration(vehicleJson.vehicle?.registration ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
       setChecking(false);
+      setLoadingPlan(false);
     }
   }
 
@@ -93,6 +126,7 @@ export function StartTourFlow({
     (!requireOdometerPhoto || Boolean(startKmPhotoPath)) &&
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
+    (!vehicleChanged || changeReason.trim().length > 0) &&
     confirmed;
 
   async function submit() {
@@ -113,6 +147,7 @@ export function StartTourFlow({
           report_fields: reportFields ?? undefined,
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
+          change_reason: vehicleChanged ? changeReason : undefined,
         }),
       });
       const json = await res.json();
@@ -139,7 +174,30 @@ export function StartTourFlow({
     return <EmptyState title="Tournée démarrée" description="Le départ a été enregistré. Bonne route !" />;
   }
 
+  if (loadingPlan) {
+    return <p className="text-sm text-navy/60">Chargement…</p>;
+  }
+
   if (!vehicleId) {
+    // A planned vehicle is confirmed in one tap, no scan needed — the
+    // scanner only appears for the no-plan case, or explicitly via
+    // "Changement de véhicule" below (showScanner).
+    if (plannedToday?.vehicles && !showScanner) {
+      return (
+        <Card className="flex flex-col gap-3">
+          <p className="text-sm">
+            Tournée n°{plannedToday.tour_number} prévue aujourd&apos;hui — véhicule{" "}
+            <span className="font-medium">{plannedToday.vehicles.registration}</span>.
+          </p>
+          <button className="btn-primary w-full justify-center" onClick={confirmPlannedVehicle}>
+            ✅ Commencer avec {plannedToday.vehicles.registration}
+          </button>
+          <button className="btn-secondary w-full justify-center text-sm" onClick={() => setShowScanner(true)}>
+            🔄 Changement de véhicule — scanner le véhicule remplaçant
+          </button>
+        </Card>
+      );
+    }
     return <QrScanner expected="vehicle" label="Scannez le QR du véhicule" onScan={(p) => handleScan(p.id)} />;
   }
 
@@ -171,6 +229,25 @@ export function StartTourFlow({
           Tournée n°{plannedToday.tour_number} prévue aujourd&apos;hui
           {plannedToday.vehicles ? ` — véhicule ${plannedToday.vehicles.registration}` : ""}. Le planning sera mis à jour automatiquement.
         </p>
+      )}
+
+      {vehicleChanged && (
+        <div className="flex flex-col gap-2 rounded-lg border border-gold-ink/20 bg-gold-ink/5 p-3">
+          <p className="text-xs text-gold-ink">
+            Ce véhicule ({registration ?? "?"}) n&apos;est pas celui prévu au planning
+            {plannedToday?.vehicles ? ` (${plannedToday.vehicles.registration})` : ""} — un responsable sera prévenu.
+          </p>
+          <div>
+            <label className="label">Motif du changement *</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={changeReason}
+              onChange={(e) => setChangeReason(e.target.value)}
+              placeholder="ex: panne, maintenance, véhicule indisponible…"
+            />
+          </div>
+        </div>
       )}
 
       <div>

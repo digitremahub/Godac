@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
 import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
+import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
 
 const reportFieldsSchema = z.object({
   tour_number: z.string().nullable(),
@@ -34,6 +35,10 @@ const bodySchema = z
     report_fields: reportFieldsSchema.partial().optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
+    // Required only when the submitted vehicle_id differs from the
+    // planned entry's original vehicle — checked server-side below,
+    // never just trusted from a client-side "vehicleChanged" flag.
+    change_reason: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.vehicle_ok && !data.problem_description) {
@@ -136,7 +141,7 @@ export async function POST(req: Request) {
     ? (
         await supabase
           .from("planning_entries")
-          .select("id")
+          .select("id, vehicle_id")
           .eq("id", parsed.data.planned_entry_id)
           .eq("driver_id", appUser.id)
           .eq("status", "planned")
@@ -146,13 +151,24 @@ export async function POST(req: Request) {
       ? (
           await supabase
             .from("planning_entries")
-            .select("id")
+            .select("id, vehicle_id")
             .eq("driver_id", appUser.id)
             .eq("tour_number", parsed.data.tour_number)
             .eq("status", "planned")
             .maybeSingle()
         ).data
       : null;
+
+  // A changed vehicle is detected here, from the planned row's own
+  // original vehicle_id — never from a client-supplied "I swapped"
+  // flag, which a driver could just omit.
+  const vehicleChanged = Boolean(plannedMatch?.vehicle_id && plannedMatch.vehicle_id !== vehicle.id);
+  if (vehicleChanged && !parsed.data.change_reason) {
+    return NextResponse.json(
+      { error: "Un motif est requis : ce véhicule n'est pas celui prévu au planning." },
+      { status: 422 },
+    );
+  }
 
   const { data, error } = plannedMatch
     ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()
@@ -163,6 +179,16 @@ export async function POST(req: Request) {
         .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (vehicleChanged && plannedMatch?.vehicle_id && parsed.data.change_reason) {
+    await reportVehicleSwap(supabase, {
+      organizationId: appUser.organization_id,
+      plannedEntryId: data.id,
+      plannedVehicleId: plannedMatch.vehicle_id,
+      actualVehicleId: vehicle.id,
+      reason: parsed.data.change_reason,
+    });
+  }
 
   let problemPhotoStoragePath: string | null = null;
   if (!parsed.data.vehicle_ok) {
