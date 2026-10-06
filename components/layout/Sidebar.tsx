@@ -25,6 +25,7 @@ import {
   IconFlag,
   IconQrCode,
   IconLifeBuoy,
+  IconCoins,
 } from "@/components/layout/icons";
 import { textSafeVariant } from "@/lib/theme/contrast";
 
@@ -83,6 +84,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/alerts", label: "Alertes", icon: IconBell, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/reports", label: "Rapports de tournée", icon: IconFileText, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
+      { href: "/payroll", label: "Salaires", icon: IconCoins, allow: ["direction"], moduleKey: "planning" },
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
       { href: "/support", label: "Demandes d'assistance", icon: IconLifeBuoy, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "assistant" },
     ],
