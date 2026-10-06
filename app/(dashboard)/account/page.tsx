@@ -6,6 +6,7 @@ import { PasswordForm } from "@/components/account/PasswordForm";
 import { EmailForm } from "@/components/account/EmailForm";
 import { NameForm } from "@/components/account/NameForm";
 import { DriverPinForm } from "@/components/account/DriverPinForm";
+import { PasskeyManager } from "@/components/account/PasskeyManager";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 export default async function AccountPage() {
@@ -68,6 +69,7 @@ export default async function AccountPage() {
       />
       {authMethod !== "pin" && <EmailForm currentEmail={appUser.email} />}
       <PasswordForm />
+      <PasskeyManager />
     </div>
   );
 }

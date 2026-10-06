@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
 
 /**
  * Sign-up (and a first sign-in) is always magic link / OTP — Supabase
@@ -21,6 +22,28 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyUnavailable, setPasskeyUnavailable] = useState(false);
+
+  async function usePasskey() {
+    setPasskeyBusy(true);
+    setError(null);
+    setPasskeyUnavailable(false);
+    try {
+      const { attempted } = await tryPasskeyLogin({ email });
+      if (attempted) {
+        window.location.href = "/dashboard";
+        return;
+      }
+      setPasskeyUnavailable(true);
+    } catch (e) {
+      if (!(e instanceof Error) || e.name !== "NotAllowedError") {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      }
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,6 +137,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </div>
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {passkeyUnavailable && (
+        <p className="text-xs text-navy/40">Aucune clé Face ID / empreinte enregistrée pour cet email sur cet appareil.</p>
+      )}
       <button
         type="submit"
         className="btn-primary"
@@ -121,6 +147,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       >
         {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
+      {mode === "sign-in" && (
+        <button type="button" className="btn-secondary" disabled={passkeyBusy || !email} onClick={usePasskey}>
+          {passkeyBusy ? "…" : "🔓 Face ID / empreinte"}
+        </button>
+      )}
       {mode === "sign-in" && (
         <div className="flex items-center justify-between">
           <button
