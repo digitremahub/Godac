@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { geocodeAddress } from "@/lib/geo/geocode";
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -15,6 +16,7 @@ const bodySchema = z.object({
   require_odometer_photo: z.boolean().optional(),
   emergency_phone: z.string().trim().min(1).nullable().optional(),
   consumption_anomaly_threshold_percent: z.coerce.number().int().min(1).max(200).optional(),
+  depot_address: z.string().trim().min(1).nullable().optional(),
 });
 
 /** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
@@ -32,6 +34,7 @@ export async function PATCH(req: Request) {
     require_odometer_photo,
     emergency_phone,
     consumption_anomaly_threshold_percent,
+    depot_address,
   } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
@@ -44,6 +47,12 @@ export async function PATCH(req: Request) {
   if (emergency_phone !== undefined) profileFields.emergency_phone = emergency_phone;
   if (consumption_anomaly_threshold_percent !== undefined)
     profileFields.consumption_anomaly_threshold_percent = consumption_anomaly_threshold_percent;
+  if (depot_address !== undefined) {
+    const geocoded = depot_address ? await geocodeAddress(depot_address) : null;
+    profileFields.depot_address = depot_address;
+    profileFields.depot_lat = geocoded?.lat ?? null;
+    profileFields.depot_lng = geocoded?.lng ?? null;
+  }
 
   if (Object.keys(profileFields).length > 0) {
     const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
@@ -64,7 +73,9 @@ export async function PATCH(req: Request) {
 
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent")
+    .select(
+      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address",
+    )
     .eq("id", appUser.organization_id)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

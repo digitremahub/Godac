@@ -41,10 +41,10 @@ export async function POST(req: Request) {
   const [{ data: organization }, { data: recipients }] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", alert.organization_id).single(),
     alert.recipient_user_id
-      ? supabase.from("users").select("email").eq("id", alert.recipient_user_id).eq("active", true)
+      ? supabase.from("users").select("email, contact_email, auth_method").eq("id", alert.recipient_user_id).eq("active", true)
       : supabase
           .from("users")
-          .select("email")
+          .select("email, contact_email, auth_method")
           .eq("organization_id", alert.organization_id)
           .eq("active", true)
           .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
@@ -58,8 +58,17 @@ export async function POST(req: Request) {
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   });
 
+  // A badge+PIN driver's own `email` is a fabricated address that's
+  // never delivered (see lib/auth/driver-pin.ts) — it only exists to
+  // serve as their Supabase Auth identifier. Without a contact_email
+  // on file, there's simply no address to send to; sending to the
+  // fabricated one would just bounce.
+  const addresses = (recipients ?? [])
+    .map((r) => r.contact_email ?? (r.auth_method === "pin" ? null : r.email))
+    .filter((email): email is string => Boolean(email));
+
   const result = await sendTransactionalEmail({
-    to: (recipients ?? []).map((r) => r.email),
+    to: addresses,
     subject,
     html,
   });

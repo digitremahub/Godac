@@ -25,6 +25,7 @@ const bodySchema = z
     sheet_photo_path: z.string().optional(),
     report_fields: reportFieldsSchema.partial().optional(),
     notes: z.string().optional(),
+    return_type: z.enum(["depot", "domicile"]).optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
   })
@@ -94,6 +95,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       notes: parsed.data.notes || null,
       end_photo_path: parsed.data.sheet_photo_path ?? null,
       end_vehicle_ok: parsed.data.vehicle_ok,
+      return_type: parsed.data.return_type ?? null,
       status: "done",
       ...(reportFields
         ? {

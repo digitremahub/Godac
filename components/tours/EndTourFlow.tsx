@@ -41,6 +41,7 @@ export function EndTourFlow({
   const [endKm, setEndKm] = useState("");
   const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
   const [notes, setNotes] = useState("");
+  const [returnType, setReturnType] = useState<"depot" | "domicile">("depot");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
@@ -108,6 +109,7 @@ export function EndTourFlow({
           sheet_photo_path: sheetPhotoPath || undefined,
           report_fields: reportFields ?? undefined,
           notes: notes || undefined,
+          return_type: returnType,
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
         }),
@@ -226,6 +228,25 @@ export function EndTourFlow({
           <p className="text-xs text-orange-ink">Un signalement sera créé automatiquement pour les gestionnaires.</p>
         </div>
       )}
+
+      <div>
+        <label className="label">Retour</label>
+        <div className="flex flex-col gap-2">
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+            <input type="radio" name="return-type" checked={returnType === "depot"} onChange={() => setReturnType("depot")} />
+            Retour au dépôt
+          </label>
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+            <input
+              type="radio"
+              name="return-type"
+              checked={returnType === "domicile"}
+              onChange={() => setReturnType("domicile")}
+            />
+            Retour direct à domicile
+          </label>
+        </div>
+      </div>
 
       <div>
         <label className="label">Remarques (optionnel)</label>
