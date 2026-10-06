@@ -4,28 +4,8 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ReportsViewTabs } from "@/components/reports/ReportsViewTabs";
 import { ReportFilters } from "@/components/reports/ReportFilters";
+import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable";
 import { addDays, todayISO } from "@/lib/planning/dates";
-
-interface ReportRow {
-  id: string;
-  tour_number: string;
-  start_at: string;
-  report_bl_number: string | null;
-  report_departure_time: string | null;
-  report_return_time: string | null;
-  report_stops_total: number | null;
-  report_packages_count: number | null;
-  report_priority_count: number | null;
-  report_stops_delivered: number | null;
-  report_packages_missing: number | null;
-  report_pickups: number | null;
-  report_packages_picked_up: number | null;
-  report_packages_returned: number | null;
-  report_packages_relay: number | null;
-  services: { name: string } | null;
-  vehicles: { registration: string } | null;
-  users: { full_name: string } | null;
-}
 
 interface PhotoRow {
   id: string;
@@ -126,7 +106,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {view === "photos" ? (
         <PhotosView supabase={supabase} from={from} toExclusive={toExclusive} service={filters.service} driver={filters.driver} />
       ) : (
-        <TableView supabase={supabase} from={from} toExclusive={toExclusive} service={filters.service} driver={filters.driver} />
+        <TableView
+          supabase={supabase}
+          from={from}
+          toExclusive={toExclusive}
+          service={filters.service}
+          driver={filters.driver}
+          canEdit={isDirection}
+        />
       )}
     </div>
   );
@@ -138,7 +125,9 @@ async function TableView({
   toExclusive,
   service,
   driver,
+  canEdit,
 }: {
+  canEdit: boolean;
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
   from: string;
   toExclusive: string;
@@ -171,60 +160,7 @@ async function TableView({
     );
   }
 
-  return (
-    <Card className="overflow-x-auto">
-      <table className="w-full min-w-[1180px] text-sm">
-        <thead className="text-left text-navy/40">
-          <tr>
-            <th className="pb-2">Date</th>
-            <th className="pb-2">Chauffeur</th>
-            <th className="pb-2">Service</th>
-            <th className="pb-2">Véhicule</th>
-            <th className="pb-2">Tournée</th>
-            <th className="pb-2">BL</th>
-            <th className="pb-2">Départ</th>
-            <th className="pb-2">Retour</th>
-            <th className="pb-2">Arrêts</th>
-            <th className="pb-2">Colis</th>
-            <th className="pb-2">Priorité</th>
-            <th className="pb-2">Ramassés</th>
-            <th className="pb-2">Ramenés dépôt</th>
-            <th className="pb-2">En relais</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reports.map((r) => (
-            <tr key={r.id} className="border-t border-navy/5">
-              <td className="py-2">
-                {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-              </td>
-              <td className="py-2">{r.users?.full_name ?? "—"}</td>
-              <td className="py-2">{r.services?.name ?? "—"}</td>
-              <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
-              <td className="py-2">n°{r.tour_number}</td>
-              <td className="py-2">{r.report_bl_number ?? "—"}</td>
-              <td className="py-2">{r.report_departure_time ?? "—"}</td>
-              <td className="py-2">{r.report_return_time ?? "—"}</td>
-              <td className="py-2">
-                {r.report_stops_delivered !== null || r.report_stops_total !== null
-                  ? `${r.report_stops_delivered ?? "—"} / ${r.report_stops_total ?? "—"}`
-                  : "—"}
-              </td>
-              <td className="py-2">
-                {r.report_packages_count !== null || r.report_packages_missing !== null
-                  ? `${r.report_packages_count ?? "—"}${r.report_packages_missing ? ` (${r.report_packages_missing} manquant(s))` : ""}`
-                  : "—"}
-              </td>
-              <td className="py-2">{r.report_priority_count ?? "—"}</td>
-              <td className="py-2">{r.report_packages_picked_up ?? "—"}</td>
-              <td className="py-2">{r.report_packages_returned ?? "—"}</td>
-              <td className="py-2">{r.report_packages_relay ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
-  );
+  return <ReportsTable reports={reports} canEdit={canEdit} />;
 }
 
 async function PhotosView({
