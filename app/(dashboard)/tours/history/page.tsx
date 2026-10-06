@@ -134,6 +134,7 @@ export default async function TourHistoryPage({
                 <th className="pb-2">Service</th>
                 <th className="pb-2">Véhicule</th>
                 <th className="pb-2">Tournée</th>
+                <th className="pb-2">Horaires</th>
                 <th className="pb-2">Km</th>
                 <th className="pb-2">Retour</th>
                 <th className="pb-2">Statut</th>
@@ -155,6 +156,12 @@ export default async function TourHistoryPage({
                     <td className="py-2">{r.services?.name ?? "—"}</td>
                     <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
                     <td className="py-2">n°{r.tour_number}</td>
+                    <td className="py-2">
+                      {new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      {r.end_at
+                        ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                        : " → en cours"}
+                    </td>
                     <td className="py-2">
                       {r.start_km !== null ? `${r.start_km}${r.end_km !== null ? ` → ${r.end_km}` : ""} km` : "—"}
                     </td>
