@@ -6,6 +6,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { PayrollTable } from "@/components/payroll/PayrollTable";
 import { PayrollFilters } from "@/components/payroll/PayrollFilters";
 import { firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
+import { computeHourlyRates } from "@/lib/business/payroll";
 
 interface DoneTour {
   driver_id: string | null;
@@ -48,13 +49,11 @@ export default async function PayrollPage({
   const monthEnd = firstOfMonth(addMonths(month, 1));
   const selectedDriver = params.driver ?? "";
 
-  const [{ data: drivers }, { data: toursData }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, hourly_rate")
-      .eq("active", true)
-      .in("role", ["chauffeur", "manager_chauffeur"])
-      .order("full_name"),
+  const [{ data: drivers }, { data: contracts }, { data: toursData }] = await Promise.all([
+    supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    // Separate table (not a column on `users`, whose RLS lets any org
+    // member read any row) — see 20260101000077.
+    supabase.from("user_contracts").select("user_id, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours"),
     (() => {
       let query = supabase
         .from("planning_entries")
@@ -77,14 +76,28 @@ export default async function PayrollPage({
     hoursByDriver.set(t.driver_id, { hours: current.hours + Math.max(hours, 0), tours: current.tours + 1 });
   }
 
+  const contractByDriver = new Map((contracts ?? []).map((c) => [c.user_id, c]));
+
   const rows = (drivers ?? [])
     .filter((d) => !selectedDriver || d.id === selectedDriver)
     .map((d) => {
       const worked = hoursByDriver.get(d.id) ?? { hours: 0, tours: 0 };
+      const contract = contractByDriver.get(d.id);
+      const monthlyGross = contract?.monthly_gross_salary !== undefined && contract.monthly_gross_salary !== null ? Number(contract.monthly_gross_salary) : null;
+      const monthlyNet = contract?.monthly_net_salary !== undefined && contract.monthly_net_salary !== null ? Number(contract.monthly_net_salary) : null;
+      const contractualHours = contract ? Number(contract.contractual_monthly_hours) : 151.67;
+      const rates = computeHourlyRates({
+        monthlyGrossSalary: monthlyGross,
+        monthlyNetSalary: monthlyNet,
+        contractualMonthlyHours: contractualHours,
+      });
       return {
         driver_id: d.id,
         full_name: d.full_name,
-        hourly_rate: d.hourly_rate,
+        monthly_gross_salary: monthlyGross,
+        monthly_net_salary: monthlyNet,
+        contractual_monthly_hours: contractualHours,
+        hourly_rates: rates,
         tours_count: worked.tours,
         worked_hours: worked.hours,
       };

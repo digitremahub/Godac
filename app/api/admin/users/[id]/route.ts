@@ -21,8 +21,11 @@ const bodySchema = z.object({
   // Lot 7: forgets their PIN → direction clears it, next badge scan
   // offers "créez votre code" again instead of "entrez votre code".
   reset_pin: z.boolean().optional(),
-  // Ajusté au cas par cas par la direction (lecture du contrat) — voir /payroll.
-  hourly_rate: z.number().min(0).max(999.99).nullable().optional(),
+  // Données du contrat, lues par la direction — le taux horaire s'en
+  // déduit (lib/business/payroll.ts), voir /payroll.
+  monthly_gross_salary: z.number().min(0).max(999999.99).nullable().optional(),
+  monthly_net_salary: z.number().min(0).max(999999.99).nullable().optional(),
+  contractual_monthly_hours: z.number().positive().max(999.99).optional(),
 });
 
 /**
@@ -67,7 +70,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { service_id, services, reset_pin, ...userFields } = parsed.data;
+  const { service_id, services, reset_pin, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours, ...userFields } =
+    parsed.data;
   const updateFields: Record<string, unknown> = { ...userFields };
 
   if (reset_pin) {
@@ -107,6 +111,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const { error: linkError } = await supabase.from("user_services").insert({ user_id: id, service_id });
       if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
     }
+  }
+
+  if (monthly_gross_salary !== undefined || monthly_net_salary !== undefined || contractual_monthly_hours !== undefined) {
+    // Separate table (user_contracts), not `users` — RLS on `users`
+    // lets any org member read any row (legitimate for a name/phone/
+    // role, not for a salary); see 20260101000077.
+    const contractFields: Record<string, unknown> = { user_id: id, updated_at: new Date().toISOString() };
+    if (monthly_gross_salary !== undefined) contractFields.monthly_gross_salary = monthly_gross_salary;
+    if (monthly_net_salary !== undefined) contractFields.monthly_net_salary = monthly_net_salary;
+    if (contractual_monthly_hours !== undefined) contractFields.contractual_monthly_hours = contractual_monthly_hours;
+    const { error: contractError } = await supabase.from("user_contracts").upsert(contractFields, { onConflict: "user_id" });
+    if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
   }
 
   return NextResponse.json({ user: targetUser ?? { id } });
