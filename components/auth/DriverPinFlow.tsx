@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
 import { Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
@@ -26,12 +27,15 @@ export function DriverPinFlow({
   email,
   needsSetup,
   pendingApproval,
+  hasPasskey = false,
 }: {
   id: string;
   fullName: string;
   email: string;
   needsSetup: boolean;
   pendingApproval: boolean;
+  /** Skips straight to a "Déverrouiller" button above the PIN form — see app/api/auth/passkey. */
+  hasPasskey?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [pin, setPin] = useState("");
@@ -39,6 +43,24 @@ export function DriverPinFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinJustCreated, setPinJustCreated] = useState(false);
+
+  async function unlockWithPasskey() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { attempted } = await tryPasskeyLogin({ user_id: id });
+      if (attempted) {
+        window.location.href = "/dashboard";
+        return;
+      }
+      setBusy(false);
+    } catch (e) {
+      if (!(e instanceof Error) || e.name !== "NotAllowedError") {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      }
+      setBusy(false);
+    }
+  }
 
   async function signIn(withPin: string) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: withPin });
@@ -146,6 +168,18 @@ export function DriverPinFlow({
         <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
         <p className="mt-1 text-sm text-navy/50">Entrez votre code PIN pour vous connecter.</p>
       </div>
+      {hasPasskey && (
+        <>
+          <button type="button" className="btn-primary" disabled={busy} onClick={unlockWithPasskey}>
+            {busy ? "…" : "🔓 Face ID / empreinte"}
+          </button>
+          <div className="flex items-center gap-2 text-xs text-navy/30">
+            <div className="h-px flex-1 bg-navy/10" />
+            ou
+            <div className="h-px flex-1 bg-navy/10" />
+          </div>
+        </>
+      )}
       <form onSubmit={submitLogin} className="flex flex-col gap-3">
         <div>
           <label className="label">Code PIN</label>
