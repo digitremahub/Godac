@@ -251,3 +251,13 @@ export function IconLifeBuoy(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconCoins(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <ellipse cx="9" cy="8" rx="6" ry="3.5" />
+      <path d="M3 8v5c0 1.93 2.69 3.5 6 3.5s6-1.57 6-3.5V8" />
+      <path d="M12.5 12.3c3.4.3 5.5 1.7 5.5 3.2 0 1.93-2.69 3.5-6 3.5-2.5 0-4.64-.88-5.55-2.12" />
+    </Svg>
+  );
+}

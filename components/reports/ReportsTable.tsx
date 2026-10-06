@@ -8,9 +8,8 @@ export interface ReportRow {
   id: string;
   tour_number: string;
   start_at: string;
+  end_at: string | null;
   report_bl_number: string | null;
-  report_departure_time: string | null;
-  report_return_time: string | null;
   report_stops_total: number | null;
   report_packages_count: number | null;
   report_priority_count: number | null;
@@ -27,8 +26,6 @@ export interface ReportRow {
 
 type EditableField =
   | "report_bl_number"
-  | "report_departure_time"
-  | "report_return_time"
   | "report_stops_total"
   | "report_packages_count"
   | "report_priority_count"
@@ -56,8 +53,6 @@ type FormState = Record<EditableField, string>;
 function toFormState(r: ReportRow): FormState {
   return {
     report_bl_number: r.report_bl_number ?? "",
-    report_departure_time: r.report_departure_time ?? "",
-    report_return_time: r.report_return_time ?? "",
     report_stops_total: r.report_stops_total?.toString() ?? "",
     report_packages_count: r.report_packages_count?.toString() ?? "",
     report_priority_count: r.report_priority_count?.toString() ?? "",
@@ -181,8 +176,12 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
               <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
               <td className="py-2">n°{r.tour_number}</td>
               <td className="py-2">{cell(r, "report_bl_number", r.report_bl_number ?? "—")}</td>
-              <td className="py-2">{cell(r, "report_departure_time", r.report_departure_time ?? "—")}</td>
-              <td className="py-2">{cell(r, "report_return_time", r.report_return_time ?? "—")}</td>
+              <td className="py-2" title="Heure du scan de départ, pas l'heure imprimée sur le BL">
+                {new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              </td>
+              <td className="py-2" title="Heure du scan de retour, pas l'heure imprimée sur le BL">
+                {r.end_at ? new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"}
+              </td>
               <td className="py-2">{cell(r, "report_stops_total", r.report_stops_total?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_stops_delivered", r.report_stops_delivered?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_packages_count", r.report_packages_count?.toString() ?? "—")}</td>

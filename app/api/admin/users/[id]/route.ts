@@ -21,6 +21,8 @@ const bodySchema = z.object({
   // Lot 7: forgets their PIN → direction clears it, next badge scan
   // offers "créez votre code" again instead of "entrez votre code".
   reset_pin: z.boolean().optional(),
+  // Ajusté au cas par cas par la direction (lecture du contrat) — voir /payroll.
+  hourly_rate: z.number().min(0).max(999.99).nullable().optional(),
 });
 
 /**

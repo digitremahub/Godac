@@ -5,8 +5,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
   report_bl_number: z.string().nullable().optional(),
-  report_departure_time: z.string().nullable().optional(),
-  report_return_time: z.string().nullable().optional(),
   report_stops_total: z.number().int().min(0).nullable().optional(),
   report_packages_count: z.number().int().min(0).nullable().optional(),
   report_priority_count: z.number().int().min(0).nullable().optional(),
