@@ -58,7 +58,7 @@ export default async function PlanningPage({
     rangeEnd = addDays(weekStart, 7);
   }
 
-  const [{ data: allServices }, { data: myServiceRows }, { data: vehicles }, { data: drivers }, { data: entries }, { data: lastTours }] =
+  const [{ data: allServices }, { data: myServiceRows }, { data: vehicles }, { data: drivers }, { data: entries }, { data: lastTours }, { data: validations }] =
     await Promise.all([
       isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
       isDirection
@@ -90,6 +90,10 @@ export default async function PlanningPage({
         .not("driver_id", "is", null)
         .order("start_at", { ascending: false })
         .limit(500),
+      // "Valider et envoyer" (see app/api/planning/validate) — one row
+      // per service once its week has been sent; the week view button
+      // reads this to show "Déjà envoyé" instead of re-sending blind.
+      view === "week" ? supabase.from("planning_validations").select("service_id, validated_at").eq("week_start", weekStart) : Promise.resolve({ data: null }),
     ]);
 
   const services = isDirection
@@ -137,6 +141,8 @@ export default async function PlanningPage({
           prevWeek={addDays(weekStart, -7)}
           nextWeek={addDays(weekStart, 7)}
           lastTourByDriver={Object.fromEntries(lastTourByDriver)}
+          canValidate={appUser.role === "manager" || appUser.role === "direction"}
+          validatedByService={Object.fromEntries((validations ?? []).map((v: any) => [v.service_id, v.validated_at]))}
         />
       )}
       {view === "day" && <PlanningDayView {...commonProps} day={selectedDay} />}

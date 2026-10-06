@@ -70,6 +70,8 @@ export function PlanningGrid({
   nextWeek,
   selectedService,
   lastTourByDriver = {},
+  canValidate = false,
+  validatedByService = {},
 }: {
   services: ServiceOption[];
   filteredServices: ServiceOption[];
@@ -82,9 +84,14 @@ export function PlanningGrid({
   selectedService: string;
   /** Each driver's most recent tour (any week) — pre-fills the form below so re-typing the same weekly route isn't needed every time. */
   lastTourByDriver?: Record<string, { vehicleId: string; tourNumber: string }>;
+  /** Only manager/direction get "Valider et envoyer" — see app/api/planning/validate. */
+  canValidate?: boolean;
+  /** service_id -> ISO validated_at, for the service(s) already validated this week. */
+  validatedByService?: Record<string, string>;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState(false);
@@ -157,6 +164,29 @@ export function PlanningGrid({
       setDuplicating(false);
     }
   }
+
+  async function validatePlanning() {
+    if (!selectedService) return;
+    setValidating(true);
+    setError(null);
+    setWarning(null);
+    try {
+      const res = await fetch("/api/planning/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_id: selectedService, week_start: weekStart }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  const validatedAt = selectedService ? validatedByService[selectedService] : undefined;
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -359,6 +389,23 @@ export function PlanningGrid({
         <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
           + Nouvelle affectation
         </button>
+        {canValidate &&
+          (selectedService ? (
+            <button
+              className="btn-primary !px-3 !py-1.5 text-sm"
+              disabled={validating}
+              onClick={validatePlanning}
+              title={
+                validatedAt
+                  ? `Déjà envoyé le ${new Date(validatedAt).toLocaleDateString("fr-FR")} à ${new Date(validatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — cliquez pour renvoyer avec les changements`
+                  : undefined
+              }
+            >
+              {validating ? "Envoi…" : validatedAt ? "✓ Envoyé — revalider" : "✅ Valider et envoyer"}
+            </button>
+          ) : (
+            <span className="text-xs text-navy/40">Sélectionnez un service pour valider son planning</span>
+          ))}
       </div>
 
       {error && <p className="text-sm text-orange-ink">{error}</p>}
