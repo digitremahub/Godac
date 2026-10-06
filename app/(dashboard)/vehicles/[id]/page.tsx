@@ -73,8 +73,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         .limit(15),
       supabase
         .from("planning_entries")
-        .select("id, tour_number, start_at, end_at, start_km, end_km")
+        .select("id, tour_number, start_at, end_at, start_km, end_km, status, services(name), users!planning_entries_driver_id_fkey(full_name)")
         .eq("vehicle_id", id)
+        .in("status", ["in_progress", "done"])
         .order("start_at", { ascending: false })
         .limit(20),
       washesEnabled
@@ -169,6 +170,45 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               showVehicle={false}
               emptyDescription="Aucun ravitaillement enregistré pour ce véhicule."
             />
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-base">Historique de conduite</h3>
+            {!tours || tours.length === 0 ? (
+              <EmptyState title="Aucune tournée" description="Qui a conduit ce véhicule et quand apparaîtra ici." />
+            ) : (
+              <Card className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="text-left text-navy/40">
+                    <tr>
+                      <th className="pb-2">Date</th>
+                      <th className="pb-2">Chauffeur</th>
+                      <th className="pb-2">Service</th>
+                      <th className="pb-2">Tournée</th>
+                      <th className="pb-2">Horaires</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(tours as any[]).map((t) => (
+                      <tr key={t.id} className="border-t border-navy/5">
+                        <td className="py-2">
+                          {new Date(t.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="py-2">{t.users?.full_name ?? "—"}</td>
+                        <td className="py-2">{t.services?.name ?? "—"}</td>
+                        <td className="py-2">n°{t.tour_number}</td>
+                        <td className="py-2">
+                          {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {t.end_at
+                            ? ` → ${new Date(t.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                            : " → en cours"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
           </div>
 
           {washesEnabled && (
