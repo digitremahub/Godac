@@ -1,8 +1,9 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState } from "@/components/ui";
 import { TourHistoryFilters } from "@/components/tours/TourHistoryFilters";
+import { TourHistoryTable, type TourHistoryRow } from "@/components/tours/TourHistoryTable";
 import { MonthlyEarningsCard } from "@/components/tours/MonthlyEarningsCard";
 import { addDays, todayISO, firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
 import { estimateReturnDistanceDeltaKm } from "@/lib/business/fuel-profitability";
@@ -198,61 +199,34 @@ export default async function TourHistoryPage({
       {history.length === 0 ? (
         <EmptyState title="Aucune tournée sur cette période" />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead className="text-left text-navy/40">
-              <tr>
-                <th className="pb-2">Date</th>
-                {!isChauffeur && <th className="pb-2">Chauffeur</th>}
-                <th className="pb-2">Service</th>
-                <th className="pb-2">Véhicule</th>
-                <th className="pb-2">Tournée</th>
-                <th className="pb-2">Horaires</th>
-                <th className="pb-2">Km</th>
-                <th className="pb-2">Retour</th>
-                <th className="pb-2">Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((r) => {
-                const homeCoords =
-                  r.users?.address_lat !== null && r.users?.address_lng !== null && r.users
-                    ? { lat: Number(r.users.address_lat), lng: Number(r.users.address_lng) }
-                    : null;
-                const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, depotCoords, homeCoords);
-                return (
-                  <tr key={r.id} className="border-t border-navy/5">
-                    <td className="py-2">
-                      {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    {!isChauffeur && <td className="py-2">{r.users?.full_name ?? "—"}</td>}
-                    <td className="py-2">{r.services?.name ?? "—"}</td>
-                    <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
-                    <td className="py-2">n°{r.tour_number}</td>
-                    <td className="py-2">
-                      {new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      {r.end_at
-                        ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
-                        : " → en cours"}
-                    </td>
-                    <td className="py-2">
-                      {r.start_km !== null ? `${r.start_km}${r.end_km !== null ? ` → ${r.end_km}` : ""} km` : "—"}
-                    </td>
-                    <td className="py-2">
-                      {r.return_type ? RETURN_TYPE_LABEL[r.return_type] : "—"}
-                      {r.return_type === "domicile" && (
-                        <span className="ml-1 text-xs text-navy/40">
-                          {returnDelta !== null ? `(≈${returnDelta} km vs dépôt)` : "(adresse manquante)"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2">{STATUS_LABEL[r.status] ?? r.status}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+        <TourHistoryTable
+          showDriverColumn={!isChauffeur}
+          canEditKm={isDirection}
+          rows={history.map((r): TourHistoryRow => {
+            const homeCoords =
+              r.users?.address_lat !== null && r.users?.address_lng !== null && r.users
+                ? { lat: Number(r.users.address_lat), lng: Number(r.users.address_lng) }
+                : null;
+            const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, depotCoords, homeCoords);
+            return {
+              id: r.id,
+              dateLabel: new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
+              driverName: r.users?.full_name ?? null,
+              serviceName: r.services?.name ?? "—",
+              vehicleRegistration: r.vehicles?.registration ?? "—",
+              tourNumber: r.tour_number,
+              scheduleLabel:
+                new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
+                (r.end_at ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : " → en cours"),
+              startKm: r.start_km,
+              endKm: r.end_km,
+              returnLabel: r.return_type ? (RETURN_TYPE_LABEL[r.return_type] ?? "—") : "—",
+              returnDeltaLabel:
+                r.return_type === "domicile" ? (returnDelta !== null ? `(≈${returnDelta} km vs dépôt)` : "(adresse manquante)") : null,
+              statusLabel: STATUS_LABEL[r.status] ?? r.status,
+            };
+          })}
+        />
       )}
     </div>
   );

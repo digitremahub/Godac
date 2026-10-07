@@ -14,6 +14,13 @@ const bodySchema = z.object({
   report_packages_picked_up: z.number().int().min(0).nullable().optional(),
   report_packages_returned: z.number().int().min(0).nullable().optional(),
   report_packages_relay: z.number().int().min(0).nullable().optional(),
+  // Correction d'un km de départ/retour erroné (ex: valeur de test
+  // saisie par erreur) — contourne volontairement
+  // checkOdometerNotRegressing (lib/business/odometer.ts), qui ne
+  // s'applique qu'au flux chauffeur de départ/fin de tournée ; ici
+  // direction corrige un historique déjà figé, pas un nouveau relevé.
+  start_km: z.number().min(0).nullable().optional(),
+  end_km: z.number().min(0).nullable().optional(),
 });
 
 /**
@@ -39,6 +46,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+
+  if (parsed.data.start_km !== undefined || parsed.data.end_km !== undefined) {
+    const { data: current, error: currentError } = await supabase
+      .from("planning_entries")
+      .select("start_km, end_km")
+      .eq("id", id)
+      .single();
+    if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 });
+
+    const effectiveStart = parsed.data.start_km !== undefined ? parsed.data.start_km : current.start_km !== null ? Number(current.start_km) : null;
+    const effectiveEnd = parsed.data.end_km !== undefined ? parsed.data.end_km : current.end_km !== null ? Number(current.end_km) : null;
+    if (effectiveStart !== null && effectiveEnd !== null && effectiveEnd < effectiveStart) {
+      return NextResponse.json({ error: "Le km de retour ne peut pas être inférieur au km de départ." }, { status: 422 });
+    }
+  }
+
   const { error } = await supabase.from("planning_entries").update(parsed.data).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
