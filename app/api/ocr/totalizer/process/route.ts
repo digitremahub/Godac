@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { extractTotalizerReading } from "@/lib/ocr/mindee";
+import { extractTotalizerReading } from "@/lib/ocr/counter";
 
 const bodySchema = z.object({ storagePath: z.string().min(1) });
 
@@ -40,5 +40,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ reading: null, confidence: null, error: result.reason });
   }
 
-  return NextResponse.json({ reading: result.reading.value, confidence: result.reading.confidence });
+  return NextResponse.json({ reading: result.reading, confidence: null });
 }

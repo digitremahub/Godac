@@ -9,8 +9,8 @@ import "server-only";
  * HEADER_ALIASES map forever for every new client's spreadsheet shape,
  * the model reads the structure itself, the same way a human would.
  *
- * Plain fetch to the Messages API, matching lib/ocr/mindee.ts's style
- * (no SDK dependency) — never throws for a business-level failure
+ * Plain fetch to the Messages API, matching lib/ocr/tour-report.ts's
+ * style (no SDK dependency) — never throws for a business-level failure
  * (missing key, malformed response): callers get `{ ok: false, reason }`
  * and fall back to showing the normal "no rows found" validation UI.
  */

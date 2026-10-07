@@ -43,7 +43,7 @@ export function FuelEntryForm({
   submitLabel: string;
   busy?: boolean;
   ocrNotice?: string;
-  /** Offers a "photo du compteur" capture (Mindee OCR) next to each totalizer field instead of relying on typing alone. */
+  /** Offers a "photo du compteur" capture (Claude vision OCR) next to each totalizer field instead of relying on typing alone. */
   totalizerOcrEnabled?: boolean;
   onSubmit: (values: FuelEntryFormValues) => void;
 }) {

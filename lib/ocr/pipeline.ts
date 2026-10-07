@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { extractFuelReceipt } from "@/lib/ocr/mindee";
+import { extractFuelReceipt } from "@/lib/ocr/fuel-receipt";
 
 /**
  * Runs the OCR extraction for one fuel_entries row and writes the
@@ -56,26 +56,17 @@ export async function processFuelEntryOcr(fuelEntryId: string): Promise<void> {
     return;
   }
 
-  const { extraction, raw } = result;
+  const { fields, raw } = result;
 
   const { error: updateError } = await supabase
     .from("fuel_entries")
     .update({
       status: "awaiting_validation",
-      occurred_at: combineDateTime(extraction.date.value, extraction.time.value) ?? undefined,
-      liters: extraction.liters.value ?? undefined,
-      unit_price: extraction.unitPrice.value ?? undefined,
-      station_name: extraction.stationName.value ?? undefined,
+      occurred_at: combineDateTime(fields.date, fields.time) ?? undefined,
+      liters: fields.liters ?? undefined,
+      unit_price: fields.unit_price ?? undefined,
+      station_name: fields.station_name ?? undefined,
       ocr_raw: raw as any,
-      ocr_confidence: {
-        date: extraction.date.confidence,
-        time: extraction.time.confidence,
-        liters: extraction.liters.confidence,
-        unitPrice: extraction.unitPrice.confidence,
-        totalAmount: extraction.totalAmount.confidence,
-        stationName: extraction.stationName.confidence,
-        fuelType: extraction.fuelType.confidence,
-      },
       ocr_error: null,
     })
     .eq("id", fuelEntryId);
