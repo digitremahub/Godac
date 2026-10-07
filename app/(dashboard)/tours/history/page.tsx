@@ -3,8 +3,10 @@ import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TourHistoryFilters } from "@/components/tours/TourHistoryFilters";
-import { addDays, todayISO } from "@/lib/planning/dates";
+import { MonthlyEarningsCard } from "@/components/tours/MonthlyEarningsCard";
+import { addDays, todayISO, firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
 import { estimateReturnDistanceDeltaKm } from "@/lib/business/fuel-profitability";
+import { computeHourlyRates, estimateSalary, countWeekdays, leaveDayHoursEquivalent } from "@/lib/business/payroll";
 
 const STATUS_LABEL: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
 const RETURN_TYPE_LABEL: Record<string, string> = { depot: "Dépôt", domicile: "Domicile" };
@@ -100,6 +102,75 @@ export default async function TourHistoryPage({
   const { data: rows } = await query;
   const history = (rows ?? []) as unknown as HistoryRow[];
 
+  // Own running month-to-date earnings estimate — chauffeur only, and
+  // always this own user's data (RLS on user_contracts already backs
+  // this up, see 20260101000077), never another driver's.
+  let monthlyEarnings: {
+    workedHours: number;
+    absenceWeekdays: number;
+    estimate: { gross: number | null; net: number | null } | null;
+    hasContract: boolean;
+  } | null = null;
+  if (isChauffeur) {
+    const month = currentMonth();
+    const monthStart = firstOfMonth(month);
+    const monthEnd = firstOfMonth(addMonths(month, 1));
+
+    const [{ data: contract }, { data: doneTours }, { data: leaves }] = await Promise.all([
+      supabase
+        .from("user_contracts")
+        .select("monthly_gross_salary, monthly_net_salary, contractual_monthly_hours")
+        .eq("user_id", appUser.id)
+        .maybeSingle(),
+      supabase
+        .from("planning_entries")
+        .select("start_at, end_at")
+        .eq("driver_id", appUser.id)
+        .eq("status", "done")
+        .not("end_at", "is", null)
+        .gte("start_at", `${monthStart}T00:00:00`)
+        .lt("start_at", `${monthEnd}T00:00:00`),
+      supabase
+        .from("leave_requests")
+        .select("start_date, end_date")
+        .eq("driver_id", appUser.id)
+        .eq("status", "approved")
+        .lt("start_date", monthEnd)
+        .gte("end_date", monthStart),
+    ]);
+
+    const workedHours = (doneTours ?? []).reduce((sum, t) => {
+      if (!t.end_at) return sum;
+      const hours = (new Date(t.end_at).getTime() - new Date(t.start_at).getTime()) / 3_600_000;
+      return sum + Math.max(hours, 0);
+    }, 0);
+
+    const contractualHours = contract ? Number(contract.contractual_monthly_hours) : 151.67;
+    const lastDayOfMonth = addDays(monthEnd, -1);
+    const absenceWeekdays = (leaves ?? []).reduce((sum, l) => {
+      const clampedStart = l.start_date < monthStart ? monthStart : l.start_date;
+      const clampedEnd = l.end_date > lastDayOfMonth ? lastDayOfMonth : l.end_date;
+      if (clampedEnd < clampedStart) return sum;
+      return sum + countWeekdays(new Date(`${clampedStart}T00:00:00Z`), new Date(`${clampedEnd}T00:00:00Z`));
+    }, 0);
+
+    const rates = contract
+      ? computeHourlyRates({
+          monthlyGrossSalary: contract.monthly_gross_salary !== null ? Number(contract.monthly_gross_salary) : null,
+          monthlyNetSalary: contract.monthly_net_salary !== null ? Number(contract.monthly_net_salary) : null,
+          contractualMonthlyHours: contractualHours,
+        })
+      : null;
+    const totalHours = workedHours + absenceWeekdays * leaveDayHoursEquivalent(contractualHours);
+
+    monthlyEarnings = {
+      workedHours,
+      absenceWeekdays,
+      estimate: estimateSalary(totalHours, rates),
+      hasContract: Boolean(contract),
+    };
+  }
+
   return (
     <div>
       <PageHeader
@@ -110,6 +181,8 @@ export default async function TourHistoryPage({
             : "Tournées passées de votre périmètre — démarrées ou terminées."
         }
       />
+
+      {monthlyEarnings && <MonthlyEarningsCard {...monthlyEarnings} />}
 
       {!isChauffeur && (
         <TourHistoryFilters
