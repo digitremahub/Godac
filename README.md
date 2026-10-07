@@ -5,7 +5,7 @@ modulaire pour les PME françaises de transport routier de marchandises
 (TRM), flottes mixtes VL/PL/SPL.
 
 Ce dossier (`godac/`) contient l'application V2, construite en
-full-stack propre (Next.js + Supabase + Stripe + Resend + Mindee), à
+full-stack propre (Next.js + Supabase + Stripe + Resend + Anthropic), à
 côté du site vitrine Digitrema existant à la racine du repo — les deux
 sont des projets indépendants dans le même repository.
 
@@ -20,7 +20,7 @@ sont des projets indépendants dans le même repository.
 | Paiement / abonnement SaaS | Stripe |
 | Jobs / webhooks lourds | Route Handlers Next.js aujourd'hui, migrable vers Railway sans changer la logique (voir plus bas) |
 | Email transactionnel | Resend |
-| OCR tickets carburant | Mindee |
+| OCR tickets carburant / compteurs | Claude vision (Anthropic) |
 
 Charte graphique : fond clair (`paper` `#F6F7FB`), texte `navy`
 `#0A0F1E`, accents teal `#1BE4C1`, orange `#FF6B35`, gold `#F5C842`
@@ -193,7 +193,7 @@ lib/
   business/            # PMP, écart totaliseur, TICPE, congés (+ tests)
   supabase/            # clients server / browser / admin (service role)
   auth/                # session, invitations, provisioning des comptes invités
-  ocr/                 # client Mindee + pipeline d'extraction + lecture rapport de tournée (Lot C)
+  ocr/                 # lecture Claude vision (tickets, compteurs, rapport de tournée Lot C) + pipeline d'extraction
   vehicles/            # consommation, référence kilométrique, spécifications IA (Lot A)
   assistant/           # Lot B : sources, routage du relais, rate-limit, appels IA (+ tests)
   import/              # extraction de tableau CSV/Excel (import véhicules/chauffeurs)
@@ -219,20 +219,19 @@ intégration :
 - **Stripe** : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   `NEXT_PUBLIC_STRIPE_PRICE_STARTER` / `_PRO`.
 - **Resend** : `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
-- **Mindee** : `MINDEE_API_KEY`, `MINDEE_FUEL_MODEL_ID` (optionnel),
-  `MINDEE_TOTALIZER_MODEL_ID` (optionnel), `MINDEE_ODOMETER_MODEL_ID`
-  (optionnel).
-- **Anthropic** : `ANTHROPIC_API_KEY` (optionnel) — alimente trois
-  fonctionnalités indépendantes, chacune dégradant proprement en son
-  absence : le fallback IA de l'import véhicules/chauffeurs
+- **Anthropic** : `ANTHROPIC_API_KEY` (optionnel) — alimente toutes les
+  fonctionnalités d'IA/OCR de l'app, chacune dégradant proprement en
+  son absence : le fallback IA de l'import véhicules/chauffeurs
   (`app/api/import/parse-file/route.ts`, format de colonnes non
   reconnu), la fiche véhicule complétée par IA (Lot A,
   `lib/vehicles/ai-specs.ts` — le bouton "Compléter par IA" disparaît
   sans la clé), la lecture OCR du rapport de tournée (Lot C,
-  `lib/ocr/tour-report.ts` — la photo reste une simple pièce jointe) et
-  l'assistant d'aide + relais humain (Lot B, `lib/assistant/` — le
-  bouton flottant n'apparaît pas du tout sans la clé, voir
-  `app/(dashboard)/layout.tsx`).
+  `lib/ocr/tour-report.ts`), la lecture OCR des tickets carburant
+  (Module 3, `lib/ocr/fuel-receipt.ts`) et des compteurs km/totalisateur
+  (`lib/ocr/counter.ts` — ces trois dernières dégradent en simple pièce
+  jointe / saisie manuelle sans la clé) et l'assistant d'aide + relais
+  humain (Lot B, `lib/assistant/` — le bouton flottant n'apparaît pas
+  du tout sans la clé, voir `app/(dashboard)/layout.tsx`).
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
 - **CRON_SECRET** : requise pour le digest hebdomadaire de planning
@@ -301,9 +300,8 @@ Variables), au minimum :
 - `RESEND_API_KEY`, `RESEND_FROM_EMAIL` pour les emails d'alerte —
   sinon les alertes restent visibles dans le centre d'alertes in-app
   mais ne sont jamais envoyées par email.
-- `MINDEE_API_KEY` (+ les `MINDEE_*_MODEL_ID` optionnels), `ANTHROPIC_API_KEY`
-  (optionnel) — sinon OCR et import bascule proprement en saisie
-  manuelle.
+- `ANTHROPIC_API_KEY` (optionnel) — sinon OCR et import basculent
+  proprement en saisie manuelle.
 - `GODAC_STAFF_EMAILS`, `SUPABASE_DB_WEBHOOK_SECRET`.
 - `CRON_SECRET` (obligatoire pour le digest hebdomadaire de planning —
   voir `## Variables d'environnement` ci-dessous).
@@ -340,14 +338,6 @@ placeholder silencieux :
   SQL classique sans droits superuser sur `pg_net`. Sans lui, les
   alertes sont bien créées en base et visibles dans le centre
   d'alertes in-app, mais aucun email n'est envoyé.
-- **Mindee** : fonctionne avec le modèle générique
-  "financial_document" tant que `MINDEE_FUEL_MODEL_ID` n'est pas
-  défini — ce modèle ne restitue pas litres/prix unitaire (seulement
-  montant total, date, fournisseur). Un modèle custom entraîné sur des
-  tickets carburant français (mentionné dans le brief comme option) est
-  nécessaire pour une extraction complète ; le code
-  (`lib/ocr/mindee.ts`) a déjà le branchement prêt, il attend juste
-  l'id du modèle entraîné.
 - **Pennylane** : **non intégré**. Aucune clé, aucun appel API, aucun
   stub actif dans le code au-delà des variables d'environnement
   réservées dans `.env.example`. GODAC ne doit pas devenir lui-même
@@ -357,7 +347,7 @@ placeholder silencieux :
 - **Railway** : non utilisé pour l'instant. Le pipeline OCR
   (`lib/ocr/pipeline.ts`) tourne dans une Route Handler Next.js
   (`app/api/ocr/process`), ce qui est suffisant en volume MVP. Si les
-  temps d'extraction Mindee dépassent les limites d'exécution Vercel,
+  temps d'extraction dépassent les limites d'exécution Vercel,
   déplacer l'appel à `processFuelEntryOcr()` vers un worker Railway
   sans changer sa signature.
 - **Niveau réel de carburant en cuve** : l'app affiche l'index
@@ -388,7 +378,7 @@ placeholder silencieux :
 - Module 2 — Gestion Carburant (saisie manuelle, PMP auto, détection
   d'écart de totaliseur, historique, vue cuves, livraisons de
   carburant + facture)
-- Module 3 — OCR (capture photo mobile-first, pipeline Mindee,
+- Module 3 — OCR (capture photo mobile-first, pipeline Claude vision,
   validation humaine obligatoire, revue manager, mode dégradé, OCR
   compteur totaliseur/odomètre, QR badges véhicule/pompe/chauffeur)
 - Module 4 — Gestion de Flotte (fiche véhicule, consommation L/100km
