@@ -17,6 +17,8 @@ export async function reportVehicleSwap(
     plannedVehicleId: string;
     actualVehicleId: string;
     reason: string;
+    /** "départ" (default, swap vs. the manager's plan) or "retour" (swap vs. the vehicle scanned at departure). */
+    stage?: "départ" | "retour";
   },
 ): Promise<string> {
   const [{ data: planned }, { data: actual }] = await Promise.all([
@@ -24,7 +26,8 @@ export async function reportVehicleSwap(
     supabase.from("vehicles").select("registration").eq("id", params.actualVehicleId).single(),
   ]);
 
-  const message = `Changement de véhicule au départ : prévu ${planned?.registration ?? "?"}, utilisé ${actual?.registration ?? "?"} — motif : ${params.reason}`;
+  const stage = params.stage ?? "départ";
+  const message = `Changement de véhicule au ${stage} : ${stage === "départ" ? "prévu" : "parti avec"} ${planned?.registration ?? "?"}, ${stage === "départ" ? "utilisé" : "revenu avec"} ${actual?.registration ?? "?"} — motif : ${params.reason}`;
 
   await supabase.from("alerts").insert({
     organization_id: params.organizationId,

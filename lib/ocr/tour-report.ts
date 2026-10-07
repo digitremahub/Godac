@@ -44,11 +44,21 @@ export type TourReportOcrResult =
 
 const SYSTEM_PROMPT = `Tu lis une photo d'un rapport de tournée de livraison (écran de terminal portable type Honeywell, ou compte-rendu imprimé type DPD/transporteur). Extrais uniquement les chiffres et références explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Les champs correspondent typiquement à : numéro de tournée ("Num Tour", "Tournée"), numéro de bordereau/BL ("Num BL", "Bordereau"), nombre total d'arrêts/stops, nombre de colis, nombre de colis prioritaires ("Prio"), nombre d'arrêts livrés ("Livré"), nombre de colis non livrés/manquants, nombre de stops de ramasse ("Stop(s) ramasse"), heure de départ, heure de retour, nombre de colis ramassés (collectés chez un client, distinct du nombre de stops de ramasse), nombre de colis ramenés au dépôt (non livrés, rapportés physiquement), nombre de colis déposés en point relais. Un rapport ne contient pas forcément tous ces champs — renvoie null pour ceux qui sont absents.`;
 
-const imageMediaTypeFromFilename = (filename: string): string => {
-  if (filename.endsWith(".png")) return "image/png";
-  if (filename.endsWith(".webp")) return "image/webp";
-  return "image/jpeg";
-};
+/**
+ * Builds the right Claude content block for whatever got uploaded —
+ * a PDF scan (téléversé depuis un PC) needs a "document" block, not
+ * an "image" one, which Claude would otherwise reject. Everything
+ * else (photo from the camera or an existing image file) stays an
+ * image block, as before.
+ */
+function contentBlockFromFile(imageBytes: Buffer, filename: string) {
+  const data = imageBytes.toString("base64");
+  if (filename.toLowerCase().endsWith(".pdf")) {
+    return { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf", data } };
+  }
+  const media_type = filename.endsWith(".png") ? "image/png" : filename.endsWith(".webp") ? "image/webp" : "image/jpeg";
+  return { type: "image" as const, source: { type: "base64" as const, media_type, data } };
+}
 
 export async function extractTourReportFromImage(imageBytes: Buffer, filename: string): Promise<TourReportOcrResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -107,11 +117,8 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: imageMediaTypeFromFilename(filename), data: imageBytes.toString("base64") },
-              },
-              { type: "text", text: "Extrais les champs du rapport de tournée visible sur cette photo via l'outil fourni." },
+              contentBlockFromFile(imageBytes, filename),
+              { type: "text", text: "Extrais les champs du rapport de tournée visible sur ce document via l'outil fourni." },
             ],
           },
         ],

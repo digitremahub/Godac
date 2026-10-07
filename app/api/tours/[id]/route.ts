@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
+import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
 
 const reportFieldsSchema = z.object({
   bl_number: z.string().nullable(),
@@ -28,6 +29,10 @@ const bodySchema = z
     return_type: z.enum(["depot", "domicile"]).optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
+    // Required only when vehicle_id differs from the vehicle scanned
+    // at departure (checked server-side below, e.g. a breakdown
+    // swap mid-tour) — never just trusted from a client-side flag.
+    change_reason: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.vehicle_ok && !data.problem_description) {
@@ -40,11 +45,11 @@ const bodySchema = z
   });
 
 /**
- * Closes out a tour the moment a driver scans their vehicle again at
- * day's end — the digital "rapport retour". vehicle_id is re-checked
- * server-side (not just trusted from the client's earlier /open
- * lookup) so a stray scan of the wrong truck can't close the wrong
- * tour.
+ * Closes out a tour — the digital "rapport retour". vehicle_id
+ * normally matches the one scanned at departure (auto-selected
+ * client-side, no re-scan needed); a mismatch is only accepted with
+ * an explicit change_reason (mid-tour breakdown/swap), checked
+ * server-side, never just trusted from a client-side flag.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,8 +72,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (tour.driver_id !== appUser.id || tour.status !== "in_progress") {
     return NextResponse.json({ error: "Cette tournée n'est pas ouverte pour vous." }, { status: 403 });
   }
-  if (tour.vehicle_id !== parsed.data.vehicle_id) {
-    return NextResponse.json({ error: "Cette tournée concerne un autre véhicule." }, { status: 409 });
+
+  const vehicleChanged = tour.vehicle_id !== parsed.data.vehicle_id;
+  if (vehicleChanged && !parsed.data.change_reason) {
+    return NextResponse.json(
+      { error: "Un motif est requis : ce véhicule n'est pas celui utilisé au départ de cette tournée." },
+      { status: 422 },
+    );
+  }
+  if (vehicleChanged) {
+    const { data: newVehicle, error: vehicleError } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("id", parsed.data.vehicle_id)
+      .single();
+    if (vehicleError || !newVehicle) {
+      return NextResponse.json({ error: "Véhicule introuvable." }, { status: 404 });
+    }
   }
 
   // "retour < départ" is rejected outright; a very large gap is
@@ -89,6 +109,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { error } = await supabase
     .from("planning_entries")
     .update({
+      vehicle_id: parsed.data.vehicle_id,
       end_at: new Date().toISOString(),
       end_km: parsed.data.end_km,
       end_km_photo_path: parsed.data.end_km_photo_path,
@@ -115,12 +136,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  if (vehicleChanged && parsed.data.change_reason) {
+    await reportVehicleSwap(supabase, {
+      organizationId: appUser.organization_id,
+      plannedEntryId: tour.id,
+      plannedVehicleId: tour.vehicle_id,
+      actualVehicleId: parsed.data.vehicle_id,
+      reason: parsed.data.change_reason,
+      stage: "retour",
+    });
+  }
+
   let problemPhotoStoragePath: string | null = null;
   if (!parsed.data.vehicle_ok) {
-    problemPhotoStoragePath = `${appUser.organization_id}/${tour.vehicle_id}/${randomUUID()}.jpg`;
+    problemPhotoStoragePath = `${appUser.organization_id}/${parsed.data.vehicle_id}/${randomUUID()}.jpg`;
     const { error: interventionError } = await supabase.from("vehicle_interventions").insert({
       organization_id: appUser.organization_id,
-      vehicle_id: tour.vehicle_id,
+      vehicle_id: parsed.data.vehicle_id,
       type: "Signalement automatique (retour de tournée)",
       description: parsed.data.problem_description,
       urgency: "normal",
