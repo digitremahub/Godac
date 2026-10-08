@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
+import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 
 interface Alert {
   id: string;
@@ -15,30 +16,6 @@ interface Alert {
   created_at: string;
   related_table: string | null;
   related_id: string | null;
-}
-
-/**
- * "Résoudre" used to just flip the status flag — nothing took you to
- * where the actual problem lives, so a manager had to go hunt down
- * the fuel entry/intervention/etc. by hand elsewhere in the app. Maps
- * each related_table to the page where that row actually gets
- * reviewed/corrected; no per-row deep link yet (none of these pages
- * accept one today), but at least it's the right page instead of
- * none at all.
- */
-const RESOLVE_URL: Record<string, string> = {
-  fuel_entries: "/fuel",
-  vehicle_interventions: "/maintenance",
-  tank_deliveries: "/tanks/deliveries",
-  fines: "/fines",
-  planning_entries: "/tours/history",
-  support_requests: "/support",
-  meeting_requests: "/intranet",
-  convocations: "/intranet",
-};
-
-function resolveUrl(relatedTable: string | null): string | null {
-  return relatedTable ? (RESOLVE_URL[relatedTable] ?? null) : null;
 }
 
 const SEVERITY_BADGE: Record<Alert["severity"], string> = {
@@ -80,8 +57,8 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
               {!alert.notified_at && <span className="badge-neutral">Email non envoyé</span>}
             </div>
             <p className="text-sm">{alert.message}</p>
-            {resolveUrl(alert.related_table) && (
-              <Link href={resolveUrl(alert.related_table)!} className="mt-1 inline-block text-xs text-teal-ink underline">
+            {resolveAlertUrl(alert.related_table) && (
+              <Link href={resolveAlertUrl(alert.related_table)!} className="mt-1 inline-block text-xs text-teal-ink underline">
                 Voir →
               </Link>
             )}

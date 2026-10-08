@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { sendTransactionalEmail } from "@/lib/email/resend";
 import { renderAlertEmail } from "@/lib/email/templates/alert-notification";
+import { sendPushToSubscriptions } from "@/lib/push/send";
+import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 import type { UserRole } from "@/lib/types/domain";
 
 /**
  * Receiver for a Supabase Database Webhook configured on
  * `insert on public.alerts` (Dashboard > Database > Webhooks — this
  * is the piece that can't be created from a SQL migration, see
- * README "Intégrations non branchées"). Resolves recipient emails
- * from `alerts.recipient_roles` and sends via Resend.
+ * README "Intégrations non branchées"). Resolves recipients from
+ * `alerts.recipient_roles`/`recipient_user_id` and notifies them on
+ * two independent channels — email (Resend) and web push
+ * (lib/push/send.ts, per-device opt-in from /account) — either one
+ * succeeding marks the alert notified.
  *
  * Protected by a shared secret header rather than a signed payload
  * (Supabase DB webhooks let you set arbitrary headers, unlike
@@ -34,6 +39,7 @@ export async function POST(req: Request) {
     message: string;
     recipient_roles: UserRole[];
     recipient_user_id: string | null;
+    related_table: string | null;
   };
 
   const supabase = createAdminSupabaseClient();
@@ -41,10 +47,10 @@ export async function POST(req: Request) {
   const [{ data: organization }, { data: recipients }] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", alert.organization_id).single(),
     alert.recipient_user_id
-      ? supabase.from("users").select("email, contact_email, auth_method").eq("id", alert.recipient_user_id).eq("active", true)
+      ? supabase.from("users").select("id, email, contact_email, auth_method").eq("id", alert.recipient_user_id).eq("active", true)
       : supabase
           .from("users")
-          .select("email, contact_email, auth_method")
+          .select("id, email, contact_email, auth_method")
           .eq("organization_id", alert.organization_id)
           .eq("active", true)
           .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
@@ -67,17 +73,26 @@ export async function POST(req: Request) {
     .map((r) => r.contact_email ?? (r.auth_method === "pin" ? null : r.email))
     .filter((email): email is string => Boolean(email));
 
-  const result = await sendTransactionalEmail({
-    to: addresses,
-    subject,
-    html,
-  });
+  const recipientIds = (recipients ?? []).map((r) => r.id);
+  const { data: subscriptions } = recipientIds.length
+    ? await supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", recipientIds)
+    : { data: [] };
 
-  if (result.sent) {
+  const [emailResult, pushResult] = await Promise.all([
+    sendTransactionalEmail({ to: addresses, subject, html }),
+    sendPushToSubscriptions(supabase, subscriptions ?? [], {
+      title: subject,
+      body: alert.message,
+      url: resolveAlertUrl(alert.related_table) ?? "/alerts",
+    }),
+  ]);
+
+  if (emailResult.sent || pushResult.sent > 0) {
     await supabase.from("alerts").update({ notified_at: new Date().toISOString() }).eq("id", alert.id);
-  } else {
-    console.warn(`Alert ${alert.id} not emailed: ${result.reason}`);
+  }
+  if (!emailResult.sent) {
+    console.warn(`Alert ${alert.id} not emailed: ${emailResult.reason}`);
   }
 
-  return NextResponse.json({ emailed: result.sent, reason: result.reason });
+  return NextResponse.json({ emailed: emailResult.sent, pushed: pushResult.sent, reason: emailResult.reason });
 }
