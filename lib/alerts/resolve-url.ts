@@ -17,6 +17,16 @@ const RESOLVE_URL: Record<string, string> = {
   convocations: "/intranet",
 };
 
-export function resolveAlertUrl(relatedTable: string | null): string | null {
+// Overrides keyed by alert `type`, checked before the related_table
+// fallback above — a validated-planning digest should open the
+// planning view itself, not /tours/history (every other
+// planning_entries alert — assignment, conflict, swap — is correctly
+// served by tour history, so this can't just change the table map).
+const RESOLVE_URL_BY_TYPE: Record<string, string> = {
+  planning_validated: "/planning/mine",
+};
+
+export function resolveAlertUrl(relatedTable: string | null, type?: string | null): string | null {
+  if (type && RESOLVE_URL_BY_TYPE[type]) return RESOLVE_URL_BY_TYPE[type];
   return relatedTable ? (RESOLVE_URL[relatedTable] ?? null) : null;
 }
