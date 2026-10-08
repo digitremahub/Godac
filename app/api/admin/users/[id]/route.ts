@@ -26,6 +26,16 @@ const bodySchema = z.object({
   monthly_gross_salary: z.number().min(0).max(999999.99).nullable().optional(),
   monthly_net_salary: z.number().min(0).max(999999.99).nullable().optional(),
   contractual_monthly_hours: z.number().positive().max(999.99).optional(),
+  // Dossier RH (employee_files) — profil complet visible direction
+  // uniquement, voir app/(dashboard)/admin/users/[id]/page.tsx.
+  // hr_status n'accepte que 'active'/'suspended'/'terminated' ici :
+  // 'on_leave' est dérivé par compute_hr_status() à partir des congés
+  // approuvés, jamais saisi à la main (voir 20260101000017).
+  contract_type: z.enum(["cdi", "cdd", "interim", "apprentissage"]).nullable().optional(),
+  hire_date: z.string().nullable().optional(),
+  contract_end_date: z.string().nullable().optional(),
+  hr_status: z.enum(["active", "suspended", "terminated"]).optional(),
+  hr_notes: z.string().nullable().optional(),
 });
 
 /**
@@ -70,8 +80,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { service_id, services, reset_pin, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours, ...userFields } =
-    parsed.data;
+  const {
+    service_id,
+    services,
+    reset_pin,
+    monthly_gross_salary,
+    monthly_net_salary,
+    contractual_monthly_hours,
+    contract_type,
+    hire_date,
+    contract_end_date,
+    hr_status,
+    hr_notes,
+    ...userFields
+  } = parsed.data;
   const updateFields: Record<string, unknown> = { ...userFields };
 
   if (reset_pin) {
@@ -123,6 +145,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (contractual_monthly_hours !== undefined) contractFields.contractual_monthly_hours = contractual_monthly_hours;
     const { error: contractError } = await supabase.from("user_contracts").upsert(contractFields, { onConflict: "user_id" });
     if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
+  }
+
+  if (
+    contract_type !== undefined ||
+    hire_date !== undefined ||
+    contract_end_date !== undefined ||
+    hr_status !== undefined ||
+    hr_notes !== undefined
+  ) {
+    const employeeFileFields: Record<string, unknown> = { organization_id: appUser.organization_id, user_id: id };
+    if (contract_type !== undefined) employeeFileFields.contract_type = contract_type;
+    if (hire_date !== undefined) employeeFileFields.hire_date = hire_date;
+    if (contract_end_date !== undefined) employeeFileFields.contract_end_date = contract_end_date;
+    if (hr_status !== undefined) employeeFileFields.hr_status = hr_status;
+    if (hr_notes !== undefined) employeeFileFields.notes = hr_notes;
+    const { error: employeeFileError } = await supabase.from("employee_files").upsert(employeeFileFields, { onConflict: "user_id" });
+    if (employeeFileError) return NextResponse.json({ error: employeeFileError.message }, { status: 500 });
   }
 
   return NextResponse.json({ user: targetUser ?? { id } });
