@@ -9,6 +9,7 @@ import { DriverPinForm } from "@/components/account/DriverPinForm";
 import { PasskeyManager } from "@/components/account/PasskeyManager";
 import { PushNotificationToggle } from "@/components/account/PushNotificationToggle";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { isModuleEnabled } from "@/lib/organization/modules";
 
 export default async function AccountPage() {
   const appUser = await requireAppUser();
@@ -19,8 +20,8 @@ export default async function AccountPage() {
   let address: string | null = null;
   let contactEmail: string | null = null;
   let authMethod: string | null = null;
+  const supabase = await createServerSupabaseClient();
   if (isFieldRole) {
-    const supabase = await createServerSupabaseClient();
     const { data } = await supabase
       .from("users")
       .select("pin_set_at, driver_code, address, contact_email, auth_method")
@@ -32,6 +33,7 @@ export default async function AccountPage() {
     contactEmail = data?.contact_email ?? null;
     authMethod = data?.auth_method ?? null;
   }
+  const pushEnabled = await isModuleEnabled(supabase, appUser.organization_id, "push_notifications");
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,7 +46,7 @@ export default async function AccountPage() {
         </div>
       </Card>
 
-      <PushNotificationToggle />
+      {pushEnabled && <PushNotificationToggle />}
 
       {isFieldRole && (
         <>
