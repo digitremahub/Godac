@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     sendPushToSubscriptions(supabase, subscriptions ?? [], {
       title: subject,
       body: alert.message,
-      url: resolveAlertUrl(alert.related_table) ?? "/alerts",
+      url: resolveAlertUrl(alert.related_table, alert.type) ?? "/alerts",
     }),
   ]);
 
