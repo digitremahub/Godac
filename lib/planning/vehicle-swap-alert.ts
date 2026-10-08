@@ -21,9 +21,12 @@ export async function reportVehicleSwap(
     stage?: "départ" | "retour";
   },
 ): Promise<string> {
-  const [{ data: planned }, { data: actual }] = await Promise.all([
+  const [{ data: planned }, { data: actual }, { data: entry }] = await Promise.all([
     supabase.from("vehicles").select("registration").eq("id", params.plannedVehicleId).single(),
     supabase.from("vehicles").select("registration").eq("id", params.actualVehicleId).single(),
+    // Scopes the alert to this tour's own service (see 20260101000078)
+    // instead of broadcasting it to every manager in the organization.
+    supabase.from("planning_entries").select("service_id").eq("id", params.plannedEntryId).single(),
   ]);
 
   const stage = params.stage ?? "départ";
@@ -36,6 +39,7 @@ export async function reportVehicleSwap(
     message,
     related_table: "planning_entries",
     related_id: params.plannedEntryId,
+    service_id: entry?.service_id ?? null,
   });
 
   return message;

@@ -32,6 +32,10 @@ export async function warnIfDriverDoubleBooked(
     .map((c) => `n°${c.tourNumber}${c.service ? ` (${c.service})` : ""}`)
     .join(", ")}.`;
 
+  // Scopes the alert to this tour's own service (see 20260101000078)
+  // instead of broadcasting it to every manager in the organization.
+  const { data: entry } = await supabase.from("planning_entries").select("service_id").eq("id", params.excludeEntryId).single();
+
   await supabase.from("alerts").insert({
     organization_id: params.organizationId,
     type: "planning_conflict",
@@ -39,6 +43,7 @@ export async function warnIfDriverDoubleBooked(
     message,
     related_table: "planning_entries",
     related_id: params.excludeEntryId,
+    service_id: entry?.service_id ?? null,
   });
 
   return message;
