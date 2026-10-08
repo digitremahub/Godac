@@ -86,11 +86,16 @@ async function markFailed(fuelEntryId: string, reason: string) {
 
   const { data: entry } = await supabase
     .from("fuel_entries")
-    .select("organization_id")
+    .select("organization_id, vehicle_id")
     .eq("id", fuelEntryId)
     .single();
 
   if (entry) {
+    // Scopes the alert to the vehicle's own service (see
+    // 20260101000078) instead of broadcasting it to every manager in
+    // the organization.
+    const { data: vehicle } = await supabase.from("vehicles").select("service_id").eq("id", entry.vehicle_id).single();
+
     await supabase.from("alerts").insert({
       organization_id: entry.organization_id,
       type: "ocr_failure",
@@ -99,6 +104,7 @@ async function markFailed(fuelEntryId: string, reason: string) {
       related_table: "fuel_entries",
       related_id: fuelEntryId,
       recipient_roles: ["manager", "manager_chauffeur"],
+      service_id: vehicle?.service_id ?? null,
     });
   }
 }

@@ -6,7 +6,7 @@ export default async function AlertsPage() {
   const supabase = await createServerSupabaseClient();
   const { data: alerts } = await supabase
     .from("alerts")
-    .select("id, type, severity, message, status, notified_at, created_at")
+    .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
     .order("created_at", { ascending: false })
     .limit(100);
 
