@@ -17,12 +17,15 @@ interface OpenTour {
 }
 
 /**
- * Retour de tournée: scan véhicule → vérifie que ça correspond à la
- * tournée ouverte du chauffeur → kilométrage retour (obligatoire) +
- * état du véhicule (obligatoire, jamais précoché) → validation
- * explicite. La photo du rapport et celle du compteur (sauf réglage
- * d'organisation contraire) restent facultatives et ne bloquent
- * jamais l'envoi. end_at est pris automatiquement à l'envoi.
+ * Retour de tournée: le véhicule est auto-sélectionné depuis la
+ * tournée déjà ouverte du chauffeur (pas de re-scan par défaut) —
+ * seul un "changement de véhicule" explicite (panne, échange en
+ * cours de tournée) demande de scanner le remplaçant et d'indiquer un
+ * motif, un responsable étant alors prévenu. Kilométrage retour
+ * (obligatoire) + état du véhicule (obligatoire, jamais précoché) →
+ * validation explicite. La photo du rapport et celle du compteur
+ * (sauf réglage d'organisation contraire) restent facultatives et ne
+ * bloquent jamais l'envoi. end_at est pris automatiquement à l'envoi.
  */
 export function EndTourFlow({
   initialVehicleId,
@@ -34,10 +37,14 @@ export function EndTourFlow({
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [registration, setRegistration] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [loadingTour, setLoadingTour] = useState(true);
   const [openTour, setOpenTour] = useState<OpenTour | null>(null);
-  const [mismatch, setMismatch] = useState(false);
   const [none, setNone] = useState(false);
+  const [vehicleChanged, setVehicleChanged] = useState(false);
+  const [changeReason, setChangeReason] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const [endKm, setEndKm] = useState("");
   const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
   const [notes, setNotes] = useState("");
@@ -52,36 +59,64 @@ export function EndTourFlow({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // Same shortcut as StartTourFlow: a vehicle already identified by
-  // /v/[id] doesn't need a second scan to run the same open-tour check.
+  // Loaded up front, before any scan, so the vehicle used at
+  // departure is confirmed in one tap — the QR scanner is only shown
+  // for an explicit "changement de véhicule" (handleScan below,
+  // re-run against whatever was actually scanned) or when a vehicle
+  // was already identified by /v/[id] (initialVehicleId).
   useEffect(() => {
-    if (initialVehicleId) handleScan(initialVehicleId);
+    if (initialVehicleId) {
+      handleScan(initialVehicleId);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch("/api/tours/open");
+        const json = await res.json();
+        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+        const tour = json.tour as OpenTour | null;
+        setOpenTour(tour);
+        if (!tour) setNone(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      } finally {
+        setLoadingTour(false);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialVehicleId]);
 
+  function confirmOpenVehicle() {
+    if (!openTour?.vehicles) return;
+    setVehicleId(openTour.vehicles.id);
+    setRegistration(openTour.vehicles.registration);
+    setVehicleChanged(false);
+  }
+
   async function handleScan(id: string) {
     setVehicleId(id);
+    setShowScanner(false);
     setChecking(true);
     setError(null);
-    setMismatch(false);
     setNone(false);
     try {
-      const res = await fetch("/api/tours/open");
-      const json = await res.json();
-      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-      const tour = json.tour as OpenTour | null;
+      const [openRes, vehicleRes] = await Promise.all([fetch("/api/tours/open"), fetch(`/api/vehicles/${id}`)]);
+      const openJson = await openRes.json();
+      if (!openRes.ok) throw new Error(typeof openJson.error === "string" ? openJson.error : "Erreur");
+      const tour = openJson.tour as OpenTour | null;
+      setOpenTour(tour);
       if (!tour) {
         setNone(true);
-      } else if (tour.vehicles?.id !== id) {
-        setOpenTour(tour);
-        setMismatch(true);
-      } else {
-        setOpenTour(tour);
+        return;
       }
+      setVehicleChanged(Boolean(tour.vehicles && tour.vehicles.id !== id));
+      const vehicleJson = await vehicleRes.json();
+      if (vehicleRes.ok) setRegistration(vehicleJson.vehicle?.registration ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
       setChecking(false);
+      setLoadingTour(false);
     }
   }
 
@@ -92,6 +127,7 @@ export function EndTourFlow({
     (!requireOdometerPhoto || Boolean(endKmPhotoPath)) &&
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
+    (!vehicleChanged || changeReason.trim().length > 0) &&
     confirmed;
 
   async function submit() {
@@ -112,6 +148,7 @@ export function EndTourFlow({
           return_type: returnType,
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
+          change_reason: vehicleChanged ? changeReason : undefined,
         }),
       });
       const patchJson = await patchRes.json();
@@ -138,7 +175,38 @@ export function EndTourFlow({
     return <EmptyState title="Tournée terminée" description="Le retour a été enregistré. À demain !" />;
   }
 
+  if (loadingTour) {
+    return <p className="text-sm text-navy/60">Chargement…</p>;
+  }
+
+  if (none) {
+    return (
+      <EmptyState
+        title="Aucune tournée en cours"
+        description="Démarrez une tournée avant de pouvoir la clôturer."
+      />
+    );
+  }
+
   if (!vehicleId) {
+    // The vehicle used at departure is confirmed in one tap, no scan
+    // needed — the scanner only appears via "Changement de véhicule"
+    // below (showScanner).
+    if (openTour?.vehicles && !showScanner) {
+      return (
+        <Card className="flex flex-col gap-3">
+          <p className="text-sm">
+            Tournée n°{openTour.tour_number} en cours — véhicule <span className="font-medium">{openTour.vehicles.registration}</span>.
+          </p>
+          <button className="btn-primary w-full justify-center" onClick={confirmOpenVehicle}>
+            ✅ Terminer avec {openTour.vehicles.registration}
+          </button>
+          <button className="btn-secondary w-full justify-center text-sm" onClick={() => setShowScanner(true)}>
+            🔄 Changement de véhicule — scanner le véhicule remplaçant
+          </button>
+        </Card>
+      );
+    }
     return <QrScanner expected="vehicle" label="Scannez le QR du véhicule au retour" onScan={(p) => handleScan(p.id)} />;
   }
 
@@ -146,32 +214,31 @@ export function EndTourFlow({
     return <p className="text-sm text-navy/60">Vérification…</p>;
   }
 
-  if (none) {
-    return (
-      <EmptyState
-        title="Aucune tournée en cours"
-        description="Scannez le véhicule au départ pour démarrer une tournée avant de pouvoir la clôturer."
-      />
-    );
-  }
-
-  if (mismatch && openTour) {
-    return (
-      <Card>
-        <p className="text-sm text-orange-ink">
-          Votre tournée en cours concerne un autre véhicule ({openTour.vehicles?.registration ?? "inconnu"}).
-          Scannez ce véhicule pour la terminer.
-        </p>
-      </Card>
-    );
-  }
-
   return (
     <Card className="flex flex-col gap-3">
       {error && <p className="text-sm text-orange-ink">{error}</p>}
       <p className="text-sm text-navy/60">
-        Tournée n°{openTour?.tour_number} — {openTour?.vehicles?.registration}
+        Tournée n°{openTour?.tour_number} — {registration ?? openTour?.vehicles?.registration}
       </p>
+
+      {vehicleChanged && (
+        <div className="flex flex-col gap-2 rounded-lg border border-gold-ink/20 bg-gold-ink/5 p-3">
+          <p className="text-xs text-gold-ink">
+            Ce véhicule ({registration ?? "?"}) n&apos;est pas celui utilisé au départ
+            {openTour?.vehicles ? ` (${openTour.vehicles.registration})` : ""} — un responsable sera prévenu.
+          </p>
+          <div>
+            <label className="label">Motif du changement *</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={changeReason}
+              onChange={(e) => setChangeReason(e.target.value)}
+              placeholder="ex: panne, maintenance, véhicule indisponible…"
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="label">Kilométrage au retour *</label>
@@ -279,7 +346,7 @@ export function EndTourFlow({
 
       <label className="flex min-h-[44px] items-center gap-2 text-sm">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-        Je confirme terminer la tournée avec le véhicule{openTour?.vehicles ? ` ${openTour.vehicles.registration}` : ""}.
+        Je confirme terminer la tournée avec le véhicule{(registration ?? openTour?.vehicles?.registration) ? ` ${registration ?? openTour?.vehicles?.registration}` : ""}.
       </label>
 
       <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>

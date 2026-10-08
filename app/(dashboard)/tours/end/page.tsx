@@ -21,7 +21,7 @@ export default async function EndTourPage({
     <div>
       <PageHeader
         title="Terminer une tournée"
-        description="Scannez le même véhicule, indiquez le kilométrage retour et l'état du véhicule, puis validez votre retour."
+        description="Votre véhicule est déjà sélectionné — indiquez le kilométrage retour et l'état du véhicule, puis validez votre retour."
       />
       <div className="mx-auto max-w-md">
         <EndTourFlow initialVehicleId={vehicle} requireOdometerPhoto={organization?.require_odometer_photo ?? false} />
