@@ -19,6 +19,11 @@ export function isPushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
 }
 
+/** Surfaces a pre-existing browser-level block before the user even clicks "Activer" — see subscribeToPush for why the button alone can't recover from it. */
+export function isNotificationBlocked(): boolean {
+  return isPushSupported() && typeof Notification !== "undefined" && Notification.permission === "denied";
+}
+
 export async function getExistingSubscription(): Promise<PushSubscription | null> {
   if (!isPushSupported()) return null;
   const registration = await navigator.serviceWorker.getRegistration("/");
@@ -38,9 +43,27 @@ export async function subscribeToPush(): Promise<SubscribeResult> {
     return { ok: false, reason: "Notifications push non configurées pour cette organisation." };
   }
 
+  // Once a site has been denied, Chrome/Firefox/Safari never show the
+  // native prompt again — Notification.requestPermission() just
+  // silently re-resolves "denied" instantly. Without this check the
+  // user sees the same generic "autorisation refusée" message forever
+  // with no indication that clicking the button can't possibly help;
+  // they need to go unblock the site itself first.
+  if (Notification.permission === "denied") {
+    return {
+      ok: false,
+      reason:
+        "Ce site est bloqué pour les notifications dans votre navigateur (un refus précédent, probablement). " +
+        "Le bouton ne peut pas réafficher la demande tant que ce n'est pas débloqué manuellement : sur " +
+        "iPhone → Réglages > [nom de l'app ajoutée à l'écran d'accueil] > Notifications > Autoriser ; sur " +
+        "Android/PC → touchez l'icône 🔒 ou ⓘ à côté de l'adresse du site > Autorisations > Notifications > Autoriser. " +
+        "Revenez ensuite ici et réessayez.",
+    };
+  }
+
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
-    return { ok: false, reason: "Autorisation refusée — activez les notifications dans les réglages du navigateur." };
+    return { ok: false, reason: `Autorisation refusée (statut : ${permission}) — activez les notifications dans les réglages du navigateur.` };
   }
 
   const registration = await navigator.serviceWorker.register("/sw.js");
