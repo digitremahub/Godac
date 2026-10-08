@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   title: "GODAC — Gestion et Optimisation Des Assets et Carburant",
   description:
     "L'OS de backoffice pour les entreprises de transport routier de marchandises : carburant, flotte, RH, planning et conformité.",
+  // iOS only exposes PushManager to a page added to the home screen and
+  // reopened from there — this meta (on top of app/manifest.ts) is what
+  // makes "Ajouter à l'écran d'accueil" register as a standalone app
+  // reliably across iOS versions, not just 16.4+'s manifest-only path.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "GODAC",
+  },
 };
 
 export const viewport: Viewport = {
