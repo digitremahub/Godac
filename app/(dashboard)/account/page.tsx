@@ -7,6 +7,7 @@ import { EmailForm } from "@/components/account/EmailForm";
 import { NameForm } from "@/components/account/NameForm";
 import { DriverPinForm } from "@/components/account/DriverPinForm";
 import { PasskeyManager } from "@/components/account/PasskeyManager";
+import { PushNotificationToggle } from "@/components/account/PushNotificationToggle";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 
 export default async function AccountPage() {
@@ -42,6 +43,8 @@ export default async function AccountPage() {
           <p>{ROLE_LABELS[appUser.role]}</p>
         </div>
       </Card>
+
+      <PushNotificationToggle />
 
       {isFieldRole && (
         <>

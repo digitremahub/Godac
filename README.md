@@ -300,6 +300,10 @@ Variables), au minimum :
 - `RESEND_API_KEY`, `RESEND_FROM_EMAIL` pour les emails d'alerte —
   sinon les alertes restent visibles dans le centre d'alertes in-app
   mais ne sont jamais envoyées par email.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+  pour les notifications push (second canal, en plus de l'email,
+  activé par utilisateur depuis `/account`) — sinon le bouton "Activer
+  les notifications" échoue proprement, l'email continue seul.
 - `ANTHROPIC_API_KEY` (optionnel) — sinon OCR et import basculent
   proprement en saisie manuelle.
 - `GODAC_STAFF_EMAILS`, `SUPABASE_DB_WEBHOOK_SECRET`.
@@ -397,8 +401,9 @@ placeholder silencieux :
   validation) et intranet (annonces)
 - Module 7 — Export TICPE (filtré PL/SPL strictement, Excel, rôle
   comptable)
-- Module 8 — Alertes & Notifications (centre in-app + email Resend,
-  écarts de totaliseur, anomalies de prix/kilométrage/consommation,
+- Module 8 — Alertes & Notifications (centre in-app + email Resend +
+  notification push web par appareil, scopées par service, écarts de
+  totaliseur, anomalies de prix/kilométrage/consommation,
   échecs OCR, demandes d'entretien)
 - Module 9 — Administration & Multi-tenant (paramètres org dont seuils
   d'alerte et numéro d'urgence, gestion des rôles, facturation Stripe
