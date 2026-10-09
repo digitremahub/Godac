@@ -1,13 +1,22 @@
 import "server-only";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import path from "node:path";
+import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 
-// "Helvetica" is one of the 14 standard PDF base fonts react-pdf
-// already ships with — no Font.register() needed (and registering it
-// with `src: "Helvetica"` is actually wrong: react-pdf then tries to
-// fetch/load a font file at that "path", which fails and crashes PDF
-// generation before any response is ever sent).
+// react-pdf's own "standard" fonts (Helvetica, etc.) are loaded by
+// pdfkit from node_modules/pdfkit/js/standard-fonts/* at render time,
+// via a dynamically-built require path — Next's output file tracing
+// can't follow that, and outputFileTracingIncludes can't force a
+// node_modules path into the Vercel bundle either (confirmed directly:
+// even a single, non-glob path there gets silently dropped), so every
+// PDF generation crashed in production with "Cannot find module
+// '.../pdfkit/js/standard-fonts/Helvetica.cjs'". Registering our own
+// embedded font from a project-root path (traced the same way
+// content/help/*.md already is, see next.config.mjs) sidesteps pdfkit's
+// standard-font loading entirely.
+Font.register({ family: "NotoSans", src: path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf") });
+
 const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 9, fontFamily: "Helvetica" },
+  page: { padding: 28, fontSize: 9, fontFamily: "NotoSans" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
   employerBox: { width: "48%", borderWidth: 1, borderColor: "#999", padding: 8 },
   employerName: { fontSize: 10, fontWeight: 700, marginBottom: 2 },

@@ -1,8 +1,14 @@
 import "server-only";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import path from "node:path";
+import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
+
+// See lib/payslips/generate-pdf.tsx's comment: pdfkit's own standard
+// fonts can't be traced into the Vercel serverless bundle, so this
+// registers an embedded font from the project root instead.
+Font.register({ family: "NotoSans", src: path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf") });
 
 const styles = StyleSheet.create({
-  page: { padding: 32, fontSize: 9, fontFamily: "Helvetica" },
+  page: { padding: 32, fontSize: 9, fontFamily: "NotoSans" },
   title: { fontSize: 16, fontWeight: 700, marginBottom: 2 },
   subtitle: { fontSize: 9, color: "#555", marginBottom: 16 },
   table: { borderWidth: 1, borderColor: "#999" },
