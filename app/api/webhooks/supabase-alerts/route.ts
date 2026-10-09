@@ -57,12 +57,17 @@ export async function POST(req: Request) {
           .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
   ]);
 
+  // Shared by both channels so an alert always opens the same page
+  // whether it's clicked from the email or from the push notification.
+  const linkPath = resolveAlertUrl(alert.related_table, alert.type, alert.related_id) ?? "/alerts";
+
   const { subject, html } = renderAlertEmail({
     type: alert.type,
     severity: alert.severity,
     message: alert.message,
     organizationName: organization?.name ?? "GODAC",
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    linkPath,
   });
 
   // A badge+PIN driver's own `email` is a fabricated address that's
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
     sendPushToSubscriptions(supabase, subscriptions ?? [], {
       title: subject,
       body: alert.message,
-      url: resolveAlertUrl(alert.related_table, alert.type, alert.related_id) ?? "/alerts",
+      url: linkPath,
     }),
   ]);
 
