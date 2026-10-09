@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mondayOf, addDays, toISODate, todayISO, firstOfMonth, addMonths, monthCalendarDays } from "../dates";
+import { mondayOf, addDays, toISODate, todayISO, firstOfMonth, addMonths, monthCalendarDays, parisWallTimeToUtcISOString } from "../dates";
 
 describe("mondayOf", () => {
   it("returns the same date when already a Monday", () => {
@@ -53,6 +53,32 @@ describe("firstOfMonth / addMonths", () => {
   it("steps forward and backward across a year boundary", () => {
     expect(addMonths("2026-12", 1)).toBe("2027-01");
     expect(addMonths("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("parisWallTimeToUtcISOString", () => {
+  it("converts a winter-time (CET, UTC+1) wall clock to UTC", () => {
+    expect(parisWallTimeToUtcISOString("2026-01-15", "08:00")).toBe("2026-01-15T07:00:00.000Z");
+  });
+
+  it("converts a summer-time (CEST, UTC+2) wall clock to UTC", () => {
+    expect(parisWallTimeToUtcISOString("2026-07-15", "08:00")).toBe("2026-07-15T06:00:00.000Z");
+  });
+
+  it("rolls back to the previous UTC calendar day for a late-evening Paris time", () => {
+    // 23:30 Paris in summer (CEST, UTC+2) is 21:30 UTC the same day;
+    // this also exercises the day-rollover edge case near midnight.
+    expect(parisWallTimeToUtcISOString("2026-07-15", "23:30")).toBe("2026-07-15T21:30:00.000Z");
+  });
+
+  it("is stable regardless of the process's own timezone", () => {
+    const originalTZ = process.env.TZ;
+    process.env.TZ = "Europe/Paris";
+    try {
+      expect(parisWallTimeToUtcISOString("2026-01-15", "08:00")).toBe("2026-01-15T07:00:00.000Z");
+    } finally {
+      process.env.TZ = originalTZ;
+    }
   });
 });
 

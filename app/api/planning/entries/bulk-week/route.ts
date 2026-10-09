@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { addDays } from "@/lib/planning/dates";
+import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const bodySchema = z.object({
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   const rows = days
     .map((offset) => {
       const day = addDays(week_start, offset);
-      const startAt = new Date(`${day}T${time}:00`).toISOString();
+      const startAt = parisWallTimeToUtcISOString(day, time);
       return { startAt, slotKey: `${tour_number}:${startAt}` };
     })
     .filter((r) => !existingSlots.has(r.slotKey))

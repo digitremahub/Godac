@@ -48,6 +48,49 @@ export function todayISO(): string {
   return toISODate(new Date());
 }
 
+/**
+ * "YYYY-MM-DD" + "HH:MM", understood as the wall-clock time a French
+ * user typed into a form (Europe/Paris), converted to the matching
+ * UTC instant. Needed anywhere a day+time pair is turned into a
+ * start_at timestamp on the server instead of in the browser: Vercel's
+ * runtime timezone is UTC, so `new Date(`${day}T${time}:00`)` there
+ * silently treats the typed time as UTC and stores e.g. "08:00" as
+ * 08:00 UTC — 09:00 or 10:00 Paris depending on DST — instead of the
+ * intended 08:00 Paris. Same bug class as the calendar-day/UTC
+ * mismatch documented at the top of this file, but for time-of-day.
+ * Browser-side code doesn't need this: `new Date(...).toISOString()`
+ * there already resolves against the user's own (Paris) timezone.
+ */
+export function parisWallTimeToUtcISOString(day: string, time: string): string {
+  const { year, month, day: dayNum } = parseISODate(day);
+  const [hour, minute] = time.split(":").map(Number);
+  const guessUTC = Date.UTC(year, month - 1, dayNum, hour, minute, 0);
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Paris",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(new Date(guessUTC))
+      .map((p) => [p.type, p.value]),
+  );
+  const asIfUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour) === 24 ? 0 : Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return new Date(guessUTC + (guessUTC - asIfUTC)).toISOString();
+}
+
 /** "YYYY-MM" -> {year, month} (1-indexed), assuming the caller already validated the format. */
 function parseMonth(monthStr: string): { year: number; month: number } {
   const parts = monthStr.split("-");

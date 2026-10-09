@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { findFineMatchCandidate } from "@/lib/business/fine-match";
+import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const infractionAt = new Date(`${parsed.data.infraction_date}T${parsed.data.infraction_time}:00`).toISOString();
+  const infractionAt = parisWallTimeToUtcISOString(parsed.data.infraction_date, parsed.data.infraction_time);
   const supabase = await createServerSupabaseClient();
 
   const candidate = await findFineMatchCandidate(supabase, { vehicleId: parsed.data.vehicle_id, infractionAt });
