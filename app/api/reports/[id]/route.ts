@@ -14,6 +14,8 @@ const bodySchema = z.object({
   report_packages_picked_up: z.number().int().min(0).nullable().optional(),
   report_packages_returned: z.number().int().min(0).nullable().optional(),
   report_packages_relay: z.number().int().min(0).nullable().optional(),
+  report_departure_time: z.string().nullable().optional(),
+  report_return_time: z.string().nullable().optional(),
   // Correction d'un km de départ/retour erroné (ex: valeur de test
   // saisie par erreur) — contourne volontairement
   // checkOdometerNotRegressing (lib/business/odometer.ts), qui ne

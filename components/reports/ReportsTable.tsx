@@ -19,6 +19,8 @@ export interface ReportRow {
   report_packages_picked_up: number | null;
   report_packages_returned: number | null;
   report_packages_relay: number | null;
+  report_departure_time: string | null;
+  report_return_time: string | null;
   services: { name: string } | null;
   vehicles: { registration: string } | null;
   users: { full_name: string } | null;
@@ -34,7 +36,9 @@ type EditableField =
   | "report_pickups"
   | "report_packages_picked_up"
   | "report_packages_returned"
-  | "report_packages_relay";
+  | "report_packages_relay"
+  | "report_departure_time"
+  | "report_return_time";
 
 const NUMERIC_FIELDS = new Set<EditableField>([
   "report_stops_total",
@@ -62,6 +66,8 @@ function toFormState(r: ReportRow): FormState {
     report_packages_picked_up: r.report_packages_picked_up?.toString() ?? "",
     report_packages_returned: r.report_packages_returned?.toString() ?? "",
     report_packages_relay: r.report_packages_relay?.toString() ?? "",
+    report_departure_time: r.report_departure_time ?? "",
+    report_return_time: r.report_return_time ?? "",
   };
 }
 
@@ -143,7 +149,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
   return (
     <Card className="overflow-x-auto">
       {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
-      <table className="w-full min-w-[1180px] text-sm">
+      <table className="w-full min-w-[1340px] text-sm">
         <thead className="text-left text-navy/40">
           <tr>
             <th className="pb-2">Date</th>
@@ -152,6 +158,12 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Tournée</th>
             <th className="pb-2">BL</th>
+            <th className="pb-2" title="Heure imprimée sur le rapport de tournée, lue par l'OCR">
+              Départ (BL)
+            </th>
+            <th className="pb-2" title="Heure imprimée sur le rapport de tournée, lue par l'OCR">
+              Retour (BL)
+            </th>
             <th className="pb-2">Départ</th>
             <th className="pb-2">Retour</th>
             <th className="pb-2">Arrêts</th>
@@ -176,6 +188,8 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
               <td className="py-2">{r.vehicles?.registration ?? "—"}</td>
               <td className="py-2">n°{r.tour_number}</td>
               <td className="py-2">{cell(r, "report_bl_number", r.report_bl_number ?? "—")}</td>
+              <td className="py-2">{cell(r, "report_departure_time", r.report_departure_time ?? "—")}</td>
+              <td className="py-2">{cell(r, "report_return_time", r.report_return_time ?? "—")}</td>
               <td className="py-2" title="Heure du scan de départ, pas l'heure imprimée sur le BL">
                 {new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
               </td>
