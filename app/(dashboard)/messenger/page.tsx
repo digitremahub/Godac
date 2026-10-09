@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { MessageForm } from "@/components/messenger/MessageForm";
+import { MessageThread } from "@/components/messenger/MessageThread";
 
 /**
  * GODAC Messenger (Module) — simple 1:1 chat between org colleagues,
@@ -36,6 +37,15 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
     .order("full_name");
 
   const contactId = params.with && (colleagues ?? []).some((c) => c.id === params.with) ? params.with : undefined;
+
+  if (contactId) {
+    await supabase
+      .from("messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("sender_id", contactId)
+      .eq("recipient_id", appUser.id)
+      .is("read_at", null);
+  }
 
   const { data: messages } = contactId
     ? await supabase
@@ -82,29 +92,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
           ) : (
             <>
               <Card className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
-                {messagesWithPhotos.length === 0 ? (
-                  <p className="text-xs text-navy/40">Aucun message échangé pour l&apos;instant.</p>
-                ) : (
-                  messagesWithPhotos.map((m) => (
-                    <div key={m.id} className={`flex ${m.sender_id === appUser.id ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[75%] rounded-xl px-3 py-1.5 text-sm ${
-                          m.sender_id === appUser.id ? "bg-teal/15" : "bg-navy/5"
-                        }`}
-                      >
-                        {m.photoUrl && (
-                          <a href={m.photoUrl} target="_blank" rel="noreferrer">
-                            <img src={m.photoUrl} alt="Photo envoyée" className="mb-1 max-h-64 max-w-full rounded-lg object-contain" />
-                          </a>
-                        )}
-                        {m.body && <p>{m.body}</p>}
-                        <p className="mt-0.5 text-right text-[10px] text-navy/35">
-                          {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
+                <MessageThread messages={messagesWithPhotos} currentUserId={appUser.id} />
               </Card>
               <MessageForm recipientId={contact.id} senderId={appUser.id} organizationId={appUser.organization_id} />
             </>

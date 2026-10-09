@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileActionBar } from "@/components/layout/MobileActionBar";
-import { AssistantWidget } from "@/components/assistant/AssistantWidget";
+import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
 import type { UserRole } from "@/lib/types/domain";
 
 export function DashboardShell({
@@ -17,6 +17,9 @@ export function DashboardShell({
   roleTitle,
   hasActiveTour,
   assistantAvailable,
+  messengerAvailable,
+  currentUserId,
+  organizationId,
   children,
 }: {
   role: UserRole;
@@ -29,6 +32,9 @@ export function DashboardShell({
   hasActiveTour: boolean;
   /** Module enabled AND ANTHROPIC_API_KEY configured — resolved server-side so the widget is absent, not just hidden, otherwise. */
   assistantAvailable: boolean;
+  messengerAvailable: boolean;
+  currentUserId: string;
+  organizationId: string;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -70,7 +76,12 @@ export function DashboardShell({
         </main>
       </div>
       {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} />}
-      {assistantAvailable && <AssistantWidget />}
+      <FloatingChatWidget
+        assistantAvailable={assistantAvailable}
+        messengerAvailable={messengerAvailable}
+        currentUserId={currentUserId}
+        organizationId={organizationId}
+      />
     </div>
   );
 }

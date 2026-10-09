@@ -1,0 +1,289 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AssistantTabBody, type AssistantMessage } from "@/components/chat/AssistantTabBody";
+import { ConversationTabBody } from "@/components/chat/ConversationTabBody";
+
+interface Contact {
+  id: string;
+  full_name: string;
+}
+interface ConversationTab {
+  contactId: string;
+  contactName: string;
+}
+
+/**
+ * One floating bubble for everything that isn't a dedicated page:
+ * the help assistant (first tab, always present when available) and
+ * 1:1 conversations (one closable tab each). A tab (re)appears on its
+ * own whenever a new message arrives for a conversation the viewer
+ * doesn't already have open — see the polling effect below, the only
+ * way this codebase has to notice "something new happened" without a
+ * realtime subscription.
+ */
+export function FloatingChatWidget({
+  assistantAvailable,
+  messengerAvailable,
+  currentUserId,
+  organizationId,
+}: {
+  assistantAvailable: boolean;
+  messengerAvailable: boolean;
+  currentUserId: string;
+  organizationId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeKey, setActiveKey] = useState<string>(assistantAvailable ? "assistant" : "");
+  const [conversations, setConversations] = useState<ConversationTab[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [contacts, setContacts] = useState<Contact[] | null>(null);
+  const [unreadBySender, setUnreadBySender] = useState<Record<string, { full_name: string; unreadCount: number }>>({});
+
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantLoaded, setAssistantLoaded] = useState(false);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantBusy, setAssistantBusy] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+  const [relayNotice, setRelayNotice] = useState<{ recipientLabel: string; emergencyPhone: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!messengerAvailable) return;
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await fetch("/api/messenger/unread-senders");
+        const json = await res.json();
+        if (cancelled || !Array.isArray(json.senders)) return;
+        const next: Record<string, { full_name: string; unreadCount: number }> = {};
+        for (const s of json.senders) next[s.id] = { full_name: s.full_name, unreadCount: s.unreadCount };
+        setUnreadBySender(next);
+        setConversations((prev) => {
+          const existingIds = new Set(prev.map((c) => c.contactId));
+          const additions = json.senders.filter((s: any) => !existingIds.has(s.id)).map((s: any) => ({ contactId: s.id, contactName: s.full_name }));
+          return additions.length === 0 ? prev : [...prev, ...additions];
+        });
+      } catch {
+        // Best-effort polling — a failed tick just tries again later.
+      }
+    }
+    poll();
+    const interval = setInterval(poll, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [messengerAvailable]);
+
+  useEffect(() => {
+    if (activeKey === "assistant" && !assistantLoaded) {
+      fetch("/api/assistant/conversation")
+        .then((r) => r.json())
+        .then((json) => {
+          if (Array.isArray(json.messages)) setAssistantMessages(json.messages);
+          setAssistantLoaded(true);
+        })
+        .catch(() => setAssistantLoaded(true));
+    }
+  }, [activeKey, assistantLoaded]);
+
+  function openConversation(contactId: string, contactName: string) {
+    setConversations((prev) => (prev.some((c) => c.contactId === contactId) ? prev : [...prev, { contactId, contactName }]));
+    setActiveKey(`conv:${contactId}`);
+    setOpen(true);
+    setPickerOpen(false);
+  }
+
+  function closeConversation(contactId: string) {
+    setConversations((prev) => {
+      const next = prev.filter((c) => c.contactId !== contactId);
+      if (activeKey === `conv:${contactId}`) {
+        setActiveKey(assistantAvailable ? "assistant" : next[0] ? `conv:${next[0].contactId}` : "");
+      }
+      return next;
+    });
+  }
+
+  async function togglePicker() {
+    setPickerOpen((v) => !v);
+    if (!contacts) {
+      const res = await fetch("/api/messenger/contacts");
+      const json = await res.json();
+      if (Array.isArray(json.contacts)) setContacts(json.contacts);
+    }
+  }
+
+  async function sendAssistant() {
+    const text = assistantInput.trim();
+    if (!text || assistantBusy) return;
+    setAssistantBusy(true);
+    setAssistantError(null);
+    setRelayNotice(null);
+    setAssistantMessages((prev) => [
+      ...prev,
+      { id: `tmp-${Date.now()}`, role: "user", content: text, needs_human: null, feedback: null, created_at: new Date().toISOString() },
+    ]);
+    setAssistantInput("");
+    try {
+      const res = await fetch("/api/assistant/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setAssistantMessages((prev) => [
+        ...prev,
+        { id: json.messageId, role: "assistant", content: json.answer, needs_human: json.needsHuman, feedback: null, created_at: new Date().toISOString() },
+      ]);
+      if (json.relay) setRelayNotice(json.relay);
+    } catch (e) {
+      setAssistantError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setAssistantBusy(false);
+    }
+  }
+
+  async function escalateAssistant() {
+    setAssistantBusy(true);
+    setAssistantError(null);
+    try {
+      const res = await fetch("/api/assistant/escalate", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      setRelayNotice(json.relay);
+    } catch (e) {
+      setAssistantError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setAssistantBusy(false);
+    }
+  }
+
+  async function voteAssistant(messageId: string, useful: boolean) {
+    setAssistantMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, feedback: useful } : m)));
+    try {
+      const res = await fetch("/api/assistant/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_id: messageId, useful }),
+      });
+      const json = await res.json();
+      if (res.ok && json.relay) setRelayNotice(json.relay);
+    } catch {
+      // Feedback is best-effort — never block the conversation on it.
+    }
+  }
+
+  if (!assistantAvailable && !messengerAvailable) return null;
+
+  const totalUnread = Object.values(unreadBySender).reduce((sum, s) => sum + s.unreadCount, 0);
+
+  return (
+    <>
+      <button
+        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal text-2xl shadow-[0_4px_16px_-4px_rgba(27,228,193,0.6)] lg:bottom-6"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Messages et assistant"
+      >
+        {open ? "✕" : "💬"}
+        {!open && totalUnread > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 text-xs font-bold text-white">
+            {totalUnread > 9 ? "9+" : totalUnread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="fixed bottom-[9.5rem] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-2xl lg:bottom-24">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-navy/10 bg-navy/5 px-2 pt-2">
+            {assistantAvailable && (
+              <button
+                className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium ${activeKey === "assistant" ? "bg-white" : "text-navy/50"}`}
+                onClick={() => setActiveKey("assistant")}
+              >
+                🤖 Assistant
+              </button>
+            )}
+            {conversations.map((c) => (
+              <div
+                key={c.contactId}
+                className={`flex shrink-0 items-center gap-1 rounded-t-lg px-2 py-1.5 text-xs font-medium ${
+                  activeKey === `conv:${c.contactId}` ? "bg-white" : "text-navy/50"
+                }`}
+              >
+                <button onClick={() => setActiveKey(`conv:${c.contactId}`)} className="flex items-center gap-1">
+                  {c.contactName.split(" ")[0]}
+                  {unreadBySender[c.contactId] && activeKey !== `conv:${c.contactId}` && <span className="h-1.5 w-1.5 rounded-full bg-orange" />}
+                </button>
+                <button onClick={() => closeConversation(c.contactId)} className="text-navy/30 hover:text-orange-ink">
+                  ✕
+                </button>
+              </div>
+            ))}
+            {messengerAvailable && (
+              <div className="relative shrink-0">
+                <button className="rounded-t-lg px-2 py-1.5 text-xs text-navy/50 hover:text-navy" onClick={togglePicker}>
+                  +
+                </button>
+                {pickerOpen && (
+                  <div className="absolute right-0 top-full z-50 max-h-48 w-44 overflow-y-auto rounded-lg border border-navy/10 bg-white py-1 shadow-xl">
+                    {!contacts ? (
+                      <p className="px-3 py-1.5 text-xs text-navy/40">Chargement…</p>
+                    ) : contacts.length === 0 ? (
+                      <p className="px-3 py-1.5 text-xs text-navy/40">Aucun collègue.</p>
+                    ) : (
+                      contacts.map((c) => (
+                        <button
+                          key={c.id}
+                          className="block w-full px-3 py-1.5 text-left text-xs hover:bg-navy/5"
+                          onClick={() => openConversation(c.id, c.full_name)}
+                        >
+                          {c.full_name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            {assistantAvailable && (
+              <div className={activeKey === "assistant" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+                <AssistantTabBody
+                  messages={assistantMessages}
+                  loaded={assistantLoaded}
+                  input={assistantInput}
+                  busy={assistantBusy}
+                  error={assistantError}
+                  relayNotice={relayNotice}
+                  onInputChange={setAssistantInput}
+                  onSend={sendAssistant}
+                  onEscalate={escalateAssistant}
+                  onVote={voteAssistant}
+                />
+              </div>
+            )}
+            {conversations.map((c) => (
+              <div key={c.contactId} className={activeKey === `conv:${c.contactId}` ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+                <ConversationTabBody
+                  contactId={c.contactId}
+                  contactName={c.contactName}
+                  currentUserId={currentUserId}
+                  organizationId={organizationId}
+                  isActive={activeKey === `conv:${c.contactId}`}
+                />
+              </div>
+            ))}
+            {!activeKey && (
+              <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-navy/40">
+                Choisissez une conversation ou démarrez-en une nouvelle (+).
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
