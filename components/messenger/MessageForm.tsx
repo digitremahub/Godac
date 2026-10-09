@@ -4,7 +4,18 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-export function MessageForm({ recipientId, senderId, organizationId }: { recipientId: string; senderId: string; organizationId: string }) {
+export function MessageForm({
+  recipientId,
+  senderId,
+  organizationId,
+  onSent,
+}: {
+  recipientId: string;
+  senderId: string;
+  organizationId: string;
+  /** Floating widget context: refetch the open thread instead of a full page router.refresh(). */
+  onSent?: () => void;
+}) {
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +57,8 @@ export function MessageForm({ recipientId, senderId, organizationId }: { recipie
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
       setBody("");
       clearPhoto();
-      router.refresh();
+      if (onSent) onSent();
+      else router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {

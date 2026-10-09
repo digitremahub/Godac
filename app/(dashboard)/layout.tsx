@@ -38,6 +38,7 @@ export default async function DashboardLayout({
   // configured — never a client-side check, so there's no flash of a
   // button that would then fail on first use.
   const assistantAvailable = enabledModuleKeys.includes("assistant") && Boolean(process.env.ANTHROPIC_API_KEY);
+  const messengerAvailable = enabledModuleKeys.includes("messenger");
 
   return (
     <DashboardShell
@@ -50,6 +51,9 @@ export default async function DashboardLayout({
       roleTitle={appUser.role_title}
       hasActiveTour={Boolean(activeTour.data)}
       assistantAvailable={assistantAvailable}
+      messengerAvailable={messengerAvailable}
+      currentUserId={appUser.id}
+      organizationId={appUser.organization_id}
     >
       {children}
     </DashboardShell>
