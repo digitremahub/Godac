@@ -9,7 +9,6 @@ import {
   IconPlusCircle,
   IconCamera,
   IconCylinder,
-  IconImage,
   IconTruck,
   IconWrench,
   IconCalendar,
@@ -59,7 +58,6 @@ const SECTIONS: NavSection[] = [
       { href: "/fuel/new", label: "Nouveau ravitaillement", icon: IconPlusCircle, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
       { href: "/ocr-review", label: "Revue OCR", icon: IconCamera, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "ocr" },
       { href: "/tanks", label: "Cuves", icon: IconCylinder, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
-      { href: "/tanks/photos", label: "Photos de cuves", icon: IconImage, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
       { href: "/tanks/deliveries", label: "Approvisionnements", icon: IconUpload, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
       { href: "/my-vehicle", label: "Mon véhicule", icon: IconTruck, allow: ["chauffeur", "manager_chauffeur"] },
@@ -145,8 +143,8 @@ export function Sidebar({
     items: section.items.filter((item) => item.allow.includes(role) && (!item.moduleKey || enabled.has(item.moduleKey))),
   })).filter((section) => section.items.length > 0);
 
-  // Most-specific-href-wins, so /tanks/photos doesn't also light up
-  // the plain /tanks entry it happens to prefix.
+  // Most-specific-href-wins, so a nested route doesn't also light up
+  // a shorter entry it happens to prefix.
   const allHrefs = sections.flatMap((s) => s.items.map((i) => i.href));
   const activeHref = allHrefs
     .filter((href) => (href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)))
