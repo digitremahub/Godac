@@ -69,10 +69,16 @@ export interface PayslipPdfData {
   periodEndLabel: string;
   grossSalary: number;
   netSalary: number;
+  /** Saisis au moment de la génération (voir /payroll) — pas de cotisation calculée dessus, ajoutés tels quels au net à payer. */
+  mealVouchersAmount?: number | null;
+  bonusAmount?: number | null;
 }
 
 function PayslipDocument({ data }: { data: PayslipPdfData }) {
   const estimatedContributions = data.grossSalary - data.netSalary;
+  const mealVouchers = data.mealVouchersAmount ?? 0;
+  const bonus = data.bonusAmount ?? 0;
+  const totalNet = data.netSalary + mealVouchers + bonus;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -112,12 +118,26 @@ function PayslipDocument({ data }: { data: PayslipPdfData }) {
             <Text style={styles.cellValue}></Text>
             <Text style={styles.cellValue}>{formatEuro(estimatedContributions)}</Text>
           </View>
+          {bonus > 0 && (
+            <View style={styles.tableRow}>
+              <Text style={styles.cellDesignation}>Prime(s)</Text>
+              <Text style={styles.cellValue}>{formatEuro(bonus)}</Text>
+              <Text style={styles.cellValue}></Text>
+            </View>
+          )}
+          {mealVouchers > 0 && (
+            <View style={styles.tableRow}>
+              <Text style={styles.cellDesignation}>Panier(s) repas</Text>
+              <Text style={styles.cellValue}>{formatEuro(mealVouchers)}</Text>
+              <Text style={styles.cellValue}></Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.netRow}>
           <View style={styles.netBox}>
             <Text style={styles.netLabel}>NET À PAYER</Text>
-            <Text style={styles.netValue}>{formatEuro(data.netSalary)}</Text>
+            <Text style={styles.netValue}>{formatEuro(totalNet)}</Text>
           </View>
         </View>
 
