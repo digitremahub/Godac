@@ -13,10 +13,11 @@ export default async function NewFuelEntryPage({
   const supabase = await createServerSupabaseClient();
   const params = await searchParams;
 
-  const [{ data: vehicles }, { data: tanks }, ocrEnabled] = await Promise.all([
+  const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }] = await Promise.all([
     supabase.from("vehicles").select("id, registration, type").eq("status", "active").order("registration"),
     supabase.from("tanks").select("id, name, fuel_type").order("name"),
     isModuleEnabled(supabase, appUser.organization_id, "ocr"),
+    supabase.from("vehicles").select("id").eq("assigned_driver_id", appUser.id).eq("status", "active").maybeSingle(),
   ]);
 
   return (
@@ -31,6 +32,7 @@ export default async function NewFuelEntryPage({
         ocrEnabled={ocrEnabled}
         initialVehicleId={params.vehicle}
         initialTankId={params.tank}
+        assignedVehicleId={assignedVehicle?.id}
         selfDriverId={appUser.id}
         selfDriverName={appUser.full_name}
       />

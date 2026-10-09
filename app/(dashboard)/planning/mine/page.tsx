@@ -3,9 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { mondayOf, toISODate, addDays } from "@/lib/planning/dates";
+import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO } from "@/lib/planning/dates";
 
-const DAY_LABELS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const STATUS_BADGE: Record<string, string> = {
   planned: "badge-neutral",
   in_progress: "badge-gold",
@@ -17,18 +16,52 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Terminée",
 };
 
+type ViewMode = "day" | "week" | "month";
+
+function windowFor(view: ViewMode, anchor: string): { start: string; end: string; prevAnchor: string; nextAnchor: string; label: string } {
+  if (view === "day") {
+    return {
+      start: anchor,
+      end: addDays(anchor, 1),
+      prevAnchor: addDays(anchor, -1),
+      nextAnchor: addDays(anchor, 1),
+      label: new Date(`${anchor}T00:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", timeZone: "UTC" }),
+    };
+  }
+  if (view === "month") {
+    const monthStr = anchor.slice(0, 7);
+    const start = firstOfMonth(monthStr);
+    return {
+      start,
+      end: firstOfMonth(addMonths(monthStr, 1)),
+      prevAnchor: `${addMonths(monthStr, -1)}-01`,
+      nextAnchor: `${addMonths(monthStr, 1)}-01`,
+      label: new Date(`${start}T00:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }),
+    };
+  }
+  const start = toISODate(mondayOf(new Date(`${anchor}T00:00:00Z`)));
+  return {
+    start,
+    end: addDays(start, 7),
+    prevAnchor: addDays(anchor, -7),
+    nextAnchor: addDays(anchor, 7),
+    label: `Semaine du ${start.split("-").reverse().join("/")}`,
+  };
+}
+
 /**
  * Read-only, own-tours-only counterpart to the manager-facing
  * /planning grid — a chauffeur has no reason to see other drivers'
- * assignments or drag anything around, just "what am I doing this
- * week". RLS (planning_entries: read within org,
- * driver_id = current_app_user_id()) already scopes this correctly
- * for any role, so no new policy is needed.
+ * assignments or drag anything around, just "what am I doing". RLS
+ * (planning_entries: read within org, driver_id =
+ * current_app_user_id()) already scopes this correctly for any role,
+ * so no new policy is needed. Day/week/month are the same read with a
+ * different window, not three different queries.
  */
 export default async function MyPlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ view?: string; anchor?: string; week?: string }>;
 }) {
   const params = await searchParams;
   const appUser = await requireAppUser();
@@ -44,46 +77,60 @@ export default async function MyPlanningPage({
     );
   }
 
-  const weekStart = toISODate(mondayOf(params.week && !Number.isNaN(Date.parse(params.week)) ? new Date(params.week) : new Date()));
-  const weekEnd = addDays(weekStart, 7);
-  const prevWeek = addDays(weekStart, -7);
-  const nextWeek = addDays(weekStart, 7);
+  const view: ViewMode = params.view === "day" || params.view === "month" ? params.view : "week";
+  // `week` is the old param name (still linked to from elsewhere); `anchor` is the new one.
+  const anchorInput = params.anchor ?? params.week;
+  const anchor = anchorInput && !Number.isNaN(Date.parse(anchorInput)) ? toISODate(new Date(anchorInput)) : todayISO();
+  const { start, end, prevAnchor, nextAnchor, label } = windowFor(view, anchor);
 
   const { data: entries } = await supabase
     .from("planning_entries")
     .select("id, tour_number, start_at, end_at, status, vehicles(registration), services(name)")
     .eq("driver_id", appUser.id)
-    .gte("start_at", `${weekStart}T00:00:00`)
-    .lt("start_at", `${weekEnd}T00:00:00`)
+    .gte("start_at", `${start}T00:00:00`)
+    .lt("start_at", `${end}T00:00:00`)
     .order("start_at");
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const dayCount = Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000);
+  const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i));
 
   return (
     <div>
-      <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées, semaine par semaine." />
+      <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées." />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {(["day", "week", "month"] as const).map((v) => (
+          <Link
+            key={v}
+            href={`/planning/mine?view=${v}&anchor=${anchor}`}
+            className={v === view ? "btn-primary !px-3 !py-1.5 text-sm" : "btn-secondary !px-3 !py-1.5 text-sm"}
+          >
+            {v === "day" ? "Jour" : v === "week" ? "Semaine" : "Mois"}
+          </Link>
+        ))}
+      </div>
 
       <div className="mb-4 flex items-center gap-3">
-        <Link href={`/planning/mine?week=${prevWeek}`} className="btn-secondary !px-3 !py-1.5 text-sm">
-          ← Semaine préc.
+        <Link href={`/planning/mine?view=${view}&anchor=${prevAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+          ← Préc.
         </Link>
-        <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
-        <Link href={`/planning/mine?week=${nextWeek}`} className="btn-secondary !px-3 !py-1.5 text-sm">
-          Semaine suiv. →
+        <span className="text-sm capitalize text-navy/60">{label}</span>
+        <Link href={`/planning/mine?view=${view}&anchor=${nextAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+          Suiv. →
         </Link>
       </div>
 
       {(entries ?? []).length === 0 ? (
-        <EmptyState title="Aucune tournée cette semaine" description="Rien ne vous est encore assigné pour cette période." />
+        <EmptyState title="Aucune tournée sur cette période" description="Rien ne vous est encore assigné." />
       ) : (
         <div className="flex flex-col gap-4">
-          {days.map((dayISO, i) => {
+          {days.map((dayISO) => {
             const dayEntries = (entries ?? []).filter((e: any) => e.start_at.slice(0, 10) === dayISO);
             if (dayEntries.length === 0) return null;
             return (
               <div key={dayISO}>
                 <p className="mb-2 text-sm font-medium capitalize text-navy/60">
-                  {DAY_LABELS[i]} {dayISO.split("-").reverse().join("/")}
+                  {new Date(`${dayISO}T00:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}
                 </p>
                 <div className="flex flex-col gap-2">
                   {dayEntries.map((entry: any) => (

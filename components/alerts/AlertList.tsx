@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
+import type { UserRole } from "@/lib/types/domain";
 
 interface Alert {
   id: string;
@@ -24,9 +25,18 @@ const SEVERITY_BADGE: Record<Alert["severity"], string> = {
   critical: "badge-orange",
 };
 
-export function AlertList({ alerts }: { alerts: Alert[] }) {
+/**
+ * Resolve/acknowledge are decisions, not something a plain chauffeur
+ * should be doing — a driver only reads their own alerts (a new
+ * message, a planning change). Managers act on what concerns their
+ * service, direction/comptable act on anything org-wide; RLS already
+ * scopes which alerts each of them even sees, this just hides the
+ * action buttons for the one role that shouldn't get them at all.
+ */
+export function AlertList({ alerts, viewerRole }: { alerts: Alert[]; viewerRole: UserRole }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const canAct = viewerRole !== "chauffeur";
 
   async function updateStatus(id: string, status: "acknowledged" | "resolved") {
     setBusyId(id);
@@ -66,7 +76,7 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
               </Link>
             )}
           </div>
-          {alert.status === "open" && (
+          {alert.status === "open" && canAct && (
             <div className="flex shrink-0 gap-2">
               <button
                 className="btn-secondary !px-3 !py-1.5 text-xs"

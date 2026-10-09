@@ -191,7 +191,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
 
         <div>
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
         </div>
       </div>
     </div>
