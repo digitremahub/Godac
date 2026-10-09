@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
 
 export interface TourHistoryRow {
   id: string;
@@ -14,6 +15,8 @@ export interface TourHistoryRow {
   scheduleLabel: string;
   startKm: number | null;
   endKm: number | null;
+  startPhotoPath: string | null;
+  endPhotoPath: string | null;
   returnLabel: string;
   returnDeltaLabel: string | null;
   statusLabel: string;
@@ -143,9 +146,13 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                         </button>
                       </div>
                     ) : (
-                      <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(r)} aria-label="Modifier les km" title="Modifier les km">
-                        ✎
-                      </button>
+                      <div className="flex flex-col items-start gap-1">
+                        <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(r)} aria-label="Modifier les km" title="Modifier les km">
+                          ✎ Km
+                        </button>
+                        {!r.startPhotoPath && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}
+                        {!r.endPhotoPath && <AttachReportPhotoButton planningEntryId={r.id} stage="end" />}
+                      </div>
                     )}
                   </td>
                 )}

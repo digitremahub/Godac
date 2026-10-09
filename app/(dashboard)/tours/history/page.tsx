@@ -20,6 +20,8 @@ interface HistoryRow {
   status: string;
   start_km: number | null;
   end_km: number | null;
+  start_photo_path: string | null;
+  end_photo_path: string | null;
   return_type: "depot" | "domicile" | null;
   services: { name: string } | null;
   vehicles: { registration: string } | null;
@@ -83,7 +85,7 @@ export default async function TourHistoryPage({
   let query = supabase
     .from("planning_entries")
     .select(
-      "id, tour_number, start_at, end_at, status, start_km, end_km, return_type, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name, address_lat, address_lng)",
+      "id, tour_number, start_at, end_at, status, start_km, end_km, start_photo_path, end_photo_path, return_type, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name, address_lat, address_lng)",
     )
     .in("status", ["in_progress", "done"])
     .gte("start_at", `${from}T00:00:00`)
@@ -220,6 +222,8 @@ export default async function TourHistoryPage({
                 (r.end_at ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : " → en cours"),
               startKm: r.start_km,
               endKm: r.end_km,
+              startPhotoPath: r.start_photo_path,
+              endPhotoPath: r.end_photo_path,
               returnLabel: r.return_type ? (RETURN_TYPE_LABEL[r.return_type] ?? "—") : "—",
               returnDeltaLabel:
                 r.return_type === "domicile" ? (returnDelta !== null ? `(≈${returnDelta} km vs dépôt)` : "(adresse manquante)") : null,
