@@ -15,7 +15,7 @@ export default async function OrganizationSettingsPage() {
     supabase
       .from("organizations")
       .select(
-        "name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address",
+        "name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address",
       )
       .eq("id", appUser.organization_id)
       .single(),
@@ -39,6 +39,8 @@ export default async function OrganizationSettingsPage() {
         emergencyPhone={organization?.emergency_phone ?? null}
         consumptionAnomalyThresholdPercent={organization?.consumption_anomaly_threshold_percent ?? 20}
         depotAddress={organization?.depot_address ?? null}
+        siret={organization?.siret ?? null}
+        legalAddress={organization?.legal_address ?? null}
       />
       <ServicesPanel services={services ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />

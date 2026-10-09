@@ -1,27 +1,34 @@
 import "server-only";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer, Font } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 
-Font.register({
-  family: "Helvetica",
-  fonts: [{ src: "Helvetica" }],
-});
-
+// "Helvetica" is one of the 14 standard PDF base fonts react-pdf
+// already ships with — no Font.register() needed (and registering it
+// with `src: "Helvetica"` is actually wrong: react-pdf then tries to
+// fetch/load a font file at that "path", which fails and crashes PDF
+// generation before any response is ever sent).
 const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 10, fontFamily: "Helvetica" },
-  title: { fontSize: 14, fontWeight: 700, marginBottom: 4 },
-  subtitle: { fontSize: 9, color: "#555", marginBottom: 16 },
-  row: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  box: { width: "48%" },
-  label: { fontSize: 8, color: "#888", marginBottom: 2 },
-  value: { fontSize: 10, marginBottom: 6 },
-  hr: { borderBottomWidth: 1, borderBottomColor: "#ccc", marginVertical: 10 },
-  lineRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
-  lineLabel: { fontSize: 10 },
-  lineValue: { fontSize: 10, textAlign: "right" },
-  netRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, backgroundColor: "#eef7f5" },
-  netLabel: { fontSize: 11, fontWeight: 700 },
-  netValue: { fontSize: 11, fontWeight: 700, textAlign: "right" },
-  disclaimer: { marginTop: 24, fontSize: 7.5, color: "#888", lineHeight: 1.4 },
+  page: { padding: 28, fontSize: 9, fontFamily: "Helvetica" },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  employerBox: { width: "48%", borderWidth: 1, borderColor: "#999", padding: 8 },
+  employerName: { fontSize: 10, fontWeight: 700, marginBottom: 2 },
+  employerLine: { fontSize: 8, color: "#333", marginBottom: 1 },
+  titleBox: { width: "48%", alignItems: "flex-end" },
+  title: { fontSize: 20, fontWeight: 700, letterSpacing: 1 },
+  periodLine: { fontSize: 8.5, marginTop: 6, color: "#333" },
+  employeeBox: { borderWidth: 1, borderColor: "#999", padding: 8, marginBottom: 14, width: "55%", marginLeft: "auto" },
+  employeeName: { fontSize: 10, fontWeight: 700, marginBottom: 2 },
+  employeeLine: { fontSize: 8.5, color: "#333", marginBottom: 1 },
+  table: { borderWidth: 1, borderColor: "#999" },
+  tableHeaderRow: { flexDirection: "row", backgroundColor: "#e8e8e8", borderBottomWidth: 1, borderBottomColor: "#999" },
+  tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#ddd" },
+  cellDesignation: { flex: 3, padding: 4, fontSize: 9 },
+  cellValue: { flex: 1, padding: 4, fontSize: 9, textAlign: "right" },
+  headerCell: { padding: 4, fontSize: 8, fontWeight: 700 },
+  netRow: { flexDirection: "row", marginTop: 12, justifyContent: "flex-end" },
+  netBox: { borderWidth: 1.5, borderColor: "#0A0F1E", padding: 8, width: 180, alignItems: "center" },
+  netLabel: { fontSize: 9, fontWeight: 700, marginBottom: 2 },
+  netValue: { fontSize: 15, fontWeight: 700 },
+  disclaimer: { marginTop: 28, fontSize: 7.5, color: "#888", lineHeight: 1.4 },
 });
 
 function formatEuro(n: number): string {
@@ -30,8 +37,11 @@ function formatEuro(n: number): string {
 
 export interface PayslipPdfData {
   organizationName: string;
+  organizationAddress: string | null;
+  organizationSiret: string | null;
   employeeName: string;
   employeeRoleTitle: string | null;
+  employeeAddress: string | null;
   periodLabel: string;
   periodStartLabel: string;
   periodEndLabel: string;
@@ -44,47 +54,58 @@ function PayslipDocument({ data }: { data: PayslipPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.title}>{data.organizationName}</Text>
-        <Text style={styles.subtitle}>Bulletin de paie — {data.periodLabel}</Text>
-
-        <View style={styles.row}>
-          <View style={styles.box}>
-            <Text style={styles.label}>Employeur</Text>
-            <Text style={styles.value}>{data.organizationName}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.employerBox}>
+            <Text style={styles.employerName}>{data.organizationName}</Text>
+            {data.organizationAddress && <Text style={styles.employerLine}>{data.organizationAddress}</Text>}
+            {data.organizationSiret && <Text style={styles.employerLine}>SIRET {data.organizationSiret}</Text>}
           </View>
-          <View style={styles.box}>
-            <Text style={styles.label}>Salarié</Text>
-            <Text style={styles.value}>{data.employeeName}</Text>
-            {data.employeeRoleTitle && <Text style={styles.value}>{data.employeeRoleTitle}</Text>}
+          <View style={styles.titleBox}>
+            <Text style={styles.title}>BULLETIN DE PAIE</Text>
+            <Text style={styles.periodLine}>
+              Période du {data.periodStartLabel} au {data.periodEndLabel}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.label}>Période</Text>
-        <Text style={styles.value}>
-          Du {data.periodStartLabel} au {data.periodEndLabel}
-        </Text>
-
-        <View style={styles.hr} />
-
-        <View style={styles.lineRow}>
-          <Text style={styles.lineLabel}>Salaire mensuel brut</Text>
-          <Text style={styles.lineValue}>{formatEuro(data.grossSalary)}</Text>
+        <View style={styles.employeeBox}>
+          <Text style={styles.employeeName}>{data.employeeName}</Text>
+          {data.employeeRoleTitle && <Text style={styles.employeeLine}>{data.employeeRoleTitle}</Text>}
+          {data.employeeAddress && <Text style={styles.employeeLine}>{data.employeeAddress}</Text>}
         </View>
-        <View style={styles.lineRow}>
-          <Text style={styles.lineLabel}>Cotisations sociales (estimation)</Text>
-          <Text style={styles.lineValue}>- {formatEuro(estimatedContributions)}</Text>
+
+        <View style={styles.table}>
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.headerCell, { flex: 3 }]}>Désignation</Text>
+            <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Gain</Text>
+            <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Retenue</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.cellDesignation}>Salaire mensuel brut</Text>
+            <Text style={styles.cellValue}>{formatEuro(data.grossSalary)}</Text>
+            <Text style={styles.cellValue}></Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.cellDesignation}>Cotisations sociales (estimation globale)</Text>
+            <Text style={styles.cellValue}></Text>
+            <Text style={styles.cellValue}>{formatEuro(estimatedContributions)}</Text>
+          </View>
         </View>
+
         <View style={styles.netRow}>
-          <Text style={styles.netLabel}>Net à payer</Text>
-          <Text style={styles.netValue}>{formatEuro(data.netSalary)}</Text>
+          <View style={styles.netBox}>
+            <Text style={styles.netLabel}>NET À PAYER</Text>
+            <Text style={styles.netValue}>{formatEuro(data.netSalary)}</Text>
+          </View>
         </View>
 
         <Text style={styles.disclaimer}>
           Document indicatif généré automatiquement à partir des données contractuelles enregistrées dans GODAC
-          (salaire brut/net saisis par la direction). Il ne détaille pas les cotisations ligne par ligne, n&apos;intègre
-          pas le prélèvement à la source personnalisé, et ne constitue ni un bulletin de paie officiel au sens de
-          l&apos;article R3243-1 du code du travail, ni une déclaration sociale nominative (DSN). À faire valider par
-          votre expert-comptable ou votre logiciel de paie avant toute remise officielle au salarié.
+          (salaire brut/net saisis par la direction). Il ne détaille pas les cotisations ligne par ligne (URSSAF,
+          retraite, prévoyance...), n&apos;intègre pas le prélèvement à la source personnalisé, et ne constitue ni un
+          bulletin de paie officiel au sens de l&apos;article R3243-1 du code du travail, ni une déclaration sociale
+          nominative (DSN). À faire valider par votre expert-comptable ou votre logiciel de paie avant toute remise
+          officielle au salarié.
         </Text>
       </Page>
     </Document>

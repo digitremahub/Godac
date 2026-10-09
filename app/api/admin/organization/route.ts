@@ -17,6 +17,8 @@ const bodySchema = z.object({
   emergency_phone: z.string().trim().min(1).nullable().optional(),
   consumption_anomaly_threshold_percent: z.coerce.number().int().min(1).max(200).optional(),
   depot_address: z.string().trim().min(1).nullable().optional(),
+  siret: z.string().trim().min(1).nullable().optional(),
+  legal_address: z.string().trim().min(1).nullable().optional(),
 });
 
 /** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
@@ -35,6 +37,8 @@ export async function PATCH(req: Request) {
     emergency_phone,
     consumption_anomaly_threshold_percent,
     depot_address,
+    siret,
+    legal_address,
   } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
@@ -53,6 +57,8 @@ export async function PATCH(req: Request) {
     profileFields.depot_lat = geocoded?.lat ?? null;
     profileFields.depot_lng = geocoded?.lng ?? null;
   }
+  if (siret !== undefined) profileFields.siret = siret;
+  if (legal_address !== undefined) profileFields.legal_address = legal_address;
 
   if (Object.keys(profileFields).length > 0) {
     const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
@@ -74,7 +80,7 @@ export async function PATCH(req: Request) {
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address",
+      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address",
     )
     .eq("id", appUser.organization_id)
     .single();

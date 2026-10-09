@@ -43,12 +43,12 @@ export async function POST(req: Request) {
   const [{ data: employee }, { data: contract }, { data: organization }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role_title")
+      .select("id, full_name, role_title, address")
       .eq("id", parsed.data.user_id)
       .eq("organization_id", appUser.organization_id)
       .single(),
     supabase.from("user_contracts").select("monthly_gross_salary, monthly_net_salary").eq("user_id", parsed.data.user_id).maybeSingle(),
-    supabase.from("organizations").select("name").eq("id", appUser.organization_id).single(),
+    supabase.from("organizations").select("name, siret, legal_address").eq("id", appUser.organization_id).single(),
   ]);
 
   if (!employee) return NextResponse.json({ error: "Employé introuvable." }, { status: 404 });
@@ -57,16 +57,25 @@ export async function POST(req: Request) {
   }
 
   const periodStart = new Date(parsed.data.period_start);
-  const pdfBytes = await generatePayslipPdf({
-    organizationName: organization?.name ?? "Organisation",
-    employeeName: employee.full_name,
-    employeeRoleTitle: employee.role_title,
-    periodLabel: MONTH_LABEL.format(periodStart),
-    periodStartLabel: DAY_LABEL.format(new Date(parsed.data.period_start)),
-    periodEndLabel: DAY_LABEL.format(new Date(parsed.data.period_end)),
-    grossSalary: Number(contract.monthly_gross_salary),
-    netSalary: Number(contract.monthly_net_salary),
-  });
+  let pdfBytes: Buffer;
+  try {
+    pdfBytes = await generatePayslipPdf({
+      organizationName: organization?.name ?? "Organisation",
+      organizationAddress: organization?.legal_address ?? null,
+      organizationSiret: organization?.siret ?? null,
+      employeeName: employee.full_name,
+      employeeRoleTitle: employee.role_title,
+      employeeAddress: employee.address ?? null,
+      periodLabel: MONTH_LABEL.format(periodStart),
+      periodStartLabel: DAY_LABEL.format(new Date(parsed.data.period_start)),
+      periodEndLabel: DAY_LABEL.format(new Date(parsed.data.period_end)),
+      grossSalary: Number(contract.monthly_gross_salary),
+      netSalary: Number(contract.monthly_net_salary),
+    });
+  } catch (e) {
+    console.error("payslips/generate: PDF rendering failed", e);
+    return NextResponse.json({ error: "Échec de la génération du PDF." }, { status: 500 });
+  }
 
   const filePath = `${appUser.organization_id}/${parsed.data.user_id}/${randomUUID()}.pdf`;
   const { error: uploadError } = await supabase.storage.from("payslips").upload(filePath, pdfBytes, { contentType: "application/pdf" });

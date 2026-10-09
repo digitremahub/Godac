@@ -18,6 +18,8 @@ export function OrganizationSettingsForm({
   emergencyPhone,
   consumptionAnomalyThresholdPercent,
   depotAddress,
+  siret,
+  legalAddress,
 }: {
   organizationId: string;
   name: string;
@@ -28,6 +30,8 @@ export function OrganizationSettingsForm({
   emergencyPhone: string | null;
   consumptionAnomalyThresholdPercent: number;
   depotAddress: string | null;
+  siret: string | null;
+  legalAddress: string | null;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -38,6 +42,8 @@ export function OrganizationSettingsForm({
   const [emergencyPhoneValue, setEmergencyPhoneValue] = useState(emergencyPhone ?? "");
   const [consumptionThreshold, setConsumptionThreshold] = useState(String(consumptionAnomalyThresholdPercent));
   const [depotAddressValue, setDepotAddressValue] = useState(depotAddress ?? "");
+  const [siretValue, setSiretValue] = useState(siret ?? "");
+  const [legalAddressValue, setLegalAddressValue] = useState(legalAddress ?? "");
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +90,8 @@ export function OrganizationSettingsForm({
           emergency_phone: emergencyPhoneValue.trim() || null,
           consumption_anomaly_threshold_percent: Number(consumptionThreshold) || 20,
           depot_address: depotAddressValue.trim() || null,
+          siret: siretValue.trim() || null,
+          legal_address: legalAddressValue.trim() || null,
         }),
       });
       const json = await res.json();
@@ -212,6 +220,25 @@ export function OrganizationSettingsForm({
         <p className="mt-1 text-sm text-navy/50">
           Sert à estimer la distance d&apos;un retour direct à domicile par rapport au retour habituel au dépôt
           (rentabilité carburant).
+        </p>
+      </div>
+
+      <div>
+        <label className="label">SIRET</label>
+        <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} />
+        <p className="mt-1 text-sm text-navy/50">Affiché sur les fiches de paie générées, s&apos;il est renseigné.</p>
+      </div>
+
+      <div>
+        <label className="label">Adresse légale (siège social)</label>
+        <input
+          className="input"
+          placeholder="ex: 60 rue Laennec, 93700 Drancy"
+          value={legalAddressValue}
+          onChange={(e) => setLegalAddressValue(e.target.value)}
+        />
+        <p className="mt-1 text-sm text-navy/50">
+          Affichée sur les fiches de paie — distincte de l&apos;adresse du dépôt ci-dessus si votre siège social est ailleurs.
         </p>
       </div>
 
