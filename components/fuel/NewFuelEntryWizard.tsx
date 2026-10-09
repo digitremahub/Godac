@@ -26,6 +26,7 @@ export function NewFuelEntryWizard({
   ocrEnabled,
   initialVehicleId,
   initialTankId,
+  assignedVehicleId,
   selfDriverId,
   selfDriverName,
 }: {
@@ -34,11 +35,14 @@ export function NewFuelEntryWizard({
   ocrEnabled: boolean;
   initialVehicleId?: string;
   initialTankId?: string;
+  /** This driver's own assigned vehicle (vehicles.assigned_driver_id) — pre-selected and shown locked, with a "changer de véhicule" escape hatch, instead of yet another dropdown to fill in every time. */
+  assignedVehicleId?: string;
   selfDriverId: string;
   selfDriverName: string;
 }) {
   const router = useRouter();
-  const [vehicleId, setVehicleId] = useState(initialVehicleId ?? "");
+  const [vehicleId, setVehicleId] = useState(initialVehicleId ?? assignedVehicleId ?? "");
+  const [vehicleLocked, setVehicleLocked] = useState(Boolean(assignedVehicleId) && !initialVehicleId);
   const [tankId, setTankId] = useState(initialTankId ?? "");
   const [driverId, setDriverId] = useState(selfDriverId);
   const [driverLabel, setDriverLabel] = useState(selfDriverName);
@@ -56,7 +60,14 @@ export function NewFuelEntryWizard({
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
           <p className="label">Véhicule</p>
-          {scanTarget === "vehicle" ? (
+          {vehicleLocked ? (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-navy/70">✅ {vehicle?.registration} ({vehicle?.type})</span>
+              <button className="btn-secondary shrink-0" onClick={() => setVehicleLocked(false)}>
+                Changer de véhicule
+              </button>
+            </div>
+          ) : scanTarget === "vehicle" ? (
             <QrScanner
               expected="vehicle"
               label="Scannez le QR code du véhicule"

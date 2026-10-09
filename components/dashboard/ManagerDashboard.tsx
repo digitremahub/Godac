@@ -178,7 +178,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
       {openAlerts.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
         </div>
       )}
     </div>

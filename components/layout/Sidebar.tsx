@@ -55,9 +55,9 @@ const SECTIONS: NavSection[] = [
     label: "Exploitation",
     items: [
       { href: "/fuel", label: "Carburant", icon: IconDroplet, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
-      { href: "/fuel/new", label: "Nouveau ravitaillement", icon: IconPlusCircle, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"] },
+      { href: "/fuel/new", label: "Nouveau ravitaillement", icon: IconPlusCircle, allow: ["manager", "manager_chauffeur", "direction"] },
       { href: "/ocr-review", label: "Revue OCR", icon: IconCamera, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "ocr" },
-      { href: "/tanks", label: "Cuves", icon: IconCylinder, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
+      { href: "/tanks", label: "Cuves", icon: IconCylinder, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/tanks/deliveries", label: "Approvisionnements", icon: IconUpload, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
       { href: "/my-vehicle", label: "Mon véhicule", icon: IconTruck, allow: ["chauffeur", "manager_chauffeur"] },
