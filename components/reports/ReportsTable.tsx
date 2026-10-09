@@ -3,12 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
 
 export interface ReportRow {
   id: string;
   tour_number: string;
   start_at: string;
   end_at: string | null;
+  start_photo_path: string | null;
+  end_photo_path: string | null;
   report_bl_number: string | null;
   report_stops_total: number | null;
   report_packages_count: number | null;
@@ -149,7 +152,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
   return (
     <Card className="overflow-x-auto">
       {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
-      <table className="w-full min-w-[1340px] text-sm">
+      <table className="w-full min-w-[1420px] text-sm">
         <thead className="text-left text-navy/40">
           <tr>
             <th className="pb-2">Date</th>
@@ -174,6 +177,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
             <th className="pb-2">Ramassés</th>
             <th className="pb-2">Ramenés dépôt</th>
             <th className="pb-2">En relais</th>
+            {canEdit && <th className="pb-2">Photo</th>}
             {canEdit && <th className="pb-2" />}
           </tr>
         </thead>
@@ -205,6 +209,14 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
               <td className="py-2">{cell(r, "report_packages_picked_up", r.report_packages_picked_up?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_packages_returned", r.report_packages_returned?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_packages_relay", r.report_packages_relay?.toString() ?? "—")}</td>
+              {canEdit && (
+                <td className="py-2">
+                  <div className="flex flex-col gap-1">
+                    {!r.start_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}
+                    {!r.end_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="end" />}
+                  </div>
+                </td>
+              )}
               {canEdit && (
                 <td className="py-2">
                   {editingId === r.id ? (
