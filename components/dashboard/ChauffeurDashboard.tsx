@@ -1,0 +1,179 @@
+import Link from "next/link";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
+import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { AlertList } from "@/components/alerts/AlertList";
+import { ClockButton } from "@/components/time-clock/ClockButton";
+import type { AppUser } from "@/lib/auth/session";
+
+/**
+ * The driver's own day at a glance: start/end the tour (the one action
+ * that matters most, so it sits first and large), then the week ahead,
+ * the latest fuel entries, and anything needing their attention —
+ * never the fleet-wide numbers a manager cares about.
+ */
+export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
+  const supabase = await createServerSupabaseClient();
+  const planningEnabled = enabledModules.includes("planning");
+  const timeClockEnabled = enabledModules.includes("time_clock");
+  const maintenanceEnabled = enabledModules.includes("maintenance_requests");
+
+  const now = new Date().toISOString();
+
+  const [openTourRes, upcomingRes, recentEntriesRes, openClockRes, myMaintenanceRes, openAlertsRes, openAlertsCountRes] = await Promise.all([
+    supabase
+      .from("planning_entries")
+      .select("id, tour_number, start_at, vehicles(registration)")
+      .eq("driver_id", appUser.id)
+      .eq("status", "in_progress")
+      .maybeSingle(),
+    planningEnabled
+      ? supabase
+          .from("planning_entries")
+          .select("id, tour_number, start_at, vehicles(registration)")
+          .eq("driver_id", appUser.id)
+          .eq("status", "planned")
+          .gte("start_at", now)
+          .order("start_at", { ascending: true })
+          .limit(4)
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("fuel_entries")
+      .select("id, occurred_at, liters, unit_price, status, vehicles(registration)")
+      .eq("driver_id", appUser.id)
+      .order("occurred_at", { ascending: false })
+      .limit(5),
+    timeClockEnabled
+      ? supabase.from("time_clock_entries").select("id").eq("user_id", appUser.id).is("clocked_out_at", null).maybeSingle()
+      : Promise.resolve({ data: null }),
+    maintenanceEnabled
+      ? supabase
+          .from("vehicle_interventions")
+          .select("id", { count: "exact", head: true })
+          .eq("requested_by", appUser.id)
+          .not("status", "in", "(done,cancelled)")
+      : Promise.resolve({ count: null }),
+    supabase
+      .from("alerts")
+      .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
+  ]);
+
+  const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
+  const upcoming = (upcomingRes.data ?? []) as any as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null }[];
+  const recentEntries = (recentEntriesRes.data ?? []) as any[];
+  const openAlerts = (openAlertsRes.data ?? []) as any[];
+
+  return (
+    <div>
+      <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre journée en un coup d'œil." />
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+          {openTour ? (
+            <>
+              <p className="mb-1 text-sm text-navy/60">
+                Tournée n°{openTour.tour_number} en cours
+                {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
+              </p>
+              <p className="mb-3 text-xs text-navy/40">
+                Départ à {new Date(openTour.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+              <Link href="/tours/end" className="btn-primary block w-full text-center">
+                🏁 Terminer la tournée
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-navy/60">Aucune tournée en cours</p>
+              <Link href="/tours/start" className="btn-primary block w-full text-center">
+                🚚 Démarrer une tournée
+              </Link>
+            </>
+          )}
+          {planningEnabled && (
+            <Link href="/planning/mine" className="mt-1 block text-xs text-teal-ink hover:underline">
+              Voir mon planning →
+            </Link>
+          )}
+        </Card>
+
+        <div className="flex flex-col gap-4">
+          <QrCodeBadge type="driver" id={appUser.id} title={appUser.full_name} subtitle="Mon badge chauffeur — à présenter à la pompe" />
+          {timeClockEnabled && <ClockButton clockedIn={Boolean(openClockRes.data)} />}
+        </div>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
+        {maintenanceEnabled && (
+          <Link href="/maintenance" className="block">
+            <StatTile label="Mes demandes d'entretien en cours" value={String(myMaintenanceRes.count ?? 0)} accent="gold" />
+          </Link>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {planningEnabled && (
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg">Mon planning cette semaine</h2>
+              <Link href="/planning/mine" className="text-sm text-teal-ink hover:underline">
+                Voir tout
+              </Link>
+            </div>
+            {upcoming.length === 0 ? (
+              <p className="text-sm text-navy/40">Aucune tournée planifiée à venir.</p>
+            ) : (
+              <ul className="flex flex-col gap-2 text-sm">
+                {upcoming.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                    <span>
+                      n°{t.tour_number} {t.vehicles ? `— ${t.vehicles.registration}` : ""}
+                    </span>
+                    <span className="text-xs text-navy/40">
+                      {new Date(t.start_at).toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg">Mes derniers ravitaillements</h2>
+            <Link href="/fuel" className="text-sm text-teal-ink hover:underline">
+              Voir tout
+            </Link>
+          </div>
+          {recentEntries.length === 0 ? (
+            <EmptyState title="Aucun ravitaillement enregistré" />
+          ) : (
+            <ul className="flex flex-col gap-2 text-sm">
+              {recentEntries.map((e) => (
+                <li key={e.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                  <span>
+                    {e.vehicles?.registration ?? "—"} · {e.liters ? `${e.liters} L` : "—"}
+                  </span>
+                  <span className="text-xs text-navy/40">{new Date(e.occurred_at).toLocaleDateString("fr-FR")}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {openAlerts.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-lg">Notifications</h2>
+          <AlertList alerts={openAlerts} />
+        </div>
+      )}
+    </div>
+  );
+}
