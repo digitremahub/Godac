@@ -8,6 +8,20 @@ const nextConfig = {
   // for the one route that needs it at runtime (Vercel).
   outputFileTracingIncludes: {
     "/api/assistant/message": ["./content/help/**"],
+    // @react-pdf/renderer's PDF generation goes through pdfkit, which
+    // requires its standard-font data files (js/standard-fonts/*,
+    // js/data/*.afm) at runtime from a dynamically-built path Next's
+    // static file tracing can't follow. outputFileTracingIncludes
+    // can't rescue this either — tested directly: even a single,
+    // non-glob node_modules path given here is silently dropped from
+    // the trace, unlike a project-root path (see content/help above).
+    // The actual fix is lib/payslips/generate-pdf.tsx and
+    // lib/ticpe/generate-pdf.tsx registering their own embedded font
+    // from assets/fonts/ instead of ever touching pdfkit's standard
+    // fonts — this entry just makes sure that font file is traced.
+    "/api/payslips/generate": ["./assets/fonts/**"],
+    "/api/ticpe/export": ["./assets/fonts/**"],
+    "/api/ticpe/export-lines/[id]": ["./assets/fonts/**"],
   },
   images: {
     remotePatterns: [
