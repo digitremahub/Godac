@@ -13,7 +13,20 @@ import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@r
 // embedded font from a project-root path (traced the same way
 // content/help/*.md already is, see next.config.mjs) sidesteps pdfkit's
 // standard-font loading entirely.
-Font.register({ family: "NotoSans", src: path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf") });
+// Only one weight is actually vendored — registered for both 400 and
+// 700 (same file) so a style requesting fontWeight: 700 still resolves
+// to "NotoSans" instead of react-pdf falling back to pdfkit's broken
+// standard-font loading for the unmatched weight (the second, more
+// subtle cause of the same "Cannot find module .../Helvetica.cjs"
+// crash, confirmed in production after the first fix alone).
+const notoSansPath = path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf");
+Font.register({
+  family: "NotoSans",
+  fonts: [
+    { src: notoSansPath, fontWeight: 400 },
+    { src: notoSansPath, fontWeight: 700 },
+  ],
+});
 
 const styles = StyleSheet.create({
   page: { padding: 28, fontSize: 9, fontFamily: "NotoSans" },

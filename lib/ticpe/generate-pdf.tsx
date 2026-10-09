@@ -4,8 +4,18 @@ import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@r
 
 // See lib/payslips/generate-pdf.tsx's comment: pdfkit's own standard
 // fonts can't be traced into the Vercel serverless bundle, so this
-// registers an embedded font from the project root instead.
-Font.register({ family: "NotoSans", src: path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf") });
+// registers an embedded font from the project root instead — under
+// both 400 and 700 (same file, only one weight is vendored) so a
+// fontWeight: 700 style doesn't fall back to pdfkit's broken standard
+// fonts for the unmatched weight.
+const notoSansPath = path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf");
+Font.register({
+  family: "NotoSans",
+  fonts: [
+    { src: notoSansPath, fontWeight: 400 },
+    { src: notoSansPath, fontWeight: 700 },
+  ],
+});
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 9, fontFamily: "NotoSans" },
