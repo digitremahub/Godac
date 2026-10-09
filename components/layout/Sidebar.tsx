@@ -26,6 +26,8 @@ import {
   IconQrCode,
   IconLifeBuoy,
   IconCoins,
+  IconChatBubble,
+  IconChartBar,
 } from "@/components/layout/icons";
 import { textSafeVariant } from "@/lib/theme/contrast";
 
@@ -76,6 +78,9 @@ const SECTIONS: NavSection[] = [
       { href: "/leaves", label: "Congés & Absences", icon: IconCalendar, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "leave_management" },
       { href: "/leaves/planning", label: "Planning congés", icon: IconCalendar, allow: ["direction"], moduleKey: "leave_management" },
       { href: "/intranet", label: "Intranet & Convocations", icon: IconMegaphone, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "intranet" },
+      { href: "/messenger", label: "Messenger", icon: IconChatBubble, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "messenger" },
+      { href: "/time-clock", label: "Pointeuse", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "time_clock" },
+      { href: "/payslips", label: "Fiches de paie", icon: IconCoins, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "payslips" },
       { href: "/driver-signups", label: "Chauffeurs à valider", icon: IconUsers, allow: ["manager", "manager_chauffeur", "direction"] },
     ],
   },
@@ -88,6 +93,7 @@ const SECTIONS: NavSection[] = [
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
       { href: "/fines", label: "Amendes", icon: IconFileText, allow: ["direction"], moduleKey: "fines" },
       { href: "/support", label: "Demandes d'assistance", icon: IconLifeBuoy, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "assistant" },
+      { href: "/reporting", label: "Reporting BI", icon: IconChartBar, allow: ["direction"], moduleKey: "bi_reporting" },
     ],
   },
   {

@@ -261,3 +261,11 @@ export function IconCoins(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconChatBubble(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4.5 4V16H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
+    </Svg>
+  );
+}
