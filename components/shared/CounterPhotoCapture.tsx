@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { networkErrorMessage } from "@/lib/utils/network-error";
 
 /**
  * Photographs a bare digit counter (tank/pump totalizer, vehicle
@@ -58,7 +59,7 @@ export function CounterPhotoCapture({
       onCaptured({ photoPath: storagePath, reading });
     } catch (e) {
       setStatus("error");
-      setError(e instanceof Error ? e.message : "Erreur inattendue");
+      setError(networkErrorMessage(e));
     }
   }
 
