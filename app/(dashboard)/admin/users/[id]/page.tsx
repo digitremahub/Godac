@@ -13,12 +13,33 @@ import { EmployeeDocumentsPanel, type EmployeeDocument } from "@/components/admi
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { computeHourlyRates } from "@/lib/business/payroll";
 
+const LEAVE_STATUS_LABELS: Record<string, string> = { pending: "En attente", approved: "Approuvé", rejected: "Refusé" };
+const STATUS_LABELS: Record<string, string> = { titulaire: "Titulaire", formation: "Formation", remplacement: "Remplacement" };
+const HR_STATUS_LABELS: Record<string, string> = { active: "Actif", on_leave: "En congé", suspended: "Suspendu", terminated: "Sorti des effectifs" };
+const CONTRACT_TYPE_LABELS: Record<string, string> = { cdi: "CDI", cdd: "CDD", interim: "Intérim", apprentissage: "Apprentissage" };
+const TOUR_STATUS_LABELS: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
+
 /**
- * A driver's "fiche" — profile info plus their vehicle-usage history
- * (fuel_entries: the only table with a real per-day driver↔vehicle
- * record, since planning_entries exists in the schema but nothing
- * writes to it yet). manager-like/comptable/direction can open anyone's;
- * everyone else can only open their own.
+ * A driver's "fiche" — visibility of each section depends on both the
+ * viewer's role AND whether the org has bought the module behind it
+ * (a client can own employee_files without hr_status, or buy neither):
+ *
+ *  - chauffeur (soi-même) : identité + son propre historique tournées/carburant.
+ *  - manager/manager_chauffeur (quelqu'un d'autre) : identité, congés et
+ *    historiques tournées/carburant — RLS les scope déjà à leur(s)
+ *    service(s), pas besoin de refiltrer ici. Jamais la rémunération,
+ *    les coordonnées ou le dossier RH.
+ *  - comptable : rémunération + dossier RH en lecture seule (contrat/
+ *    dates, jamais les documents ni les notes RH "usage interne
+ *    direction"). Jamais l'historique véhicule — hors de son périmètre.
+ *  - direction : tout, en édition.
+ *
+ * "Historique des véhicules utilisés" vient de deux sources
+ * complémentaires : planning_entries (qui a réellement pris quel
+ * véhicule, et quand — alimenté par StartTourFlow/EndTourFlow) et
+ * fuel_entries (le détail des pleins). La première est la trace
+ * fiable, la seconde ne couvre que les chauffeurs qui font eux-mêmes
+ * le plein.
  */
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,10 +50,25 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   }
 
   const supabase = await createServerSupabaseClient();
+  const isSelf = id === appUser.id;
   const isDirection = appUser.role === "direction";
-  const employeeFilesEnabled = isDirection && (await isModuleEnabled(supabase, appUser.organization_id, "employee_files"));
+  const isComptable = appUser.role === "comptable";
+  const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur"]) && !isSelf;
+  const canSeeOperational = isDirection || isManagerLike || isSelf;
+  const canSeePayrollAndHr = isDirection || isComptable;
 
-  const [{ data: user }, { data: fuelHistory }, { data: orgServices }, { data: contract }, { data: employeeFile }, { data: hrStatus }, { data: recentLeaves }] =
+  const [employeeFilesEnabled, hrStatusEnabled, leaveManagementEnabled, planningEnabled, fuelTrackingEnabled] = await Promise.all([
+    canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "employee_files") : Promise.resolve(false),
+    canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "hr_status") : Promise.resolve(false),
+    isDirection || isManagerLike ? isModuleEnabled(supabase, appUser.organization_id, "leave_management") : Promise.resolve(false),
+    canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "planning") : Promise.resolve(false),
+    canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "fuel_tracking") : Promise.resolve(false),
+  ]);
+  const showLeaves = (isDirection || isManagerLike) && leaveManagementEnabled;
+  const showTourHistory = canSeeOperational && planningEnabled;
+  const showFuelHistory = canSeeOperational && fuelTrackingEnabled;
+
+  const [{ data: user }, { data: tourHistory }, { data: fuelHistory }, { data: orgServices }, { data: contract }, { data: employeeFile }, { data: hrStatus }, { data: recentLeaves }] =
     await Promise.all([
       supabase
         .from("users")
@@ -41,14 +77,24 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         )
         .eq("id", id)
         .single(),
-      supabase
-        .from("fuel_entries")
-        .select("id, occurred_at, liters, total_amount, status, gap_flagged, vehicles(registration)")
-        .eq("driver_id", id)
-        .order("occurred_at", { ascending: false })
-        .limit(15),
+      showTourHistory
+        ? supabase
+            .from("planning_entries")
+            .select("id, tour_number, start_at, status, vehicles(registration)")
+            .eq("driver_id", id)
+            .order("start_at", { ascending: false })
+            .limit(15)
+        : Promise.resolve({ data: null }),
+      showFuelHistory
+        ? supabase
+            .from("fuel_entries")
+            .select("id, occurred_at, liters, total_amount, status, gap_flagged, vehicles(registration)")
+            .eq("driver_id", id)
+            .order("occurred_at", { ascending: false })
+            .limit(15)
+        : Promise.resolve({ data: null }),
       isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
-      isDirection
+      canSeePayrollAndHr
         ? supabase.from("user_contracts").select("monthly_gross_salary, monthly_net_salary, contractual_monthly_hours").eq("user_id", id).maybeSingle()
         : Promise.resolve({ data: null }),
       employeeFilesEnabled
@@ -58,8 +104,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             .eq("user_id", id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
-      employeeFilesEnabled ? supabase.rpc("compute_hr_status", { p_user_id: id }) : Promise.resolve({ data: null }),
-      isDirection
+      hrStatusEnabled ? supabase.rpc("compute_hr_status", { p_user_id: id }) : Promise.resolve({ data: null }),
+      showLeaves
         ? supabase.from("leave_requests").select("start_date, end_date, status").eq("driver_id", id).order("start_date", { ascending: false }).limit(5)
         : Promise.resolve({ data: null }),
     ]);
@@ -68,7 +114,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const u = user as any;
 
   let employeeDocuments: EmployeeDocument[] = [];
-  if (employeeFilesEnabled && employeeFile?.id) {
+  if (isDirection && employeeFilesEnabled && employeeFile?.id) {
     const { data: docs } = await supabase
       .from("employee_documents")
       .select("id, doc_type, uploaded_at, file_path")
@@ -90,8 +136,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       })
     : null;
 
-  const LEAVE_STATUS_LABELS: Record<string, string> = { pending: "En attente", approved: "Approuvé", rejected: "Refusé" };
-  const STATUS_LABELS: Record<string, string> = { titulaire: "Titulaire", formation: "Formation", remplacement: "Remplacement" };
   const serviceNames = (u.user_services ?? [])
     .filter((us: any) => us.services?.name)
     .map((us: any) => `${us.services.name} (${STATUS_LABELS[us.status] ?? us.status})`)
@@ -99,7 +143,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const serviceAssignments = (u.user_services ?? []).map((us: any) => ({ service_id: us.service_id, status: us.status }));
 
   const isFieldRole = u.role === "chauffeur" || u.role === "manager_chauffeur";
-  const canConvene = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) && id !== appUser.id;
+  const canConvene = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) && !isSelf;
 
   return (
     <div>
@@ -128,7 +172,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </Card>
       </div>
 
-      {isFieldRole && (
+      {isFieldRole && (isDirection || isManagerLike || isSelf) && (
         <div className="mb-6 flex justify-center">
           <QrCodeBadge
             type="driver"
@@ -143,123 +187,181 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       )}
 
       {isDirection && (
-        <div className="mb-6 flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Card className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Coordonnées</p>
-              <div>
-                <p className="text-xs text-navy/40">Téléphone</p>
-                <p className="text-sm">{u.phone ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-navy/40">Adresse</p>
-                <p className="text-sm">{u.address ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-navy/40">Email de contact</p>
-                <p className="text-sm">{u.contact_email ?? "—"}</p>
-              </div>
-            </Card>
+        <Card className="mb-6 flex flex-col gap-2">
+          <p className="text-sm font-medium">Coordonnées</p>
+          <div>
+            <p className="text-xs text-navy/40">Téléphone</p>
+            <p className="text-sm">{u.phone ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-navy/40">Adresse</p>
+            <p className="text-sm">{u.address ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-navy/40">Email de contact</p>
+            <p className="text-sm">{u.contact_email ?? "—"}</p>
+          </div>
+        </Card>
+      )}
 
-            <Card className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Rémunération</p>
+      {canSeePayrollAndHr && (
+        <div className="mb-6 flex flex-col gap-4">
+          <Card className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Rémunération</p>
+              {isDirection && (
                 <Link href="/payroll" className="text-xs text-teal-ink hover:underline">
                   Modifier →
                 </Link>
-              </div>
-              <div>
-                <p className="text-xs text-navy/40">Salaire mensuel brut / net</p>
-                <p className="text-sm">
-                  {contract?.monthly_gross_salary !== null && contract?.monthly_gross_salary !== undefined
-                    ? `${Number(contract.monthly_gross_salary).toLocaleString("fr-FR")} €`
-                    : "—"}
-                  {" / "}
-                  {contract?.monthly_net_salary !== null && contract?.monthly_net_salary !== undefined
-                    ? `${Number(contract.monthly_net_salary).toLocaleString("fr-FR")} €`
-                    : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-navy/40">Heures contractuelles mensuelles</p>
-                <p className="text-sm">{contract ? Number(contract.contractual_monthly_hours) : "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-navy/40">Taux horaire brut / net</p>
-                <p className="text-sm">
-                  {hourlyRates?.grossPerHour !== null && hourlyRates?.grossPerHour !== undefined
-                    ? `${hourlyRates.grossPerHour.toFixed(2)} €`
-                    : "—"}
-                  {" / "}
-                  {hourlyRates?.netPerHour !== null && hourlyRates?.netPerHour !== undefined
-                    ? `${hourlyRates.netPerHour.toFixed(2)} €`
-                    : "—"}
-                </p>
-              </div>
-            </Card>
-          </div>
-
-          <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />
-
-          {employeeFilesEnabled && (
-            <>
-              {hrStatus && (
-                <p className="text-sm">
-                  Statut RH actuel :{" "}
-                  <span className={hrStatus === "active" ? "badge-teal" : hrStatus === "on_leave" ? "badge-gold" : "badge-orange"}>
-                    {{ active: "Actif", on_leave: "En congé", suspended: "Suspendu", terminated: "Sorti des effectifs" }[hrStatus as string] ??
-                      hrStatus}
-                  </span>
-                </p>
               )}
-              <EmployeeFileForm
-                userId={u.id}
-                initialContractType={employeeFile?.contract_type ?? null}
-                initialHireDate={employeeFile?.hire_date ?? null}
-                initialContractEndDate={employeeFile?.contract_end_date ?? null}
-                initialHrStatus={(employeeFile?.hr_status as "active" | "suspended" | "terminated" | undefined) ?? "active"}
-                initialNotes={employeeFile?.notes ?? null}
-              />
-              <EmployeeDocumentsPanel userId={u.id} documents={employeeDocuments} />
-            </>
+            </div>
+            <div>
+              <p className="text-xs text-navy/40">Salaire mensuel brut / net</p>
+              <p className="text-sm">
+                {contract?.monthly_gross_salary !== null && contract?.monthly_gross_salary !== undefined
+                  ? `${Number(contract.monthly_gross_salary).toLocaleString("fr-FR")} €`
+                  : "—"}
+                {" / "}
+                {contract?.monthly_net_salary !== null && contract?.monthly_net_salary !== undefined
+                  ? `${Number(contract.monthly_net_salary).toLocaleString("fr-FR")} €`
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-navy/40">Heures contractuelles mensuelles</p>
+              <p className="text-sm">{contract ? Number(contract.contractual_monthly_hours) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-navy/40">Taux horaire brut / net</p>
+              <p className="text-sm">
+                {hourlyRates?.grossPerHour !== null && hourlyRates?.grossPerHour !== undefined
+                  ? `${hourlyRates.grossPerHour.toFixed(2)} €`
+                  : "—"}
+                {" / "}
+                {hourlyRates?.netPerHour !== null && hourlyRates?.netPerHour !== undefined
+                  ? `${hourlyRates.netPerHour.toFixed(2)} €`
+                  : "—"}
+              </p>
+            </div>
+          </Card>
+
+          {hrStatusEnabled && hrStatus && (
+            <p className="text-sm">
+              Statut RH actuel :{" "}
+              <span className={hrStatus === "active" ? "badge-teal" : hrStatus === "on_leave" ? "badge-gold" : "badge-orange"}>
+                {HR_STATUS_LABELS[hrStatus as string] ?? (hrStatus as string)}
+              </span>
+            </p>
           )}
 
-          <Card className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Congés récents</p>
-              <Link href="/leaves" className="text-xs text-teal-ink hover:underline">
-                Voir tout →
-              </Link>
-            </div>
-            {(recentLeaves ?? []).length === 0 ? (
-              <p className="text-xs text-navy/40">Aucune demande de congé.</p>
+          {employeeFilesEnabled &&
+            (isDirection ? (
+              <>
+                <EmployeeFileForm
+                  userId={u.id}
+                  initialContractType={employeeFile?.contract_type ?? null}
+                  initialHireDate={employeeFile?.hire_date ?? null}
+                  initialContractEndDate={employeeFile?.contract_end_date ?? null}
+                  initialHrStatus={(employeeFile?.hr_status as "active" | "suspended" | "terminated" | undefined) ?? "active"}
+                  initialNotes={employeeFile?.notes ?? null}
+                />
+                <EmployeeDocumentsPanel userId={u.id} documents={employeeDocuments} />
+              </>
             ) : (
-              <ul className="flex flex-col gap-1">
-                {(recentLeaves ?? []).map((lr: any, i: number) => (
-                  <li key={i} className="flex items-center justify-between text-sm">
-                    <span>
-                      {new Date(lr.start_date).toLocaleDateString("fr-FR")} → {new Date(lr.end_date).toLocaleDateString("fr-FR")}
-                    </span>
-                    <span className="text-xs text-navy/40">{LEAVE_STATUS_LABELS[lr.status] ?? lr.status}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+              <Card className="flex flex-col gap-2">
+                <p className="text-sm font-medium">Dossier RH</p>
+                <div>
+                  <p className="text-xs text-navy/40">Type de contrat</p>
+                  <p className="text-sm">
+                    {employeeFile?.contract_type ? CONTRACT_TYPE_LABELS[employeeFile.contract_type] ?? employeeFile.contract_type : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-navy/40">Date d&apos;embauche</p>
+                  <p className="text-sm">{employeeFile?.hire_date ? new Date(employeeFile.hire_date).toLocaleDateString("fr-FR") : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-navy/40">Fin de contrat</p>
+                  <p className="text-sm">
+                    {employeeFile?.contract_end_date ? new Date(employeeFile.contract_end_date).toLocaleDateString("fr-FR") : "—"}
+                  </p>
+                </div>
+              </Card>
+            ))}
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-base">Historique des véhicules utilisés</h3>
-        <Link href={`/fuel?driver=${id}`} className="text-sm text-teal-ink hover:underline">
-          Voir tout l&apos;historique →
-        </Link>
-      </div>
-      <FuelHistoryTable
-        entries={(fuelHistory ?? []) as any}
-        showDriver={false}
-        emptyDescription="Aucun ravitaillement enregistré pour ce chauffeur."
-      />
+      {isDirection && <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />}
+
+      {showLeaves && (
+        <Card className="mb-6 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Congés récents</p>
+            <Link href="/leaves" className="text-xs text-teal-ink hover:underline">
+              Voir tout →
+            </Link>
+          </div>
+          {(recentLeaves ?? []).length === 0 ? (
+            <p className="text-xs text-navy/40">Aucune demande de congé.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {(recentLeaves ?? []).map((lr: any, i: number) => (
+                <li key={i} className="flex items-center justify-between text-sm">
+                  <span>
+                    {new Date(lr.start_date).toLocaleDateString("fr-FR")} → {new Date(lr.end_date).toLocaleDateString("fr-FR")}
+                  </span>
+                  <span className="text-xs text-navy/40">{LEAVE_STATUS_LABELS[lr.status] ?? lr.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      {showTourHistory && (
+        <div className="mb-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-base">Historique des tournées</h3>
+            <Link href={`/tours/history?driver=${id}`} className="text-sm text-teal-ink hover:underline">
+              Voir tout →
+            </Link>
+          </div>
+          {(tourHistory ?? []).length === 0 ? (
+            <Card>
+              <p className="text-xs text-navy/40">Aucune tournée enregistrée pour ce chauffeur.</p>
+            </Card>
+          ) : (
+            <Card className="flex flex-col gap-1.5">
+              {(tourHistory ?? []).map((t: any) => (
+                <div key={t.id} className="flex items-center justify-between text-sm">
+                  <span>
+                    {new Date(t.start_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} — n°
+                    {t.tour_number}
+                    {t.vehicles ? ` (${t.vehicles.registration})` : ""}
+                  </span>
+                  <span className="text-xs text-navy/40">{TOUR_STATUS_LABELS[t.status] ?? t.status}</span>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+      )}
+
+      {showFuelHistory && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-base">Historique des ravitaillements</h3>
+            <Link href={`/fuel?driver=${id}`} className="text-sm text-teal-ink hover:underline">
+              Voir tout l&apos;historique →
+            </Link>
+          </div>
+          <FuelHistoryTable
+            entries={(fuelHistory ?? []) as any}
+            showDriver={false}
+            emptyDescription="Aucun ravitaillement enregistré pour ce chauffeur."
+          />
+        </div>
+      )}
     </div>
   );
 }
