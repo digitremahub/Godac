@@ -5,10 +5,13 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
-const bodySchema = z.object({
-  recipient_id: z.string().uuid(),
-  body: z.string().trim().min(1).max(4000),
-});
+const bodySchema = z
+  .object({
+    recipient_id: z.string().uuid(),
+    body: z.string().trim().max(4000).optional(),
+    photo_path: z.string().optional(),
+  })
+  .refine((data) => Boolean(data.body) || Boolean(data.photo_path), { message: "Message vide." });
 
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
@@ -40,13 +43,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Destinataire introuvable." }, { status: 404 });
   }
 
+  // Storage RLS already confines the upload to this folder, but a
+  // garbage path here would still get stored as a dangling reference.
+  if (parsed.data.photo_path && !parsed.data.photo_path.startsWith(`${appUser.organization_id}/${appUser.id}/`)) {
+    return NextResponse.json({ error: "Chemin de photo invalide." }, { status: 400 });
+  }
+
   const { data: message, error } = await supabase
     .from("messages")
     .insert({
       organization_id: appUser.organization_id,
       sender_id: appUser.id,
       recipient_id: parsed.data.recipient_id,
-      body: parsed.data.body,
+      body: parsed.data.body ?? null,
+      photo_path: parsed.data.photo_path ?? null,
     })
     .select("id")
     .single();
@@ -62,7 +72,11 @@ export async function POST(req: Request) {
   // security-definer triggers and service-role crons write to it (see
   // app/api/planning/validate/route.ts for the same constraint) — the
   // admin client is required here, not the sender's own RLS-scoped one.
-  const truncatedBody = parsed.data.body.length > 120 ? `${parsed.data.body.slice(0, 117)}...` : parsed.data.body;
+  const truncatedBody = !parsed.data.body
+    ? "📷 Photo"
+    : parsed.data.body.length > 120
+      ? `${parsed.data.body.slice(0, 117)}...`
+      : parsed.data.body;
   const admin = createAdminSupabaseClient();
   const { error: alertError } = await admin.from("alerts").insert({
     organization_id: appUser.organization_id,

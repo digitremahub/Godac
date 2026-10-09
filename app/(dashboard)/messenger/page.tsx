@@ -40,11 +40,19 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
   const { data: messages } = contactId
     ? await supabase
         .from("messages")
-        .select("id, sender_id, recipient_id, body, created_at")
+        .select("id, sender_id, recipient_id, body, photo_path, created_at")
         .or(`and(sender_id.eq.${appUser.id},recipient_id.eq.${contactId}),and(sender_id.eq.${contactId},recipient_id.eq.${appUser.id})`)
         .order("created_at", { ascending: true })
         .limit(200)
     : { data: null };
+
+  const messagesWithPhotos = await Promise.all(
+    ((messages ?? []) as any[]).map(async (m) => {
+      if (!m.photo_path) return { ...m, photoUrl: null };
+      const { data } = await supabase.storage.from("messenger-photos").createSignedUrl(m.photo_path, 600);
+      return { ...m, photoUrl: data?.signedUrl ?? null };
+    }),
+  );
 
   const contact = (colleagues ?? []).find((c) => c.id === contactId);
 
@@ -74,17 +82,22 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
           ) : (
             <>
               <Card className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
-                {(messages ?? []).length === 0 ? (
+                {messagesWithPhotos.length === 0 ? (
                   <p className="text-xs text-navy/40">Aucun message échangé pour l&apos;instant.</p>
                 ) : (
-                  (messages ?? []).map((m: any) => (
+                  messagesWithPhotos.map((m) => (
                     <div key={m.id} className={`flex ${m.sender_id === appUser.id ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[75%] rounded-xl px-3 py-1.5 text-sm ${
                           m.sender_id === appUser.id ? "bg-teal/15" : "bg-navy/5"
                         }`}
                       >
-                        <p>{m.body}</p>
+                        {m.photoUrl && (
+                          <a href={m.photoUrl} target="_blank" rel="noreferrer">
+                            <img src={m.photoUrl} alt="Photo envoyée" className="mb-1 max-h-64 max-w-full rounded-lg object-contain" />
+                          </a>
+                        )}
+                        {m.body && <p>{m.body}</p>}
                         <p className="mt-0.5 text-right text-[10px] text-navy/35">
                           {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                         </p>
@@ -93,7 +106,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
                   ))
                 )}
               </Card>
-              <MessageForm recipientId={contact.id} />
+              <MessageForm recipientId={contact.id} senderId={appUser.id} organizationId={appUser.organization_id} />
             </>
           )}
         </div>
