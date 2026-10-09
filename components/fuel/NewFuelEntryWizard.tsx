@@ -166,7 +166,7 @@ export function NewFuelEntryWizard({
           📷 Photographier le ticket (OCR)
         </button>
         <button className="btn-secondary" onClick={() => setPhase("manual")}>
-          ✏️ Saisie manuelle
+          ⛽ Plein cuve (totaliseur)
         </button>
       </div>
     );
