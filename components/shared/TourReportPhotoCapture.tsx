@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { networkErrorMessage } from "@/lib/utils/network-error";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
 
 /**
@@ -64,7 +65,7 @@ export function TourReportPhotoCapture({
       onCaptured({ photoPath: storagePath, fields });
     } catch (e) {
       setStatus("error");
-      setError(e instanceof Error ? e.message : "Erreur inattendue");
+      setError(networkErrorMessage(e));
     }
   }
 
