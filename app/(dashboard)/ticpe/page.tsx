@@ -17,7 +17,7 @@ export default async function TicpePage() {
   const [{ data: exports }, { data: eligibleVehicles }] = await Promise.all([
     supabase
       .from("ticpe_exports")
-      .select("id, period_start, period_end, vehicle_count, total_liters, created_at")
+      .select("id, period_start, period_end, vehicle_count, total_liters, created_at, pdf_file_path")
       .order("created_at", { ascending: false }),
     supabase.from("vehicles").select("id, registration, type, spec_sources").in("type", ["PL", "SPL"]),
   ]);
@@ -82,9 +82,19 @@ export default async function TicpePage() {
                   <td className="py-2">{exp.vehicle_count}</td>
                   <td className="py-2">{Number(exp.total_liters).toLocaleString("fr-FR")} L</td>
                   <td className="py-2">
-                    <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">
-                      Télécharger
-                    </a>
+                    <div className="flex gap-3">
+                      <Link href={`/ticpe/${exp.id}`} className="text-teal-ink hover:underline">
+                        Vérifier
+                      </Link>
+                      <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">
+                        Excel
+                      </a>
+                      {exp.pdf_file_path && (
+                        <a href={`/api/ticpe/exports/${exp.id}/download-pdf`} className="text-teal-ink hover:underline">
+                          PDF
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
