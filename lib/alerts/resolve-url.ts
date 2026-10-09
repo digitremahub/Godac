@@ -22,11 +22,18 @@ const RESOLVE_URL: Record<string, string> = {
 // planning view itself, not /tours/history (every other
 // planning_entries alert — assignment, conflict, swap — is correctly
 // served by tour history, so this can't just change the table map).
-const RESOLVE_URL_BY_TYPE: Record<string, string> = {
+// A plain string is a fixed destination; a function gets `related_id`
+// (messages.sender_id for new_message) to deep-link to the right row —
+// no other alert type has needed a per-row link yet.
+const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) => string)> = {
   planning_validated: "/planning/mine",
+  new_message: (relatedId) => (relatedId ? `/messenger?with=${relatedId}` : "/messenger"),
 };
 
-export function resolveAlertUrl(relatedTable: string | null, type?: string | null): string | null {
-  if (type && RESOLVE_URL_BY_TYPE[type]) return RESOLVE_URL_BY_TYPE[type];
+export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null): string | null {
+  if (type && RESOLVE_URL_BY_TYPE[type]) {
+    const entry = RESOLVE_URL_BY_TYPE[type];
+    return typeof entry === "function" ? entry(relatedId ?? null) : entry;
+  }
   return relatedTable ? (RESOLVE_URL[relatedTable] ?? null) : null;
 }

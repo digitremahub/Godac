@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     recipient_roles: UserRole[];
     recipient_user_id: string | null;
     related_table: string | null;
+    related_id: string | null;
   };
 
   const supabase = createAdminSupabaseClient();
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     sendPushToSubscriptions(supabase, subscriptions ?? [], {
       title: subject,
       body: alert.message,
-      url: resolveAlertUrl(alert.related_table, alert.type) ?? "/alerts",
+      url: resolveAlertUrl(alert.related_table, alert.type, alert.related_id) ?? "/alerts",
     }),
   ]);
 

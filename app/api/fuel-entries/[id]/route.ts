@@ -8,6 +8,7 @@ const patchSchema = z.object({
   totalizer_after: z.coerce.number().optional(),
   totalizer_before_photo_path: z.string().optional(),
   totalizer_after_photo_path: z.string().optional(),
+  vehicle_km: z.coerce.number().nonnegative().optional(),
   liters: z.coerce.number().positive().optional(),
   unit_price: z.coerce.number().nonnegative().optional(),
   occurred_at: z.string().datetime().optional(),

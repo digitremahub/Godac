@@ -181,8 +181,9 @@ export function NewFuelEntryWizard({
           totalizer_after: Number(values.totalizer_after),
           totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
           totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
-          liters: Number(values.liters),
-          unit_price: Number(values.unit_price),
+          vehicle_km: values.vehicle_km ? Number(values.vehicle_km) : undefined,
+          liters: values.liters ? Number(values.liters) : undefined,
+          unit_price: values.unit_price ? Number(values.unit_price) : undefined,
           station_name: values.station_name || undefined,
         }),
       });
@@ -212,6 +213,7 @@ export function NewFuelEntryWizard({
           totalizer_after: Number(values.totalizer_after),
           totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
           totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
+          vehicle_km: values.vehicle_km ? Number(values.vehicle_km) : undefined,
           liters: Number(values.liters),
           unit_price: Number(values.unit_price),
           station_name: values.station_name || undefined,
@@ -245,6 +247,7 @@ export function NewFuelEntryWizard({
           submitLabel="Enregistrer"
           busy={busy}
           totalizerOcrEnabled={ocrEnabled}
+          showPriceFields
           onSubmit={(values) => submitOcrConfirmation(values, true)}
         />
       );
@@ -261,6 +264,7 @@ export function NewFuelEntryWizard({
         submitLabel="Valider et enregistrer"
         busy={busy}
         totalizerOcrEnabled={ocrEnabled}
+        showPriceFields
         onSubmit={(values) => submitOcrConfirmation(values)}
       />
     );

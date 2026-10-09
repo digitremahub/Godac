@@ -6,13 +6,14 @@ import { TankPhotoCapture } from "@/components/tanks/TankPhotoCapture";
 import { TankEditPanel } from "@/components/tanks/TankEditPanel";
 import { AddTankForm } from "@/components/tanks/AddTankForm";
 import { TankDeliveryForm } from "@/components/tanks/TankDeliveryForm";
+import { TankPhotosTable } from "@/components/tanks/TankPhotosTable";
 
 export default async function TanksPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
-  const [{ data: tanks }, { data: services }] = await Promise.all([
+  const [{ data: tanks }, { data: services }, { data: photos }] = await Promise.all([
     supabase
       .from("tanks")
       .select(
@@ -20,7 +21,28 @@ export default async function TanksPage() {
       )
       .order("name"),
     supabase.from("services").select("id, name").order("name"),
+    supabase
+      .from("tank_photos")
+      .select("id, totalizer_reading, note, status, created_at, photo_path, tanks(name), users!tank_photos_submitted_by_fkey(full_name)")
+      .order("created_at", { ascending: false }),
   ]);
+
+  const photoRows = (photos ?? []) as any[];
+  const photosWithUrls = await Promise.all(
+    photoRows.map(async (p) => {
+      const { data } = await supabase.storage.from("tank-photos").createSignedUrl(p.photo_path, 600);
+      return {
+        id: p.id,
+        tankName: p.tanks?.name ?? "—",
+        submittedByName: p.users?.full_name ?? "—",
+        totalizerReading: p.totalizer_reading,
+        note: p.note,
+        status: p.status,
+        createdAt: p.created_at,
+        photoUrl: data?.signedUrl ?? null,
+      };
+    }),
+  );
 
   return (
     <div>
@@ -104,6 +126,9 @@ export default async function TanksPage() {
         zéro) reste indépendant et demeure la donnée fiable utilisée pour la
         détection d&apos;écarts.
       </Card>
+
+      <h3 className="mb-2 mt-6 text-base">Photos de cuves</h3>
+      <TankPhotosTable photos={photosWithUrls} canReview={canManage} />
     </div>
   );
 }

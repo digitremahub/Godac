@@ -57,8 +57,11 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
               {!alert.notified_at && <span className="badge-neutral">Email non envoyé</span>}
             </div>
             <p className="text-sm">{alert.message}</p>
-            {resolveAlertUrl(alert.related_table, alert.type) && (
-              <Link href={resolveAlertUrl(alert.related_table, alert.type)!} className="mt-1 inline-block text-xs text-teal-ink underline">
+            {resolveAlertUrl(alert.related_table, alert.type, alert.related_id) && (
+              <Link
+                href={resolveAlertUrl(alert.related_table, alert.type, alert.related_id)!}
+                className="mt-1 inline-block text-xs text-teal-ink underline"
+              >
                 Voir →
               </Link>
             )}
