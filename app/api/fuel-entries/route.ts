@@ -24,7 +24,7 @@ const bodySchema = z.object({
 
 /**
  * Module 2: 100% manual fuel entry — the degraded mode when OCR is
- * off, or the driver picks "Saisie manuelle" outright. The dominant
+ * off, or the driver picks "Plein cuve (totaliseur)" outright. The dominant
  * real case here is a fill-up from the company's own cuve: the driver
  * has no ticket and no idea what the fuel costs, only the totalizer
  * before/after and which vehicle. So when litres/prix aren't given:
