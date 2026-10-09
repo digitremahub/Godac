@@ -139,7 +139,7 @@ async function TableView({
   let query = supabase
     .from("planning_entries")
     .select(
-      "id, tour_number, start_at, end_at, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_stops_delivered, report_packages_missing, report_pickups, report_packages_picked_up, report_packages_returned, report_packages_relay, report_departure_time, report_return_time, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
+      "id, tour_number, start_at, end_at, start_photo_path, end_photo_path, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_stops_delivered, report_packages_missing, report_pickups, report_packages_picked_up, report_packages_returned, report_packages_relay, report_departure_time, report_return_time, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
     )
     .or(REPORT_FIELDS_FILTER)
     .gte("start_at", `${from}T00:00:00`)
