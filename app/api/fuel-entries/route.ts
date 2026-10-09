@@ -14,6 +14,7 @@ const bodySchema = z.object({
   totalizer_before_photo_path: z.string().optional(),
   totalizer_after_photo_path: z.string().optional(),
   vehicle_km: z.coerce.number().nonnegative().optional(),
+  vehicle_km_photo_path: z.string().optional(),
   // Both optional: a cuve fill-up has neither on hand (see below), a
   // station purchase typed by hand still has both (no ticket photo,
   // but a real receipt in the driver's other hand).
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
       totalizer_before_photo_path: parsed.data.totalizer_before_photo_path,
       totalizer_after_photo_path: parsed.data.totalizer_after_photo_path,
       vehicle_km: parsed.data.vehicle_km ?? null,
+      vehicle_km_photo_path: parsed.data.vehicle_km_photo_path,
       liters,
       unit_price: unitPrice,
       station_name: parsed.data.station_name,
