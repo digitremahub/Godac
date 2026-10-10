@@ -1,0 +1,19 @@
+diff --git a/node_modules/pdfkit/js/pdfkit.node.mjs b/node_modules/pdfkit/js/pdfkit.node.mjs
+index e852d25..ecc69da 100644
+--- a/node_modules/pdfkit/js/pdfkit.node.mjs
++++ b/node_modules/pdfkit/js/pdfkit.node.mjs
+@@ -7261,10 +7261,10 @@ registerStdFontLoaders({
+   'Courier-Bold': () => require$1('#standard-fonts/CourierBold'),
+   'Courier-BoldOblique': () => require$1('#standard-fonts/CourierBoldOblique'),
+   'Courier-Oblique': () => require$1('#standard-fonts/CourierOblique'),
+-  Helvetica: () => require$1('#standard-fonts/Helvetica'),
+-  'Helvetica-Bold': () => require$1('#standard-fonts/HelveticaBold'),
+-  'Helvetica-BoldOblique': () => require$1('#standard-fonts/HelveticaBoldOblique'),
+-  'Helvetica-Oblique': () => require$1('#standard-fonts/HelveticaOblique'),
++  Helvetica: () => JSON.parse(readFileSync(new URL('../../../assets/pdfkit-standard-fonts/Helvetica.json', import.meta.url), 'utf8')),
++  'Helvetica-Bold': () => JSON.parse(readFileSync(new URL('../../../assets/pdfkit-standard-fonts/HelveticaBold.json', import.meta.url), 'utf8')),
++  'Helvetica-BoldOblique': () => JSON.parse(readFileSync(new URL('../../../assets/pdfkit-standard-fonts/HelveticaBoldOblique.json', import.meta.url), 'utf8')),
++  'Helvetica-Oblique': () => JSON.parse(readFileSync(new URL('../../../assets/pdfkit-standard-fonts/HelveticaOblique.json', import.meta.url), 'utf8')),
+   Symbol: () => require$1('#standard-fonts/Symbol'),
+   'Times-Bold': () => require$1('#standard-fonts/TimesBold'),
+   'Times-BoldItalic': () => require$1('#standard-fonts/TimesBoldItalic'),
