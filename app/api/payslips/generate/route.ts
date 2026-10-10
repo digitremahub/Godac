@@ -10,6 +10,8 @@ const bodySchema = z.object({
   user_id: z.string().uuid(),
   period_start: z.string().date(),
   period_end: z.string().date(),
+  meal_vouchers_amount: z.coerce.number().nonnegative().optional(),
+  bonus_amount: z.coerce.number().nonnegative().optional(),
 });
 
 const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
@@ -56,6 +58,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Salaire brut/net non renseigné pour cet employé (voir /payroll)." }, { status: 422 });
   }
 
+  const mealVouchersAmount = parsed.data.meal_vouchers_amount ?? 0;
+  const bonusAmount = parsed.data.bonus_amount ?? 0;
+
   const periodStart = new Date(parsed.data.period_start);
   let pdfBytes: Buffer;
   try {
@@ -71,6 +76,8 @@ export async function POST(req: Request) {
       periodEndLabel: DAY_LABEL.format(new Date(parsed.data.period_end)),
       grossSalary: Number(contract.monthly_gross_salary),
       netSalary: Number(contract.monthly_net_salary),
+      mealVouchersAmount: mealVouchersAmount || null,
+      bonusAmount: bonusAmount || null,
     });
   } catch (e) {
     console.error("payslips/generate: PDF rendering failed", e);
@@ -86,13 +93,26 @@ export async function POST(req: Request) {
     user_id: parsed.data.user_id,
     period_start: parsed.data.period_start,
     period_end: parsed.data.period_end,
-    gross_amount: contract.monthly_gross_salary,
-    net_amount: contract.monthly_net_salary,
+    gross_amount: Number(contract.monthly_gross_salary) + bonusAmount,
+    net_amount: Number(contract.monthly_net_salary) + bonusAmount + mealVouchersAmount,
+    meal_vouchers_amount: mealVouchersAmount,
+    bonus_amount: bonusAmount,
     file_path: filePath,
     status: "generated",
     generated_by: appUser.id,
   });
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) {
+    // The generated PDF is now orphaned in storage (not wasted — the
+    // unique (user_id, period_start, period_end) constraint firing
+    // here means direction/une génération groupée a déjà traité ce
+    // chauffeur pour cette période entre temps) but there's no row to
+    // delete it from; good enough compared to blocking on a cleanup
+    // that itself could fail.
+    if (insertError.code === "23505") {
+      return NextResponse.json({ error: "Une fiche de paie existe déjà pour ce chauffeur sur cette période." }, { status: 409 });
+    }
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

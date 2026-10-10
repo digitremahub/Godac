@@ -5,7 +5,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { PayrollTable } from "@/components/payroll/PayrollTable";
 import { PayrollFilters } from "@/components/payroll/PayrollFilters";
-import { firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
+import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
 import { computeHourlyRates } from "@/lib/business/payroll";
 
 interface DoneTour {
@@ -47,9 +47,15 @@ export default async function PayrollPage({
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonth();
   const monthStart = firstOfMonth(month);
   const monthEnd = firstOfMonth(addMonths(month, 1));
+  // Last calendar day of `month` — matches exactly what
+  // GeneratePayslipForm/payroll's own "générer" button already sends
+  // as period_end (firstAndLastOfMonth), so a payslip row for this
+  // month is found by period_start/period_end alone, not a range scan.
+  const periodEnd = addDays(monthEnd, -1);
   const selectedDriver = params.driver ?? "";
+  const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
 
-  const [{ data: drivers }, { data: contracts }, { data: toursData }] = await Promise.all([
+  const [{ data: drivers }, { data: contracts }, { data: toursData }, { data: existingPayslips }] = await Promise.all([
     supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
     // Separate table (not a column on `users`, whose RLS lets any org
     // member read any row) — see 20260101000077.
@@ -66,7 +72,12 @@ export default async function PayrollPage({
       if (selectedDriver) query = query.eq("driver_id", selectedDriver);
       return query;
     })(),
+    payslipsEnabled
+      ? supabase.from("payslips").select("user_id").eq("period_start", monthStart).eq("period_end", periodEnd)
+      : Promise.resolve({ data: null }),
   ]);
+
+  const generatedDriverIds = (existingPayslips ?? []).map((p) => p.user_id);
 
   const hoursByDriver = new Map<string, { hours: number; tours: number }>();
   for (const t of (toursData ?? []) as DoneTour[]) {
@@ -100,6 +111,7 @@ export default async function PayrollPage({
         hourly_rates: rates,
         tours_count: worked.tours,
         worked_hours: worked.hours,
+        payslip_generated: generatedDriverIds.includes(d.id),
       };
     });
 
@@ -113,7 +125,7 @@ export default async function PayrollPage({
       {rows.length === 0 ? (
         <EmptyState title="Aucun chauffeur" description="Aucun chauffeur actif à afficher." />
       ) : (
-        <PayrollTable rows={rows} />
+        <PayrollTable rows={rows} payslipsEnabled={payslipsEnabled} periodStart={monthStart} periodEnd={periodEnd} />
       )}
     </div>
   );
