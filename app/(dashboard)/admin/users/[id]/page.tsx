@@ -25,7 +25,9 @@ const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", ye
  * viewer's role AND whether the org has bought the module behind it
  * (a client can own employee_files without hr_status, or buy neither):
  *
- *  - chauffeur (soi-même) : identité + son propre historique tournées/carburant.
+ *  - chauffeur (soi-même) : identité, son propre historique tournées/
+ *    carburant et ses propres fiches de paie — jamais la rémunération
+ *    (le brut/net du contrat) ni le dossier RH.
  *  - manager/manager_chauffeur (quelqu'un d'autre) : identité, congés et
  *    historiques tournées/carburant — RLS les scope déjà à leur(s)
  *    service(s), pas besoin de refiltrer ici. Jamais la rémunération,
@@ -57,6 +59,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur"]) && !isSelf;
   const canSeeOperational = isDirection || isManagerLike || isSelf;
   const canSeePayrollAndHr = isDirection || isComptable;
+  // Rémunération/dossier RH stay direction+comptable only — but a
+  // chauffeur can always see their own payslips, same as /payslips
+  // already lets them (this page is just a second place to find them,
+  // on their own profile).
+  const canSeePayslips = canSeePayrollAndHr || isSelf;
 
   const [employeeFilesEnabled, hrStatusEnabled, leaveManagementEnabled, planningEnabled, fuelTrackingEnabled, payslipsEnabled] = await Promise.all([
     canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "employee_files") : Promise.resolve(false),
@@ -64,7 +71,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
     isDirection || isManagerLike ? isModuleEnabled(supabase, appUser.organization_id, "leave_management") : Promise.resolve(false),
     canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "planning") : Promise.resolve(false),
     canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "fuel_tracking") : Promise.resolve(false),
-    canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
+    canSeePayslips ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
   ]);
   const showLeaves = (isDirection || isManagerLike) && leaveManagementEnabled;
   const showTourHistory = canSeeOperational && planningEnabled;
@@ -271,38 +278,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             </div>
           </Card>
 
-          {payslipsEnabled && (
-            <Card className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Fiches de paie</p>
-                <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
-                  {isDirection ? "Générer / voir tout →" : "Voir tout →"}
-                </Link>
-              </div>
-              {payslipsWithUrls.length === 0 ? (
-                <p className="text-xs text-navy/40">Aucun bulletin généré pour ce chauffeur.</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {payslipsWithUrls.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between text-sm">
-                      <span>{PAYSLIP_MONTH_LABEL.format(new Date(p.period_start))}</span>
-                      <span className="flex items-center gap-3">
-                        <span className="text-xs text-navy/40">
-                          {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
-                        </span>
-                        {p.downloadUrl && (
-                          <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
-                            Télécharger
-                          </a>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
-
           {hrStatusEnabled && hrStatus && (
             <p className="text-sm">
               Statut RH actuel :{" "}
@@ -351,6 +326,38 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               </Card>
             ))}
         </div>
+      )}
+
+      {payslipsEnabled && (
+        <Card className="mb-6 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Fiches de paie</p>
+            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+              {isDirection ? "Générer / voir tout →" : "Voir tout →"}
+            </Link>
+          </div>
+          {payslipsWithUrls.length === 0 ? (
+            <p className="text-xs text-navy/40">{isSelf ? "Aucun bulletin généré." : "Aucun bulletin généré pour ce chauffeur."}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {payslipsWithUrls.map((p) => (
+                <li key={p.id} className="flex items-center justify-between text-sm">
+                  <span>{PAYSLIP_MONTH_LABEL.format(new Date(p.period_start))}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-xs text-navy/40">
+                      {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
+                    </span>
+                    {p.downloadUrl && (
+                      <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
+                        Télécharger
+                      </a>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       )}
 
       {isDirection && <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />}
