@@ -34,7 +34,7 @@ export function MobileActionBar({
       icon: hasActiveTour ? IconFlag : IconClock,
       moduleKey: "planning",
     },
-    { href: "/fuel/new", label: "Plein", icon: IconPlusCircle },
+    { href: "/fuel?new=1", label: "Plein", icon: IconPlusCircle },
     { href: "/maintenance", label: "Signaler", icon: IconWrench, moduleKey: "maintenance_requests" },
     { href: "/planning/mine", label: "Planning", icon: IconCalendar, moduleKey: "planning" },
   ].filter((item) => !item.moduleKey || enabled.has(item.moduleKey));

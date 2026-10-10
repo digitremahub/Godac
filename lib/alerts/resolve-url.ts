@@ -9,7 +9,7 @@
 const RESOLVE_URL: Record<string, string> = {
   fuel_entries: "/fuel",
   vehicle_interventions: "/maintenance",
-  tank_deliveries: "/tanks/deliveries",
+  tank_deliveries: "/tanks?tab=approvisionnements",
   fines: "/fines",
   planning_entries: "/tours/history",
   support_requests: "/support",

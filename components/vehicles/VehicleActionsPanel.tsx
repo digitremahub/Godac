@@ -45,7 +45,7 @@ export function VehicleActionsPanel({
         </Link>
       )}
 
-      <Link href={`/fuel/new?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
+      <Link href={`/fuel?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
         ⛽ Plein
       </Link>
 

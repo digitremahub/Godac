@@ -183,7 +183,7 @@ npm test        # lance la suite vitest sur toute la logique métier
 ```
 app/
   (dashboard)/        # layout authentifié : sidebar/topbar par rôle
-    dashboard/         fuel/  fuel/new/  ocr-review/  tanks/
+    dashboard/         fuel/  ocr-review/  tanks/
     vehicles/           alerts/  ticpe/  admin/{organizations,billing,users}
   onboarding/          # Module 1 : création org, import véhicules/chauffeurs, cuves, plan Stripe
   scan/[type]/[id]/    # atterrissage d'un QR scanné par l'appareil photo natif

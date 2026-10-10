@@ -36,6 +36,8 @@ export function NewFuelEntryWizard({
   ocrEnabled,
   initialVehicleId,
   initialTankId,
+  initialDriverId,
+  initialDriverName,
   assignedVehicleId,
   selfDriverId,
   selfDriverName,
@@ -45,6 +47,9 @@ export function NewFuelEntryWizard({
   ocrEnabled: boolean;
   initialVehicleId?: string;
   initialTankId?: string;
+  /** A driver's own badge scanned by someone else (shared terminal at the pump, see app/scan/[type]/[id]) — pre-fills the driver step and skips past it, same as initialVehicleId/initialTankId do for theirs. */
+  initialDriverId?: string;
+  initialDriverName?: string;
   /** This driver's own assigned vehicle (vehicles.assigned_driver_id) — pre-selected and shown locked, with a "changer de véhicule" escape hatch, instead of yet another dropdown to fill in every time. */
   assignedVehicleId?: string;
   selfDriverId: string;
@@ -54,13 +59,15 @@ export function NewFuelEntryWizard({
   const [vehicleId, setVehicleId] = useState(initialVehicleId ?? assignedVehicleId ?? "");
   const [vehicleLocked, setVehicleLocked] = useState(Boolean(assignedVehicleId) && !initialVehicleId);
   const [tankId, setTankId] = useState(initialTankId ?? "");
-  const [driverId, setDriverId] = useState(selfDriverId);
-  const [driverLabel, setDriverLabel] = useState(selfDriverName);
+  const [driverId, setDriverId] = useState(initialDriverId ?? selfDriverId);
+  const [driverLabel, setDriverLabel] = useState(initialDriverName ?? selfDriverName);
   const [scanTarget, setScanTarget] = useState<"vehicle" | "tank" | "driver" | null>(null);
   // A vehicle+tank passed in already (e.g. from a vehicle/tank QR scan
   // elsewhere) skips straight past driver/vehicle choice — but the
-  // odometer photo is never skipped, ticket or cuve alike.
-  const [phase, setPhase] = useState<Phase>(vehicleId && tankId ? "odometer" : "driver");
+  // odometer photo is never skipped, ticket or cuve alike. A known
+  // driver alone (badge scanned, no vehicle/tank yet) only skips the
+  // driver step.
+  const [phase, setPhase] = useState<Phase>(vehicleId && tankId ? "odometer" : initialDriverId ? "vehicle" : "driver");
   const [ocrResult, setOcrResult] = useState<OcrCaptureResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -113,7 +113,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         )}
         <StatTile label="Carburant ce mois" value={`${Math.round(totalCost).toLocaleString("fr-FR")} €`} />
         <StatTile label="Litres ce mois" value={`${Math.round(totalLiters).toLocaleString("fr-FR")} L`} accent="gold" />
-        <Link href="/tanks/deliveries" className="block">
+        <Link href="/tanks?tab=approvisionnements" className="block">
           <StatTile
             label="Factures d'approvisionnement manquantes"
             value={String(missingInvoicesRes.count ?? 0)}
@@ -169,7 +169,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Approvisionnements sans facture</h2>
-            <Link href="/tanks/deliveries" className="text-sm text-teal-ink hover:underline">
+            <Link href="/tanks?tab=approvisionnements" className="text-sm text-teal-ink hover:underline">
               Voir tout
             </Link>
           </div>

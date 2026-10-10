@@ -45,11 +45,11 @@ export default async function ScanRedirectPage({
     if (user.id === id) {
       redirect("/account");
     }
-    redirect(`/fuel/new?driver=${id}`);
+    redirect(`/fuel?new=1&driver=${id}`);
   }
 
   if (entityType === "vehicle") {
     redirect(`/v/${id}`);
   }
-  redirect(`/fuel/new?${entityType}=${id}`);
+  redirect(`/fuel?new=1&${entityType}=${id}`);
 }
