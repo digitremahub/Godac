@@ -35,6 +35,11 @@ export function GeneratePayslipForm({ employees }: { employees: { id: string; fu
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
+      // A "déjà générée" conflict means the row already exists server-
+      // side — refresh anyway so the list below reflects it, instead
+      // of leaving a stale page that still shows "Aucun bulletin
+      // généré" right next to an error saying otherwise.
+      router.refresh();
     } finally {
       setBusy(false);
     }

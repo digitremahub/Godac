@@ -28,6 +28,14 @@ const RESOLVE_URL: Record<string, string> = {
 const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) => string)> = {
   planning_validated: "/planning/mine",
   new_message: (relatedId) => (relatedId ? `/messenger?with=${relatedId}` : "/messenger"),
+  // The requester's own "your question was answered" alert — distinct
+  // from the "support_request" broadcast to managers/direction
+  // (related_table support_requests → /support above), which that
+  // requester can be any role, chauffeur included, and /support is
+  // gated to manager-like/direction. The answer lives in the floating
+  // assistant widget (every page, every role), not a page of its own —
+  // ?assistant=1 tells FloatingChatWidget to open on it.
+  support_request_resolved: "/dashboard?assistant=1",
 };
 
 export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null): string | null {

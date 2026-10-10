@@ -18,6 +18,12 @@ export function createAdminSupabaseClient() {
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Same no-store fix as lib/supabase/server.ts — this client reads
+    // current data too (webhooks, cron jobs, OCR writeback) and is just
+    // as exposed to Next's default fetch Data Cache otherwise.
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }
 
