@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AssistantTabBody, type AssistantMessage } from "@/components/chat/AssistantTabBody";
 import { ConversationTabBody } from "@/components/chat/ConversationTabBody";
 
@@ -33,8 +34,27 @@ export function FloatingChatWidget({
   currentUserId: string;
   organizationId: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<string>(assistantAvailable ? "assistant" : "");
+
+  // Deep-link from an alert ("votre question a reçu une réponse", see
+  // lib/alerts/resolve-url.ts) — the answer lives here, not on a page
+  // of its own, so ?assistant=1 is how that alert opens on it.
+  // Reads from the shared router search params (not just on mount):
+  // this widget is mounted once in the dashboard layout and survives
+  // client-side navigation between pages, so a link landing on
+  // /dashboard?assistant=1 from elsewhere doesn't remount it.
+  useEffect(() => {
+    if (searchParams.get("assistant") !== "1" || !assistantAvailable) return;
+    setOpen(true);
+    setActiveKey("assistant");
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.delete("assistant");
+    router.replace(qs.toString() ? `${pathname}?${qs.toString()}` : pathname, { scroll: false });
+  }, [searchParams, assistantAvailable, pathname, router]);
   const [conversations, setConversations] = useState<ConversationTab[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [contacts, setContacts] = useState<Contact[] | null>(null);

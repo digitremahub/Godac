@@ -29,6 +29,19 @@ export async function createServerSupabaseClient() {
         }
       },
     },
+    // supabase-js's own fetch calls are otherwise invisible to Next:
+    // using cookies()/headers() opts the ROUTE into dynamic rendering,
+    // but that's a separate switch from the per-fetch Data Cache, which
+    // Next still applies by default to any fetch() call it can patch —
+    // including these, since createServerClient doesn't request
+    // no-store itself. A row freshly inserted (e.g. a just-generated
+    // payslip) could then stay invisible to every subsequent read on
+    // this same route indefinitely, surviving even a hard browser
+    // reload, since the stale response lives in Next's server-side
+    // cache, not anything the browser controls.
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }
 
