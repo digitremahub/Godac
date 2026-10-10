@@ -11,8 +11,8 @@ interface DigestEntry {
 function buildDigestMessage(entries: DigestEntry[]): string {
   const lines = entries.map((e) => {
     const d = new Date(e.start_at);
-    const day = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-    const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const day = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Paris" });
+    const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
     return `${day} ${time} — n°${e.tour_number}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
   });
   return `Votre planning de la semaine prochaine :\n${lines.join("\n")}`;

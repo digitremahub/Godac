@@ -20,6 +20,26 @@ function toCoords(lat: unknown, lng: unknown): Coordinates | null {
 }
 
 /**
+ * "Autre lieu" / "position inconnue" alone doesn't let direction
+ * actually locate a badge GPS doesn't match the depot or the
+ * driver's home — a map link next to the label does, whenever a
+ * coordinate was actually captured (nothing to link to otherwise).
+ */
+function mapLink(coords: Coordinates | null) {
+  if (!coords) return null;
+  return (
+    <a
+      href={`https://www.google.com/maps?q=${coords.lat},${coords.lng}`}
+      target="_blank"
+      rel="noreferrer"
+      className="ml-1 text-teal-ink underline"
+    >
+      🗺️ Voir
+    </a>
+  );
+}
+
+/**
  * Raw clock-in/out log (Module Pointeuse Électronique) — a direction-
  * visible badge button plus history, not yet wired into payroll
  * (/payroll still reads user_contracts directly) and deliberately so
@@ -76,19 +96,31 @@ export default async function TimeClockPage() {
         <Card className="flex flex-col gap-1.5">
           {(entries ?? []).map((e: any) => {
             const homeCoords = toCoords(e.users?.address_lat, e.users?.address_lng);
-            const inLocation = classifyLocation(toCoords(e.clock_in_lat, e.clock_in_lng), depotCoords, homeCoords);
-            const outLocation = e.clocked_out_at ? classifyLocation(toCoords(e.clock_out_lat, e.clock_out_lng), depotCoords, homeCoords) : null;
+            const inCoords = toCoords(e.clock_in_lat, e.clock_in_lng);
+            const outCoords = e.clocked_out_at ? toCoords(e.clock_out_lat, e.clock_out_lng) : null;
+            const inLocation = classifyLocation(inCoords, depotCoords, homeCoords);
+            const outLocation = e.clocked_out_at ? classifyLocation(outCoords, depotCoords, homeCoords) : null;
             return (
               <div key={e.id} className="flex items-center justify-between border-t border-navy/5 py-1.5 text-sm first:border-t-0 first:pt-0">
                 <span>
                   {isDirection && <span className="font-medium">{e.users?.full_name ?? "—"} — </span>}
-                  {new Date(e.clocked_in_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  <span className="ml-1 text-xs text-navy/40">({LOCATION_LABEL_DISPLAY[inLocation]})</span>
+                  {new Date(e.clocked_in_at).toLocaleString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "Europe/Paris",
+                  })}
+                  <span className="ml-1 text-xs text-navy/40">
+                    ({LOCATION_LABEL_DISPLAY[inLocation]}){mapLink(inCoords)}
+                  </span>
                   {" → "}
                   {e.clocked_out_at ? (
                     <>
-                      {new Date(e.clocked_out_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      <span className="ml-1 text-xs text-navy/40">({LOCATION_LABEL_DISPLAY[outLocation!]})</span>
+                      {new Date(e.clocked_out_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
+                      <span className="ml-1 text-xs text-navy/40">
+                        ({LOCATION_LABEL_DISPLAY[outLocation!]}){mapLink(outCoords)}
+                      </span>
                     </>
                   ) : (
                     "en cours"

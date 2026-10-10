@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const sourceEnd = addDays(parsed.data.source_week_start, 7);
   const targetEnd = addDays(parsed.data.target_week_start, 7);
   const dayOffset =
-    (new Date(`${parsed.data.target_week_start}T00:00:00`).getTime() - new Date(`${parsed.data.source_week_start}T00:00:00`).getTime()) /
+    (new Date(`${parsed.data.target_week_start}T00:00:00Z`).getTime() - new Date(`${parsed.data.source_week_start}T00:00:00Z`).getTime()) /
     (24 * 60 * 60 * 1000);
 
   let sourceQuery = supabase

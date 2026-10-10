@@ -141,9 +141,9 @@ export default async function MyPlanningPage({
                         </p>
                         <p className="text-sm text-navy/60">{entry.vehicles?.registration ?? "Véhicule non précisé"}</p>
                         <p className="text-xs text-navy/40">
-                          {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
                           {entry.end_at
-                            ? ` → ${new Date(entry.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                            ? ` → ${new Date(entry.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`
                             : ""}
                         </p>
                       </div>

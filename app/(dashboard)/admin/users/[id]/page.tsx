@@ -18,13 +18,16 @@ const STATUS_LABELS: Record<string, string> = { titulaire: "Titulaire", formatio
 const HR_STATUS_LABELS: Record<string, string> = { active: "Actif", on_leave: "En congé", suspended: "Suspendu", terminated: "Sorti des effectifs" };
 const CONTRACT_TYPE_LABELS: Record<string, string> = { cdi: "CDI", cdd: "CDD", interim: "Intérim", apprentissage: "Apprentissage" };
 const TOUR_STATUS_LABELS: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
+const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
 /**
  * A driver's "fiche" — visibility of each section depends on both the
  * viewer's role AND whether the org has bought the module behind it
  * (a client can own employee_files without hr_status, or buy neither):
  *
- *  - chauffeur (soi-même) : identité + son propre historique tournées/carburant.
+ *  - chauffeur (soi-même) : identité, son propre historique tournées/
+ *    carburant et ses propres fiches de paie — jamais la rémunération
+ *    (le brut/net du contrat) ni le dossier RH.
  *  - manager/manager_chauffeur (quelqu'un d'autre) : identité, congés et
  *    historiques tournées/carburant — RLS les scope déjà à leur(s)
  *    service(s), pas besoin de refiltrer ici. Jamais la rémunération,
@@ -56,20 +59,35 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur"]) && !isSelf;
   const canSeeOperational = isDirection || isManagerLike || isSelf;
   const canSeePayrollAndHr = isDirection || isComptable;
+  // Rémunération/dossier RH stay direction+comptable only — but a
+  // chauffeur can always see their own payslips, same as /payslips
+  // already lets them (this page is just a second place to find them,
+  // on their own profile).
+  const canSeePayslips = canSeePayrollAndHr || isSelf;
 
-  const [employeeFilesEnabled, hrStatusEnabled, leaveManagementEnabled, planningEnabled, fuelTrackingEnabled] = await Promise.all([
+  const [employeeFilesEnabled, hrStatusEnabled, leaveManagementEnabled, planningEnabled, fuelTrackingEnabled, payslipsEnabled] = await Promise.all([
     canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "employee_files") : Promise.resolve(false),
     canSeePayrollAndHr ? isModuleEnabled(supabase, appUser.organization_id, "hr_status") : Promise.resolve(false),
     isDirection || isManagerLike ? isModuleEnabled(supabase, appUser.organization_id, "leave_management") : Promise.resolve(false),
     canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "planning") : Promise.resolve(false),
     canSeeOperational ? isModuleEnabled(supabase, appUser.organization_id, "fuel_tracking") : Promise.resolve(false),
+    canSeePayslips ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
   ]);
   const showLeaves = (isDirection || isManagerLike) && leaveManagementEnabled;
   const showTourHistory = canSeeOperational && planningEnabled;
   const showFuelHistory = canSeeOperational && fuelTrackingEnabled;
 
-  const [{ data: user }, { data: tourHistory }, { data: fuelHistory }, { data: orgServices }, { data: contract }, { data: employeeFile }, { data: hrStatus }, { data: recentLeaves }] =
-    await Promise.all([
+  const [
+    { data: user },
+    { data: tourHistory },
+    { data: fuelHistory },
+    { data: orgServices },
+    { data: contract },
+    { data: employeeFile },
+    { data: hrStatus },
+    { data: recentLeaves },
+    { data: payslips },
+  ] = await Promise.all([
       supabase
         .from("users")
         .select(
@@ -108,10 +126,25 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       showLeaves
         ? supabase.from("leave_requests").select("start_date, end_date, status").eq("driver_id", id).order("start_date", { ascending: false }).limit(5)
         : Promise.resolve({ data: null }),
+      payslipsEnabled
+        ? supabase
+            .from("payslips")
+            .select("id, period_start, period_end, gross_amount, net_amount, file_path")
+            .eq("user_id", id)
+            .order("period_start", { ascending: false })
+            .limit(5)
+        : Promise.resolve({ data: null }),
     ]);
 
   if (!user) notFound();
   const u = user as any;
+
+  const payslipsWithUrls = await Promise.all(
+    (payslips ?? []).map(async (p) => {
+      const { data: signed } = await supabase.storage.from("payslips").createSignedUrl(p.file_path, 300);
+      return { ...p, downloadUrl: signed?.signedUrl ?? null };
+    }),
+  );
 
   let employeeDocuments: EmployeeDocument[] = [];
   if (isDirection && employeeFilesEnabled && employeeFile?.id) {
@@ -278,17 +311,53 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                 </div>
                 <div>
                   <p className="text-xs text-navy/40">Date d&apos;embauche</p>
-                  <p className="text-sm">{employeeFile?.hire_date ? new Date(employeeFile.hire_date).toLocaleDateString("fr-FR") : "—"}</p>
+                  <p className="text-sm">
+                    {employeeFile?.hire_date ? new Date(employeeFile.hire_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) : "—"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-navy/40">Fin de contrat</p>
                   <p className="text-sm">
-                    {employeeFile?.contract_end_date ? new Date(employeeFile.contract_end_date).toLocaleDateString("fr-FR") : "—"}
+                    {employeeFile?.contract_end_date
+                      ? new Date(employeeFile.contract_end_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })
+                      : "—"}
                   </p>
                 </div>
               </Card>
             ))}
         </div>
+      )}
+
+      {payslipsEnabled && (
+        <Card className="mb-6 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Fiches de paie</p>
+            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+              {isDirection ? "Générer / voir tout →" : "Voir tout →"}
+            </Link>
+          </div>
+          {payslipsWithUrls.length === 0 ? (
+            <p className="text-xs text-navy/40">{isSelf ? "Aucun bulletin généré." : "Aucun bulletin généré pour ce chauffeur."}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {payslipsWithUrls.map((p) => (
+                <li key={p.id} className="flex items-center justify-between text-sm">
+                  <span>{PAYSLIP_MONTH_LABEL.format(new Date(p.period_start))}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-xs text-navy/40">
+                      {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
+                    </span>
+                    {p.downloadUrl && (
+                      <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
+                        Télécharger
+                      </a>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       )}
 
       {isDirection && <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />}
@@ -308,7 +377,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               {(recentLeaves ?? []).map((lr: any, i: number) => (
                 <li key={i} className="flex items-center justify-between text-sm">
                   <span>
-                    {new Date(lr.start_date).toLocaleDateString("fr-FR")} → {new Date(lr.end_date).toLocaleDateString("fr-FR")}
+                    {new Date(lr.start_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} →{" "}
+                    {new Date(lr.end_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                   </span>
                   <span className="text-xs text-navy/40">{LEAVE_STATUS_LABELS[lr.status] ?? lr.status}</span>
                 </li>
@@ -335,8 +405,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               {(tourHistory ?? []).map((t: any) => (
                 <div key={t.id} className="flex items-center justify-between text-sm">
                   <span>
-                    {new Date(t.start_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} — n°
-                    {t.tour_number}
+                    {new Date(t.start_at).toLocaleString("fr-FR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "Europe/Paris",
+                    })}{" "}
+                    — n°{t.tour_number}
                     {t.vehicles ? ` (${t.vehicles.registration})` : ""}
                   </span>
                   <span className="text-xs text-navy/40">{TOUR_STATUS_LABELS[t.status] ?? t.status}</span>
