@@ -60,7 +60,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!fine.driver_id) {
       return NextResponse.json({ error: "Confirmez d'abord le chauffeur avant de le notifier." }, { status: 422 });
     }
-    const date = new Date(fine.infraction_at).toLocaleDateString("fr-FR");
+    const date = new Date(fine.infraction_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
     const message = `Une amende de ${fine.amount} € du ${date}${fine.reference ? ` (réf. ${fine.reference})` : ""} vous a été attribuée.`;
     // RLS has no insert policy for "alerts" on authenticated clients
     // (only security-definer triggers and service-role crons write to
