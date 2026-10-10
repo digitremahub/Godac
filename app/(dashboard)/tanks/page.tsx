@@ -7,11 +7,36 @@ import { TankEditPanel } from "@/components/tanks/TankEditPanel";
 import { AddTankForm } from "@/components/tanks/AddTankForm";
 import { TankDeliveryForm } from "@/components/tanks/TankDeliveryForm";
 import { TankPhotosTable } from "@/components/tanks/TankPhotosTable";
+import { TankDeliveriesTable } from "@/components/tanks/TankDeliveriesTable";
+import { TanksPageTabs } from "@/components/tanks/TanksPageTabs";
 
-export default async function TanksPage() {
+/** "Cuves" et "Approvisionnements" (ex-/tanks/deliveries) réunis sur une seule page à onglets — une création d'approvisionnement vivait déjà sur l'onglet Cuves (TankDeliveryForm par cuve), l'ancien /tanks/deliveries n'était qu'un historique en lecture seule. */
+export default async function TanksPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const params = await searchParams;
+  const tab = params.tab === "approvisionnements" ? "approvisionnements" : "cuves";
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+
+  return (
+    <div>
+      <PageHeader
+        title="Cuves & Approvisionnements"
+        description="Index totaliseur en temps réel et livraisons de carburant dans les cuves."
+      />
+      <TanksPageTabs tab={tab} />
+
+      {tab === "cuves" ? (
+        <TanksTab canManage={canManage} />
+      ) : (
+        <DeliveriesTab supabase={supabase} canManage={canManage} />
+      )}
+    </div>
+  );
+}
+
+async function TanksTab({ canManage }: { canManage: boolean }) {
+  const supabase = await createServerSupabaseClient();
 
   const [{ data: tanks }, { data: services }, { data: photos }] = await Promise.all([
     supabase
@@ -45,12 +70,7 @@ export default async function TanksPage() {
   );
 
   return (
-    <div>
-      <PageHeader
-        title="Cuves"
-        description="Index totaliseur en temps réel — la source de vérité pour la détection d'écarts."
-      />
-
+    <>
       {canManage && <AddTankForm services={services ?? []} />}
 
       {!tanks || tanks.length === 0 ? (
@@ -129,6 +149,39 @@ export default async function TanksPage() {
 
       <h3 className="mb-2 mt-6 text-base">Photos de cuves</h3>
       <TankPhotosTable photos={photosWithUrls} canReview={canManage} />
-    </div>
+    </>
   );
+}
+
+async function DeliveriesTab({
+  supabase,
+  canManage,
+}: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  canManage: boolean;
+}) {
+  const { data: deliveries } = await supabase
+    .from("tank_deliveries")
+    .select("id, liters, unit_price, supplier, delivered_at, invoice_path, tanks(name)")
+    .order("delivered_at", { ascending: false });
+
+  const rows = (deliveries ?? []) as any[];
+  const withUrls = await Promise.all(
+    rows.map(async (d) => {
+      const invoiceUrl = d.invoice_path
+        ? (await supabase.storage.from("tank-invoices").createSignedUrl(d.invoice_path, 600)).data?.signedUrl ?? null
+        : null;
+      return {
+        id: d.id,
+        tankName: d.tanks?.name ?? "—",
+        liters: d.liters,
+        unitPrice: d.unit_price,
+        supplier: d.supplier,
+        deliveredAt: d.delivered_at,
+        invoiceUrl,
+      };
+    }),
+  );
+
+  return <TankDeliveriesTable deliveries={withUrls} canManage={canManage} />;
 }

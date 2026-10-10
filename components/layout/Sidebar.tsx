@@ -6,7 +6,6 @@ import type { UserRole } from "@/lib/types/domain";
 import {
   IconGrid,
   IconDroplet,
-  IconPlusCircle,
   IconCamera,
   IconCylinder,
   IconTruck,
@@ -19,7 +18,6 @@ import {
   IconCreditCard,
   IconUsers,
   IconUserCircle,
-  IconUpload,
   IconClock,
   IconFlag,
   IconQrCode,
@@ -55,10 +53,12 @@ const SECTIONS: NavSection[] = [
     label: "Exploitation",
     items: [
       { href: "/fuel", label: "Carburant", icon: IconDroplet, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
-      { href: "/fuel/new", label: "Nouveau ravitaillement", icon: IconPlusCircle, allow: ["manager", "manager_chauffeur", "direction"] },
+      // "Nouveau ravitaillement" vit maintenant sur /fuel?new=1 (bouton
+      // "+ Nouveau ravitaillement" sur la page Carburant elle-même,
+      // visible manager/manager_chauffeur/direction) — plus d'entrée de
+      // nav séparée.
       { href: "/ocr-review", label: "Revue OCR", icon: IconCamera, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "ocr" },
-      { href: "/tanks", label: "Cuves", icon: IconCylinder, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
-      { href: "/tanks/deliveries", label: "Approvisionnements", icon: IconUpload, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
+      { href: "/tanks", label: "Cuves & Approvisionnements", icon: IconCylinder, allow: ["manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/vehicles", label: "Flotte", icon: IconTruck, allow: ["manager", "manager_chauffeur", "direction", "comptable"], moduleKey: "fleet" },
       { href: "/my-vehicle", label: "Mon véhicule", icon: IconTruck, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/qr-codes", label: "Badges QR", icon: IconQrCode, allow: ["manager", "manager_chauffeur", "direction"] },
