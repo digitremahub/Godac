@@ -20,6 +20,10 @@ export function OrganizationSettingsForm({
   depotAddress,
   siret,
   legalAddress,
+  legalForm,
+  apeCode,
+  conventionCollective,
+  urssafNumber,
 }: {
   organizationId: string;
   name: string;
@@ -32,6 +36,10 @@ export function OrganizationSettingsForm({
   depotAddress: string | null;
   siret: string | null;
   legalAddress: string | null;
+  legalForm: string | null;
+  apeCode: string | null;
+  conventionCollective: string | null;
+  urssafNumber: string | null;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -44,6 +52,10 @@ export function OrganizationSettingsForm({
   const [depotAddressValue, setDepotAddressValue] = useState(depotAddress ?? "");
   const [siretValue, setSiretValue] = useState(siret ?? "");
   const [legalAddressValue, setLegalAddressValue] = useState(legalAddress ?? "");
+  const [legalFormValue, setLegalFormValue] = useState(legalForm ?? "");
+  const [apeCodeValue, setApeCodeValue] = useState(apeCode ?? "");
+  const [conventionCollectiveValue, setConventionCollectiveValue] = useState(conventionCollective ?? "");
+  const [urssafNumberValue, setUrssafNumberValue] = useState(urssafNumber ?? "");
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +104,10 @@ export function OrganizationSettingsForm({
           depot_address: depotAddressValue.trim() || null,
           siret: siretValue.trim() || null,
           legal_address: legalAddressValue.trim() || null,
+          legal_form: legalFormValue.trim() || null,
+          ape_code: apeCodeValue.trim() || null,
+          convention_collective: conventionCollectiveValue.trim() || null,
+          urssaf_number: urssafNumberValue.trim() || null,
         }),
       });
       const json = await res.json();
@@ -223,23 +239,54 @@ export function OrganizationSettingsForm({
         </p>
       </div>
 
-      <div>
-        <label className="label">SIRET</label>
-        <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} />
-        <p className="mt-1 text-sm text-navy/50">Affiché sur les fiches de paie générées, s&apos;il est renseigné.</p>
-      </div>
-
-      <div>
-        <label className="label">Adresse légale (siège social)</label>
-        <input
-          className="input"
-          placeholder="ex: 60 rue Laennec, 93700 Drancy"
-          value={legalAddressValue}
-          onChange={(e) => setLegalAddressValue(e.target.value)}
-        />
-        <p className="mt-1 text-sm text-navy/50">
-          Affichée sur les fiches de paie — distincte de l&apos;adresse du dépôt ci-dessus si votre siège social est ailleurs.
+      <div className="flex flex-col gap-3 rounded-lg bg-navy/5 p-3">
+        <p className="font-medium">Identité légale (fiche employeur)</p>
+        <p className="text-sm text-navy/50">
+          Affichée dans l&apos;encadré employeur des fiches de paie générées — chaque champ renseigné y apparaît, les champs vides sont simplement omis.
         </p>
+
+        <div>
+          <label className="label">Forme juridique</label>
+          <input className="input" placeholder="ex: SARL, SAS, EURL…" value={legalFormValue} onChange={(e) => setLegalFormValue(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="label">SIRET</label>
+          <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="label">Code APE/NAF</label>
+          <input className="input" placeholder="ex: 4941A" value={apeCodeValue} onChange={(e) => setApeCodeValue(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="label">Convention collective applicable</label>
+          <input
+            className="input"
+            placeholder="ex: Transports routiers (IDCC 1340)"
+            value={conventionCollectiveValue}
+            onChange={(e) => setConventionCollectiveValue(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="label">Numéro de cotisant URSSAF</label>
+          <input className="input" value={urssafNumberValue} onChange={(e) => setUrssafNumberValue(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="label">Adresse légale (siège social)</label>
+          <input
+            className="input"
+            placeholder="ex: 60 rue Laennec, 93700 Drancy"
+            value={legalAddressValue}
+            onChange={(e) => setLegalAddressValue(e.target.value)}
+          />
+          <p className="mt-1 text-sm text-navy/50">
+            Distincte de l&apos;adresse du dépôt ci-dessus si votre siège social est ailleurs.
+          </p>
+        </div>
       </div>
 
       <div>
