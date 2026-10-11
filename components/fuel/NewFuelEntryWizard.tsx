@@ -18,6 +18,10 @@ interface TankOption {
   name: string;
   fuel_type: string;
 }
+interface EmployeeOption {
+  id: string;
+  full_name: string;
+}
 
 /**
  * Follows the physical order of a real fill-up instead of one
@@ -33,6 +37,7 @@ const FUEL_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "fuel-tic
 export function NewFuelEntryWizard({
   vehicles,
   tanks,
+  employees,
   ocrEnabled,
   initialVehicleId,
   initialTankId,
@@ -41,9 +46,12 @@ export function NewFuelEntryWizard({
   assignedVehicleId,
   selfDriverId,
   selfDriverName,
+  selfIsDriver,
 }: {
   vehicles: VehicleOption[];
   tanks: TankOption[];
+  /** Tous les chauffeurs/manager_chauffeur actifs — fourni uniquement aux rôles autorisés à saisir un plein pour quelqu'un d'autre (manager/manager_chauffeur/direction), pour une saisie de secours (téléphone en panne, urgence) sans badge à scanner. */
+  employees?: EmployeeOption[];
   ocrEnabled: boolean;
   initialVehicleId?: string;
   initialTankId?: string;
@@ -54,13 +62,15 @@ export function NewFuelEntryWizard({
   assignedVehicleId?: string;
   selfDriverId: string;
   selfDriverName: string;
+  /** False for manager/direction (never drivers themselves) — forces an explicit choice instead of defaulting to their own account, which would otherwise be submitted as the driver_id. */
+  selfIsDriver: boolean;
 }) {
   const router = useRouter();
   const [vehicleId, setVehicleId] = useState(initialVehicleId ?? assignedVehicleId ?? "");
   const [vehicleLocked, setVehicleLocked] = useState(Boolean(assignedVehicleId) && !initialVehicleId);
   const [tankId, setTankId] = useState(initialTankId ?? "");
-  const [driverId, setDriverId] = useState(initialDriverId ?? selfDriverId);
-  const [driverLabel, setDriverLabel] = useState(initialDriverName ?? selfDriverName);
+  const [driverId, setDriverId] = useState(initialDriverId ?? (selfIsDriver ? selfDriverId : ""));
+  const [driverLabel, setDriverLabel] = useState(initialDriverName ?? (selfIsDriver ? selfDriverName : ""));
   const [scanTarget, setScanTarget] = useState<"vehicle" | "tank" | "driver" | null>(null);
   // A vehicle+tank passed in already (e.g. from a vehicle/tank QR scan
   // elsewhere) skips straight past driver/vehicle choice — but the
@@ -99,6 +109,28 @@ export function NewFuelEntryWizard({
                 setScanTarget(null);
               }}
             />
+          ) : employees && employees.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <select
+                className="input"
+                value={driverId}
+                onChange={(e) => {
+                  const selected = employees.find((emp) => emp.id === e.target.value);
+                  setDriverId(e.target.value);
+                  setDriverLabel(selected?.full_name ?? "");
+                }}
+              >
+                <option value="">Sélectionner un chauffeur…</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.full_name}
+                  </option>
+                ))}
+              </select>
+              <button className="btn-secondary self-start" onClick={() => setScanTarget("driver")}>
+                📷 Ou scanner un badge
+              </button>
+            </div>
           ) : (
             <div className="flex items-center justify-between">
               <span className="text-sm text-navy/70">{driverLabel}</span>
@@ -109,7 +141,7 @@ export function NewFuelEntryWizard({
           )}
         </Card>
 
-        <button className="btn-primary" onClick={() => setPhase("vehicle")}>
+        <button className="btn-primary" disabled={!driverId} onClick={() => setPhase("vehicle")}>
           Continuer
         </button>
       </div>
