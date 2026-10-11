@@ -27,6 +27,10 @@ const bodySchema = z
     // below (which still runs as a fallback for a driver who typed a
     // tour number without ever seeing a plannedToday suggestion).
     planned_entry_id: z.string().uuid().optional(),
+    // Only meaningful for a polyvalent driver (StartTourFlow shows the
+    // picker it comes from only then) — checked against their own
+    // user_services below, never trusted as-is.
+    service_id: z.string().uuid().optional(),
     start_km: z.coerce.number().min(0),
     start_km_photo_path: z.string().optional(),
     // Already uploaded via TourReportPhotoCapture (app/api/ocr/tour-report/init+process),
@@ -53,11 +57,15 @@ const bodySchema = z
 /**
  * Opens a tour the moment a driver scans their vehicle — the digital
  * equivalent of filling out the paper "feuille de départ tournée".
- * The service is inherited from the vehicle (not the driver's own
- * user_services), since a tour belongs to whichever service owns the
- * truck. Same up-front-storage-path pattern as tank-photos: the row
- * exists with its final photo path before the browser uploads the
- * actual file.
+ * The service normally just follows the scanned vehicle (a tour
+ * belongs to whichever service owns the truck) — except for a
+ * polyvalent driver (qualified on 2+ services), who can explicitly
+ * pick which service they're working under today (StartTourFlow's
+ * service picker), e.g. when sharing a vehicle across services. That
+ * pick is still checked against their own user_services here, never
+ * trusted as-is. Same up-front-storage-path pattern as tank-photos:
+ * the row exists with its final photo path before the browser uploads
+ * the actual file.
  */
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
@@ -89,11 +97,25 @@ export async function POST(req: Request) {
   if (vehicleError || !vehicle) {
     return NextResponse.json({ error: "Véhicule introuvable." }, { status: 404 });
   }
-  if (!vehicle.service_id) {
+  if (!vehicle.service_id && !parsed.data.service_id) {
     return NextResponse.json(
       { error: `${vehicle.registration} n'est rattaché à aucun service — contactez un gestionnaire.` },
       { status: 422 },
     );
+  }
+
+  let tourServiceId = vehicle.service_id;
+  if (parsed.data.service_id) {
+    const { data: qualified } = await supabase
+      .from("user_services")
+      .select("service_id")
+      .eq("user_id", appUser.id)
+      .eq("service_id", parsed.data.service_id)
+      .maybeSingle();
+    if (!qualified) {
+      return NextResponse.json({ error: "Vous n'êtes pas qualifié sur ce service." }, { status: 422 });
+    }
+    tourServiceId = parsed.data.service_id;
   }
 
   // Coherence check against the vehicle's own history — not just
@@ -109,7 +131,7 @@ export async function POST(req: Request) {
   const reportFields = parsed.data.report_fields;
   const startFields = {
     vehicle_id: vehicle.id,
-    service_id: vehicle.service_id,
+    service_id: tourServiceId,
     start_at: new Date().toISOString(),
     status: "in_progress" as const,
     start_km: parsed.data.start_km,

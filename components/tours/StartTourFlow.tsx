@@ -24,6 +24,11 @@ interface PlannedToday {
   vehicles: { id: string; registration: string } | null;
 }
 
+interface ServiceOption {
+  id: string;
+  name: string;
+}
+
 /**
  * Départ de tournée: scan véhicule → numéro de tournée (facultatif) +
  * kilométrage (obligatoire) + état du véhicule (obligatoire, jamais
@@ -46,6 +51,8 @@ export function StartTourFlow({
   const [checking, setChecking] = useState(false);
   const [openTour, setOpenTour] = useState<OpenTour | null>(null);
   const [plannedToday, setPlannedToday] = useState<PlannedToday | null>(null);
+  const [polyvalentServices, setPolyvalentServices] = useState<ServiceOption[] | null>(null);
+  const [serviceId, setServiceId] = useState("");
   const [tourNumber, setTourNumber] = useState("");
   const [startKm, setStartKm] = useState("");
   const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
@@ -80,6 +87,7 @@ export function StartTourFlow({
         if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
         setOpenTour(json.tour);
         setPlannedToday(json.plannedToday ?? null);
+        setPolyvalentServices(json.polyvalentServices ?? null);
         if (json.plannedToday && !tourNumber) setTourNumber(json.plannedToday.tour_number);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -108,6 +116,7 @@ export function StartTourFlow({
       if (!openRes.ok) throw new Error(typeof openJson.error === "string" ? openJson.error : "Erreur");
       setOpenTour(openJson.tour);
       setPlannedToday(openJson.plannedToday ?? null);
+      setPolyvalentServices(openJson.polyvalentServices ?? null);
       if (openJson.plannedToday && !tourNumber) setTourNumber(openJson.plannedToday.tour_number);
       setVehicleChanged(Boolean(openJson.plannedToday?.vehicles && openJson.plannedToday.vehicles.id !== id));
       const vehicleJson = await vehicleRes.json();
@@ -127,6 +136,7 @@ export function StartTourFlow({
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
     (!vehicleChanged || changeReason.trim().length > 0) &&
+    (!polyvalentServices || Boolean(serviceId)) &&
     confirmed;
 
   async function submit() {
@@ -139,6 +149,7 @@ export function StartTourFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vehicle_id: vehicleId,
+          service_id: polyvalentServices ? serviceId : undefined,
           tour_number: tourNumber || undefined,
           planned_entry_id: plannedToday?.id,
           start_km: Number(startKm),
@@ -247,6 +258,20 @@ export function StartTourFlow({
               placeholder="ex: panne, maintenance, véhicule indisponible…"
             />
           </div>
+        </div>
+      )}
+
+      {polyvalentServices && (
+        <div>
+          <label className="label">Service sur lequel vous travaillez aujourd&apos;hui *</label>
+          <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+            <option value="">Choisissez un service…</option>
+            {polyvalentServices.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

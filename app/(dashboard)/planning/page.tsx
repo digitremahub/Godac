@@ -58,7 +58,7 @@ export default async function PlanningPage({
     rangeEnd = addDays(weekStart, 7);
   }
 
-  const [{ data: allServices }, { data: myServiceRows }, { data: vehicles }, { data: drivers }, { data: entries }, { data: lastTours }, { data: validations }] =
+  const [{ data: allServices }, { data: myServiceRows }, { data: vehicles }, { data: drivers }, { data: entries }, { data: lastTours }, { data: validations }, { data: qualifications }] =
     await Promise.all([
       isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
       isDirection
@@ -94,6 +94,11 @@ export default async function PlanningPage({
       // per service once its week has been sent; the week view button
       // reads this to show "Déjà envoyé" instead of re-sending blind.
       view === "week" ? supabase.from("planning_validations").select("service_id, validated_at").eq("week_start", weekStart) : Promise.resolve({ data: null }),
+      // Only the Kanban's "Par service" mode needs to know who's
+      // qualified where — a driver qualified on 2+ services is
+      // polyvalent between them, which is what lets that mode offer
+      // them as draggable between service columns in the first place.
+      view === "kanban" ? supabase.from("user_services").select("user_id, service_id") : Promise.resolve({ data: null }),
     ]);
 
   const services = isDirection
@@ -116,6 +121,13 @@ export default async function PlanningPage({
     if (!lastTourByDriver.has(row.driver_id) && row.vehicle_id) {
       lastTourByDriver.set(row.driver_id, { vehicleId: row.vehicle_id, tourNumber: row.tour_number });
     }
+  }
+
+  const driverServiceIds = new Map<string, string[]>();
+  for (const row of (qualifications ?? []) as { user_id: string; service_id: string }[]) {
+    const list = driverServiceIds.get(row.user_id) ?? [];
+    list.push(row.service_id);
+    driverServiceIds.set(row.user_id, list);
   }
 
   const commonProps = {
@@ -147,7 +159,9 @@ export default async function PlanningPage({
       )}
       {view === "day" && <PlanningDayView {...commonProps} day={selectedDay} />}
       {view === "month" && <PlanningMonthView {...commonProps} month={selectedMonth} />}
-      {view === "kanban" && <PlanningKanbanView {...commonProps} weekStart={weekStart} />}
+      {view === "kanban" && (
+        <PlanningKanbanView {...commonProps} weekStart={weekStart} driverServiceIds={Object.fromEntries(driverServiceIds)} />
+      )}
       {view === "list" && <PlanningListView {...commonProps} weekStart={weekStart} />}
     </div>
   );
