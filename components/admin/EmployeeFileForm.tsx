@@ -34,6 +34,9 @@ export function EmployeeFileForm({
   initialContractEndDate,
   initialHrStatus,
   initialNotes,
+  initialMatricule,
+  initialSocialSecurityNumber,
+  initialClassification,
 }: {
   userId: string;
   initialContractType: ContractType | null;
@@ -41,6 +44,9 @@ export function EmployeeFileForm({
   initialContractEndDate: string | null;
   initialHrStatus: HrStatus;
   initialNotes: string | null;
+  initialMatricule: string | null;
+  initialSocialSecurityNumber: string | null;
+  initialClassification: string | null;
 }) {
   const router = useRouter();
   const [contractType, setContractType] = useState<ContractType | "">(initialContractType ?? "");
@@ -48,6 +54,9 @@ export function EmployeeFileForm({
   const [contractEndDate, setContractEndDate] = useState(initialContractEndDate ?? "");
   const [hrStatus, setHrStatus] = useState<HrStatus>(initialHrStatus);
   const [notes, setNotes] = useState(initialNotes ?? "");
+  const [matricule, setMatricule] = useState(initialMatricule ?? "");
+  const [socialSecurityNumber, setSocialSecurityNumber] = useState(initialSocialSecurityNumber ?? "");
+  const [classification, setClassification] = useState(initialClassification ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -66,6 +75,9 @@ export function EmployeeFileForm({
           contract_end_date: contractEndDate || null,
           hr_status: hrStatus,
           hr_notes: notes || null,
+          matricule: matricule.trim() || null,
+          social_security_number: socialSecurityNumber.trim() || null,
+          classification: classification.trim() || null,
         }),
       });
       const json = await res.json();
@@ -112,6 +124,23 @@ export function EmployeeFileForm({
         <div>
           <label className="label">Fin de contrat (si CDD/intérim)</label>
           <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Matricule</label>
+          <input className="input" value={matricule} onChange={(e) => setMatricule(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">N° de sécurité sociale</label>
+          <input className="input" value={socialSecurityNumber} onChange={(e) => setSocialSecurityNumber(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Qualification / classification conventionnelle</label>
+          <input
+            className="input"
+            placeholder="ex: Groupe 7, coefficient 150V"
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+          />
         </div>
       </div>
       <div>
