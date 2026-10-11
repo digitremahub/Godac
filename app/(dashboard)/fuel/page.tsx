@@ -26,14 +26,30 @@ export default async function FuelPage({
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
+  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);
+  const canCreate = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  // Un manager_chauffeur est lui-même chauffeur — "soi-même" reste un
+  // choix valide par défaut. Un manager/la direction ne le sont jamais :
+  // les laisser sur ce défaut soumettrait le plein au nom de leur
+  // propre compte (jamais un vrai chauffeur), d'où le champ vide forcé
+  // ci-dessous pour ces deux rôles tant qu'un employé n'est pas choisi.
+  const selfIsDriver = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
 
   if (wizardMode) {
-    const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }, { data: driver }] = await Promise.all([
+    const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }, { data: driver }, { data: employees }] = await Promise.all([
       supabase.from("vehicles").select("id, registration, type").eq("status", "active").order("registration"),
       supabase.from("tanks").select("id, name, fuel_type").order("name"),
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       supabase.from("vehicles").select("id").eq("assigned_driver_id", appUser.id).eq("status", "active").maybeSingle(),
       params.driver ? supabase.from("users").select("full_name").eq("id", params.driver).maybeSingle() : Promise.resolve({ data: null }),
+      // Secours téléphone en panne / urgence : la direction (et tout
+      // manager) peut saisir un plein pour n'importe quel chauffeur,
+      // sans badge à scanner — un menu déroulant plutôt que le scan
+      // obligatoire. Les comptables ne créent jamais d'entrée (hors de
+      // canCreate), donc pas de fetch pour eux.
+      canCreate
+        ? supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name")
+        : Promise.resolve({ data: null }),
     ]);
 
     return (
@@ -50,6 +66,7 @@ export default async function FuelPage({
         <NewFuelEntryWizard
           vehicles={vehicles ?? []}
           tanks={tanks ?? []}
+          employees={employees ?? undefined}
           ocrEnabled={ocrEnabled}
           initialVehicleId={params.vehicle}
           initialTankId={params.tank}
@@ -58,13 +75,11 @@ export default async function FuelPage({
           assignedVehicleId={assignedVehicle?.id}
           selfDriverId={appUser.id}
           selfDriverName={appUser.full_name}
+          selfIsDriver={selfIsDriver}
         />
       </div>
     );
   }
-
-  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);
-  const canCreate = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
   let query = supabase
     .from("fuel_entries")
