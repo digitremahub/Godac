@@ -23,7 +23,7 @@ interface HistoryRow {
   start_photo_path: string | null;
   end_photo_path: string | null;
   return_type: "depot" | "domicile" | null;
-  services: { name: string } | null;
+  services: { name: string; depot_lat: number | string | null; depot_lng: number | string | null } | null;
   vehicles: { registration: string } | null;
   users: { full_name: string; address_lat: number | null; address_lng: number | null } | null;
 }
@@ -74,7 +74,7 @@ export default async function TourHistoryPage({
     supabase.from("organizations").select("depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
   ]);
 
-  const depotCoords =
+  const orgDepotCoords =
     organization?.depot_lat !== null && organization?.depot_lng !== null && organization
       ? { lat: Number(organization.depot_lat), lng: Number(organization.depot_lng) }
       : null;
@@ -85,7 +85,7 @@ export default async function TourHistoryPage({
   let query = supabase
     .from("planning_entries")
     .select(
-      "id, tour_number, start_at, end_at, status, start_km, end_km, start_photo_path, end_photo_path, return_type, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name, address_lat, address_lng)",
+      "id, tour_number, start_at, end_at, status, start_km, end_km, start_photo_path, end_photo_path, return_type, services(name, depot_lat, depot_lng), vehicles(registration), users!planning_entries_driver_id_fkey(full_name, address_lat, address_lng)",
     )
     .in("status", ["in_progress", "done"])
     .gte("start_at", `${from}T00:00:00`)
@@ -209,7 +209,11 @@ export default async function TourHistoryPage({
               r.users?.address_lat !== null && r.users?.address_lng !== null && r.users
                 ? { lat: Number(r.users.address_lat), lng: Number(r.users.address_lng) }
                 : null;
-            const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, depotCoords, homeCoords);
+            const serviceDepotCoords =
+              r.services?.depot_lat !== null && r.services?.depot_lat !== undefined && r.services?.depot_lng !== null && r.services?.depot_lng !== undefined
+                ? { lat: Number(r.services.depot_lat), lng: Number(r.services.depot_lng) }
+                : null;
+            const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, serviceDepotCoords ?? orgDepotCoords, homeCoords);
             return {
               id: r.id,
               dateLabel: new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),

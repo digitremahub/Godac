@@ -8,6 +8,7 @@ import { PayrollFilters } from "@/components/payroll/PayrollFilters";
 import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } from "@/lib/planning/dates";
 import { computeHourlyRates } from "@/lib/business/payroll";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
+import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 
 interface BadgeEntry {
   user_id: string;
@@ -93,7 +94,7 @@ export default async function PayrollPage({
   const selectedDriver = params.driver ?? "";
   const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
 
-  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningSpans }, { data: existingPayslips }, { data: organization }] =
+  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningSpans }, { data: existingPayslips }, { depotsFor }] =
     await Promise.all([
       supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
       // Separate table (not a column on `users`, whose RLS lets any org
@@ -143,15 +144,10 @@ export default async function PayrollPage({
       payslipsEnabled
         ? supabase.from("payslips").select("user_id").eq("period_start", monthStart).eq("period_end", periodEnd)
         : Promise.resolve({ data: null }),
-      supabase.from("organizations").select("depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
+      buildDriverDepotsMap(supabase, appUser.organization_id),
     ]);
 
   const generatedDriverIds = (existingPayslips ?? []).map((p) => p.user_id);
-
-  const depot =
-    organization?.depot_lat !== null && organization?.depot_lat !== undefined && organization?.depot_lng !== null && organization?.depot_lng !== undefined
-      ? { lat: Number(organization.depot_lat), lng: Number(organization.depot_lng) }
-      : null;
 
   // Le plus tôt start_at planifié ce jour-là, par chauffeur — clé
   // "driverId|YYYY-MM-DD" (calendrier Paris, voir parisCalendarDate).
@@ -192,7 +188,7 @@ export default async function PayrollPage({
     const dayData = badgesByDriverDay.get(key) ?? { sessions: [], geoMatchedDepot: false };
     dayData.sessions.push(b);
     const point = b.clock_in_lat !== null && b.clock_in_lng !== null ? { lat: Number(b.clock_in_lat), lng: Number(b.clock_in_lng) } : null;
-    if (classifyLocation(point, depot, null) === "depot") dayData.geoMatchedDepot = true;
+    if (classifyLocation(point, depotsFor(b.user_id), null) === "depot") dayData.geoMatchedDepot = true;
     badgesByDriverDay.set(key, dayData);
   }
 
