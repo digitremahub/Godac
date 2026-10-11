@@ -8,6 +8,7 @@ interface ServiceRow {
   id: string;
   name: string;
   code: string | null;
+  depot_address: string | null;
 }
 
 export function ServicesPanel({ services }: { services: ServiceRow[] }) {
@@ -46,6 +47,27 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      }
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateDepotAddress(id: string, depotAddress: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/services/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ depot_address: depotAddress || null }),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -101,17 +123,29 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {services.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
-              <input
-                className="input flex-1 !py-1"
-                defaultValue={s.name}
-                onBlur={(e) => e.target.value !== s.name && renameService(s.id, e.target.value)}
-                disabled={busy}
-              />
-              <span className="w-16 text-sm text-navy/40">{s.code ?? "—"}</span>
-              <button className="btn-danger !px-2 !py-1 text-xs" disabled={busy} onClick={() => deleteService(s.id)}>
-                Supprimer
-              </button>
+            <li key={s.id} className="flex flex-col gap-2 rounded-lg bg-navy/5 px-3 py-2">
+              <div className="flex items-center gap-3">
+                <input
+                  className="input flex-1 !py-1"
+                  defaultValue={s.name}
+                  onBlur={(e) => e.target.value !== s.name && renameService(s.id, e.target.value)}
+                  disabled={busy}
+                />
+                <span className="w-16 text-sm text-navy/40">{s.code ?? "—"}</span>
+                <button className="btn-danger !px-2 !py-1 text-xs" disabled={busy} onClick={() => deleteService(s.id)}>
+                  Supprimer
+                </button>
+              </div>
+              <div>
+                <label className="label">Adresse du dépôt de ce service</label>
+                <input
+                  className="input !py-1"
+                  placeholder="ex: 1 rue du Dépôt, 69007 Lyon — laissez vide pour utiliser le dépôt de l'organisation"
+                  defaultValue={s.depot_address ?? ""}
+                  onBlur={(e) => e.target.value !== (s.depot_address ?? "") && updateDepotAddress(s.id, e.target.value)}
+                  disabled={busy}
+                />
+              </div>
             </li>
           ))}
         </ul>
