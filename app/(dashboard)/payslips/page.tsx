@@ -36,7 +36,7 @@ export default async function PayslipsPage() {
     (() => {
       let query = supabase
         .from("payslips")
-        .select("id, period_start, period_end, gross_amount, net_amount, file_path, users(full_name)")
+        .select("id, period_start, period_end, gross_amount, net_amount, file_path, users!payslips_user_id_fkey(full_name)")
         .order("period_start", { ascending: false })
         .limit(100);
       if (!isDirection) query = query.eq("user_id", appUser.id);
