@@ -22,9 +22,10 @@ interface DoneTour {
   driver_id: string | null;
 }
 
-interface PlanningStart {
+interface PlanningSpan {
   driver_id: string | null;
   start_at: string;
+  end_at: string | null;
 }
 
 /**
@@ -42,8 +43,14 @@ interface PlanningStart {
  *    domicile-dépôt non rémunéré différemment selon qu'on badge pile à
  *    l'heure ou un peu avant/après).
  *  - sinon (pas de géoloc, position hors dépôt, ou pas de tournée
- *    planifiée ce jour) : badge d'entrée → badge de sortie, comme
- *    avant — le seul signal fiable qu'on ait dans ce cas.
+ *    planifiée ce jour), mais avec au moins un badge ce jour-là :
+ *    badge d'entrée → badge de sortie, comme avant.
+ *  - aucun badge DU TOUT ce jour-là, mais une tournée terminée existe
+ *    (end_at renseigné) : repli sur l'horaire réel de la tournée
+ *    (start_at → end_at) — moins fiable qu'un badge (ne couvre pas les
+ *    tâches avant/après tournée), mais toujours préférable à 0h pour
+ *    une journée par ailleurs documentée comme travaillée (la
+ *    pointeuse n'ayant simplement pas été utilisée ce jour-là).
  *
  * Ce n'est qu'une étape intermédiaire : à terme (une fois la
  * géolocalisation fiable des deux côtés), le badge seul définira toute
@@ -87,7 +94,7 @@ export default async function PayrollPage({
   const selectedDriver = params.driver ?? "";
   const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
 
-  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningStarts }, { data: existingPayslips }, { depotsFor }] =
+  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningSpans }, { data: existingPayslips }, { depotsFor }] =
     await Promise.all([
       supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
       // Separate table (not a column on `users`, whose RLS lets any org
@@ -119,12 +126,14 @@ export default async function PayrollPage({
       // Toute tournée planifiée ce mois-ci, quel que soit son statut —
       // contrairement à toursData ci-dessus (stat "tournées" affichée
       // telle quelle, uniquement les "done"), on a besoin ici de
-      // l'heure de départ PRÉVUE, qui existe dès la planification.
+      // l'heure de départ PRÉVUE (dès la planification) et de l'heure
+      // de fin réelle quand la tournée est terminée (end_at), pour le
+      // repli "aucun badge ce jour-là" ci-dessous.
       planningEnabled
         ? (() => {
             let query = supabase
               .from("planning_entries")
-              .select("driver_id, start_at")
+              .select("driver_id, start_at, end_at")
               .not("driver_id", "is", null)
               .gte("start_at", `${monthStart}T00:00:00`)
               .lt("start_at", `${monthEnd}T00:00:00`);
@@ -143,11 +152,26 @@ export default async function PayrollPage({
   // Le plus tôt start_at planifié ce jour-là, par chauffeur — clé
   // "driverId|YYYY-MM-DD" (calendrier Paris, voir parisCalendarDate).
   const plannedStartByDriverDay = new Map<string, string>();
-  for (const p of (planningStarts ?? []) as PlanningStart[]) {
+  // Tournées terminées (end_at renseigné) ce jour-là, par chauffeur —
+  // repli utilisé uniquement quand ce jour n'a absolument aucun badge
+  // (voir plus bas) : un jour avec une tournée "done" mais aucun badge
+  // enregistré ne doit pas disparaître purement et simplement du
+  // calcul des heures — ça revient sinon à ne pas payer une journée
+  // réellement travaillée simplement parce que la pointeuse n'a pas
+  // été utilisée. Moins fiable qu'un badge (ne couvre que la tournée
+  // elle-même, pas les tâches avant/après), mais toujours mieux que 0h
+  // pour un jour par ailleurs documenté comme travaillé.
+  const planningSpansByDriverDay = new Map<string, { start_at: string; end_at: string }[]>();
+  for (const p of (planningSpans ?? []) as PlanningSpan[]) {
     if (!p.driver_id) continue;
     const key = `${p.driver_id}|${parisCalendarDate(p.start_at)}`;
     const existing = plannedStartByDriverDay.get(key);
     if (!existing || p.start_at < existing) plannedStartByDriverDay.set(key, p.start_at);
+    if (p.end_at) {
+      const spans = planningSpansByDriverDay.get(key) ?? [];
+      spans.push({ start_at: p.start_at, end_at: p.end_at });
+      planningSpansByDriverDay.set(key, spans);
+    }
   }
 
   // Sessions de badge regroupées par chauffeur + jour, avec un
@@ -182,6 +206,19 @@ export default async function PayrollPage({
         0,
       );
     }
+    hoursByDriver.set(driverId, (hoursByDriver.get(driverId) ?? 0) + dayHours);
+  }
+  // Repli tournée : seulement pour les jours absents de
+  // badgesByDriverDay (aucun badge du tout ce jour-là) — un jour qui a
+  // déjà des badges passe toujours par la branche ci-dessus, jamais
+  // les deux sources cumulées pour le même jour.
+  for (const [key, spans] of planningSpansByDriverDay) {
+    if (badgesByDriverDay.has(key)) continue;
+    const driverId = key.split("|")[0] ?? key;
+    const dayHours = spans.reduce(
+      (total, s) => total + Math.max((new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 3_600_000, 0),
+      0,
+    );
     hoursByDriver.set(driverId, (hoursByDriver.get(driverId) ?? 0) + dayHours);
   }
 
@@ -222,7 +259,7 @@ export default async function PayrollPage({
     <div>
       <PageHeader
         title="Salaires"
-        description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
+        description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie, ou horaire de la tournée si aucun badge ce jour-là. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
       />
       <PayrollFilters month={month} drivers={(drivers ?? []).map((d) => ({ id: d.id, full_name: d.full_name }))} selectedDriver={selectedDriver} />
       {rows.length === 0 ? (

@@ -145,6 +145,26 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                   onBlur={(e) => e.target.value !== (s.depot_address ?? "") && updateDepotAddress(s.id, e.target.value)}
                   disabled={busy}
                 />
+                {s.depot_address && (
+                  <p className="mt-1 flex gap-3 text-sm">
+                    <a
+                      href={`https://www.google.com/maps?q=${encodeURIComponent(s.depot_address)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-teal-ink underline"
+                    >
+                      🗺️ Google Maps
+                    </a>
+                    <a
+                      href={`https://waze.com/ul?q=${encodeURIComponent(s.depot_address)}&navigate=yes`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-teal-ink underline"
+                    >
+                      🚗 Waze
+                    </a>
+                  </p>
+                )}
               </div>
             </li>
           ))}
