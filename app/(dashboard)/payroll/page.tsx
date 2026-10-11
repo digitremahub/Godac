@@ -5,29 +5,52 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { PayrollTable } from "@/components/payroll/PayrollTable";
 import { PayrollFilters } from "@/components/payroll/PayrollFilters";
-import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
+import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } from "@/lib/planning/dates";
 import { computeHourlyRates } from "@/lib/business/payroll";
+import { classifyLocation } from "@/lib/time-clock/classify-location";
 
 interface BadgeEntry {
   user_id: string;
   clocked_in_at: string;
   clocked_out_at: string;
+  clock_in_lat: number | string | null;
+  clock_in_lng: number | string | null;
 }
 
 interface DoneTour {
   driver_id: string | null;
 }
 
+interface PlanningStart {
+  driver_id: string | null;
+  start_at: string;
+}
+
 /**
- * Direction-only — hours worked come from clocked_in_at/clocked_out_at
- * (module Pointeuse, see app/(dashboard)/time-clock), the actual
- * badge-in/badge-out of the shift — never from a tour's start_at/
- * end_at (QR scan at departure/return), which only brackets the
- * delivery round itself, not the full paid shift (pre/post-tour tasks
- * fall outside it). hourly_rate is manual, per driver — there's no
- * "standard rate" to default to, each contract differs. Tour count
- * stays a separate, planning-sourced stat (when that module is also
- * enabled) — informative, not part of the hours calculation.
+ * Direction-only. Heures travaillées, par jour (calendrier Paris) et
+ * par chauffeur :
+ *
+ *  - si le badge d'entrée ce jour-là est géolocalisé au dépôt
+ *    (organizations.depot_lat/lng, même tolérance 300 m que
+ *    lib/time-clock/classify-location.ts) ET qu'une tournée est
+ *    planifiée ce jour-là pour ce chauffeur : l'heure de DÉBUT vient du
+ *    planning (start_at le plus tôt ce jour-là), l'heure de FIN reste
+ *    le dernier badge de sortie du jour — le badge d'arrivée au dépôt
+ *    confirme que le chauffeur a bien commencé "à l'heure du planning",
+ *    sans que le badge lui-même serve de point de départ (trajet
+ *    domicile-dépôt non rémunéré différemment selon qu'on badge pile à
+ *    l'heure ou un peu avant/après).
+ *  - sinon (pas de géoloc, position hors dépôt, ou pas de tournée
+ *    planifiée ce jour) : badge d'entrée → badge de sortie, comme
+ *    avant — le seul signal fiable qu'on ait dans ce cas.
+ *
+ * Ce n'est qu'une étape intermédiaire : à terme (une fois la
+ * géolocalisation fiable des deux côtés), le badge seul définira toute
+ * la plage horaire, planning ou pas.
+ *
+ * Le nombre de tournées reste une stat à part, issue uniquement des
+ * tournées "done" du planning — informative, jamais utilisée dans le
+ * calcul des heures/salaire.
  */
 export default async function PayrollPage({
   searchParams,
@@ -63,45 +86,107 @@ export default async function PayrollPage({
   const selectedDriver = params.driver ?? "";
   const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
 
-  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: existingPayslips }] = await Promise.all([
-    supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
-    // Separate table (not a column on `users`, whose RLS lets any org
-    // member read any row) — see 20260101000077.
-    supabase.from("user_contracts").select("user_id, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours"),
-    (() => {
-      let query = supabase
-        .from("time_clock_entries")
-        .select("user_id, clocked_in_at, clocked_out_at")
-        .not("clocked_out_at", "is", null)
-        .gte("clocked_in_at", `${monthStart}T00:00:00`)
-        .lt("clocked_in_at", `${monthEnd}T00:00:00`);
-      if (selectedDriver) query = query.eq("user_id", selectedDriver);
-      return query;
-    })(),
-    planningEnabled
-      ? (() => {
-          let query = supabase
-            .from("planning_entries")
-            .select("driver_id")
-            .eq("status", "done")
-            .not("driver_id", "is", null)
-            .gte("start_at", `${monthStart}T00:00:00`)
-            .lt("start_at", `${monthEnd}T00:00:00`);
-          if (selectedDriver) query = query.eq("driver_id", selectedDriver);
-          return query;
-        })()
-      : Promise.resolve({ data: null }),
-    payslipsEnabled
-      ? supabase.from("payslips").select("user_id").eq("period_start", monthStart).eq("period_end", periodEnd)
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningStarts }, { data: existingPayslips }, { data: organization }] =
+    await Promise.all([
+      supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+      // Separate table (not a column on `users`, whose RLS lets any org
+      // member read any row) — see 20260101000077.
+      supabase.from("user_contracts").select("user_id, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours"),
+      (() => {
+        let query = supabase
+          .from("time_clock_entries")
+          .select("user_id, clocked_in_at, clocked_out_at, clock_in_lat, clock_in_lng")
+          .not("clocked_out_at", "is", null)
+          .gte("clocked_in_at", `${monthStart}T00:00:00`)
+          .lt("clocked_in_at", `${monthEnd}T00:00:00`);
+        if (selectedDriver) query = query.eq("user_id", selectedDriver);
+        return query;
+      })(),
+      planningEnabled
+        ? (() => {
+            let query = supabase
+              .from("planning_entries")
+              .select("driver_id")
+              .eq("status", "done")
+              .not("driver_id", "is", null)
+              .gte("start_at", `${monthStart}T00:00:00`)
+              .lt("start_at", `${monthEnd}T00:00:00`);
+            if (selectedDriver) query = query.eq("driver_id", selectedDriver);
+            return query;
+          })()
+        : Promise.resolve({ data: null }),
+      // Toute tournée planifiée ce mois-ci, quel que soit son statut —
+      // contrairement à toursData ci-dessus (stat "tournées" affichée
+      // telle quelle, uniquement les "done"), on a besoin ici de
+      // l'heure de départ PRÉVUE, qui existe dès la planification.
+      planningEnabled
+        ? (() => {
+            let query = supabase
+              .from("planning_entries")
+              .select("driver_id, start_at")
+              .not("driver_id", "is", null)
+              .gte("start_at", `${monthStart}T00:00:00`)
+              .lt("start_at", `${monthEnd}T00:00:00`);
+            if (selectedDriver) query = query.eq("driver_id", selectedDriver);
+            return query;
+          })()
+        : Promise.resolve({ data: null }),
+      payslipsEnabled
+        ? supabase.from("payslips").select("user_id").eq("period_start", monthStart).eq("period_end", periodEnd)
+        : Promise.resolve({ data: null }),
+      supabase.from("organizations").select("depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
+    ]);
 
   const generatedDriverIds = (existingPayslips ?? []).map((p) => p.user_id);
 
-  const hoursByDriver = new Map<string, number>();
+  const depot =
+    organization?.depot_lat !== null && organization?.depot_lat !== undefined && organization?.depot_lng !== null && organization?.depot_lng !== undefined
+      ? { lat: Number(organization.depot_lat), lng: Number(organization.depot_lng) }
+      : null;
+
+  // Le plus tôt start_at planifié ce jour-là, par chauffeur — clé
+  // "driverId|YYYY-MM-DD" (calendrier Paris, voir parisCalendarDate).
+  const plannedStartByDriverDay = new Map<string, string>();
+  for (const p of (planningStarts ?? []) as PlanningStart[]) {
+    if (!p.driver_id) continue;
+    const key = `${p.driver_id}|${parisCalendarDate(p.start_at)}`;
+    const existing = plannedStartByDriverDay.get(key);
+    if (!existing || p.start_at < existing) plannedStartByDriverDay.set(key, p.start_at);
+  }
+
+  // Sessions de badge regroupées par chauffeur + jour, avec un
+  // indicateur "au moins un badge d'entrée ce jour-là était géolocalisé
+  // au dépôt" — seul cas où on substitue l'heure de badge d'entrée par
+  // l'heure planifiée pour ce jour.
+  interface DayBadges {
+    sessions: BadgeEntry[];
+    geoMatchedDepot: boolean;
+  }
+  const badgesByDriverDay = new Map<string, DayBadges>();
   for (const b of (badgeData ?? []) as BadgeEntry[]) {
-    const hours = (new Date(b.clocked_out_at).getTime() - new Date(b.clocked_in_at).getTime()) / 3_600_000;
-    hoursByDriver.set(b.user_id, (hoursByDriver.get(b.user_id) ?? 0) + Math.max(hours, 0));
+    const key = `${b.user_id}|${parisCalendarDate(b.clocked_in_at)}`;
+    const dayData = badgesByDriverDay.get(key) ?? { sessions: [], geoMatchedDepot: false };
+    dayData.sessions.push(b);
+    const point = b.clock_in_lat !== null && b.clock_in_lng !== null ? { lat: Number(b.clock_in_lat), lng: Number(b.clock_in_lng) } : null;
+    if (classifyLocation(point, depot, null) === "depot") dayData.geoMatchedDepot = true;
+    badgesByDriverDay.set(key, dayData);
+  }
+
+  const hoursByDriver = new Map<string, number>();
+  for (const [key, dayData] of badgesByDriverDay) {
+    const driverId = key.split("|")[0] ?? key;
+    const plannedStart = plannedStartByDriverDay.get(key);
+    let dayHours: number;
+    if (dayData.geoMatchedDepot && plannedStart) {
+      const lastClockOut = dayData.sessions.reduce((latest, s) => (s.clocked_out_at > latest ? s.clocked_out_at : latest), "");
+      dayHours = Math.max((new Date(lastClockOut).getTime() - new Date(plannedStart).getTime()) / 3_600_000, 0);
+    } else {
+      dayHours = dayData.sessions.reduce(
+        (total, s) => total + Math.max((new Date(s.clocked_out_at).getTime() - new Date(s.clocked_in_at).getTime()) / 3_600_000, 0),
+        0,
+      );
+    }
+    hoursByDriver.set(driverId, (hoursByDriver.get(driverId) ?? 0) + dayHours);
   }
 
   const toursByDriver = new Map<string, number>();
@@ -141,7 +226,7 @@ export default async function PayrollPage({
     <div>
       <PageHeader
         title="Salaires"
-        description="Heures travaillées (badge entrée → badge sortie) × taux horaire — le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
+        description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
       />
       <PayrollFilters month={month} drivers={(drivers ?? []).map((d) => ({ id: d.id, full_name: d.full_name }))} selectedDriver={selectedDriver} />
       {rows.length === 0 ? (

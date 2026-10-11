@@ -91,6 +91,25 @@ export function parisWallTimeToUtcISOString(day: string, time: string): string {
   return new Date(guessUTC + (guessUTC - asIfUTC)).toISOString();
 }
 
+/**
+ * UTC instant -> the calendar date it falls on in Europe/Paris — the
+ * read-side counterpart to parisWallTimeToUtcISOString above, needed
+ * anywhere a stored UTC timestamp (clocked_in_at, start_at…) must be
+ * grouped "by day" the way a French user would read it (e.g. pairing
+ * a badge-in with that same day's planned tour start for /payroll —
+ * grouping by the UTC calendar day instead would occasionally put a
+ * late-evening Paris badge into the next UTC day, same bug class
+ * documented at the top of this file).
+ */
+export function parisCalendarDate(isoInstant: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(new Date(isoInstant))
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 /** "YYYY-MM" -> {year, month} (1-indexed), assuming the caller already validated the format. */
 function parseMonth(monthStr: string): { year: number; month: number } {
   const parts = monthStr.split("-");

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mondayOf, addDays, toISODate, todayISO, firstOfMonth, addMonths, monthCalendarDays, parisWallTimeToUtcISOString } from "../dates";
+import { mondayOf, addDays, toISODate, todayISO, firstOfMonth, addMonths, monthCalendarDays, parisWallTimeToUtcISOString, parisCalendarDate } from "../dates";
 
 describe("mondayOf", () => {
   it("returns the same date when already a Monday", () => {
@@ -79,6 +79,21 @@ describe("parisWallTimeToUtcISOString", () => {
     } finally {
       process.env.TZ = originalTZ;
     }
+  });
+});
+
+describe("parisCalendarDate", () => {
+  it("resolves a UTC instant to the same Paris calendar day in winter", () => {
+    expect(parisCalendarDate("2026-01-15T07:30:00.000Z")).toBe("2026-01-15");
+  });
+
+  it("rolls a late-evening summer instant forward to the next Paris calendar day", () => {
+    // 23:30 UTC in summer (CEST, UTC+2) is already 01:30 the next day in Paris.
+    expect(parisCalendarDate("2026-07-15T23:30:00.000Z")).toBe("2026-07-16");
+  });
+
+  it("round-trips with parisWallTimeToUtcISOString", () => {
+    expect(parisCalendarDate(parisWallTimeToUtcISOString("2026-03-10", "08:00"))).toBe("2026-03-10");
   });
 });
 
