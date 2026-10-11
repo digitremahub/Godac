@@ -42,6 +42,12 @@ const bodySchema = z.object({
   // "initiales + mois/année" dès qu'elle est renseignée — voir
   // assignDriverCodeFromBirthDate ci-dessous.
   birth_date: z.string().nullable().optional(),
+  // Identité complète affichée sur la fiche de paie (voir
+  // lib/payslips/generate-pdf.tsx) — même périmètre direction-only que
+  // le reste du dossier RH ci-dessus.
+  matricule: z.string().trim().min(1).nullable().optional(),
+  social_security_number: z.string().trim().min(1).nullable().optional(),
+  classification: z.string().trim().min(1).nullable().optional(),
 });
 
 /**
@@ -134,6 +140,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     hr_status,
     hr_notes,
     birth_date,
+    matricule,
+    social_security_number,
+    classification,
     ...userFields
   } = parsed.data;
   const updateFields: Record<string, unknown> = { ...userFields };
@@ -195,7 +204,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     contract_end_date !== undefined ||
     hr_status !== undefined ||
     hr_notes !== undefined ||
-    birth_date !== undefined
+    birth_date !== undefined ||
+    matricule !== undefined ||
+    social_security_number !== undefined ||
+    classification !== undefined
   ) {
     const employeeFileFields: Record<string, unknown> = { organization_id: appUser.organization_id, user_id: id };
     if (contract_type !== undefined) employeeFileFields.contract_type = contract_type;
@@ -204,6 +216,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (hr_status !== undefined) employeeFileFields.hr_status = hr_status;
     if (hr_notes !== undefined) employeeFileFields.notes = hr_notes;
     if (birth_date !== undefined) employeeFileFields.birth_date = birth_date;
+    if (matricule !== undefined) employeeFileFields.matricule = matricule;
+    if (social_security_number !== undefined) employeeFileFields.social_security_number = social_security_number;
+    if (classification !== undefined) employeeFileFields.classification = classification;
     const { error: employeeFileError } = await supabase.from("employee_files").upsert(employeeFileFields, { onConflict: "user_id" });
     if (employeeFileError) return NextResponse.json({ error: employeeFileError.message }, { status: 500 });
 

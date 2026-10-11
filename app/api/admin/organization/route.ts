@@ -19,6 +19,10 @@ const bodySchema = z.object({
   depot_address: z.string().trim().min(1).nullable().optional(),
   siret: z.string().trim().min(1).nullable().optional(),
   legal_address: z.string().trim().min(1).nullable().optional(),
+  legal_form: z.string().trim().min(1).nullable().optional(),
+  ape_code: z.string().trim().min(1).nullable().optional(),
+  convention_collective: z.string().trim().min(1).nullable().optional(),
+  urssaf_number: z.string().trim().min(1).nullable().optional(),
 });
 
 /** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
@@ -39,6 +43,10 @@ export async function PATCH(req: Request) {
     depot_address,
     siret,
     legal_address,
+    legal_form,
+    ape_code,
+    convention_collective,
+    urssaf_number,
   } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
@@ -59,6 +67,10 @@ export async function PATCH(req: Request) {
   }
   if (siret !== undefined) profileFields.siret = siret;
   if (legal_address !== undefined) profileFields.legal_address = legal_address;
+  if (legal_form !== undefined) profileFields.legal_form = legal_form;
+  if (ape_code !== undefined) profileFields.ape_code = ape_code;
+  if (convention_collective !== undefined) profileFields.convention_collective = convention_collective;
+  if (urssaf_number !== undefined) profileFields.urssaf_number = urssaf_number;
 
   if (Object.keys(profileFields).length > 0) {
     const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
@@ -80,7 +92,7 @@ export async function PATCH(req: Request) {
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address",
+      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
     )
     .eq("id", appUser.organization_id)
     .single();

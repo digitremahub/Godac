@@ -3,7 +3,10 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO } from "@/lib/planning/dates";
+import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays } from "@/lib/planning/dates";
+
+const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const MAX_VISIBLE_PER_DAY = 3;
 
 const STATUS_BADGE: Record<string, string> = {
   planned: "badge-neutral",
@@ -83,12 +86,21 @@ export default async function MyPlanningPage({
   const anchor = anchorInput && !Number.isNaN(Date.parse(anchorInput)) ? toISODate(new Date(anchorInput)) : todayISO();
   const { start, end, prevAnchor, nextAnchor, label } = windowFor(view, anchor);
 
+  // Month view's calendar grid shows leading/trailing days from
+  // adjacent months (to fill out the 7-column grid) — read those
+  // days' entries too, same as the manager-facing /planning month
+  // view, so a tour on e.g. the last Monday of the previous month
+  // isn't silently missing from the grid.
+  const calendarDays = view === "month" ? monthCalendarDays(anchor.slice(0, 7)) : null;
+  const queryStart = calendarDays ? (calendarDays[0] ?? start) : start;
+  const queryEnd = calendarDays ? addDays(calendarDays[calendarDays.length - 1] ?? end, 1) : end;
+
   const { data: entries } = await supabase
     .from("planning_entries")
     .select("id, tour_number, start_at, end_at, status, vehicles(registration), services(name)")
     .eq("driver_id", appUser.id)
-    .gte("start_at", `${start}T00:00:00`)
-    .lt("start_at", `${end}T00:00:00`)
+    .gte("start_at", `${queryStart}T00:00:00`)
+    .lt("start_at", `${queryEnd}T00:00:00`)
     .order("start_at");
 
   const dayCount = Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000);
@@ -120,7 +132,43 @@ export default async function MyPlanningPage({
         </Link>
       </div>
 
-      {(entries ?? []).length === 0 ? (
+      {view === "month" && calendarDays ? (
+        <div className="grid grid-cols-7 gap-1.5 text-xs">
+          {DAY_LABELS.map((l) => (
+            <div key={l} className="px-1 text-navy/40">
+              {l}
+            </div>
+          ))}
+          {calendarDays.map((dayISO) => {
+            const dayEntries = (entries ?? []).filter((e: any) => e.start_at.slice(0, 10) === dayISO);
+            const inMonth = dayISO.slice(0, 7) === anchor.slice(0, 7);
+            return (
+              <Link
+                key={dayISO}
+                href={`/planning/mine?view=day&anchor=${dayISO}`}
+                className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
+                  inMonth ? "bg-white" : "bg-navy/5 text-navy/30"
+                }`}
+              >
+                <span className="font-medium">{Number(dayISO.slice(8, 10))}</span>
+                {dayEntries.slice(0, MAX_VISIBLE_PER_DAY).map((e: any) => (
+                  <span
+                    key={e.id}
+                    className={`truncate rounded px-1 text-[10px] ${
+                      e.status === "done" ? "bg-teal/15 text-navy/70" : e.status === "in_progress" ? "bg-gold/20 text-navy/70" : "bg-navy/10 text-navy/60"
+                    }`}
+                  >
+                    n°{e.tour_number}
+                  </span>
+                ))}
+                {dayEntries.length > MAX_VISIBLE_PER_DAY && (
+                  <span className="text-[10px] text-navy/40">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ) : (entries ?? []).length === 0 ? (
         <EmptyState title="Aucune tournée sur cette période" description="Rien ne vous est encore assigné." />
       ) : (
         <div className="flex flex-col gap-4">
