@@ -10,6 +10,9 @@ import { PasskeyManager } from "@/components/account/PasskeyManager";
 import { PushNotificationToggle } from "@/components/account/PushNotificationToggle";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { isModuleEnabled } from "@/lib/organization/modules";
+import Link from "next/link";
+
+const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
 export default async function AccountPage() {
   const appUser = await requireAppUser();
@@ -35,6 +38,28 @@ export default async function AccountPage() {
   }
   const pushEnabled = await isModuleEnabled(supabase, appUser.organization_id, "push_notifications");
 
+  // Raccourci de téléchargement directement accessible sur son propre
+  // profil — en plus de /payslips (déjà rôle-scopé à "mes bulletins"
+  // pour tout le monde), pour qu'un chauffeur n'ait jamais besoin de
+  // chercher où trouver sa fiche générée.
+  const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
+  const payslips = payslipsEnabled
+    ? (
+        await supabase
+          .from("payslips")
+          .select("id, period_start, gross_amount, net_amount, file_path")
+          .eq("user_id", appUser.id)
+          .order("period_start", { ascending: false })
+          .limit(5)
+      ).data
+    : null;
+  const payslipsWithUrls = await Promise.all(
+    (payslips ?? []).map(async (p) => {
+      const { data: signed } = await supabase.storage.from("payslips").createSignedUrl(p.file_path, 300);
+      return { ...p, downloadUrl: signed?.signedUrl ?? null };
+    }),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Mon compte" description="Vos informations de connexion GODAC." />
@@ -47,6 +72,33 @@ export default async function AccountPage() {
       </Card>
 
       {pushEnabled && <PushNotificationToggle />}
+
+      {payslipsEnabled && (
+        <Card className="flex max-w-md flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Mes fiches de paie</p>
+            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+              Voir tout →
+            </Link>
+          </div>
+          {payslipsWithUrls.length === 0 ? (
+            <p className="text-xs text-navy/40">Aucun bulletin généré.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {payslipsWithUrls.map((p) => (
+                <li key={p.id} className="flex items-center justify-between text-sm">
+                  <span>{PAYSLIP_MONTH_LABEL.format(new Date(p.period_start))}</span>
+                  {p.downloadUrl && (
+                    <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
+                      Télécharger
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {isFieldRole && (
         <>
