@@ -4,6 +4,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ClockButton } from "@/components/time-clock/ClockButton";
 import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/classify-location";
+import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import type { Coordinates } from "@/lib/business/fuel-profitability";
 
 function formatDuration(startIso: string, endIso: string | null) {
@@ -64,11 +65,10 @@ export default async function TimeClockPage() {
 
   const isDirection = appUser.role === "direction";
 
-  const [{ data: openEntry }, { data: organization }] = await Promise.all([
+  const [{ data: openEntry }, { depotsFor }] = await Promise.all([
     supabase.from("time_clock_entries").select("id").eq("user_id", appUser.id).is("clocked_out_at", null).maybeSingle(),
-    supabase.from("organizations").select("depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
+    buildDriverDepotsMap(supabase, appUser.organization_id),
   ]);
-  const depotCoords = toCoords(organization?.depot_lat, organization?.depot_lng);
 
   let query = supabase
     .from("time_clock_entries")
@@ -98,6 +98,7 @@ export default async function TimeClockPage() {
             const homeCoords = toCoords(e.users?.address_lat, e.users?.address_lng);
             const inCoords = toCoords(e.clock_in_lat, e.clock_in_lng);
             const outCoords = e.clocked_out_at ? toCoords(e.clock_out_lat, e.clock_out_lng) : null;
+            const depotCoords = depotsFor(e.users?.id ?? "");
             const inLocation = classifyLocation(inCoords, depotCoords, homeCoords);
             const outLocation = e.clocked_out_at ? classifyLocation(outCoords, depotCoords, homeCoords) : null;
             return (

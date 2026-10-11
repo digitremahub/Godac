@@ -21,7 +21,7 @@ export default async function OrganizationSettingsPage() {
       .single(),
     isModuleEnabled(supabase, appUser.organization_id, "ocr"),
     isModuleEnabled(supabase, appUser.organization_id, "assistant"),
-    supabase.from("services").select("id, name, code").order("name"),
+    supabase.from("services").select("id, name, code, depot_address").order("name"),
     supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
     supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
   ]);
