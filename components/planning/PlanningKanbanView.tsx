@@ -130,6 +130,21 @@ export function PlanningKanbanView({
     }
   }
 
+  async function removeEntry(entryId: string) {
+    setBusyId(entryId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entryId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const driversWithEntries = drivers.filter((d) => entries.some((e) => e.driver_id === d.id));
   const columns = driversWithEntries.length > 0 ? driversWithEntries : drivers;
 
@@ -182,9 +197,14 @@ export function PlanningKanbanView({
                       <span className="flex items-center gap-1">
                         <span className={STATUS_BADGE[e.status] ?? "badge-neutral"}>{STATUS_LABEL[e.status] ?? e.status}</span>
                         {e.status === "planned" && editingId !== e.id && (
-                          <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
-                            ✎
-                          </button>
+                          <>
+                            <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
+                              ✎
+                            </button>
+                            <button className="text-navy/30 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
+                              ×
+                            </button>
+                          </>
                         )}
                       </span>
                     </div>

@@ -90,6 +90,21 @@ export function PlanningListView({
     }
   }
 
+  async function removeEntry(entryId: string) {
+    setBusyId(entryId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/planning/entries/${entryId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const serviceNameById = new Map(services.map((s) => [s.id, s.name]));
   const sorted = [...entries].sort((a, b) => a.start_at.localeCompare(b.start_at));
 
@@ -120,6 +135,7 @@ export function PlanningListView({
                 <th className="pb-2">Chauffeur</th>
                 <th className="pb-2">Véhicule</th>
                 <th className="pb-2">Statut</th>
+                <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
@@ -219,6 +235,19 @@ export function PlanningListView({
                     )}
                   </td>
                   <td className="py-2">{STATUS_LABEL[e.status] ?? e.status}</td>
+                  <td className="py-2">
+                    {e.status === "planned" && (
+                      <button
+                        type="button"
+                        className="text-navy/30 hover:text-orange-ink"
+                        onClick={() => removeEntry(e.id)}
+                        aria-label="Supprimer"
+                        title="Supprimer"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
