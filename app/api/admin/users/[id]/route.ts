@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { computeDriverCodeBase } from "@/lib/business/driver-code";
 
 const bodySchema = z.object({
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
@@ -36,7 +38,46 @@ const bodySchema = z.object({
   contract_end_date: z.string().nullable().optional(),
   hr_status: z.enum(["active", "suspended", "terminated"]).optional(),
   hr_notes: z.string().nullable().optional(),
+  // Déclenche le recalcul du code de secours (users.driver_code) en
+  // "initiales + mois/année" dès qu'elle est renseignée — voir
+  // assignDriverCodeFromBirthDate ci-dessous.
+  birth_date: z.string().nullable().optional(),
 });
+
+/**
+ * Recalcule le code de secours d'un chauffeur en "initiales +
+ * mois/année de naissance" (ex: FT11/88) et le pose sur `users`,
+ * avec un suffixe numérique si une collision existe déjà dans
+ * l'organisation (deux chauffeurs aux mêmes initiales et au même
+ * mois/année de naissance) — rare mais pas impossible, et la colonne
+ * reste unique par organisation (20260101000056).
+ */
+async function assignDriverCodeFromBirthDate(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userId: string,
+  fullName: string,
+  birthDateISO: string,
+) {
+  const base = computeDriverCodeBase(fullName, birthDateISO);
+  let candidate = base;
+  let suffix = 2;
+  // Au plus une poignée d'organisations auront jamais plus de 1-2
+  // collisions réelles — une boucle bornée évite simplement un cas
+  // pathologique de données corrompues de tourner indéfiniment.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const { data: conflict } = await supabase
+      .from("users")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("driver_code", candidate)
+      .neq("id", userId)
+      .maybeSingle();
+    if (!conflict) break;
+    candidate = `${base}-${suffix++}`;
+  }
+  await supabase.from("users").update({ driver_code: candidate }).eq("id", userId);
+}
 
 /**
  * Role changes are a plain update to `public.users.role` — nothing
@@ -92,6 +133,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     contract_end_date,
     hr_status,
     hr_notes,
+    birth_date,
     ...userFields
   } = parsed.data;
   const updateFields: Record<string, unknown> = { ...userFields };
@@ -152,7 +194,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     hire_date !== undefined ||
     contract_end_date !== undefined ||
     hr_status !== undefined ||
-    hr_notes !== undefined
+    hr_notes !== undefined ||
+    birth_date !== undefined
   ) {
     const employeeFileFields: Record<string, unknown> = { organization_id: appUser.organization_id, user_id: id };
     if (contract_type !== undefined) employeeFileFields.contract_type = contract_type;
@@ -160,8 +203,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (contract_end_date !== undefined) employeeFileFields.contract_end_date = contract_end_date;
     if (hr_status !== undefined) employeeFileFields.hr_status = hr_status;
     if (hr_notes !== undefined) employeeFileFields.notes = hr_notes;
+    if (birth_date !== undefined) employeeFileFields.birth_date = birth_date;
     const { error: employeeFileError } = await supabase.from("employee_files").upsert(employeeFileFields, { onConflict: "user_id" });
     if (employeeFileError) return NextResponse.json({ error: employeeFileError.message }, { status: 500 });
+
+    if (birth_date) {
+      // full_name peut venir d'être changé dans la même requête (userFields.full_name)
+      // ou être simplement celui déjà en base — toujours relu pour éviter de se fier à
+      // un `targetUser` dont le select ne porte pas forcément sur full_name.
+      const { data: userRow } = await supabase.from("users").select("full_name").eq("id", id).single();
+      if (userRow?.full_name) await assignDriverCodeFromBirthDate(supabase, appUser.organization_id, id, userRow.full_name, birth_date);
+    }
   }
 
   return NextResponse.json({ user: targetUser ?? { id } });

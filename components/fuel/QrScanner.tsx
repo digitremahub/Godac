@@ -152,17 +152,17 @@ function ManualScanInput({
       </div>
       {expected === "driver" && (
         <div className="flex flex-col gap-1.5 border-t border-navy/10 pt-3">
-          <p className="text-xs text-navy/50">Pas de badge sous la main ? Le chauffeur peut donner son code à 6 chiffres :</p>
+          <p className="text-xs text-navy/50">
+            Pas de badge sous la main ? Le chauffeur peut donner son code (initiales + mois/année de naissance, ex: FT11/88) :
+          </p>
           <div className="flex gap-2">
             <input
               className="input"
-              inputMode="numeric"
-              maxLength={6}
               placeholder="Code chauffeur"
               value={driverCode}
-              onChange={(e) => setDriverCode(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => setDriverCode(e.target.value)}
             />
-            <button className="btn-secondary shrink-0" disabled={lookingUp || driverCode.length !== 6} onClick={lookupByDriverCode}>
+            <button className="btn-secondary shrink-0" disabled={lookingUp || driverCode.trim().length === 0} onClick={lookupByDriverCode}>
               {lookingUp ? "…" : "Valider"}
             </button>
           </div>

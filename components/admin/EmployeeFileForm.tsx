@@ -34,6 +34,7 @@ export function EmployeeFileForm({
   initialContractEndDate,
   initialHrStatus,
   initialNotes,
+  initialBirthDate,
 }: {
   userId: string;
   initialContractType: ContractType | null;
@@ -41,6 +42,7 @@ export function EmployeeFileForm({
   initialContractEndDate: string | null;
   initialHrStatus: HrStatus;
   initialNotes: string | null;
+  initialBirthDate: string | null;
 }) {
   const router = useRouter();
   const [contractType, setContractType] = useState<ContractType | "">(initialContractType ?? "");
@@ -48,6 +50,7 @@ export function EmployeeFileForm({
   const [contractEndDate, setContractEndDate] = useState(initialContractEndDate ?? "");
   const [hrStatus, setHrStatus] = useState<HrStatus>(initialHrStatus);
   const [notes, setNotes] = useState(initialNotes ?? "");
+  const [birthDate, setBirthDate] = useState(initialBirthDate ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -66,6 +69,7 @@ export function EmployeeFileForm({
           contract_end_date: contractEndDate || null,
           hr_status: hrStatus,
           hr_notes: notes || null,
+          birth_date: birthDate || null,
         }),
       });
       const json = await res.json();
@@ -112,6 +116,13 @@ export function EmployeeFileForm({
         <div>
           <label className="label">Fin de contrat (si CDD/intérim)</label>
           <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Date de naissance</label>
+          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          <p className="mt-1 text-sm text-navy/50">
+            Recalcule automatiquement le code de secours du badge (initiales + mois/année, ex: FT11/88).
+          </p>
         </div>
       </div>
       <div>
