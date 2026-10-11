@@ -34,6 +34,7 @@ export function EmployeeFileForm({
   initialContractEndDate,
   initialHrStatus,
   initialNotes,
+  initialBirthDate,
   initialMatricule,
   initialSocialSecurityNumber,
   initialClassification,
@@ -44,6 +45,7 @@ export function EmployeeFileForm({
   initialContractEndDate: string | null;
   initialHrStatus: HrStatus;
   initialNotes: string | null;
+  initialBirthDate: string | null;
   initialMatricule: string | null;
   initialSocialSecurityNumber: string | null;
   initialClassification: string | null;
@@ -54,6 +56,7 @@ export function EmployeeFileForm({
   const [contractEndDate, setContractEndDate] = useState(initialContractEndDate ?? "");
   const [hrStatus, setHrStatus] = useState<HrStatus>(initialHrStatus);
   const [notes, setNotes] = useState(initialNotes ?? "");
+  const [birthDate, setBirthDate] = useState(initialBirthDate ?? "");
   const [matricule, setMatricule] = useState(initialMatricule ?? "");
   const [socialSecurityNumber, setSocialSecurityNumber] = useState(initialSocialSecurityNumber ?? "");
   const [classification, setClassification] = useState(initialClassification ?? "");
@@ -75,6 +78,7 @@ export function EmployeeFileForm({
           contract_end_date: contractEndDate || null,
           hr_status: hrStatus,
           hr_notes: notes || null,
+          birth_date: birthDate || null,
           matricule: matricule.trim() || null,
           social_security_number: socialSecurityNumber.trim() || null,
           classification: classification.trim() || null,
@@ -124,6 +128,13 @@ export function EmployeeFileForm({
         <div>
           <label className="label">Fin de contrat (si CDD/intérim)</label>
           <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Date de naissance</label>
+          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          <p className="mt-1 text-sm text-navy/50">
+            Recalcule automatiquement le code de secours du badge (initiales + mois/année, ex: FT11/88).
+          </p>
         </div>
         <div>
           <label className="label">Matricule</label>

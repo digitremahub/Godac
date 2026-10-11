@@ -12,9 +12,15 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
  */
 export async function GET(req: Request) {
   await requireAppUser();
-  const code = new URL(req.url).searchParams.get("code")?.trim();
-  if (!code || !/^\d{6}$/.test(code)) {
-    return NextResponse.json({ error: "Code à 6 chiffres attendu." }, { status: 400 });
+  // Deux formats cohabitent : l'ancien (6 chiffres aléatoires, pour
+  // les comptes sans date de naissance renseignée) et le nouveau
+  // (initiales + mois/année, ex: FT11/88, voir lib/business/driver-code.ts)
+  // — normalisé en majuscules ici pour tolérer une saisie en bas de casse
+  // des initiales à la pompe.
+  const codeInput = new URL(req.url).searchParams.get("code")?.trim();
+  const code = codeInput?.toLocaleUpperCase("fr-FR");
+  if (!code || !/^[A-ZÀ-ÖØ-Þ0-9/-]{2,20}$/.test(code)) {
+    return NextResponse.json({ error: "Code invalide." }, { status: 400 });
   }
 
   const supabase = await createServerSupabaseClient();

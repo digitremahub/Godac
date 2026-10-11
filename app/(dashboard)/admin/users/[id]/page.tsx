@@ -118,7 +118,9 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       employeeFilesEnabled
         ? supabase
             .from("employee_files")
-            .select("id, contract_type, hire_date, contract_end_date, hr_status, notes, matricule, social_security_number, classification")
+            .select(
+              "id, contract_type, hire_date, contract_end_date, hr_status, notes, birth_date, matricule, social_security_number, classification",
+            )
             .eq("user_id", id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -297,6 +299,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                   initialContractEndDate={employeeFile?.contract_end_date ?? null}
                   initialHrStatus={(employeeFile?.hr_status as "active" | "suspended" | "terminated" | undefined) ?? "active"}
                   initialNotes={employeeFile?.notes ?? null}
+                  initialBirthDate={employeeFile?.birth_date ?? null}
                   initialMatricule={employeeFile?.matricule ?? null}
                   initialSocialSecurityNumber={employeeFile?.social_security_number ?? null}
                   initialClassification={employeeFile?.classification ?? null}
