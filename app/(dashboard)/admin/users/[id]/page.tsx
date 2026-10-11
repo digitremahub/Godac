@@ -176,6 +176,13 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
     .map((us: any) => `${us.services.name} (${STATUS_LABELS[us.status] ?? us.status})`)
     .join(", ");
   const serviceAssignments = (u.user_services ?? []).map((us: any) => ({ service_id: us.service_id, status: us.status }));
+  // Titulaire/polyvalent n'est pas un champ à part : un chauffeur
+  // qualifié sur 2+ services est de fait polyvalent entre eux (et
+  // c'est ce qui autorise le Kanban "Par service" à le proposer en
+  // glisser-déposer) ; qualifié sur un seul, il est titulaire de celui-ci.
+  const qualificationCount = (u.user_services ?? []).length;
+  const qualificationBadge =
+    qualificationCount >= 2 ? { label: "Polyvalent", className: "badge-gold" } : qualificationCount === 1 ? { label: "Titulaire", className: "badge-neutral" } : null;
 
   const isFieldRole = u.role === "chauffeur" || u.role === "manager_chauffeur";
   const canConvene = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) && !isSelf;
@@ -198,7 +205,10 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           <p>{u.role_title ?? "—"}</p>
         </Card>
         <Card>
-          <p className="text-sm text-navy/50">Service</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-navy/50">Service</p>
+            {qualificationBadge && <span className={qualificationBadge.className}>{qualificationBadge.label}</span>}
+          </div>
           <p>{serviceNames || "—"}</p>
         </Card>
         <Card>
