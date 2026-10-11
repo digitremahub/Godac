@@ -233,6 +233,26 @@ export function OrganizationSettingsForm({
           value={depotAddressValue}
           onChange={(e) => setDepotAddressValue(e.target.value)}
         />
+        {depotAddressValue.trim() && (
+          <p className="mt-1 flex gap-3 text-sm">
+            <a
+              href={`https://www.google.com/maps?q=${encodeURIComponent(depotAddressValue.trim())}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-teal-ink underline"
+            >
+              🗺️ Google Maps
+            </a>
+            <a
+              href={`https://waze.com/ul?q=${encodeURIComponent(depotAddressValue.trim())}&navigate=yes`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-teal-ink underline"
+            >
+              🚗 Waze
+            </a>
+          </p>
+        )}
         <p className="mt-1 text-sm text-navy/50">
           Sert à estimer la distance d&apos;un retour direct à domicile par rapport au retour habituel au dépôt
           (rentabilité carburant).
