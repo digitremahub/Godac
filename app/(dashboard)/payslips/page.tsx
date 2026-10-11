@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { GeneratePayslipForm } from "@/components/payslips/GeneratePayslipForm";
+import { RegeneratePayslipButton } from "@/components/payslips/RegeneratePayslipButton";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
@@ -36,7 +37,7 @@ export default async function PayslipsPage() {
     (() => {
       let query = supabase
         .from("payslips")
-        .select("id, period_start, period_end, gross_amount, net_amount, file_path, users(full_name)")
+        .select("id, period_start, period_end, gross_amount, net_amount, meal_vouchers_amount, bonus_amount, file_path, users!payslips_user_id_fkey(full_name)")
         .order("period_start", { ascending: false })
         .limit(100);
       if (!isDirection) query = query.eq("user_id", appUser.id);
@@ -79,6 +80,13 @@ export default async function PayslipsPage() {
                   <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
                     Télécharger
                   </a>
+                )}
+                {isDirection && (
+                  <RegeneratePayslipButton
+                    payslipId={p.id}
+                    initialMealVouchers={Number(p.meal_vouchers_amount ?? 0)}
+                    initialBonus={Number(p.bonus_amount ?? 0)}
+                  />
                 )}
               </span>
             </div>
