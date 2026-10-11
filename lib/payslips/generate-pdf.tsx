@@ -47,6 +47,10 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#ddd" },
   cellDesignation: { flex: 3, padding: 4, fontSize: 9 },
   cellValue: { flex: 1, padding: 4, fontSize: 9, textAlign: "right" },
+  cellNote: { fontSize: 7, color: "#888" },
+  tableSubtotalRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#ddd", backgroundColor: "#f5f5f5" },
+  cellDesignationBold: { flex: 3, padding: 4, fontSize: 9 },
+  cellValueBold: { flex: 1, padding: 4, fontSize: 9, textAlign: "right" },
   headerCell: { padding: 4, fontSize: 8, fontWeight: 700 },
   netRow: { flexDirection: "row", marginTop: 12, justifyContent: "flex-end" },
   netBox: { borderWidth: 1.5, borderColor: "#0A0F1E", padding: 8, width: 180, alignItems: "center" },
@@ -59,8 +63,17 @@ const styles = StyleSheet.create({
   disclaimer: { marginTop: 28, fontSize: 7.5, color: "#888", lineHeight: 1.4 },
 });
 
+/**
+ * fr-FR's toLocaleString groups thousands with U+202F (narrow no-break
+ * space) — a codepoint the vendored NotoSans-Regular.ttf has no glyph
+ * for, so pdfkit fell back to rendering a stray box glyph overlapping
+ * the adjacent digits ("1⫽867,06" instead of "1 867,06"). Swapping it
+ * (and the plain U+00A0 non-break space some locales use) for an
+ * ordinary space sidesteps the missing glyph entirely.
+ */
 function formatEuro(n: number): string {
-  return `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const grouped = n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[  ]/g, " ");
+  return `${grouped} €`;
 }
 
 export interface PayslipPdfData {
@@ -97,6 +110,14 @@ export interface PayslipPdfData {
   /** Cumuls depuis le 1er janvier, cette fiche incluse — somme des bulletins déjà générés cette année-là. */
   cumulGrossYTD: number;
   cumulNetYTD: number;
+  /**
+   * Grille de cotisations configurée par la direction (voir
+   * supabase/migrations/20260101000094 et PayslipContributionLinesPanel),
+   * déjà appliquée au brut — null/vide quand l'organisation n'a encore
+   * rien configuré, auquel cas la ligne globale "estimation" reste
+   * affichée (comportement historique, inchangé).
+   */
+  contributionLines: { label: string; salarialAmount: number; patronalAmount: number }[] | null;
 }
 
 function PayslipDocument({ data }: { data: PayslipPdfData }) {
@@ -166,11 +187,35 @@ function PayslipDocument({ data }: { data: PayslipPdfData }) {
             <Text style={styles.cellValue}>{formatEuro(data.grossSalary)}</Text>
             <Text style={styles.cellValue}></Text>
           </View>
-          <View style={styles.tableRow}>
-            <Text style={styles.cellDesignation}>Cotisations sociales (estimation globale)</Text>
-            <Text style={styles.cellValue}></Text>
-            <Text style={styles.cellValue}>{formatEuro(estimatedContributions)}</Text>
-          </View>
+          {data.contributionLines && data.contributionLines.length > 0 ? (
+            <>
+              {data.contributionLines.map((line, i) => (
+                <View key={i} style={styles.tableRow}>
+                  <View style={styles.cellDesignation}>
+                    <Text>{line.label}</Text>
+                    {line.patronalAmount > 0 && (
+                      <Text style={styles.cellNote}>Charge patronale indicative : {formatEuro(line.patronalAmount)}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.cellValue}></Text>
+                  <Text style={styles.cellValue}>{formatEuro(line.salarialAmount)}</Text>
+                </View>
+              ))}
+              <View style={styles.tableSubtotalRow}>
+                <Text style={styles.cellDesignationBold}>Total des retenues</Text>
+                <Text style={styles.cellValueBold}></Text>
+                <Text style={styles.cellValueBold}>
+                  {formatEuro(data.contributionLines.reduce((total, l) => total + l.salarialAmount, 0))}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.tableRow}>
+              <Text style={styles.cellDesignation}>Cotisations sociales (estimation globale)</Text>
+              <Text style={styles.cellValue}></Text>
+              <Text style={styles.cellValue}>{formatEuro(estimatedContributions)}</Text>
+            </View>
+          )}
           {bonus > 0 && (
             <View style={styles.tableRow}>
               <Text style={styles.cellDesignation}>Prime(s)</Text>
@@ -205,8 +250,11 @@ function PayslipDocument({ data }: { data: PayslipPdfData }) {
 
         <Text style={styles.disclaimer}>
           Document indicatif généré automatiquement à partir des données contractuelles enregistrées dans GODAC
-          (salaire brut/net saisis par la direction). Il ne détaille pas les cotisations ligne par ligne (URSSAF,
-          retraite, prévoyance...), n&apos;intègre pas le prélèvement à la source personnalisé, et ne constitue ni un
+          (salaire brut/net saisis par la direction).{" "}
+          {data.contributionLines && data.contributionLines.length > 0
+            ? "Le détail des cotisations ci-dessus reprend les taux saisis par la direction (à vérifier auprès de votre expert-comptable) — "
+            : "Il ne détaille pas les cotisations ligne par ligne (URSSAF, retraite, prévoyance...), "}
+          n&apos;intègre pas le prélèvement à la source personnalisé, et ne constitue ni un
           bulletin de paie officiel au sens de l&apos;article R3243-1 du code du travail, ni une déclaration sociale
           nominative (DSN). Les heures travaillées, congés pris et cumuls annuels affichés sont calculés à partir des
           données GODAC (pointeuse, congés, bulletins déjà générés) et n&apos;intègrent ni heures supplémentaires
