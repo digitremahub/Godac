@@ -21,7 +21,7 @@ export async function GET() {
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);
 
-  const [openRes, plannedRes] = await Promise.all([
+  const [openRes, plannedRes, qualificationsRes] = await Promise.all([
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, start_km, vehicles(id, registration)")
@@ -37,8 +37,18 @@ export async function GET() {
       .lt("start_at", todayEnd.toISOString())
       .order("start_at")
       .limit(1),
+    // A driver qualified on 2+ services is polyvalent between them —
+    // StartTourFlow shows them a service picker only in that case
+    // (see app/api/tours POST's own comment on why the service
+    // otherwise just follows the scanned vehicle).
+    supabase.from("user_services").select("services(id, name)").eq("user_id", appUser.id),
   ]);
 
   if (openRes.error) return NextResponse.json({ error: openRes.error.message }, { status: 500 });
-  return NextResponse.json({ tour: openRes.data, plannedToday: plannedRes.data?.[0] ?? null });
+  const qualifiedServices = ((qualificationsRes.data ?? []) as any[]).map((r) => r.services).filter(Boolean);
+  return NextResponse.json({
+    tour: openRes.data,
+    plannedToday: plannedRes.data?.[0] ?? null,
+    polyvalentServices: qualifiedServices.length >= 2 ? qualifiedServices : null,
+  });
 }

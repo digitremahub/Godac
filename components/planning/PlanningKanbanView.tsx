@@ -30,7 +30,6 @@ interface PlanningEntry {
 
 const STATUS_BADGE: Record<string, string> = { planned: "badge-neutral", in_progress: "badge-gold", done: "badge-teal" };
 const STATUS_LABEL: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
-const DRIVER_DRAG_PREFIX = "driver:";
 
 /**
  * Driver-centric board for the current week: one column per chauffeur,
@@ -42,13 +41,15 @@ const DRIVER_DRAG_PREFIX = "driver:";
  * number/vehicle/time without needing to drag.
  *
  * A second "Par service" mode turns the axis around: columns become
- * services, cards become polyvalent drivers (qualified on 2+
- * services via user_services — the only ones a service move makes
- * sense for; titulaires stay out of this board entirely). Dragging
- * one into another service column bulk-moves all of their *planned*
- * entries for the displayed week to that service — a weekly
- * rebalancing tool, it never touches their standing qualifications
- * (those are edited from the driver's own fiche).
+ * services, cards become individual *tours* (planning_entries) staffed
+ * by polyvalent drivers (qualified on 2+ services via user_services —
+ * titulaires, with nowhere else to go, stay out of this board). A
+ * polyvalent driver can legitimately work different services on
+ * different days of the same week, so the drag unit here is the tour,
+ * not the driver — dragging one tour's card into another service
+ * column reassigns just that tour's service_id, same as the week
+ * grid's day-to-day drag reassigns a day. It never touches the
+ * driver's standing qualifications (those are edited from their fiche).
  */
 export function PlanningKanbanView({
   services,
@@ -107,32 +108,21 @@ export function PlanningKanbanView({
     }
   }
 
-  async function reassignDriverService(driverId: string, targetServiceId: string) {
-    const driverEntries = entries.filter((e) => e.driver_id === driverId && e.status === "planned" && e.service_id !== targetServiceId);
-    if (driverEntries.length === 0) return;
-    setBusyId(driverId);
+  async function reassignEntryService(entryId: string, targetServiceId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry || entry.status !== "planned" || entry.service_id === targetServiceId) return;
+    setBusyId(entryId);
     setError(null);
     setWarning(null);
     try {
-      const results = await Promise.all(
-        driverEntries.map((e) =>
-          fetch(`/api/planning/entries/${e.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ service_id: targetServiceId }),
-          }).then(async (res) => ({ ok: res.ok, json: await res.json() })),
-        ),
-      );
-      const failed = results.filter((r) => !r.ok);
-      if (failed.length > 0) {
-        setError(
-          failed.length === driverEntries.length
-            ? "Aucune tournée n'a pu être déplacée vers ce service (conflit avec une tournée existante)."
-            : `${failed.length} tournée(s) sur ${driverEntries.length} n'ont pas pu être déplacées (conflit avec une tournée existante).`,
-        );
-      }
-      const firstWarning = results.map((r) => r.json?.warning).find(Boolean);
-      if (firstWarning) setWarning(firstWarning);
+      const res = await fetch(`/api/planning/entries/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_id: targetServiceId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      if (json.warning) setWarning(json.warning);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -196,12 +186,8 @@ export function PlanningKanbanView({
   const columns = driversWithEntries.length > 0 ? driversWithEntries : drivers;
 
   const serviceNameById = new Map(services.map((s) => [s.id, s.name]));
-  const polyvalentDrivers = drivers.filter((d) => (driverServiceIds[d.id]?.length ?? 0) >= 2);
-  const polyvalentEntriesByDriver = new Map<string, PlanningEntry[]>();
-  for (const d of polyvalentDrivers) {
-    const list = entries.filter((e) => e.driver_id === d.id).sort((a, b) => a.start_at.localeCompare(b.start_at));
-    if (list.length > 0) polyvalentEntriesByDriver.set(d.id, list);
-  }
+  const driverById = new Map(drivers.map((d) => [d.id, d]));
+  const polyvalentDriverIds = new Set(drivers.filter((d) => (driverServiceIds[d.id]?.length ?? 0) >= 2).map((d) => d.id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -230,7 +216,8 @@ export function PlanningKanbanView({
       </div>
       {mode === "service" && (
         <p className="text-xs text-navy/50">
-          Glissez un chauffeur polyvalent vers un autre service pour y déplacer toutes ses tournées prévues cette semaine.
+          Glissez la tournée d&apos;un chauffeur polyvalent vers un autre service pour la réaffecter (un polyvalent peut travailler sur
+          plusieurs services différents jours de la semaine).
         </p>
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
@@ -334,10 +321,9 @@ export function PlanningKanbanView({
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {services.map((service) => {
-            const serviceDrivers = polyvalentDrivers.filter((d) => {
-              const driverEntries = polyvalentEntriesByDriver.get(d.id);
-              return driverEntries && driverEntries[0]?.service_id === service.id;
-            });
+            const serviceEntries = entries
+              .filter((e) => e.service_id === service.id && e.driver_id && polyvalentDriverIds.has(e.driver_id))
+              .sort((a, b) => a.start_at.localeCompare(b.start_at));
             return (
               <div
                 key={service.id}
@@ -345,47 +331,55 @@ export function PlanningKanbanView({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const payload = e.dataTransfer.getData("text/plain");
-                  if (!payload.startsWith(DRIVER_DRAG_PREFIX)) return;
-                  const driverId = payload.slice(DRIVER_DRAG_PREFIX.length);
-                  if (!(driverServiceIds[driverId] ?? []).includes(service.id)) {
+                  const entryId = e.dataTransfer.getData("text/plain");
+                  const entry = entries.find((x) => x.id === entryId);
+                  if (!entry || !entry.driver_id) return;
+                  if (!(driverServiceIds[entry.driver_id] ?? []).includes(service.id)) {
                     setError("Ce chauffeur n'est pas qualifié sur ce service (voir sa fiche).");
                     return;
                   }
-                  reassignDriverService(driverId, service.id);
+                  reassignEntryService(entryId, service.id);
                 }}
               >
                 <p className="mb-2 px-1 text-sm font-medium">
-                  {service.name} <span className="text-xs text-navy/40">({serviceDrivers.length})</span>
+                  {service.name} <span className="text-xs text-navy/40">({serviceEntries.length})</span>
                 </p>
                 <div className="flex flex-col gap-1.5">
-                  {serviceDrivers.map((driver) => {
-                    const driverEntries = polyvalentEntriesByDriver.get(driver.id) ?? [];
-                    const otherServices = (driverServiceIds[driver.id] ?? [])
+                  {serviceEntries.map((e) => {
+                    const driver = e.driver_id ? driverById.get(e.driver_id) : undefined;
+                    const otherServices = (driverServiceIds[e.driver_id ?? ""] ?? [])
                       .filter((id) => id !== service.id)
                       .map((id) => serviceNameById.get(id))
                       .filter(Boolean);
                     return (
                       <div
-                        key={driver.id}
-                        draggable={busyId !== driver.id}
-                        onDragStart={(ev) => ev.dataTransfer.setData("text/plain", `${DRIVER_DRAG_PREFIX}${driver.id}`)}
-                        className={`cursor-move rounded-lg bg-white p-2 text-xs shadow-sm ${busyId === driver.id ? "opacity-40" : ""}`}
+                        key={e.id}
+                        draggable={e.status === "planned" && busyId !== e.id}
+                        onDragStart={(ev) => ev.dataTransfer.setData("text/plain", e.id)}
+                        className={`rounded-lg bg-white p-2 text-xs shadow-sm ${e.status === "planned" ? "cursor-move" : "opacity-80"} ${
+                          busyId === e.id ? "opacity-40" : ""
+                        }`}
                       >
                         <div className="mb-0.5 flex items-center justify-between">
-                          <button type="button" className="font-medium hover:underline" onClick={() => setOpenDriverSheet(driver)}>
-                            {driver.full_name}
-                          </button>
+                          {driver ? (
+                            <button type="button" className="font-medium hover:underline" onClick={() => setOpenDriverSheet(driver)}>
+                              {driver.full_name}
+                            </button>
+                          ) : (
+                            <span className="font-medium">—</span>
+                          )}
                           <span className="badge-gold">Polyvalent</span>
                         </div>
                         <p className="text-navy/50">
-                          {driverEntries.length} tournée{driverEntries.length > 1 ? "s" : ""} cette semaine
+                          n°{e.tour_number} ·{" "}
+                          {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}{" "}
+                          {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                         {otherServices.length > 0 && <p className="text-navy/40">Aussi qualifié : {otherServices.join(", ")}</p>}
                       </div>
                     );
                   })}
-                  {serviceDrivers.length === 0 && <p className="px-1 text-xs text-navy/30">Aucun chauffeur polyvalent ici cette semaine</p>}
+                  {serviceEntries.length === 0 && <p className="px-1 text-xs text-navy/30">Aucune tournée polyvalente ici cette semaine</p>}
                 </div>
               </div>
             );
