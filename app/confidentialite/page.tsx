@@ -4,7 +4,7 @@ export default function ConfidentialitePage() {
   return (
     <LegalPageLayout title="Politique de confidentialité">
       <p>
-        [À COMPLÉTER : raison sociale] (ci-après « nous ») attache une attention particulière à la protection des
+        François, éditeur de GODAC (ci-après « nous »), attache une attention particulière à la protection des
         données personnelles traitées dans le cadre de l&apos;application GODAC, conformément au Règlement Général
         sur la Protection des Données (RGPD).
       </p>
@@ -19,10 +19,11 @@ export default function ConfidentialitePage() {
         du carburant et de la flotte, suivi des tournées, alertes de gestion, facturation. [À COMPLÉTER].
       </p>
       <p>
-        <strong>Hébergement et sous-traitants.</strong> Les données sont hébergées par Supabase (Supabase Inc.) et
-        l&apos;application par [À COMPLÉTER : hébergeur]. Des prestataires tiers peuvent être utilisés pour certaines
-        fonctionnalités optionnelles (lecture automatique de documents, envoi d&apos;emails, paiement). [À COMPLÉTER :
-        liste des sous-traitants effectivement activés].
+        <strong>Hébergement et sous-traitants.</strong> Les données sont stockées par Supabase sur des serveurs
+        situés à Paris (France) ; l&apos;application est servie par Vercel Inc., avec des traitements exécutés à
+        Paris. Les emails transactionnels sont envoyés via Resend. Des prestataires tiers peuvent être utilisés pour
+        certaines fonctionnalités optionnelles (lecture automatique de documents, paiement). [À COMPLÉTER : liste des
+        sous-traitants effectivement activés].
       </p>
       <p>
         <strong>Durée de conservation.</strong> [À COMPLÉTER].
@@ -30,7 +31,7 @@ export default function ConfidentialitePage() {
       <p>
         <strong>Droits des personnes.</strong> Conformément au RGPD, toute personne dispose d&apos;un droit
         d&apos;accès, de rectification, d&apos;effacement et de portabilité de ses données, ainsi que d&apos;un droit
-        d&apos;opposition. Pour exercer ces droits : [À COMPLÉTER : adresse email ou procédure de contact].
+        d&apos;opposition. Pour exercer ces droits : contact@godac.fr.
       </p>
       <p>
         Le présent document est un modèle à compléter et à faire valider par un professionnel du droit avant toute

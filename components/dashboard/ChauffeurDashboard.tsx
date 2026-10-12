@@ -7,6 +7,7 @@ import { ClockButton } from "@/components/time-clock/ClockButton";
 import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import { AssistedClock } from "@/components/time-clock/AssistedClock";
 import { PresenceCalendar } from "@/components/planning/PresenceCalendar";
+import { DayStrip, type StripTour } from "@/components/planning/DayStrip";
 import { presenceByDay } from "@/lib/planning/presence";
 import { addDays, addMonths, firstOfMonth, parisCalendarDate } from "@/lib/planning/dates";
 import type { AppUser } from "@/lib/auth/session";
@@ -41,6 +42,10 @@ export async function ChauffeurDashboard({
   const presenceFrom = `${addDays(firstOfMonth(month), -1)}T00:00:00Z`;
   const presenceTo = `${addDays(firstOfMonth(addMonths(month, 1)), 1)}T00:00:00Z`;
 
+  const todayParis = parisCalendarDate(now);
+  const weekStart = addDays(todayParis, -((new Date(`${todayParis}T12:00:00Z`).getUTCDay() + 6) % 7));
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
   const [openTourRes, upcomingRes, recentEntriesRes, openClockRes, myMaintenanceRes, openAlertsRes, openAlertsCountRes, autoClockRes, presenceRes] = await Promise.all([
     supabase
       .from("planning_entries")
@@ -51,12 +56,12 @@ export async function ChauffeurDashboard({
     planningEnabled
       ? supabase
           .from("planning_entries")
-          .select("id, tour_number, start_at, vehicles(registration)")
+          .select("id, tour_number, start_at, end_at, status, vehicles(registration)")
           .eq("driver_id", appUser.id)
-          .eq("status", "planned")
-          .gte("start_at", now)
+          // A day of margin each side: rows are UTC instants, grouped by Paris day below.
+          .gte("start_at", `${addDays(weekStart, -1)}T00:00:00Z`)
+          .lt("start_at", `${addDays(weekStart, 8)}T00:00:00Z`)
           .order("start_at", { ascending: true })
-          .limit(4)
       : Promise.resolve({ data: null }),
     supabase
       .from("fuel_entries")
@@ -94,7 +99,19 @@ export async function ChauffeurDashboard({
   ]);
 
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
-  const upcoming = (upcomingRes.data ?? []) as any as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null }[];
+  const weekToursByDay: Record<string, StripTour[]> = {};
+  for (const t of (upcomingRes.data ?? []) as any[]) {
+    const day = parisCalendarDate(t.start_at);
+    if (!weekDays.includes(day)) continue;
+    (weekToursByDay[day] ??= []).push({
+      id: t.id,
+      tour_number: t.tour_number,
+      start_at: t.start_at,
+      end_at: t.end_at,
+      status: t.status,
+      registration: t.vehicles?.registration ?? null,
+    });
+  }
   const recentEntries = (recentEntriesRes.data ?? []) as any[];
   const openAlerts = (openAlertsRes.data ?? []) as any[];
   const presence = presenceByDay((presenceRes.data ?? []) as { start_at: string; end_at: string | null; status: string }[], month);
@@ -136,29 +153,19 @@ export async function ChauffeurDashboard({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {planningEnabled && (
-          <Card>
+          <Card className="lg:col-span-2">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg">Mon planning cette semaine</h2>
-              <Link href="/planning/mine" className="text-sm text-teal-ink hover:underline">
+              <Link href="/planning/mine?view=week" className="text-sm text-teal-ink hover:underline">
                 Voir tout
               </Link>
             </div>
-            {upcoming.length === 0 ? (
-              <p className="text-sm text-navy/60">Aucune tournée planifiée à venir.</p>
-            ) : (
-              <ul className="flex flex-col gap-2 text-sm">
-                {upcoming.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
-                    <span>
-                      n°{t.tour_number} {t.vehicles ? `— ${t.vehicles.registration}` : ""}
-                    </span>
-                    <span className="text-xs text-navy/60">
-                      {new Date(t.start_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <DayStrip
+              days={weekDays}
+              toursByDay={weekToursByDay}
+              today={todayParis}
+              hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`}
+            />
           </Card>
         )}
 
