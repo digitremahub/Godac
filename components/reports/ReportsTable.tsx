@@ -201,7 +201,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
           {reports.map((r) => (
             <tr key={r.id} className="border-t border-navy/5">
               <td className="py-2">
-                {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                {new Date(r.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" })}
               </td>
               <td className="py-2">{r.users?.full_name ?? "—"}</td>
               <td className="py-2">{r.services?.name ?? "—"}</td>
@@ -211,10 +211,10 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
               <td className="py-2">{cell(r, "report_departure_time", r.report_departure_time ?? "—")}</td>
               <td className="py-2">{cell(r, "report_return_time", r.report_return_time ?? "—")}</td>
               <td className="py-2" title="Heure du scan de départ, pas l'heure imprimée sur le BL">
-                {new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                {new Date(r.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
               </td>
               <td className="py-2" title="Heure du scan de retour, pas l'heure imprimée sur le BL">
-                {r.end_at ? new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                {r.end_at ? new Date(r.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) : "—"}
               </td>
               <td className="py-2">{cell(r, "report_stops_total", r.report_stops_total?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_stops_delivered", r.report_stops_delivered?.toString() ?? "—")}</td>

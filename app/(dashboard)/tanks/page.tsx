@@ -115,7 +115,7 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
               <div className="flex justify-between text-sm text-navy/65">
                 <span>
                   {tank.last_reading_at
-                    ? `Dernier plein: ${new Date(tank.last_reading_at).toLocaleDateString("fr-FR")}`
+                    ? `Dernier plein: ${new Date(tank.last_reading_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
                     : "Aucun plein enregistré"}
                 </span>
               </div>

@@ -140,7 +140,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
                   <span className="text-xs text-navy/60">
-                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </li>
               ))}
@@ -182,7 +182,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
                   <span>
                     {d.tanks?.name ?? "—"} · {d.supplier ?? "—"} · {d.liters?.toLocaleString("fr-FR")} L
                   </span>
-                  <span className="text-xs text-navy/60">{new Date(d.delivered_at).toLocaleDateString("fr-FR")}</span>
+                  <span className="text-xs text-navy/60">{new Date(d.delivered_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</span>
                 </li>
               ))}
             </ul>

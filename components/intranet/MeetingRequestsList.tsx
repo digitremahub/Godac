@@ -58,8 +58,8 @@ export function MeetingRequestsList({ requests, canManage }: { requests: Meeting
             <div>
               <p className="font-medium">{canManage ? r.requesterName : "Votre demande"}</p>
               <p className="text-xs text-navy/60">
-                {new Date(r.createdAt).toLocaleDateString("fr-FR")}
-                {r.preferredDate && ` · Souhaitée le ${new Date(r.preferredDate).toLocaleDateString("fr-FR")}`}
+                {new Date(r.createdAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
+                {r.preferredDate && ` · Souhaitée le ${new Date(r.preferredDate).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`}
               </p>
             </div>
             <span className={STATUS_BADGES[r.status]}>{STATUS_LABELS[r.status]}</span>

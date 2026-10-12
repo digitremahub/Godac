@@ -85,7 +85,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
             <li key={doc.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{doc.docType}</span>
               <span className="flex items-center gap-2 text-xs text-navy/60">
-                {new Date(doc.uploadedAt).toLocaleDateString("fr-FR")}
+                {new Date(doc.uploadedAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                 {doc.downloadUrl && (
                   <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
                     Ouvrir

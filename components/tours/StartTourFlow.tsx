@@ -223,7 +223,7 @@ export function StartTourFlow({
         <p className="text-sm text-orange-ink">
           Vous avez déjà une tournée en cours (n°{openTour.tour_number}
           {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}, depuis{" "}
-          {new Date(openTour.start_at).toLocaleTimeString("fr-FR")}).
+          {new Date(openTour.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris" })}).
         </p>
         <Link href="/tours/end" className="btn-primary text-center">
           Terminer cette tournée

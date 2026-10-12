@@ -12,14 +12,14 @@ import { DirectionDashboard } from "@/components/dashboard/DirectionDashboard";
  * glance is completely different for a driver than for direction —
  * so this just reads the shared context once and delegates.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: { presence?: string } }) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const enabledModules = await getEnabledModuleKeys(supabase, appUser.organization_id);
 
   switch (appUser.role) {
     case "chauffeur":
-      return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} />;
+      return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} presenceMonth={searchParams.presence} />;
     case "manager":
     case "manager_chauffeur":
       return <ManagerDashboard appUser={appUser} enabledModules={enabledModules} />;

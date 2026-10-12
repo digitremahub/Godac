@@ -63,7 +63,7 @@ export function FuelHistoryTable({
         <tbody>
           {entries.map((e) => (
             <tr key={e.id} className="border-t border-navy/5">
-              <td className="py-2">{new Date(e.occurred_at).toLocaleString("fr-FR")}</td>
+              <td className="py-2">{new Date(e.occurred_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
               {showVehicle && <td className="py-2">{e.vehicles?.registration ?? "—"}</td>}
               {showDriver && <td className="py-2">{e.users?.full_name ?? "—"}</td>}
               <td className="py-2">{e.liters ?? "—"} L</td>

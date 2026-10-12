@@ -116,7 +116,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                     </div>
                   ) : (
                     <>
-                      {new Date(leave.startDate).toLocaleDateString("fr-FR")} → {new Date(leave.endDate).toLocaleDateString("fr-FR")}
+                      {new Date(leave.startDate).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} → {new Date(leave.endDate).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                     </>
                   )}
                 </td>

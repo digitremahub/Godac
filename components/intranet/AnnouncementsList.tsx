@@ -42,7 +42,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
             <div>
               <h3 className="text-lg">{a.title}</h3>
               <p className="text-xs text-navy/60">
-                {a.authorName} · {a.serviceName ?? "Toute l'organisation"} · {new Date(a.createdAt).toLocaleString("fr-FR")}
+                {a.authorName} · {a.serviceName ?? "Toute l'organisation"} · {new Date(a.createdAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}
               </p>
             </div>
             <div className="flex items-center gap-2">

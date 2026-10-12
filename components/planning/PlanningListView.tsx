@@ -160,8 +160,8 @@ export function PlanningListView({
                       />
                     ) : (
                       <>
-                        {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}{" "}
-                        {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(e.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" })}{" "}
+                        {new Date(e.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                       </>
                     )}
                   </td>

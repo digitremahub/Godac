@@ -132,7 +132,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
                   <span className="text-xs text-navy/60">
-                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </li>
               ))}

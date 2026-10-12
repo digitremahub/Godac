@@ -13,7 +13,7 @@ export function TourHeroCard({
   showPlanningLink?: boolean;
 }) {
   const startedAt = openTour?.start_at
-    ? new Date(openTour.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    ? new Date(openTour.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })
     : null;
 
   return (

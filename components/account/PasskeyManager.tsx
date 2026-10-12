@@ -101,7 +101,7 @@ export function PasskeyManager() {
               <span>
                 {c.device_name ?? "Appareil"}
                 <span className="ml-2 text-xs text-navy/60">
-                  ajouté le {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                  ajouté le {new Date(c.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                 </span>
               </span>
               <button className="text-navy/60 hover:text-orange-ink" disabled={busy} onClick={() => remove(c.id)} aria-label="Retirer">
