@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { getCurrentTankPmp } from "@/lib/fuel/current-pmp";
 
 const bodySchema = z.object({
@@ -43,7 +43,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const supabase = await createServerSupabaseClient();
+  // « J'entre le ravitaillement d'un collègue »: with a valid on-behalf
+  // token (badge + PIN checked in /api/tours/on-behalf) the entry is
+  // the colleague's, inserted through the service-role client — so the
+  // vehicle and tank are checked against the organization explicitly.
+  const actor = await resolveTourActor(req, appUser);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  const { db: supabase, helperId } = actor;
+  if (helperId) {
+    const [{ data: vehicle }, { data: tank }] = await Promise.all([
+      supabase.from("vehicles").select("id").eq("id", parsed.data.vehicle_id).eq("organization_id", appUser.organization_id).maybeSingle(),
+      supabase.from("tanks").select("id").eq("id", parsed.data.tank_id).eq("organization_id", appUser.organization_id).maybeSingle(),
+    ]);
+    if (!vehicle || !tank) return NextResponse.json({ error: "Véhicule ou cuve introuvable." }, { status: 404 });
+  }
+  const driverId = helperId ? actor.driverId : parsed.data.driver_id ?? appUser.id;
 
   let liters = parsed.data.liters;
   if (liters === undefined) {
@@ -77,7 +91,7 @@ export async function POST(req: Request) {
       organization_id: appUser.organization_id,
       vehicle_id: parsed.data.vehicle_id,
       tank_id: parsed.data.tank_id,
-      driver_id: parsed.data.driver_id ?? appUser.id,
+      driver_id: driverId,
       created_by: appUser.id,
       occurred_at: parsed.data.occurred_at,
       totalizer_before: parsed.data.totalizer_before ?? null,

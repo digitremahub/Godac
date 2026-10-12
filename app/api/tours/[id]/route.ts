@@ -59,7 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // With a valid on-behalf token (« Dépanner un collègue »), this
+  // With a valid on-behalf token (« J'entre pour un collègue »), this
   // closes the colleague's tour instead — service-role client, so the
   // organization is pinned explicitly on every query below.
   const actor = await resolveTourActor(req, appUser);

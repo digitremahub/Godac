@@ -14,7 +14,7 @@ const HELPER_ROLES = new Set(["chauffeur", "manager_chauffeur", "manager", "dire
 const DRIVER_ROLES = new Set(["chauffeur", "manager_chauffeur"]);
 
 /**
- * « Dépanner un collègue », step 1: the colleague's badge was scanned
+ * « J'entre pour un collègue », step 1: the colleague's badge was scanned
  * (colleague_id) and they typed their own PIN on the helper's phone.
  * The PIN is the colleague's Supabase password (see
  * app/api/auth/driver-pin), so it's checked with a throwaway,

@@ -14,7 +14,7 @@ import { resolveTourActor } from "@/lib/tours/on-behalf";
  */
 export async function GET(req: Request) {
   const appUser = await requireAppUser();
-  // Same endpoint for « Dépanner un collègue »: with a valid on-behalf
+  // Same endpoint for « J'entre pour un collègue »: with a valid on-behalf
   // token this answers for the colleague instead (lib/tours/on-behalf.ts).
   const actor = await resolveTourActor(req, appUser);
   if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });

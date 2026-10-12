@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   }
 
   // Normally the caller's own tour; with a valid on-behalf token
-  // (« Dépanner un collègue », badge + PIN already checked), the
+  // (« J'entre pour un collègue », badge + PIN already checked), the
   // colleague's — through the service-role client, so every query
   // below also pins organization_id explicitly.
   const actor = await resolveTourActor(req, appUser);

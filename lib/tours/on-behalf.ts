@@ -6,7 +6,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { AppUser } from "@/lib/auth/session";
 
 /**
- * « Dépanner un collègue » — a driver starts or closes a colleague's
+ * « J'entre pour un collègue » — a driver starts or closes a colleague's
  * tour from their own phone (dead battery, phone forgotten at home).
  *
  * Proof required: the colleague's badge (QR or driver code) AND their

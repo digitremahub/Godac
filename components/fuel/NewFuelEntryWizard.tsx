@@ -48,6 +48,7 @@ export function NewFuelEntryWizard({
   selfDriverId,
   selfDriverName,
   selfIsDriver,
+  onBehalf,
 }: {
   vehicles: VehicleOption[];
   tanks: TankOption[];
@@ -65,6 +66,8 @@ export function NewFuelEntryWizard({
   selfDriverName: string;
   /** False for manager/direction (never drivers themselves) — forces an explicit choice instead of defaulting to their own account, which would otherwise be submitted as the driver_id. */
   selfIsDriver: boolean;
+  /** « J'entre le ravitaillement d'un collègue » — token from /api/tours/on-behalf; the driver is fixed to that colleague. */
+  onBehalf?: { token: string; colleagueName: string };
 }) {
   const router = useRouter();
   const [vehicleId, setVehicleId] = useState(initialVehicleId ?? assignedVehicleId ?? "");
@@ -350,7 +353,7 @@ export function NewFuelEntryWizard({
     try {
       const res = await fetch("/api/fuel-entries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(onBehalf ? { "x-godac-on-behalf": onBehalf.token } : {}) },
         body: JSON.stringify({
           vehicle_id: vehicleId,
           tank_id: tankId,

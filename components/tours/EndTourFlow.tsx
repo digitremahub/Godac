@@ -35,7 +35,7 @@ export function EndTourFlow({
 }: {
   initialVehicleId?: string;
   requireOdometerPhoto?: boolean;
-  /** « Dépanner un collègue » — token from /api/tours/on-behalf, sent with every tour call. */
+  /** « J'entre pour un collègue » — token from /api/tours/on-behalf, sent with every tour call. */
   onBehalf?: { token: string; colleagueName: string };
 } = {}) {
   const tourHeaders: Record<string, string> = onBehalf ? { "x-godac-on-behalf": onBehalf.token } : {};

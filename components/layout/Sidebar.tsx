@@ -64,7 +64,7 @@ const SECTIONS: NavSection[] = [
       { href: "/maintenance", label: "Demandes d'entretien", icon: IconWrench, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
       { href: "/tours/start", label: "Démarrer une tournée", icon: IconClock, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/tours/end", label: "Terminer une tournée", icon: IconFlag, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
-      { href: "/tours/help", label: "Dépanner un collègue", icon: IconUsers, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
+      { href: "/tours/help", label: "J'entre pour un collègue", icon: IconUsers, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/planning/mine", label: "Mon planning", icon: IconCalendar, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/planning", label: "Planning", icon: IconCalendar, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
       { href: "/tours/history", label: "Historique des tournées", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
