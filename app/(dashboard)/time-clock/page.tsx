@@ -74,7 +74,7 @@ export default async function TimeClockPage() {
   let query = supabase
     .from("time_clock_entries")
     .select(
-      "id, clocked_in_at, clocked_out_at, clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, users(full_name, address_lat, address_lng)",
+      "id, clocked_in_at, clocked_out_at, clock_in_source, clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, users(full_name, address_lat, address_lng)",
     )
     .order("clocked_in_at", { ascending: false })
     .limit(100);
@@ -115,6 +115,11 @@ export default async function TimeClockPage() {
                   })}
                   <span className="ml-1 text-xs text-navy/60">
                     ({LOCATION_LABEL_DISPLAY[inLocation]}){mapLink(inCoords)}
+                    {e.clock_in_source === "auto" && (
+                      <span className="badge-teal ml-2" title="Entrée pointée automatiquement au dépôt (pointage assisté)">
+                        Assisté
+                      </span>
+                    )}
                   </span>
                   {" → "}
                   {e.clocked_out_at ? (

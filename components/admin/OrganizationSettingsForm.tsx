@@ -16,6 +16,7 @@ export function OrganizationSettingsForm({
   logoUrl,
   accentColor,
   requireOdometerPhoto,
+  autoClockEnabled,
   emergencyPhone,
   consumptionAnomalyThresholdPercent,
   depotAddress,
@@ -32,6 +33,7 @@ export function OrganizationSettingsForm({
   logoUrl: string | null;
   accentColor: string | null;
   requireOdometerPhoto: boolean;
+  autoClockEnabled: boolean;
   emergencyPhone: string | null;
   consumptionAnomalyThresholdPercent: number;
   depotAddress: string | null;
@@ -48,6 +50,7 @@ export function OrganizationSettingsForm({
   const [logo, setLogo] = useState(logoUrl);
   const [accent, setAccent] = useState(accentColor ?? DEFAULT_ACCENT);
   const [odometerPhotoRequired, setOdometerPhotoRequired] = useState(requireOdometerPhoto);
+  const [autoClock, setAutoClock] = useState(autoClockEnabled);
   const [emergencyPhoneValue, setEmergencyPhoneValue] = useState(emergencyPhone ?? "");
   const [consumptionThreshold, setConsumptionThreshold] = useState(String(consumptionAnomalyThresholdPercent));
   const [depotAddressValue, setDepotAddressValue] = useState(depotAddress ?? "");
@@ -100,6 +103,7 @@ export function OrganizationSettingsForm({
           logo_url: logo,
           accent_color: accent,
           require_odometer_photo: odometerPhotoRequired,
+          auto_clock_enabled: autoClock,
           emergency_phone: emergencyPhoneValue.trim() || null,
           consumption_anomaly_threshold_percent: Number(consumptionThreshold) || 20,
           depot_address: depotAddressValue.trim() || null,
@@ -210,6 +214,26 @@ export function OrganizationSettingsForm({
           onClick={() => setOdometerPhotoRequired((v) => !v)}
         >
           {odometerPhotoRequired ? "Activé" : "Désactivé"}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 rounded-lg bg-navy/[0.04] p-3">
+        <div>
+          <p className="font-medium">Pointage assisté par géolocalisation</p>
+          <p className="text-sm text-navy/65">
+            À l&apos;ouverture de l&apos;application, un salarié à moins de 300&nbsp;m du dépôt de son service est pointé
+            automatiquement (annulable) ; la sortie lui est proposée en fin de journée. La position n&apos;est lue qu&apos;à ce
+            moment, jamais en continu. Informez vos salariés avant d&apos;activer (règles CNIL sur la géolocalisation).
+            Nécessite le module Pointeuse et l&apos;adresse du dépôt de chaque service.
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-pressed={autoClock}
+          className={autoClock ? "btn-primary shrink-0 !px-3 !py-1.5" : "btn-secondary shrink-0 !px-3 !py-1.5"}
+          onClick={() => setAutoClock((v) => !v)}
+        >
+          {autoClock ? "Activé" : "Désactivé"}
         </button>
       </div>
 

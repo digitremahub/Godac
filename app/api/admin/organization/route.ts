@@ -14,6 +14,7 @@ const bodySchema = z.object({
     .nullable()
     .optional(),
   require_odometer_photo: z.boolean().optional(),
+  auto_clock_enabled: z.boolean().optional(),
   emergency_phone: z.string().trim().min(1).nullable().optional(),
   consumption_anomaly_threshold_percent: z.coerce.number().int().min(1).max(200).optional(),
   depot_address: z.string().trim().min(1).nullable().optional(),
@@ -38,6 +39,7 @@ export async function PATCH(req: Request) {
     logo_url,
     accent_color,
     require_odometer_photo,
+    auto_clock_enabled,
     emergency_phone,
     consumption_anomaly_threshold_percent,
     depot_address,
@@ -56,6 +58,7 @@ export async function PATCH(req: Request) {
   if (logo_url !== undefined) profileFields.logo_url = logo_url;
   if (accent_color !== undefined) profileFields.accent_color = accent_color;
   if (require_odometer_photo !== undefined) profileFields.require_odometer_photo = require_odometer_photo;
+  if (auto_clock_enabled !== undefined) profileFields.auto_clock_enabled = auto_clock_enabled;
   if (emergency_phone !== undefined) profileFields.emergency_phone = emergency_phone;
   if (consumption_anomaly_threshold_percent !== undefined)
     profileFields.consumption_anomaly_threshold_percent = consumption_anomaly_threshold_percent;
@@ -92,7 +95,7 @@ export async function PATCH(req: Request) {
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "id, name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
+      "id, name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
     )
     .eq("id", appUser.organization_id)
     .single();

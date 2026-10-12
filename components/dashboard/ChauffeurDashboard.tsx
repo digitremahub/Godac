@@ -5,6 +5,7 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
 import { ClockButton } from "@/components/time-clock/ClockButton";
 import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
+import { AssistedClock } from "@/components/time-clock/AssistedClock";
 import { PresenceCalendar } from "@/components/planning/PresenceCalendar";
 import { presenceByDay } from "@/lib/planning/presence";
 import { addDays, addMonths, firstOfMonth, parisCalendarDate } from "@/lib/planning/dates";
@@ -40,7 +41,7 @@ export async function ChauffeurDashboard({
   const presenceFrom = `${addDays(firstOfMonth(month), -1)}T00:00:00Z`;
   const presenceTo = `${addDays(firstOfMonth(addMonths(month, 1)), 1)}T00:00:00Z`;
 
-  const [openTourRes, upcomingRes, recentEntriesRes, openClockRes, myMaintenanceRes, openAlertsRes, openAlertsCountRes, presenceRes] = await Promise.all([
+  const [openTourRes, upcomingRes, recentEntriesRes, openClockRes, myMaintenanceRes, openAlertsRes, openAlertsCountRes, autoClockRes, presenceRes] = await Promise.all([
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, vehicles(registration)")
@@ -80,6 +81,9 @@ export async function ChauffeurDashboard({
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
+    timeClockEnabled
+      ? supabase.from("organizations").select("auto_clock_enabled").eq("id", appUser.organization_id).single()
+      : Promise.resolve({ data: null }),
     supabase
       .from("planning_entries")
       .select("start_at, end_at, status")
@@ -98,6 +102,9 @@ export async function ChauffeurDashboard({
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre journée en un coup d'œil." />
+      {timeClockEnabled && (autoClockRes.data as { auto_clock_enabled?: boolean } | null)?.auto_clock_enabled && (
+        <AssistedClock hasOpenTour={Boolean(openTour)} />
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TourHeroCard openTour={openTour} showPlanningLink={planningEnabled} />
