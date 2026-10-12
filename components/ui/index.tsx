@@ -44,7 +44,7 @@ export function StatTile({
 
 export function EmptyState({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-navy/15 bg-white/60 px-6 py-14 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-navy/15 bg-surface/60 px-6 py-14 text-center">
       <div aria-hidden="true" className="flex h-12 w-12 items-center justify-center rounded-2xl bg-navy/[0.05] text-navy/40">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="h-6 w-6">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 13h4l2 3h6l2-3h4M5 13 7 5h10l2 8v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-5Z" />

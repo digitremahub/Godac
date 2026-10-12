@@ -8,6 +8,7 @@ import { NameForm } from "@/components/account/NameForm";
 import { DriverPinForm } from "@/components/account/DriverPinForm";
 import { PasskeyManager } from "@/components/account/PasskeyManager";
 import { PushNotificationToggle } from "@/components/account/PushNotificationToggle";
+import { DisplayPreferences } from "@/components/account/DisplayPreferences";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import Link from "next/link";
@@ -63,6 +64,7 @@ export default async function AccountPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Mon compte" description="Vos informations de connexion GODAC." />
+      <DisplayPreferences />
 
       <Card className="flex max-w-md flex-col gap-2">
         <div>

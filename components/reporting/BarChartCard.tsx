@@ -27,13 +27,13 @@ export function BarChartCard({ title, data, valueSuffix, formatValue }: { title:
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#0A0F1E0D" vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#0A0F1E66" }} axisLine={{ stroke: "#0A0F1E1A" }} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: "#0A0F1E66" }} axisLine={false} tickLine={false} width={48} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--c-ink) / 0.06)" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgb(var(--c-ink) / 0.6)" }} axisLine={{ stroke: "rgb(var(--c-ink) / 0.1)" }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: "rgb(var(--c-ink) / 0.6)" }} axisLine={false} tickLine={false} width={48} />
             <Tooltip
               formatter={(v) => format(Number(v))}
-              contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #0A0F1E1A" }}
-              cursor={{ fill: "#0A0F1E08" }}
+              contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgb(var(--c-ink) / 0.1)", background: "rgb(var(--c-surface))", color: "rgb(var(--c-ink))" }}
+              cursor={{ fill: "rgb(var(--c-ink) / 0.04)" }}
             />
             <Bar dataKey="value" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={48} />
           </BarChart>

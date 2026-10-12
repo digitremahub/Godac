@@ -26,7 +26,7 @@ export function TopBar({
   onMenuClick?: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-navy/[0.08] bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-navy/[0.08] bg-surface/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
@@ -54,7 +54,7 @@ export function TopBar({
         <Link href="/account" className="flex min-w-0 items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-navy/[0.04]">
           <div
             aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-[13px] font-bold text-teal"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marine text-[13px] font-bold text-teal"
           >
             {initials(fullName)}
           </div>

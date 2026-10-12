@@ -252,7 +252,7 @@ export function PlanningKanbanView({
                       key={e.id}
                       draggable={e.status === "planned" && editingId !== e.id}
                       onDragStart={(ev) => ev.dataTransfer.setData("text/plain", e.id)}
-                      className={`rounded-lg bg-white p-2 text-xs shadow-sm ${e.status === "planned" ? "cursor-move" : "opacity-80"} ${
+                      className={`rounded-lg bg-surface p-2 text-xs shadow-sm ${e.status === "planned" ? "cursor-move" : "opacity-80"} ${
                         busyId === e.id ? "opacity-40" : ""
                       }`}
                     >
@@ -358,7 +358,7 @@ export function PlanningKanbanView({
                         key={e.id}
                         draggable={e.status === "planned" && busyId !== e.id}
                         onDragStart={(ev) => ev.dataTransfer.setData("text/plain", e.id)}
-                        className={`rounded-lg bg-white p-2 text-xs shadow-sm ${e.status === "planned" ? "cursor-move" : "opacity-80"} ${
+                        className={`rounded-lg bg-surface p-2 text-xs shadow-sm ${e.status === "planned" ? "cursor-move" : "opacity-80"} ${
                           busyId === e.id ? "opacity-40" : ""
                         }`}
                       >

@@ -190,7 +190,7 @@ export default async function MyPlanningPage({
                   href={`/planning/mine?view=day&anchor=${dayISO}`}
                   aria-label={`${Number(dayISO.slice(8, 10))} : ${dayEntries.length ? dayEntries.map((e) => `tournée ${e.tour_number}`).join(", ") : "repos"}`}
                   className={`flex min-h-[58px] flex-col gap-1 rounded-lg border p-1 sm:min-h-[78px] sm:p-1.5 ${
-                    !inMonth ? "border-transparent opacity-40" : first ? "border-navy/10 bg-white" : "border-navy/[0.06] bg-transparent"
+                    !inMonth ? "border-transparent opacity-40" : first ? "border-navy/10 bg-surface" : "border-navy/[0.06] bg-transparent"
                   } ${dayISO === today ? "ring-2 ring-teal-ink/50" : ""}`}
                 >
                   <span className={`text-right text-xs font-semibold tabular-nums ${dayISO === today ? "text-teal-ink" : ""}`}>

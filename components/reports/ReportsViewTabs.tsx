@@ -22,7 +22,7 @@ export function ReportsViewTabs({ view }: { view: string }) {
         <button
           key={v.key}
           className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-            view === v.key ? "bg-white shadow-sm" : "text-navy/65 hover:text-navy"
+            view === v.key ? "bg-surface shadow-sm" : "text-navy/65 hover:text-navy"
           }`}
           onClick={() => go(v.key)}
         >

@@ -55,7 +55,7 @@ export function VehiclePapersCard({ vehicleId, documents, today }: { vehicleId: 
                   href={doc.url ?? undefined}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex min-h-[52px] items-center gap-3 rounded-xl border border-navy/[0.1] bg-white px-4 py-2 hover:border-navy/20"
+                  className="flex min-h-[52px] items-center gap-3 rounded-xl border border-navy/[0.1] bg-surface px-4 py-2 hover:border-navy/20"
                 >
                   <IconFileText className="h-5 w-5 shrink-0 text-teal-ink" />
                   <span className="min-w-0 flex-1">

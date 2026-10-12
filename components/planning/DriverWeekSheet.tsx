@@ -178,12 +178,12 @@ export function DriverWeekSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-marine/40 p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="driver-week-sheet-title"
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-xl bg-white p-5 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-xl bg-surface p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between">
@@ -231,7 +231,7 @@ export function DriverWeekSheet({
               <button
                 key={i}
                 type="button"
-                className={`rounded-md px-2 py-1 text-xs ${bulkDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-white text-navy/60"}`}
+                className={`rounded-md px-2 py-1 text-xs ${bulkDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-surface text-navy/60"}`}
                 onClick={() => toggleBulkDay(i)}
               >
                 {label}

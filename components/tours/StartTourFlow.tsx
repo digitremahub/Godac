@@ -254,7 +254,7 @@ export function StartTourFlow({
     <Card className="flex flex-col gap-3">
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-navy px-4 py-3 text-white">
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-marine px-4 py-3 text-white">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.12em] text-white/60">Véhicule</p>
           <p className="font-display text-lg font-bold">{registration ?? "—"}</p>

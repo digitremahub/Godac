@@ -113,7 +113,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="fixed inset-x-3 top-[4.25rem] z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-pop sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
+        <div className="fixed inset-x-3 top-[4.25rem] z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-surface shadow-pop sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
           <div className="flex items-center justify-between border-b border-navy/[0.08] px-4 py-3">
             <p className="font-semibold">Notifications</p>
             {unread > 0 && (
@@ -142,7 +142,7 @@ export function NotificationBell() {
                       <span
                         aria-hidden="true"
                         className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                          item.severity === "critical" ? "bg-orange/15 text-orange-ink" : "bg-navy text-teal"
+                          item.severity === "critical" ? "bg-orange/15 text-orange-ink" : "bg-marine text-teal"
                         }`}
                       >
                         <Icon className="h-4 w-4" />

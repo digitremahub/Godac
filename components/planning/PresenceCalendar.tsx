@@ -14,7 +14,7 @@ function Mark({ on, letter, label }: { on: boolean; letter: string; label: strin
     >
       <span
         aria-hidden="true"
-        className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${on ? "bg-teal text-navy" : "ring-1 ring-inset ring-navy/20"}`}
+        className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${on ? "bg-teal text-marine" : "ring-1 ring-inset ring-navy/20"}`}
       >
         {on && <IconCheck className="h-2.5 w-2.5" />}
       </span>
@@ -97,7 +97,7 @@ export function PresenceCalendar({
               role="gridcell"
               aria-label={`${Number(day.slice(8))} : ${p?.morning ? "départ enregistré" : "pas de départ"}, ${p?.evening ? "retour enregistré" : "pas de retour"}`}
               className={`flex min-h-[64px] flex-col justify-between rounded-lg border p-1.5 sm:p-2 ${
-                full ? "border-teal/40 bg-teal/[0.08]" : future ? "border-navy/[0.06] bg-transparent" : "border-navy/[0.08] bg-white"
+                full ? "border-teal/40 bg-teal/[0.08]" : future ? "border-navy/[0.06] bg-transparent" : "border-navy/[0.08] bg-surface"
               } ${day === today ? "ring-2 ring-teal-ink/40" : ""}`}
             >
               <span className={`text-right text-xs font-semibold tabular-nums ${future ? "text-navy/40" : "text-navy"}`}>

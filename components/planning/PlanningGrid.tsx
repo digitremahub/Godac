@@ -557,7 +557,7 @@ export function PlanningGrid({
                             key={entry.id}
                             draggable={entry.status === "planned" && editingId !== entry.id && duplicatingEntryId !== entry.id}
                             onDragStart={(e) => e.dataTransfer.setData("text/plain", entry.id)}
-                            className={`rounded-md border border-navy/10 bg-white p-1.5 text-xs shadow-sm ${
+                            className={`rounded-md border border-navy/10 bg-surface p-1.5 text-xs shadow-sm ${
                               entry.status === "planned" ? "cursor-move" : "opacity-80"
                             } ${busyId === entry.id ? "opacity-40" : ""}`}
                           >

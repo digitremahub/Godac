@@ -21,7 +21,7 @@ export function TanksPageTabs({ tab }: { tab: string }) {
         <button
           key={t.key}
           className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-            tab === t.key ? "bg-white shadow-sm" : "text-navy/65 hover:text-navy"
+            tab === t.key ? "bg-surface shadow-sm" : "text-navy/65 hover:text-navy"
           }`}
           onClick={() => go(t.key)}
         >
