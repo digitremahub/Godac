@@ -29,13 +29,14 @@ export function DayStrip({
   days,
   toursByDay,
   today,
-  hrefForDay,
+  dayHrefPrefix,
   emptyLabel = "Repos",
 }: {
   days: string[];
   toursByDay: Record<string, StripTour[]>;
   today: string;
-  hrefForDay?: (day: string) => string;
+  /** Each day links to `${dayHrefPrefix}${day}` — a string, not a callback: this is a Client Component fed by Server Components. */
+  dayHrefPrefix?: string;
   emptyLabel?: string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -92,8 +93,8 @@ export function DayStrip({
         const className = `flex min-h-[8.5rem] w-[7.25rem] shrink-0 snap-start flex-col rounded-xl border p-2.5 sm:w-auto sm:min-w-[7.25rem] sm:flex-1 ${
           isToday ? "border-teal-ink/40 bg-teal/[0.07]" : "border-navy/[0.08] bg-surface"
         } ${past && !isToday ? "opacity-70" : ""}`;
-        return hrefForDay ? (
-          <Link key={day} href={hrefForDay(day)} data-today={isToday || undefined} className={`${className} transition-colors hover:border-navy/20`}>
+        return dayHrefPrefix ? (
+          <Link key={day} href={`${dayHrefPrefix}${day}`} data-today={isToday || undefined} className={`${className} transition-colors hover:border-navy/20`}>
             {header}
             {body}
           </Link>
