@@ -7,7 +7,7 @@ const base = "h-[18px] w-[18px] shrink-0";
 
 function Svg({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className ?? base}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={className ?? base}>
       {children}
     </svg>
   );

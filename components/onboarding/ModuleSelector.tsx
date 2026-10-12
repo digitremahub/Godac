@@ -41,7 +41,7 @@ export function ModuleSelector({
     <div className="flex flex-col gap-4">
       {included.length > 0 && (
         <div>
-          <p className="mb-2 text-sm text-navy/50">Inclus dans votre plan</p>
+          <p className="mb-2 text-sm text-navy/65">Inclus dans votre plan</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {included.map(({ module }) => (
               <div key={module.key} className="card flex flex-col gap-2 border-teal/30 bg-teal/5">
@@ -49,7 +49,7 @@ export function ModuleSelector({
                   <h3 className="text-base">{module.name}</h3>
                   <span className="badge-teal">Inclus</span>
                 </div>
-                <p className="text-sm text-navy/60">{module.description}</p>
+                <p className="text-sm text-navy/70">{module.description}</p>
               </div>
             ))}
           </div>
@@ -58,7 +58,7 @@ export function ModuleSelector({
 
       {addons.length > 0 && (
         <div>
-          <p className="mb-2 text-sm text-navy/50">Modules complémentaires (à la carte)</p>
+          <p className="mb-2 text-sm text-navy/65">Modules complémentaires (à la carte)</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {addons.map(({ module, price }) => {
               const checked = selected.includes(module.key);
@@ -77,9 +77,9 @@ export function ModuleSelector({
                       {checked ? "Activé" : `+${price?.monthly_price ?? 0} €`}
                     </span>
                   </div>
-                  <p className="text-sm text-navy/60">{module.description}</p>
+                  <p className="text-sm text-navy/70">{module.description}</p>
                   {price && price.setup_price > 0 && (
-                    <p className="text-xs text-navy/40">+ {price.setup_price} € de mise en service, une seule fois</p>
+                    <p className="text-xs text-navy/60">+ {price.setup_price} € de mise en service, une seule fois</p>
                   )}
                 </button>
               );
@@ -89,12 +89,12 @@ export function ModuleSelector({
       )}
 
       <Card className="flex flex-col gap-2">
-        <div className="flex justify-between text-sm text-navy/60">
+        <div className="flex justify-between text-sm text-navy/70">
           <span>Modules complémentaires sélectionnés</span>
           <span>{addonsTotal.toFixed(2)} €/mois</span>
         </div>
         {addonsSetupTotal > 0 && (
-          <div className="flex justify-between text-xs text-navy/40">
+          <div className="flex justify-between text-xs text-navy/60">
             <span>Mise en service des modules, une seule fois</span>
             <span>{addonsSetupTotal.toFixed(2)} €</span>
           </div>

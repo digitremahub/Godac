@@ -49,7 +49,7 @@ export default async function GodacStaffPage() {
       />
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="text-left text-navy/40">
+          <thead className="text-left text-navy/60">
             <tr>
               <th className="pb-2">Organisation</th>
               <th className="pb-2">Plan</th>

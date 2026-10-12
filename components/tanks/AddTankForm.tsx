@@ -61,29 +61,29 @@ export function AddTankForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="mb-6 flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle cuve</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:items-end">
         <div className="col-span-2 sm:col-span-1">
-          <label className="label">Nom</label>
-          <input className="input" placeholder="Cuve Gasoil A" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="block"><span className="label">Nom</span>
+          <input className="input" placeholder="Cuve Gasoil A" value={name} onChange={(e) => setName(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Type</label>
+          <label className="block"><span className="label">Type</span>
           <select className="input" value={fuelType} onChange={(e) => setFuelType(e.target.value as "diesel" | "adblue")}>
             <option value="diesel">Diesel</option>
             <option value="adblue">AdBlue</option>
-          </select>
+          </select></label>
         </div>
         <div>
-          <label className="label">Capacité (L)</label>
-          <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+          <label className="block"><span className="label">Capacité (L)</span>
+          <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Index initial</label>
-          <input className="input" type="number" value={startIndex} onChange={(e) => setStartIndex(e.target.value)} />
+          <label className="block"><span className="label">Index initial</span>
+          <input className="input" type="number" value={startIndex} onChange={(e) => setStartIndex(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Service</label>
+          <label className="block"><span className="label">Service</span>
           <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
             <option value="">Aucun</option>
             {services.map((s) => (
@@ -91,7 +91,7 @@ export function AddTankForm({ services }: { services: ServiceOption[] }) {
                 {s.name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
       </div>
       <div className="flex gap-2">

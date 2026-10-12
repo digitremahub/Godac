@@ -176,7 +176,7 @@ export function EndTourFlow({
   }
 
   if (loadingTour) {
-    return <p className="text-sm text-navy/60">Chargement…</p>;
+    return <p className="text-sm text-navy/70">Chargement…</p>;
   }
 
   if (none) {
@@ -211,13 +211,13 @@ export function EndTourFlow({
   }
 
   if (checking) {
-    return <p className="text-sm text-navy/60">Vérification…</p>;
+    return <p className="text-sm text-navy/70">Vérification…</p>;
   }
 
   return (
     <Card className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      <p className="text-sm text-navy/60">
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      <p className="text-sm text-navy/70">
         Tournée n°{openTour?.tour_number} — {registration ?? openTour?.vehicles?.registration}
       </p>
 
@@ -228,21 +228,21 @@ export function EndTourFlow({
             {openTour?.vehicles ? ` (${openTour.vehicles.registration})` : ""} — un responsable sera prévenu.
           </p>
           <div>
-            <label className="label">Motif du changement *</label>
+            <label className="block"><span className="label">Motif du changement *</span>
             <textarea
               className="input"
               rows={2}
               value={changeReason}
               onChange={(e) => setChangeReason(e.target.value)}
               placeholder="ex: panne, maintenance, véhicule indisponible…"
-            />
+            /></label>
           </div>
         </div>
       )}
 
       <div>
-        <label className="label">Kilométrage au retour *</label>
-        <input className="input" type="number" value={endKm} onChange={(e) => setEndKm(e.target.value)} />
+        <label className="block"><span className="label">Kilométrage au retour *</span>
+        <input className="input" type="number" value={endKm} onChange={(e) => setEndKm(e.target.value)} /></label>
         <div className="mt-1.5">
           <CounterPhotoCapture
             label={`Photo compteur kilométrique${requireOdometerPhoto ? " (obligatoire)" : " (optionnel)"}`}
@@ -257,8 +257,8 @@ export function EndTourFlow({
         </div>
       </div>
 
-      <div>
-        <label className="label">État du véhicule *</label>
+      <fieldset>
+        <legend className="label">État du véhicule *</legend>
         <div className="flex flex-col gap-2">
           <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
             <input type="radio" name="vehicle-ok" checked={vehicleOk === true} onChange={() => setVehicleOk(true)} />
@@ -269,18 +269,18 @@ export function EndTourFlow({
             Problème apparu pendant la tournée
           </label>
         </div>
-      </div>
+      </fieldset>
 
       {vehicleOk === false && (
         <div className="flex flex-col gap-2 rounded-lg border border-orange-ink/20 bg-orange-ink/5 p-3">
           <div>
-            <label className="label">Description du problème *</label>
+            <label className="block"><span className="label">Description du problème *</span>
             <textarea
               className="input"
               rows={3}
               value={problemDescription}
               onChange={(e) => setProblemDescription(e.target.value)}
-            />
+            /></label>
           </div>
           <label className="btn-secondary w-full cursor-pointer justify-center text-center text-xs">
             {problemPhotoFile ? "Photo sélectionnée ✓" : "📷 Photo du problème (optionnel)"}
@@ -288,7 +288,7 @@ export function EndTourFlow({
               type="file"
               accept="image/*"
               capture="environment"
-              className="hidden"
+              className="sr-only"
               onChange={(e) => setProblemPhotoFile(e.target.files?.[0] ?? null)}
             />
           </label>
@@ -296,8 +296,8 @@ export function EndTourFlow({
         </div>
       )}
 
-      <div>
-        <label className="label">Retour</label>
+      <fieldset>
+        <legend className="label">Retour</legend>
         <div className="flex flex-col gap-2">
           <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
             <input type="radio" name="return-type" checked={returnType === "depot"} onChange={() => setReturnType("depot")} />
@@ -313,11 +313,11 @@ export function EndTourFlow({
             Retour direct à domicile
           </label>
         </div>
-      </div>
+      </fieldset>
 
       <div>
-        <label className="label">Remarques (optionnel)</label>
-        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <label className="block"><span className="label">Remarques (optionnel)</span>
+        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
       </div>
 
       <TourReportPhotoCapture

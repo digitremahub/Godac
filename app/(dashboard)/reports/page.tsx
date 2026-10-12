@@ -224,31 +224,31 @@ async function PhotosView({
         <Card key={r.id} className="flex flex-col gap-2 text-sm">
           <div className="flex items-center justify-between">
             <p className="font-medium">n°{r.tour_number}</p>
-            <span className="text-xs text-navy/40">
+            <span className="text-xs text-navy/60">
               {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
             </span>
           </div>
-          <p className="text-xs text-navy/60">
+          <p className="text-xs text-navy/70">
             {r.users?.full_name ?? "—"} · {r.services?.name ?? "—"} · {r.vehicles?.registration ?? "—"}
           </p>
           <div className="flex gap-2">
             {r.startUrl && (
               <a href={r.startUrl} target="_blank" rel="noreferrer" className="flex-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.startUrl} alt="Rapport départ" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
-                <p className="mt-0.5 text-center text-[11px] text-navy/40">Départ</p>
+                <img loading="lazy" src={r.startUrl} alt="Rapport départ" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
+                <p className="mt-0.5 text-center text-xs text-navy/60">Départ</p>
               </a>
             )}
             {r.endUrl && (
               <a href={r.endUrl} target="_blank" rel="noreferrer" className="flex-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.endUrl} alt="Rapport retour" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
-                <p className="mt-0.5 text-center text-[11px] text-navy/40">Retour</p>
+                <img loading="lazy" src={r.endUrl} alt="Rapport retour" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
+                <p className="mt-0.5 text-center text-xs text-navy/60">Retour</p>
               </a>
             )}
           </div>
           {(r.report_bl_number || r.report_stops_total !== null || r.report_packages_count !== null) && (
-            <p className="rounded-lg bg-navy/5 px-2 py-1 text-[11px] text-navy/60">
+            <p className="rounded-lg bg-navy/5 px-2 py-1 text-xs text-navy/70">
               {[
                 r.report_bl_number && `BL ${r.report_bl_number}`,
                 r.report_stops_total !== null && `${r.report_stops_total} arrêts`,

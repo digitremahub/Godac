@@ -121,7 +121,7 @@ export function MaintenanceRequestForm({
   }
 
   if (vehicles.length === 0) {
-    return <Card className="text-sm text-navy/50">Aucun véhicule disponible pour ouvrir une demande.</Card>;
+    return <Card className="text-sm text-navy/65">Aucun véhicule disponible pour ouvrir une demande.</Card>;
   }
 
   return (
@@ -137,50 +137,50 @@ export function MaintenanceRequestForm({
         </p>
       )}
 
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {sent && <p className="text-sm text-teal-ink">Demande envoyée.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p role="status" className="text-sm text-teal-ink">Demande envoyée.</p>}
 
       <div>
-        <label className="label">Véhicule</label>
+        <label className="block"><span className="label">Véhicule</span>
         <select className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
               {v.registration}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
 
       <div>
-        <label className="label">Type de problème</label>
+        <label className="block"><span className="label">Type de problème</span>
         <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
           {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
 
       <div>
-        <label className="label">Urgence</label>
+        <label className="block"><span className="label">Urgence</span>
         <select className="input" value={urgency} onChange={(e) => setUrgency(e.target.value)}>
           {Object.entries(URGENCY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
 
       <div>
-        <label className="label">Description (optionnel)</label>
-        <textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <label className="block"><span className="label">Description (optionnel)</span>
+        <textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
       </div>
 
       <div>
-        <label className="label">Kilométrage (optionnel)</label>
-        <input className="input" type="number" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} />
+        <label className="block"><span className="label">Kilométrage (optionnel)</span>
+        <input className="input" type="number" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} /></label>
       </div>
 
       <label className="flex min-h-[44px] items-center gap-2 text-sm">
@@ -189,13 +189,13 @@ export function MaintenanceRequestForm({
       </label>
 
       <div className="flex flex-col gap-2">
-        <label className="label">Photos (optionnel, {photos.length}/{MAX_PHOTOS})</label>
+        <p className="label">Photos (optionnel, {photos.length}/{MAX_PHOTOS})</p>
         {photos.length > 0 && (
           <ul className="flex flex-wrap gap-2">
             {photos.map((file, i) => (
               <li key={i} className="flex items-center gap-1 rounded-lg bg-navy/5 px-2 py-1 text-xs">
                 {file.name}
-                <button type="button" className="text-orange-ink" onClick={() => removePhoto(i)}>
+                <button type="button" className="text-orange-ink" onClick={() => removePhoto(i)} aria-label={`Retirer ${file.name}`}>
                   ✕
                 </button>
               </li>
@@ -210,7 +210,7 @@ export function MaintenanceRequestForm({
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               capture="environment"
               multiple
-              className="hidden"
+              className="sr-only"
               onChange={(e) => addPhotos(e.target.files)}
             />
           </label>

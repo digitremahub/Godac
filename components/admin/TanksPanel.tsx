@@ -99,30 +99,30 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Cuves</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:items-end">
         <div className="col-span-2 sm:col-span-1">
-          <label className="label">Nom</label>
-          <input className="input" placeholder="Cuve Gasoil B" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="block"><span className="label">Nom</span>
+          <input className="input" placeholder="Cuve Gasoil B" value={name} onChange={(e) => setName(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Type</label>
+          <label className="block"><span className="label">Type</span>
           <select className="input" value={fuelType} onChange={(e) => setFuelType(e.target.value as "diesel" | "adblue")}>
             <option value="diesel">Diesel</option>
             <option value="adblue">AdBlue</option>
-          </select>
+          </select></label>
         </div>
         <div>
-          <label className="label">Capacité (L)</label>
-          <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+          <label className="block"><span className="label">Capacité (L)</span>
+          <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Index initial</label>
-          <input className="input" type="number" value={startIndex} onChange={(e) => setStartIndex(e.target.value)} />
+          <label className="block"><span className="label">Index initial</span>
+          <input className="input" type="number" value={startIndex} onChange={(e) => setStartIndex(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Service</label>
+          <label className="block"><span className="label">Service</span>
           <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
             <option value="">Aucun</option>
             {services.map((s) => (
@@ -130,7 +130,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
                 {s.name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
       </div>
       <button className="btn-primary self-start" disabled={busy || !name || !capacity} onClick={addTank}>
@@ -138,12 +138,12 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
       </button>
 
       {tanks.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucune cuve configurée.</p>
+        <p className="text-sm text-navy/60">Aucune cuve configurée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tanks.map((t) => (
             <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
-              <input
+              <input aria-label="Nom de la cuve"
                 className="input flex-1 !py-1"
                 defaultValue={t.name}
                 onBlur={(e) => e.target.value !== t.name && updateTank(t.id, { name: e.target.value })}
@@ -152,8 +152,8 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
               <span className={t.fuel_type === "diesel" ? "badge-teal" : "badge-gold"}>
                 {t.fuel_type === "diesel" ? "Diesel" : "AdBlue"}
               </span>
-              <span className="text-sm text-navy/40">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
-              <select
+              <span className="text-sm text-navy/60">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
+              <select aria-label="Service de la cuve"
                 className="input !w-auto !py-1"
                 defaultValue={t.service_id ?? ""}
                 onChange={(e) => updateTank(t.id, { service_id: e.target.value || null })}

@@ -108,6 +108,7 @@ export function PlanningDayView({
   }
 
   async function removeEntry(entryId: string) {
+    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
     setBusyId(entryId);
     setError(null);
     try {
@@ -130,12 +131,12 @@ export function PlanningDayView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, -1))}>
           ← Jour préc.
         </button>
-        <span className="text-sm text-navy/60">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+        <span className="text-sm text-navy/70">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, 1))}>
           Jour suiv. →
         </button>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
 
       {sorted.length === 0 ? (
@@ -156,9 +157,9 @@ export function PlanningDayView({
                           className="input !w-auto !py-1"
                           value={editTourNumber}
                           onChange={(ev) => setEditTourNumber(ev.target.value)}
-                          placeholder="N° tournée"
+                          aria-label="N° tournée" placeholder="N° tournée"
                         />
-                        <select className="input !w-auto !py-1" value={editDriverId} onChange={(ev) => setEditDriverId(ev.target.value)}>
+                        <select aria-label="Chauffeur" className="input !w-auto !py-1" value={editDriverId} onChange={(ev) => setEditDriverId(ev.target.value)}>
                           <option value="">Chauffeur…</option>
                           {drivers.map((d) => (
                             <option key={d.id} value={d.id}>
@@ -166,7 +167,7 @@ export function PlanningDayView({
                             </option>
                           ))}
                         </select>
-                        <select className="input !w-auto !py-1" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
+                        <select aria-label="Véhicule" className="input !w-auto !py-1" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
                           <option value="">Véhicule…</option>
                           {vehicles.map((v) => (
                             <option key={v.id} value={v.id}>
@@ -174,7 +175,7 @@ export function PlanningDayView({
                             </option>
                           ))}
                         </select>
-                        <input className="input !w-auto !py-1" type="time" value={editTime} onChange={(ev) => setEditTime(ev.target.value)} />
+                        <input aria-label="Heure" className="input !w-auto !py-1" type="time" value={editTime} onChange={(ev) => setEditTime(ev.target.value)} />
                         <div className="flex gap-1">
                           <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === e.id} onClick={() => saveEdit(e)}>
                             OK
@@ -194,10 +195,10 @@ export function PlanningDayView({
                           <span className={STATUS_BADGE[e.status] ?? "badge-neutral"}>{STATUS_LABEL[e.status] ?? e.status}</span>
                           {e.status === "planned" && (
                             <>
-                              <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
+                              <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
                                 ✎
                               </button>
-                              <button className="text-navy/30 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
+                              <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
                                 ×
                               </button>
                             </>

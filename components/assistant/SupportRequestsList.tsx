@@ -83,12 +83,12 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {requests.map((r) => (
         <Card key={r.id} className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-navy/50">
+              <p className="text-sm text-navy/65">
                 {r.requesterName} · {new Date(r.createdAt).toLocaleString("fr-FR")}
                 {r.recipient === "support_godac" && " · transmis au support GODAC"}
               </p>
@@ -96,10 +96,10 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
             </div>
             <span className={STATUS_BADGES[r.status]}>{STATUS_LABELS[r.status]}</span>
           </div>
-          {r.conversationSummary && <p className="rounded-lg bg-navy/5 p-2 text-xs text-navy/60">{r.conversationSummary}</p>}
+          {r.conversationSummary && <p className="rounded-lg bg-navy/5 p-2 text-xs text-navy/70">{r.conversationSummary}</p>}
           {r.response ? (
             <div className="rounded-lg bg-teal/10 p-2 text-sm">
-              <p className="mb-1 text-xs text-navy/50">Réponse envoyée</p>
+              <p className="mb-1 text-xs text-navy/65">Réponse envoyée</p>
               <p>{r.response}</p>
               {canAddToNotes && (
                 <button className="mt-2 text-xs text-teal-ink underline" disabled={busyId === r.id} onClick={() => addToNotes(r.id)}>
@@ -117,7 +117,7 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
               <textarea
                 className="input"
                 rows={2}
-                placeholder="Ta réponse…"
+                aria-label="Ta réponse" placeholder="Ta réponse…"
                 value={responseDrafts[r.id] ?? ""}
                 onChange={(e) => setResponseDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
               />

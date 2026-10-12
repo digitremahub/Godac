@@ -108,13 +108,13 @@ export function CameraCapture({
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           disabled={status === "uploading" || status === "extracting"}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
 
-      {error && <p className="text-sm text-orange-ink">{error} — vous pouvez continuer en saisie manuelle.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error} — vous pouvez continuer en saisie manuelle.</p>}
     </div>
   );
 }

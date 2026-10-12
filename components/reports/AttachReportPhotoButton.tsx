@@ -38,7 +38,7 @@ export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEn
 
   if (!open) {
     return (
-      <button className="text-[11px] text-orange-ink underline" onClick={() => setOpen(true)}>
+      <button className="text-xs text-orange-ink underline" onClick={() => setOpen(true)}>
         📎 Photo manquante
       </button>
     );
@@ -47,8 +47,8 @@ export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEn
   return (
     <div className="flex w-32 flex-col gap-1">
       <TourReportPhotoCapture label={stage === "start" ? "Rapport départ" : "Rapport retour"} onCaptured={handleCaptured} />
-      {error && <p className="text-[10px] text-orange-ink">{error}</p>}
-      <button className="text-[10px] text-navy/40 underline" onClick={() => setOpen(false)}>
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
+      <button className="text-xs text-navy/60 underline" onClick={() => setOpen(false)}>
         Annuler
       </button>
     </div>

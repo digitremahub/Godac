@@ -82,9 +82,9 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
 
   return (
     <div className="flex flex-col gap-2">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Pleins</th>
@@ -107,14 +107,14 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                 <td className="py-2">{l.entry_count}</td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input className="input !w-24 !py-1" type="number" value={litersValue} onChange={(e) => setLitersValue(e.target.value)} />
+                    <input aria-label="Litres" className="input !w-24 !py-1" type="number" value={litersValue} onChange={(e) => setLitersValue(e.target.value)} />
                   ) : (
                     `${liters.toLocaleString("fr-FR")} L`
                   )}
                 </td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
+                    <input aria-label="Montant (€)" className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
                   ) : (
                     `${amount.toLocaleString("fr-FR")} €`
                   )}
@@ -128,7 +128,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                       <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => saveCorrection(l.id)}>
                         Enregistrer
                       </button>
-                      <button className="text-xs text-navy/40" disabled={busyId === l.id} onClick={() => setEditingId(null)}>
+                      <button className="text-xs text-navy/60" disabled={busyId === l.id} onClick={() => setEditingId(null)}>
                         Annuler
                       </button>
                     </div>

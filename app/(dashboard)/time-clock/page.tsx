@@ -112,14 +112,14 @@ export default async function TimeClockPage() {
                     minute: "2-digit",
                     timeZone: "Europe/Paris",
                   })}
-                  <span className="ml-1 text-xs text-navy/40">
+                  <span className="ml-1 text-xs text-navy/60">
                     ({LOCATION_LABEL_DISPLAY[inLocation]}){mapLink(inCoords)}
                   </span>
                   {" → "}
                   {e.clocked_out_at ? (
                     <>
                       {new Date(e.clocked_out_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
-                      <span className="ml-1 text-xs text-navy/40">
+                      <span className="ml-1 text-xs text-navy/60">
                         ({LOCATION_LABEL_DISPLAY[outLocation!]}){mapLink(outCoords)}
                       </span>
                     </>
@@ -127,7 +127,7 @@ export default async function TimeClockPage() {
                     "en cours"
                   )}
                 </span>
-                <span className="text-xs text-navy/40">{formatDuration(e.clocked_in_at, e.clocked_out_at)}</span>
+                <span className="text-xs text-navy/60">{formatDuration(e.clocked_in_at, e.clocked_out_at)}</span>
               </div>
             );
           })}

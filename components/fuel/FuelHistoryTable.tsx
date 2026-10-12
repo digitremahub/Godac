@@ -50,7 +50,7 @@ export function FuelHistoryTable({
   return (
     <Card className="overflow-x-auto">
       <table className="w-full min-w-[520px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             {showVehicle && <th className="pb-2">Véhicule</th>}

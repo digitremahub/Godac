@@ -69,7 +69,7 @@ export function ClockButton({ clockedIn }: { clockedIn: boolean }) {
       <button className={clockedIn ? "btn-secondary" : "btn-primary"} disabled={busy} onClick={toggle}>
         {busy ? "…" : clockedIn ? "🔴 Badger la sortie" : "🟢 Badger l'entrée"}
       </button>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {geoWarning && <p className="text-xs text-gold-ink">{geoWarning}</p>}
     </Card>
   );

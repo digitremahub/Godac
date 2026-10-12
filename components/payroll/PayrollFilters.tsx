@@ -31,12 +31,12 @@ export function PayrollFilters({
   return (
     <Card className="mb-4 flex flex-wrap items-end gap-3">
       <div>
-        <label className="label">Mois</label>
-        <input className="input !w-auto" type="month" value={month} onChange={(e) => apply({ month: e.target.value })} />
+        <label className="block"><span className="label">Mois</span>
+        <input className="input !w-auto" type="month" value={month} onChange={(e) => apply({ month: e.target.value })} /></label>
       </div>
       {drivers.length > 0 && (
         <div>
-          <label className="label">Chauffeur</label>
+          <label className="block"><span className="label">Chauffeur</span>
           <select className="input !w-auto" value={selectedDriver} onChange={(e) => apply({ driver: e.target.value })}>
             <option value="">Tous les chauffeurs</option>
             {drivers.map((d) => (
@@ -44,7 +44,7 @@ export function PayrollFilters({
                 {d.full_name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
       )}
     </Card>

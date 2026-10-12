@@ -165,7 +165,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-lg">Consommation (30 jours)</h2>
           {consumptionRanking.length === 0 ? (
-            <p className="text-sm text-navy/40">Pas assez de données pour établir un classement.</p>
+            <p className="text-sm text-navy/60">Pas assez de données pour établir un classement.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (

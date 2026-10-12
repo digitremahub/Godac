@@ -68,11 +68,11 @@ export function MessageForm({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {error && <p className="text-xs text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
       {photo && (
         <div className="flex items-center gap-2">
-          <img src={photo.previewUrl} alt="Photo à envoyer" className="h-16 w-16 rounded-lg object-cover" />
-          <button className="text-xs text-navy/40 underline" disabled={busy} onClick={clearPhoto}>
+          <img width={64} height={64} src={photo.previewUrl} alt="Photo à envoyer" className="h-16 w-16 rounded-lg object-cover" />
+          <button className="text-xs text-navy/60 underline" disabled={busy} onClick={clearPhoto}>
             Retirer
           </button>
         </div>
@@ -84,14 +84,14 @@ export function MessageForm({
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            className="hidden"
+            className="sr-only"
             disabled={busy}
             onChange={(e) => e.target.files?.[0] && pickPhoto(e.target.files[0])}
           />
         </label>
         <input
           className="input flex-1"
-          placeholder="Votre message…"
+          aria-label="Votre message" placeholder="Votre message…"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {

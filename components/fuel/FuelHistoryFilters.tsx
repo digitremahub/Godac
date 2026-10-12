@@ -35,7 +35,7 @@ export function FuelHistoryFilters({
 
   return (
     <div className="mb-4 flex flex-wrap gap-3">
-      <select
+      <select aria-label="Filtrer par véhicule"
         className="input !w-auto"
         value={searchParams.get("vehicle") ?? ""}
         onChange={(e) => setParam("vehicle", e.target.value)}
@@ -48,7 +48,7 @@ export function FuelHistoryFilters({
         ))}
       </select>
       {drivers && (
-        <select
+        <select aria-label="Filtrer par chauffeur"
           className="input !w-auto"
           value={searchParams.get("driver") ?? ""}
           onChange={(e) => setParam("driver", e.target.value)}

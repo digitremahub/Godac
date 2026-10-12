@@ -123,22 +123,22 @@ export function OrganizationSettingsForm({
 
   return (
     <Card className="flex max-w-lg flex-col gap-4">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {saved && <p className="text-sm text-teal-ink">Modifications enregistrées.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {saved && <p role="status" className="text-sm text-teal-ink">Modifications enregistrées.</p>}
 
       <div>
-        <label className="label">Nom de l&apos;organisation</label>
-        <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+        <label className="block"><span className="label">Nom de l&apos;organisation</span>
+        <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} /></label>
       </div>
 
       <div>
-        <label className="label">Logo</label>
+        <p className="label">Logo</p>
         <div className="flex items-center gap-4">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-navy/5 p-1" />
+            <img width={56} height={56} src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-navy/5 p-1" />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-navy/5 text-xs text-navy/30">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-navy/5 text-xs text-navy/60">
               Aucun
             </div>
           )}
@@ -147,7 +147,7 @@ export function OrganizationSettingsForm({
             <input
               type="file"
               accept="image/png,image/jpeg,image/svg+xml,image/webp"
-              className="hidden"
+              className="sr-only"
               disabled={uploadingLogo}
               onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
             />
@@ -156,15 +156,16 @@ export function OrganizationSettingsForm({
       </div>
 
       <div>
-        <label className="label">Couleur d&apos;accent</label>
+        <label className="label" htmlFor="org-accent-color">Couleur d&apos;accent</label>
         <div className="flex items-center gap-3">
           <input
+            id="org-accent-color"
             type="color"
             className="h-10 w-14 cursor-pointer rounded-lg border border-navy/15 bg-transparent"
             value={accent}
             onChange={(e) => setAccent(e.target.value)}
           />
-          <span className="text-sm text-navy/50">{accent}</span>
+          <span className="text-sm text-navy/65">{accent}</span>
         </div>
         <div className="mt-3 flex flex-col gap-2 rounded-lg bg-navy/5 p-3 text-sm">
           <div className="flex items-center gap-2">
@@ -183,7 +184,7 @@ export function OrganizationSettingsForm({
       <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
         <div>
           <p className="font-medium">Module OCR</p>
-          <p className="text-sm text-navy/50">
+          <p className="text-sm text-navy/65">
             Activable/désactivable par organisation — désactivé, tous les
             ravitaillements passent en saisie 100% manuelle.
           </p>
@@ -199,7 +200,7 @@ export function OrganizationSettingsForm({
       <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
         <div>
           <p className="font-medium">Photo du compteur kilométrique obligatoire</p>
-          <p className="text-sm text-navy/50">
+          <p className="text-sm text-navy/65">
             Activé, un chauffeur ne peut plus valider un départ/retour de tournée sans photo du compteur.
           </p>
         </div>
@@ -212,27 +213,27 @@ export function OrganizationSettingsForm({
       </div>
 
       <div>
-        <label className="label">Numéro à appeler en cas d&apos;accident</label>
+        <label className="block"><span className="label">Numéro à appeler en cas d&apos;accident</span>
         <input
           className="input"
           type="tel"
           placeholder="ex: 06 12 34 56 78"
           value={emergencyPhoneValue}
           onChange={(e) => setEmergencyPhoneValue(e.target.value)}
-        />
-        <p className="mt-1 text-sm text-navy/50">
+        /></label>
+        <p className="mt-1 text-sm text-navy/65">
           Affiché aux chauffeurs sur le formulaire de signalement. Laissez vide pour masquer le bandeau.
         </p>
       </div>
 
       <div>
-        <label className="label">Adresse du dépôt</label>
+        <label className="block"><span className="label">Adresse du dépôt</span>
         <input
           className="input"
           placeholder="ex: 1 rue du Dépôt, 69007 Lyon"
           value={depotAddressValue}
           onChange={(e) => setDepotAddressValue(e.target.value)}
-        />
+        /></label>
         {depotAddressValue.trim() && (
           <p className="mt-1 flex gap-3 text-sm">
             <a
@@ -253,7 +254,7 @@ export function OrganizationSettingsForm({
             </a>
           </p>
         )}
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Sert à estimer la distance d&apos;un retour direct à domicile par rapport au retour habituel au dépôt
           (rentabilité carburant).
         </p>
@@ -261,58 +262,59 @@ export function OrganizationSettingsForm({
 
       <div className="flex flex-col gap-3 rounded-lg bg-navy/5 p-3">
         <p className="font-medium">Identité légale (fiche employeur)</p>
-        <p className="text-sm text-navy/50">
+        <p className="text-sm text-navy/65">
           Affichée dans l&apos;encadré employeur des fiches de paie générées — chaque champ renseigné y apparaît, les champs vides sont simplement omis.
         </p>
 
         <div>
-          <label className="label">Forme juridique</label>
-          <input className="input" placeholder="ex: SARL, SAS, EURL…" value={legalFormValue} onChange={(e) => setLegalFormValue(e.target.value)} />
+          <label className="block"><span className="label">Forme juridique</span>
+          <input className="input" placeholder="ex: SARL, SAS, EURL…" value={legalFormValue} onChange={(e) => setLegalFormValue(e.target.value)} /></label>
         </div>
 
         <div>
-          <label className="label">SIRET</label>
-          <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} />
+          <label className="block"><span className="label">SIRET</span>
+          <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} /></label>
         </div>
 
         <div>
-          <label className="label">Code APE/NAF</label>
-          <input className="input" placeholder="ex: 4941A" value={apeCodeValue} onChange={(e) => setApeCodeValue(e.target.value)} />
+          <label className="block"><span className="label">Code APE/NAF</span>
+          <input className="input" placeholder="ex: 4941A" value={apeCodeValue} onChange={(e) => setApeCodeValue(e.target.value)} /></label>
         </div>
 
         <div>
-          <label className="label">Convention collective applicable</label>
+          <label className="block"><span className="label">Convention collective applicable</span>
           <input
             className="input"
             placeholder="ex: Transports routiers (IDCC 1340)"
             value={conventionCollectiveValue}
             onChange={(e) => setConventionCollectiveValue(e.target.value)}
-          />
+          /></label>
         </div>
 
         <div>
-          <label className="label">Numéro de cotisant URSSAF</label>
-          <input className="input" value={urssafNumberValue} onChange={(e) => setUrssafNumberValue(e.target.value)} />
+          <label className="block"><span className="label">Numéro de cotisant URSSAF</span>
+          <input className="input" value={urssafNumberValue} onChange={(e) => setUrssafNumberValue(e.target.value)} /></label>
         </div>
 
         <div>
-          <label className="label">Adresse légale (siège social)</label>
+          <label className="block"><span className="label">Adresse légale (siège social)</span>
           <input
             className="input"
             placeholder="ex: 60 rue Laennec, 93700 Drancy"
             value={legalAddressValue}
             onChange={(e) => setLegalAddressValue(e.target.value)}
-          />
-          <p className="mt-1 text-sm text-navy/50">
+          /></label>
+          <p className="mt-1 text-sm text-navy/65">
             Distincte de l&apos;adresse du dépôt ci-dessus si votre siège social est ailleurs.
           </p>
         </div>
       </div>
 
       <div>
-        <label className="label">Seuil d&apos;alerte de surconsommation</label>
+        <label className="label" htmlFor="org-consumption-threshold">Seuil d&apos;alerte de surconsommation</label>
         <div className="flex items-center gap-2">
           <input
+            id="org-consumption-threshold"
             className="input !w-24"
             type="number"
             min={1}
@@ -320,7 +322,7 @@ export function OrganizationSettingsForm({
             value={consumptionThreshold}
             onChange={(e) => setConsumptionThreshold(e.target.value)}
           />
-          <span className="text-sm text-navy/50">% au-dessus de la moyenne 90 jours du véhicule</span>
+          <span className="text-sm text-navy/65">% au-dessus de la moyenne 90 jours du véhicule</span>
         </div>
       </div>
 

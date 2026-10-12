@@ -58,9 +58,9 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[980px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             <th className="pb-2">Véhicule</th>
@@ -81,7 +81,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
               <td className="py-2">
                 {f.driver?.full_name ?? (
                   f.suggested_driver_name ? (
-                    <span className="text-navy/60">
+                    <span className="text-navy/70">
                       Suggéré : {f.suggested_driver_name}
                       {f.suggested_tour_number ? ` (n°${f.suggested_tour_number})` : ""}
                     </span>
@@ -113,10 +113,10 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
                       Notifier le chauffeur
                     </button>
                   )}
-                  {f.notified_at && <span className="text-xs text-navy/40">Notifié</span>}
+                  {f.notified_at && <span className="text-xs text-navy/60">Notifié</span>}
                   {f.status === "identified" && (
                     <button
-                      className="text-xs text-navy/40 hover:text-orange-ink"
+                      className="text-xs text-navy/60 hover:text-orange-ink"
                       disabled={busyId === f.id}
                       onClick={() => patch(f.id, { status: "contested" })}
                     >
@@ -125,7 +125,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
                   )}
                   {(f.status === "identified" || f.status === "contested") && (
                     <button
-                      className="text-xs text-navy/40 hover:text-teal-ink"
+                      className="text-xs text-navy/60 hover:text-teal-ink"
                       disabled={busyId === f.id}
                       onClick={() => patch(f.id, { status: "paid" })}
                     >

@@ -50,35 +50,35 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
   return (
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
-        <h2 className="text-xl">Créer mon compte chauffeur</h2>
-        <p className="mt-1 text-sm text-navy/50">
+        <h1 className="text-xl">Créer mon compte chauffeur</h1>
+        <p className="mt-1 text-sm text-navy/65">
           Un responsable devra valider votre compte avant que vous puissiez vous connecter — vous pouvez créer votre code
           PIN dès maintenant, ça ira plus vite ensuite.
         </p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div>
-          <label className="label">Nom complet</label>
-          <input className="input" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <label className="block"><span className="label">Nom complet</span>
+          <input className="input" required value={fullName} onChange={(e) => setFullName(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Entreprise pour laquelle vous travaillez</label>
+          <label className="block"><span className="label">Entreprise pour laquelle vous travaillez</span>
           <input
             className="input"
             required
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
             placeholder="Nom de votre entreprise"
-          />
-          <p className="mt-1 text-xs text-navy/40">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
+          /></label>
+          <p className="mt-1 text-xs text-navy/60">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
         </div>
         <div>
-          <label className="label">Téléphone (optionnel)</label>
-          <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <label className="block"><span className="label">Téléphone (optionnel)</span>
+          <input className="input" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
         </div>
         {services.length > 0 && (
           <div>
-            <label className="label">Service (optionnel)</label>
+            <label className="block"><span className="label">Service (optionnel)</span>
             <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
               <option value="">Je ne sais pas / aucun</option>
               {services.map((s) => (
@@ -86,10 +86,10 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
                   {s.name}
                 </option>
               ))}
-            </select>
+            </select></label>
           </div>
         )}
-        {error && <p className="text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy || !fullName || !companyName}>
           {busy ? "Création…" : "Créer mon compte"}
         </button>

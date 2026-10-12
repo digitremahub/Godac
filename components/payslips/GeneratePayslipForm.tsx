@@ -48,23 +48,23 @@ export function GeneratePayslipForm({ employees }: { employees: { id: string; fu
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div>
-        <label className="label">Employé</label>
+        <label className="block"><span className="label">Employé</span>
         <select className="input" value={userId} onChange={(e) => setUserId(e.target.value)}>
           {employees.map((e) => (
             <option key={e.id} value={e.id}>
               {e.full_name}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
       <div>
-        <label className="label">Mois</label>
-        <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <label className="block"><span className="label">Mois</span>
+        <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label>
       </div>
       <button className="btn-primary" disabled={busy || !userId} onClick={generate}>
         {busy ? "Génération…" : "Générer le bulletin"}
       </button>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
     </div>
   );
 }

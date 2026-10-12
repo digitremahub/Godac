@@ -53,7 +53,7 @@ export function ConversationTabBody({
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3">
         {!loaded ? (
-          <p className="text-sm text-navy/40">Chargement…</p>
+          <p className="text-sm text-navy/60">Chargement…</p>
         ) : (
           <div className="flex flex-col gap-2">
             <MessageThread messages={messages} currentUserId={currentUserId} onChanged={fetchThread} />

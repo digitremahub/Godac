@@ -5,17 +5,17 @@ export default function SignUpPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
       <Link href="/" className="flex items-center gap-2.5">
-        <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
+        <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
         <span className="font-display text-xl font-extrabold">GODAC</span>
       </Link>
       <AuthForm mode="sign-up" />
-      <p className="text-sm text-navy/40">
+      <p className="text-sm text-navy/60">
         Déjà un compte ?{" "}
         <Link href="/sign-in" className="text-teal-ink hover:underline">
           Se connecter
         </Link>
       </p>
-      <div className="flex gap-3 text-xs text-navy/30">
+      <div className="flex gap-3 text-xs text-navy/60">
         <Link href="/mentions-legales" className="hover:underline">
           Mentions légales
         </Link>

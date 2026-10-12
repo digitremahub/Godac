@@ -43,6 +43,21 @@ type EditableField =
   | "report_departure_time"
   | "report_return_time";
 
+const FIELD_LABELS: Record<EditableField, string> = {
+  report_bl_number: "N° de BL",
+  report_stops_total: "Arrêts",
+  report_packages_count: "Colis",
+  report_priority_count: "Colis prioritaires",
+  report_stops_delivered: "Arrêts livrés",
+  report_packages_missing: "Colis manquants",
+  report_pickups: "Ramasses",
+  report_packages_picked_up: "Colis ramassés",
+  report_packages_returned: "Colis ramenés au dépôt",
+  report_packages_relay: "Colis en relais",
+  report_departure_time: "Heure de départ",
+  report_return_time: "Heure de retour",
+};
+
 const NUMERIC_FIELDS = new Set<EditableField>([
   "report_stops_total",
   "report_packages_count",
@@ -139,7 +154,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
       return display;
     }
     return (
-      <input
+      <input aria-label={FIELD_LABELS[field]}
         className="input !h-7 !w-20 !py-0.5 !text-xs"
         type={NUMERIC_FIELDS.has(field) ? "number" : "text"}
         min={NUMERIC_FIELDS.has(field) ? 0 : undefined}
@@ -151,9 +166,9 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[1420px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             <th className="pb-2">Chauffeur</th>
@@ -221,16 +236,16 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                 <td className="py-2">
                   {editingId === r.id ? (
                     <div className="flex gap-1">
-                      <button className="btn-primary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={() => save(r.id)}>
+                      <button className="btn-primary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={() => save(r.id)}>
                         OK
                       </button>
-                      <button className="btn-secondary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={cancelEdit}>
+                      <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={cancelEdit}>
                         Annuler
                       </button>
                     </div>
                   ) : (
                     <button
-                      className="text-navy/30 hover:text-teal-ink"
+                      className="text-navy/60 hover:text-teal-ink"
                       onClick={() => startEdit(r)}
                       aria-label="Modifier"
                       title="Modifier"

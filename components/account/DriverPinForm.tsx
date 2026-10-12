@@ -48,16 +48,16 @@ export function DriverPinForm({ pinAlreadySet }: { pinAlreadySet: boolean }) {
     <Card className="flex max-w-md flex-col gap-4">
       <div>
         <h3 className="text-lg">Connexion par badge (code PIN)</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           {pinAlreadySet
             ? "Activée — scannez votre badge ci-dessus pour vous connecter avec ce code. Vous pouvez le changer ici."
             : "Activez un code PIN (4 à 6 chiffres) : vous pourrez ensuite vous connecter en scannant votre badge, sans mot de passe à retenir. Cela remplace votre mot de passe actuel."}
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {saved && <p className="text-sm text-teal-ink">Code PIN enregistré.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {saved && <p role="status" className="text-sm text-teal-ink">Code PIN enregistré.</p>}
       <div>
-        <label className="label">{pinAlreadySet ? "Nouveau code PIN" : "Code PIN"}</label>
+        <label className="block"><span className="label">{pinAlreadySet ? "Nouveau code PIN" : "Code PIN"}</span>
         <input
           className="input"
           type="password"
@@ -65,10 +65,10 @@ export function DriverPinForm({ pinAlreadySet }: { pinAlreadySet: boolean }) {
           autoComplete="off"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-        />
+        /></label>
       </div>
       <div>
-        <label className="label">Confirmez le code PIN</label>
+        <label className="block"><span className="label">Confirmez le code PIN</span>
         <input
           className="input"
           type="password"
@@ -76,7 +76,7 @@ export function DriverPinForm({ pinAlreadySet }: { pinAlreadySet: boolean }) {
           autoComplete="off"
           value={confirmPin}
           onChange={(e) => setConfirmPin(e.target.value)}
-        />
+        /></label>
       </div>
       <button className="btn-primary self-start" disabled={busy || !pin || !confirmPin} onClick={save}>
         {busy ? "Enregistrement…" : pinAlreadySet ? "Changer mon code PIN" : "Activer la connexion par badge"}

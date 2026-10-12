@@ -126,7 +126,7 @@ export default async function MyPlanningPage({
         <Link href={`/planning/mine?view=${view}&anchor=${prevAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           ← Préc.
         </Link>
-        <span className="text-sm capitalize text-navy/60">{label}</span>
+        <span className="text-sm capitalize text-navy/70">{label}</span>
         <Link href={`/planning/mine?view=${view}&anchor=${nextAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           Suiv. →
         </Link>
@@ -135,7 +135,7 @@ export default async function MyPlanningPage({
       {view === "month" && calendarDays ? (
         <div className="grid grid-cols-7 gap-1.5 text-xs">
           {DAY_LABELS.map((l) => (
-            <div key={l} className="px-1 text-navy/40">
+            <div key={l} className="px-1 text-navy/60">
               {l}
             </div>
           ))}
@@ -147,22 +147,22 @@ export default async function MyPlanningPage({
                 key={dayISO}
                 href={`/planning/mine?view=day&anchor=${dayISO}`}
                 className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                  inMonth ? "bg-white" : "bg-navy/5 text-navy/30"
+                  inMonth ? "bg-white" : "bg-navy/5 text-navy/60"
                 }`}
               >
                 <span className="font-medium">{Number(dayISO.slice(8, 10))}</span>
                 {dayEntries.slice(0, MAX_VISIBLE_PER_DAY).map((e: any) => (
                   <span
                     key={e.id}
-                    className={`truncate rounded px-1 text-[10px] ${
-                      e.status === "done" ? "bg-teal/15 text-navy/70" : e.status === "in_progress" ? "bg-gold/20 text-navy/70" : "bg-navy/10 text-navy/60"
+                    className={`truncate rounded px-1 text-[11px] ${
+                      e.status === "done" ? "bg-teal/15 text-navy/70" : e.status === "in_progress" ? "bg-gold/20 text-navy/70" : "bg-navy/10 text-navy/70"
                     }`}
                   >
                     n°{e.tour_number}
                   </span>
                 ))}
                 {dayEntries.length > MAX_VISIBLE_PER_DAY && (
-                  <span className="text-[10px] text-navy/40">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
+                  <span className="text-[11px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
                 )}
               </Link>
             );
@@ -177,7 +177,7 @@ export default async function MyPlanningPage({
             if (dayEntries.length === 0) return null;
             return (
               <div key={dayISO}>
-                <p className="mb-2 text-sm font-medium capitalize text-navy/60">
+                <p className="mb-2 text-sm font-medium capitalize text-navy/70">
                   {new Date(`${dayISO}T00:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}
                 </p>
                 <div className="flex flex-col gap-2">
@@ -187,8 +187,8 @@ export default async function MyPlanningPage({
                         <p className="font-medium">
                           Tournée n°{entry.tour_number} {entry.services ? `· ${entry.services.name}` : ""}
                         </p>
-                        <p className="text-sm text-navy/60">{entry.vehicles?.registration ?? "Véhicule non précisé"}</p>
-                        <p className="text-xs text-navy/40">
+                        <p className="text-sm text-navy/70">{entry.vehicles?.registration ?? "Véhicule non précisé"}</p>
+                        <p className="text-xs text-navy/60">
                           {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
                           {entry.end_at
                             ? ` → ${new Date(entry.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`

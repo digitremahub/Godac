@@ -54,7 +54,7 @@ export function RegeneratePayslipButton({
 
   if (!open) {
     return (
-      <button type="button" className="text-xs text-navy/40 hover:text-teal-ink hover:underline" onClick={() => setOpen(true)}>
+      <button type="button" className="text-xs text-navy/60 hover:text-teal-ink hover:underline" onClick={() => setOpen(true)}>
         🔄 Mettre à jour
       </button>
     );
@@ -67,7 +67,7 @@ export function RegeneratePayslipButton({
         type="number"
         min={0}
         step={0.01}
-        placeholder="Panier €"
+        aria-label="Panier €" placeholder="Panier €"
         value={mealVouchers}
         onChange={(e) => setMealVouchers(e.target.value)}
         disabled={busy}
@@ -77,18 +77,18 @@ export function RegeneratePayslipButton({
         type="number"
         min={0}
         step={0.01}
-        placeholder="Prime €"
+        aria-label="Prime €" placeholder="Prime €"
         value={bonus}
         onChange={(e) => setBonus(e.target.value)}
         disabled={busy}
       />
-      <button className="btn-primary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={confirm}>
+      <button className="btn-primary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={confirm}>
         {busy ? "…" : "Écraser"}
       </button>
-      <button className="btn-secondary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={() => setOpen(false)}>
+      <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={() => setOpen(false)}>
         Annuler
       </button>
-      {error && <span className="text-[10px] text-orange-ink">{error}</span>}
+      {error && <span role="alert" className="text-xs text-orange-ink">{error}</span>}
     </span>
   );
 }

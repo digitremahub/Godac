@@ -58,12 +58,12 @@ export function TankPhotoCapture({ tankId }: { tankId: string }) {
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {error && <p className="text-xs text-orange-ink">{error}</p>}
-      {sent && <p className="text-xs text-teal-ink">Photo envoyée, en attente de vérification.</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
+      {sent && <p role="status" className="text-xs text-teal-ink">Photo envoyée, en attente de vérification.</p>}
       <input
         className="input !py-1 text-sm"
         type="number"
-        placeholder="Index lu (optionnel)"
+        aria-label="Index lu (optionnel)" placeholder="Index lu (optionnel)"
         value={reading}
         onChange={(e) => setReading(e.target.value)}
       />
@@ -73,12 +73,12 @@ export function TankPhotoCapture({ tankId }: { tankId: string }) {
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           disabled={busy}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
-      <button className="text-xs text-navy/40 hover:text-navy/70" onClick={() => setCapturing(false)} disabled={busy}>
+      <button className="text-xs text-navy/60 hover:text-navy/70" onClick={() => setCapturing(false)} disabled={busy}>
         Annuler
       </button>
     </div>

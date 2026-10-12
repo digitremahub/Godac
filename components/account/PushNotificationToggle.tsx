@@ -56,12 +56,12 @@ export function PushNotificationToggle() {
     <Card className="flex max-w-md flex-col gap-2">
       <p className="label">Notifications push</p>
       {!supported ? (
-        <p className="text-sm text-navy/50">
+        <p className="text-sm text-navy/65">
           Non disponible sur ce navigateur — sur iPhone, ajoutez d&apos;abord GODAC à l&apos;écran d&apos;accueil.
         </p>
       ) : (
         <>
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             {subscribed
               ? "Activées sur cet appareil — vous recevrez les alertes même sans avoir GODAC ouvert."
               : "Recevez les alertes directement sur cet appareil, en plus de l'email."}
@@ -77,7 +77,7 @@ export function PushNotificationToggle() {
           <button className={subscribed ? "btn-secondary self-start" : "btn-primary self-start"} disabled={busy} onClick={toggle}>
             {busy ? "…" : subscribed ? "Désactiver" : "Activer les notifications"}
           </button>
-          {error && <p className="text-xs text-orange-ink">{error}</p>}
+          {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
         </>
       )}
     </Card>

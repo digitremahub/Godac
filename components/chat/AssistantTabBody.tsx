@@ -46,9 +46,9 @@ export function AssistantTabBody({
     <div className="flex h-full flex-col">
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3">
         {!loaded ? (
-          <p className="text-sm text-navy/40">Chargement…</p>
+          <p className="text-sm text-navy/60">Chargement…</p>
         ) : messages.length === 0 ? (
-          <p className="text-sm text-navy/40">Pose une question sur l&apos;utilisation de GODAC ou les consignes de ton entreprise.</p>
+          <p className="text-sm text-navy/60">Pose une question sur l&apos;utilisation de GODAC ou les consignes de ton entreprise.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {messages.map((m) => (
@@ -60,21 +60,25 @@ export function AssistantTabBody({
                       <button
                         className={`text-xs ${m.feedback === true ? "opacity-100" : "opacity-40 hover:opacity-100"}`}
                         onClick={() => onVote(m.id, true)}
+                        aria-label="Réponse utile"
+                        aria-pressed={m.feedback === true}
                       >
-                        👍
+                        <span aria-hidden="true">👍</span>
                       </button>
                       <button
                         className={`text-xs ${m.feedback === false ? "opacity-100" : "opacity-40 hover:opacity-100"}`}
                         onClick={() => onVote(m.id, false)}
+                        aria-label="Réponse pas utile"
+                        aria-pressed={m.feedback === false}
                       >
-                        👎
+                        <span aria-hidden="true">👎</span>
                       </button>
                     </div>
                   )}
                 </div>
               </div>
             ))}
-            {busy && <p className="text-xs text-navy/40">L&apos;assistant écrit…</p>}
+            {busy && <p className="text-xs text-navy/60">L&apos;assistant écrit…</p>}
           </div>
         )}
         {relayNotice && (
@@ -90,7 +94,7 @@ export function AssistantTabBody({
             )}
           </div>
         )}
-        {error && <p className="mt-2 text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-orange-ink">{error}</p>}
       </div>
 
       <div className="border-t border-navy/10 p-3">
@@ -99,7 +103,7 @@ export function AssistantTabBody({
             className="input flex-1 !py-2 text-sm"
             value={input}
             maxLength={MAX_MESSAGE_LENGTH}
-            placeholder="Écris ta question…"
+            aria-label="Écris ta question" placeholder="Écris ta question…"
             disabled={busy}
             onKeyDown={(e) => e.key === "Enter" && onSend()}
             onChange={(e) => onInputChange(e.target.value)}
@@ -109,14 +113,14 @@ export function AssistantTabBody({
           </button>
         </div>
         <div className="mt-2 flex items-center justify-between">
-          <button className="text-xs text-navy/50 underline" disabled={busy} onClick={onEscalate}>
+          <button className="text-xs text-navy/65 underline" disabled={busy} onClick={onEscalate}>
             Parler à quelqu&apos;un
           </button>
-          <span className="text-[10px] text-navy/30">
+          <span className="text-xs text-navy/60">
             {input.length}/{MAX_MESSAGE_LENGTH}
           </span>
         </div>
-        <p className="mt-1.5 text-[10px] text-navy/30">Assistant automatique. Ne saisis pas d&apos;informations personnelles sensibles.</p>
+        <p className="mt-1.5 text-xs text-navy/60">Assistant automatique. Ne saisis pas d&apos;informations personnelles sensibles.</p>
       </div>
     </div>
   );

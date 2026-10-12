@@ -30,8 +30,8 @@ export function WashHistory({ washes }: { washes: WashRecord[] }) {
           <li key={w.id} className="flex items-center justify-between border-t border-navy/5 pt-1.5 text-sm first:border-0 first:pt-0">
             <span className="text-navy/70">{labels(w)}</span>
             <span className="flex items-center gap-3">
-              <span className="text-navy/40">{w.driverName}</span>
-              <span className="text-xs text-navy/40">{new Date(w.created_at).toLocaleDateString("fr-FR")}</span>
+              <span className="text-navy/60">{w.driverName}</span>
+              <span className="text-xs text-navy/60">{new Date(w.created_at).toLocaleDateString("fr-FR")}</span>
             </span>
           </li>
         ))}

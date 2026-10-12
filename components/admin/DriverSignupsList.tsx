@@ -35,17 +35,17 @@ export function DriverSignupsList({ requests }: { requests: SignupRequest[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {requests.map((r) => {
         const serviceNames = (r.user_services ?? []).map((us) => us.services?.name).filter(Boolean).join(", ");
         return (
           <Card key={r.id} className={`flex items-center justify-between gap-4 ${busyId === r.id ? "opacity-40" : ""}`}>
             <div>
               <p className="font-medium">{r.full_name}</p>
-              <p className="text-sm text-navy/50">
+              <p className="text-sm text-navy/65">
                 {r.phone ?? "Pas de téléphone"} · {serviceNames || "Aucun service choisi"}
               </p>
-              <p className="text-xs text-navy/40">
+              <p className="text-xs text-navy/60">
                 Inscrit le {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>

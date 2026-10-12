@@ -53,7 +53,45 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  /* One visible, on-brand keyboard focus ring for every interactive
+     element — :focus-visible so a mouse click doesn't draw it. The
+     deep teal clears 3:1 against white, paper and the teal button. */
+  :focus-visible {
+    outline: 2px solid theme("colors.teal-ink");
+    outline-offset: 2px;
+  }
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+  /* Photo/file pickers are a styled <label> around a visually hidden
+     (sr-only, still focusable) file input: the ring goes on the label. */
+  label:has(> input[type="file"].sr-only) {
+    position: relative;
+  }
+  label:has(> input[type="file"]:focus-visible) {
+    outline: 2px solid theme("colors.teal-ink");
+    outline-offset: 2px;
+  }
+  /* Figures in every data table line up column-wise (liters, €, km). */
+  table {
+    font-variant-numeric: tabular-nums;
   }
   body {
     @apply text-navy font-body antialiased;
@@ -69,6 +107,7 @@
   h3,
   h4 {
     @apply font-display font-extrabold tracking-tight;
+    text-wrap: balance;
   }
   ::selection {
     background-color: rgba(15, 118, 110, 0.18);
@@ -100,16 +139,16 @@
     @apply card cursor-pointer hover:border-navy/20 hover:shadow-[0_1px_2px_0_rgba(10,15,30,0.04),0_12px_28px_-10px_rgba(10,15,30,0.16)];
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-semibold text-navy shadow-[0_4px_16px_-4px_rgba(27,228,193,0.5)] transition-all duration-150 hover:brightness-105 hover:shadow-[0_6px_20px_-4px_rgba(27,228,193,0.65)] active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-semibold text-navy shadow-[0_4px_16px_-4px_rgba(27,228,193,0.5)] transition-[filter,box-shadow,transform] duration-150 hover:brightness-105 hover:shadow-[0_6px_20px_-4px_rgba(27,228,193,0.65)] active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:active:scale-100;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-navy/15 bg-navy/[0.02] px-4 py-2.5 font-semibold text-navy transition-all duration-150 hover:border-navy/25 hover:bg-navy/[0.05] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-navy/15 bg-navy/[0.02] px-4 py-2.5 font-semibold text-navy transition-[border-color,background-color,transform] duration-150 hover:border-navy/25 hover:bg-navy/[0.05] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 font-semibold text-white shadow-[0_4px_16px_-4px_rgba(255,107,53,0.45)] transition-all duration-150 hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 font-semibold text-white shadow-[0_4px_16px_-4px_rgba(255,107,53,0.45)] transition-[filter,transform] duration-150 hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
   }
   .input {
-    @apply w-full rounded-lg border border-navy/15 bg-navy/[0.02] px-3 py-2 text-navy placeholder-navy/35 outline-none transition-all duration-150 hover:border-navy/25 focus:border-teal-ink/50 focus:bg-white focus:shadow-[0_0_0_3px_rgba(15,118,110,0.13)];
+    @apply w-full rounded-lg border border-navy/15 bg-navy/[0.02] px-3 py-2 text-navy placeholder-navy/50 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-navy/25 focus:border-teal-ink/50 focus:bg-white focus:shadow-[0_0_0_3px_rgba(15,118,110,0.13)];
   }
   .label {
     @apply mb-1 block text-sm font-medium text-navy/60;
@@ -133,6 +172,18 @@
     @apply border-t border-navy/10;
   }
   .kicker {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-navy/40;
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-navy/60;
+  }
+}
+
+/* Users who asked the OS for less motion get state changes without the
+   travel: slide-ins, scale-on-press and fades collapse to near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

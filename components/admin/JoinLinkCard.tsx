@@ -50,13 +50,13 @@ export function JoinLinkCard({ token }: { token: string }) {
   return (
     <Card className="flex flex-col gap-3">
       <p className="text-sm font-medium">Auto-inscription chauffeur</p>
-      <p className="text-xs text-navy/40">
+      <p className="text-xs text-navy/60">
         Un seul lien/QR à afficher au dépôt — chaque nouveau chauffeur le scanne pour créer lui-même son compte. Son
         compte reste en attente jusqu&apos;à validation par un chef de service ou la direction (voir &quot;Chauffeurs à
         valider&quot;).
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <canvas ref={canvasRef} className="rounded-lg border border-navy/10" />
+        <canvas ref={canvasRef} role="img" aria-label="QR code du lien d’inscription chauffeur" className="rounded-lg border border-navy/10" />
         <div className="flex flex-1 flex-col gap-2">
           <code className="break-all rounded-lg bg-navy/5 px-3 py-2 text-xs">{url}</code>
           <div className="flex gap-2">
@@ -69,7 +69,7 @@ export function JoinLinkCard({ token }: { token: string }) {
           </div>
         </div>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
     </Card>
   );
 }

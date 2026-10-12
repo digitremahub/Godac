@@ -57,7 +57,7 @@ export function MeetingRequestsList({ requests, canManage }: { requests: Meeting
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="font-medium">{canManage ? r.requesterName : "Votre demande"}</p>
-              <p className="text-xs text-navy/40">
+              <p className="text-xs text-navy/60">
                 {new Date(r.createdAt).toLocaleDateString("fr-FR")}
                 {r.preferredDate && ` · Souhaitée le ${new Date(r.preferredDate).toLocaleDateString("fr-FR")}`}
               </p>

@@ -105,9 +105,9 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[1000px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Type</th>
@@ -126,23 +126,23 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
             return (
               <tr key={r.id} className="border-t border-navy/5 align-top">
                 <td className="py-2">{r.vehicleRegistration}</td>
-                <td className="py-2">{isEditing ? <input className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} /> : r.type}</td>
-                <td className="py-2 text-navy/60">
+                <td className="py-2">{isEditing ? <input aria-label="Type de problème" className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} /> : r.type}</td>
+                <td className="py-2 text-navy/70">
                   {isEditing ? (
-                    <input className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+                    <input aria-label="Description" className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
                   ) : (
                     r.description ?? "—"
                   )}
                   {r.appointmentNeeded && <span className="badge-gold ml-2">RDV garage à prévoir</span>}
                 </td>
-                <td className="py-2 text-navy/60">{r.odometerKm ?? "—"}</td>
+                <td className="py-2 text-navy/70">{r.odometerKm ?? "—"}</td>
                 <td className="py-2">
                   {r.photoUrls.length > 0 ? (
                     <div className="flex gap-1">
                       {r.photoUrls.map((url, i) => (
                         <a key={i} href={url} target="_blank" rel="noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt="Photo du signalement" className="h-10 w-10 rounded object-cover" />
+                          <img width={40} height={40} loading="lazy" src={url} alt="Photo du signalement" className="h-10 w-10 rounded object-cover" />
                         </a>
                       ))}
                     </div>
@@ -152,7 +152,7 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
                 </td>
                 <td className="py-2">
                   {isEditing ? (
-                    <select
+                    <select aria-label="Urgence"
                       className="input !w-auto !py-1"
                       value={editUrgency}
                       onChange={(e) => setEditUrgency(e.target.value as RequestRow["urgency"])}

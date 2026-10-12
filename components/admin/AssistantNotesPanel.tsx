@@ -56,6 +56,7 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
   }
 
   async function remove(id: string) {
+    if (!window.confirm("Supprimer cette note ?")) return;
     setBusy(true);
     setError(null);
     try {
@@ -73,16 +74,16 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
     <Card className="flex flex-col gap-4">
       <div>
         <h3 className="text-lg">Consignes pour l&apos;assistant</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Ex : que faire en cas d&apos;accrochage, où faire le plein, qui appeler pour une panne. Visible par l&apos;assistant
           en plus du guide d&apos;utilisation — ne cochez aucun rôle pour la rendre visible par tous.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
-        <input className="input" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea className="input" rows={3} placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
+        <input className="input" aria-label="Titre" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <textarea className="input" rows={3} aria-label="Contenu" placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
         <div className="flex flex-wrap gap-2">
           {ROLES.map((r) => (
             <label key={r} className="flex items-center gap-1.5 text-xs">
@@ -101,8 +102,8 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
           <div key={n.id} className="flex items-start justify-between gap-3 rounded-lg border border-navy/10 p-3 text-sm">
             <div>
               <p className="font-medium">{n.title}</p>
-              <p className="text-navy/60">{n.content}</p>
-              <p className="mt-1 text-xs text-navy/40">
+              <p className="text-navy/70">{n.content}</p>
+              <p className="mt-1 text-xs text-navy/60">
                 {n.roles.length === 0 ? "Tous les rôles" : n.roles.map((r) => ROLE_LABELS[r]).join(", ")}
               </p>
             </div>

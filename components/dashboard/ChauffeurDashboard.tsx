@@ -75,11 +75,11 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
         <Card className="flex flex-col items-center justify-center gap-3 py-8 text-center">
           {openTour ? (
             <>
-              <p className="mb-1 text-sm text-navy/60">
+              <p className="mb-1 text-sm text-navy/70">
                 Tournée n°{openTour.tour_number} en cours
                 {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
               </p>
-              <p className="mb-3 text-xs text-navy/40">
+              <p className="mb-3 text-xs text-navy/60">
                 Départ à {new Date(openTour.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
               </p>
               <Link href="/tours/end" className="btn-primary block w-full text-center">
@@ -88,7 +88,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
             </>
           ) : (
             <>
-              <p className="mb-3 text-sm text-navy/60">Aucune tournée en cours</p>
+              <p className="mb-3 text-sm text-navy/70">Aucune tournée en cours</p>
               <Link href="/tours/start" className="btn-primary block w-full text-center">
                 🚚 Démarrer une tournée
               </Link>
@@ -126,7 +126,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
               </Link>
             </div>
             {upcoming.length === 0 ? (
-              <p className="text-sm text-navy/40">Aucune tournée planifiée à venir.</p>
+              <p className="text-sm text-navy/60">Aucune tournée planifiée à venir.</p>
             ) : (
               <ul className="flex flex-col gap-2 text-sm">
                 {upcoming.map((t) => (
@@ -134,7 +134,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
                     <span>
                       n°{t.tour_number} {t.vehicles ? `— ${t.vehicles.registration}` : ""}
                     </span>
-                    <span className="text-xs text-navy/40">
+                    <span className="text-xs text-navy/60">
                       {new Date(t.start_at).toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </li>
@@ -160,7 +160,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
                   <span>
                     {e.vehicles?.registration ?? "—"} · {e.liters ? `${e.liters} L` : "—"}
                   </span>
-                  <span className="text-xs text-navy/40">{new Date(e.occurred_at).toLocaleDateString("fr-FR")}</span>
+                  <span className="text-xs text-navy/60">{new Date(e.occurred_at).toLocaleDateString("fr-FR")}</span>
                 </li>
               ))}
             </ul>

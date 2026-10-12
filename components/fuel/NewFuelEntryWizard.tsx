@@ -111,7 +111,7 @@ export function NewFuelEntryWizard({
             />
           ) : employees && employees.length > 0 ? (
             <div className="flex flex-col gap-2">
-              <select
+              <select aria-label="Chauffeur"
                 className="input"
                 value={driverId}
                 onChange={(e) => {
@@ -171,7 +171,7 @@ export function NewFuelEntryWizard({
             />
           ) : (
             <div className="flex gap-2">
-              <select className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+              <select aria-label="Véhicule" className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
                 <option value="">Sélectionner…</option>
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -199,7 +199,7 @@ export function NewFuelEntryWizard({
             />
           ) : (
             <div className="flex gap-2">
-              <select className="input" value={tankId} onChange={(e) => setTankId(e.target.value)}>
+              <select aria-label="Cuve" className="input" value={tankId} onChange={(e) => setTankId(e.target.value)}>
                 <option value="">Sélectionner…</option>
                 {tanks.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -225,12 +225,12 @@ export function NewFuelEntryWizard({
     return (
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             {vehicle?.registration} · {tank?.name}
           </p>
           <div>
-            <label className="label">Kilométrage du véhicule *</label>
-            <input type="number" step="1" className="input" value={vehicleKm} onChange={(e) => setVehicleKm(e.target.value)} />
+            <label className="block"><span className="label">Kilométrage du véhicule *</span>
+            <input type="number" step="1" className="input" value={vehicleKm} onChange={(e) => setVehicleKm(e.target.value)} /></label>
             {ocrEnabled && (
               <div className="mt-1.5">
                 <CounterPhotoCapture
@@ -259,7 +259,7 @@ export function NewFuelEntryWizard({
     return (
       <div className="flex flex-col gap-4">
         <Card>
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             {vehicle?.registration} · {tank?.name} · {vehicleKm} km
           </p>
         </Card>
@@ -282,7 +282,7 @@ export function NewFuelEntryWizard({
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
           <p className="label">Index totaliseur avant (L)</p>
-          <input
+          <input aria-label="Index totaliseur avant (L)"
             type="number"
             step="0.01"
             className="input"
@@ -315,7 +315,7 @@ export function NewFuelEntryWizard({
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
           <p className="label">Index totaliseur après (L) *</p>
-          <input
+          <input aria-label="Index totaliseur après (L)"
             type="number"
             step="0.01"
             className="input"
@@ -468,16 +468,16 @@ export function NewFuelEntryWizard({
         </div>
 
         <div>
-          <label className="label">Date et heure</label>
-          <input type="datetime-local" className="input" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+          <label className="block"><span className="label">Date et heure</span>
+          <input type="datetime-local" className="input" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} /></label>
         </div>
 
         <div>
-          <label className="label">Station (optionnel)</label>
-          <input className="input" value={stationName} onChange={(e) => setStationName(e.target.value)} />
+          <label className="block"><span className="label">Station (optionnel)</span>
+          <input className="input" value={stationName} onChange={(e) => setStationName(e.target.value)} /></label>
         </div>
 
-        {error && <p className="text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
         <button className="btn-primary" disabled={busy} onClick={submitManual}>
           {busy ? "Enregistrement…" : "Enregistrer"}
@@ -490,7 +490,7 @@ export function NewFuelEntryWizard({
     return (
       <Card className="flex flex-col items-center gap-4 py-10 text-center">
         <p className="text-lg">✅ Ravitaillement enregistré</p>
-        {error && <p className="text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
         <button className="btn-primary" onClick={() => router.push("/fuel")}>
           Voir l&apos;historique
         </button>

@@ -43,6 +43,7 @@ export function MobileActionBar({
 
   return (
     <nav
+      aria-label="Actions rapides"
       className="fixed inset-x-0 bottom-0 z-30 flex border-t border-navy/10 bg-white/95 backdrop-blur-sm lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
@@ -52,10 +53,10 @@ export function MobileActionBar({
           <Link
             key={item.href}
             href={item.href}
-            className="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-navy/60 transition-colors active:bg-navy/[0.05]"
+            className="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-navy/70 transition-colors active:bg-navy/[0.05]"
           >
             <Icon className="h-5 w-5" />
-            <span className="text-[11px] font-medium">{item.label}</span>
+            <span className="text-xs font-medium">{item.label}</span>
           </Link>
         );
       })}

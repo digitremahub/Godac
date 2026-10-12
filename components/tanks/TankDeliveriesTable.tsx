@@ -59,9 +59,9 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             <th className="pb-2">Cuve</th>
@@ -85,18 +85,18 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
                     Télécharger
                   </a>
                 ) : canManage ? (
-                  <label className="cursor-pointer text-xs text-navy/50 underline">
+                  <label className="cursor-pointer text-xs text-navy/65 underline">
                     {busyId === d.id ? "Envoi…" : "📎 Joindre"}
                     <input
                       type="file"
                       accept="application/pdf,image/*"
-                      className="hidden"
+                      className="sr-only"
                       disabled={busyId === d.id}
                       onChange={(e) => e.target.files?.[0] && attachInvoice(d.id, e.target.files[0])}
                     />
                   </label>
                 ) : (
-                  <span className="text-navy/30">—</span>
+                  <span className="text-navy/60">—</span>
                 )}
               </td>
             </tr>

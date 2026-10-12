@@ -49,7 +49,7 @@ export function MessageThread({
   }
 
   if (messages.length === 0) {
-    return <p className="text-xs text-navy/40">Aucun message échangé pour l&apos;instant.</p>;
+    return <p className="text-xs text-navy/60">Aucun message échangé pour l&apos;instant.</p>;
   }
 
   return (
@@ -59,22 +59,23 @@ export function MessageThread({
           <div className={`max-w-[75%] rounded-xl px-3 py-1.5 text-sm ${m.sender_id === currentUserId ? "bg-teal/15" : "bg-navy/5"}`}>
             {m.photoUrl && (
               <a href={m.photoUrl} target="_blank" rel="noreferrer">
-                <img src={m.photoUrl} alt="Photo envoyée" className="mb-1 max-h-64 max-w-full rounded-lg object-contain" />
+                <img loading="lazy" src={m.photoUrl} alt="Photo envoyée" className="mb-1 max-h-64 max-w-full rounded-lg object-contain" />
               </a>
             )}
             {m.body && <p>{m.body}</p>}
             <div className="mt-0.5 flex items-center justify-end gap-1.5">
               {m.sender_id === currentUserId && (
                 <button
-                  className="text-[10px] text-navy/30 hover:text-orange-ink"
+                  className="text-xs text-navy/60 hover:text-orange-ink"
                   disabled={busyId === m.id}
                   onClick={() => del(m.id)}
                   title="Supprimer"
+                  aria-label="Supprimer le message"
                 >
-                  🗑
+                  <span aria-hidden="true">🗑</span>
                 </button>
               )}
-              <p className="text-[10px] text-navy/35">
+              <p className="text-xs text-navy/60">
                 {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>

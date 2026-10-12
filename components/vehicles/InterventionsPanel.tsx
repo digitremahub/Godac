@@ -142,14 +142,14 @@ export function InterventionsPanel({
       <h3 className="mb-3 text-lg">Interventions / entretiens</h3>
 
       <div className="mb-4 flex flex-wrap items-start gap-2">
-        <input className="input" placeholder="Type (ex: Vidange)" value={type} onChange={(e) => setType(e.target.value)} />
+        <input className="input" aria-label="Type d’intervention" placeholder="Type (ex: Vidange)" value={type} onChange={(e) => setType(e.target.value)} />
         <input
           className="input"
-          placeholder="Description (optionnel)"
+          aria-label="Description (optionnel)" placeholder="Description (optionnel)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <select className="input !w-auto" value={urgency} onChange={(e) => setUrgency(e.target.value as Intervention["urgency"])}>
+        <select aria-label="Urgence" className="input !w-auto" value={urgency} onChange={(e) => setUrgency(e.target.value as Intervention["urgency"])}>
           {Object.entries(URGENCY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -159,7 +159,7 @@ export function InterventionsPanel({
         <input
           className="input !w-32"
           type="number"
-          placeholder="Km (optionnel)"
+          aria-label="Km (optionnel)" placeholder="Km (optionnel)"
           value={odometerKm}
           onChange={(e) => setOdometerKm(e.target.value)}
         />
@@ -181,7 +181,7 @@ export function InterventionsPanel({
       </div>
 
       {interventions.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucune intervention enregistrée.</p>
+        <p className="text-sm text-navy/60">Aucune intervention enregistrée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {interventions.map((i) => {
@@ -190,9 +190,9 @@ export function InterventionsPanel({
               <li key={i.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
                 {isEditing ? (
                   <div className="flex flex-col gap-2">
-                    <input className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} />
-                    <input className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
-                    <select
+                    <input aria-label="Type d’intervention" className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} />
+                    <input aria-label="Description" className="input !py-1" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+                    <select aria-label="Urgence"
                       className="input !w-auto !py-1"
                       value={editUrgency}
                       onChange={(e) => setEditUrgency(e.target.value as Intervention["urgency"])}
@@ -216,15 +216,15 @@ export function InterventionsPanel({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{i.type}</p>
-                      {i.description && <p className="text-navy/50">{i.description}</p>}
-                      {i.odometer_km !== null && <p className="text-xs text-navy/40">{i.odometer_km} km</p>}
+                      {i.description && <p className="text-navy/65">{i.description}</p>}
+                      {i.odometer_km !== null && <p className="text-xs text-navy/60">{i.odometer_km} km</p>}
                       {i.appointment_needed && <span className="badge-gold">RDV garage à prévoir</span>}
                       {i.photoUrls.length > 0 && (
                         <div className="mt-1 flex gap-1">
                           {i.photoUrls.map((url, idx) => (
                             <a key={idx} href={url} target="_blank" rel="noreferrer">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt="Photo de l'intervention" className="h-10 w-10 rounded object-cover" />
+                              <img width={40} height={40} loading="lazy" src={url} alt="Photo de l'intervention" className="h-10 w-10 rounded object-cover" />
                             </a>
                           ))}
                         </div>

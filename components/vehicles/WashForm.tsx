@@ -70,7 +70,7 @@ export function WashForm({ vehicleId, vehicleType }: { vehicleId: string; vehicl
 
   return (
     <Card className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div className="flex flex-col gap-2">
         <label className="flex min-h-[44px] items-center gap-2.5 text-sm">
           <input type="checkbox" className="h-5 w-5" checked={exterior} onChange={(e) => setExterior(e.target.checked)} />
@@ -93,7 +93,7 @@ export function WashForm({ vehicleId, vehicleType }: { vehicleId: string; vehicl
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
         />
       </label>

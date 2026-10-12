@@ -206,7 +206,7 @@ export function EditVehicleForm({
     const state = specSources[field];
     if (!state || state.origin !== "ia") return null;
     return (
-      <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-gold-ink">
+      <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-gold-ink">
         🤖 Estimé par IA
         {!state.confirmed && (
           <button type="button" className="underline" onClick={() => confirmAi(field)}>
@@ -220,36 +220,36 @@ export function EditVehicleForm({
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Modifier le véhicule</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div>
-        <label className="label">Immatriculation</label>
-        <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} />
+        <label className="block"><span className="label">Immatriculation</span>
+        <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} /></label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Marque</label>
-          <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} />
+          <label className="block"><span className="label">Marque</span>
+          <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Modèle</label>
-          <input className="input" value={model} onChange={(e) => setModel(e.target.value)} />
+          <label className="block"><span className="label">Modèle</span>
+          <input className="input" value={model} onChange={(e) => setModel(e.target.value)} /></label>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Année</label>
-          <input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+          <label className="block"><span className="label">Année</span>
+          <input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Boîte de vitesses</label>
+          <label className="block"><span className="label">Boîte de vitesses</span>
           <select className="input" value={gearbox} onChange={(e) => setGearbox(e.target.value)}>
             <option value="">Non précisé</option>
             <option value="manuelle">Manuelle</option>
             <option value="automatique">Automatique</option>
-          </select>
+          </select></label>
         </div>
       </div>
 
@@ -257,7 +257,7 @@ export function EditVehicleForm({
         <button type="button" className="btn-secondary self-start" disabled={aiBusy || !brand || !model} onClick={completeByAi}>
           {aiBusy ? "Estimation en cours…" : "🤖 Compléter les champs vides par IA"}
         </button>
-        {aiError && <p className="text-xs text-orange-ink">{aiError}</p>}
+        {aiError && <p role="alert" className="text-xs text-orange-ink">{aiError}</p>}
         {variants.length > 0 && (
           <div className="mt-1 flex flex-col gap-1 rounded-lg bg-gold/10 p-3 text-sm">
             <p className="text-gold-ink">Plusieurs versions possibles — choisissez la vôtre :</p>
@@ -278,7 +278,7 @@ export function EditVehicleForm({
       </div>
 
       <div>
-        <label className="label">Type</label>
+        <label className="block"><span className="label">Type</span>
         <select
           className="input"
           value={type}
@@ -290,12 +290,12 @@ export function EditVehicleForm({
           <option value="VL">VL (véhicule léger)</option>
           <option value="PL">PL (poids lourd)</option>
           <option value="SPL">SPL (semi-remorque)</option>
-        </select>
+        </select></label>
         <AiBadge field="type" />
       </div>
 
       <div>
-        <label className="label">Carburant</label>
+        <label className="block"><span className="label">Carburant</span>
         <input
           className="input"
           value={fuelType}
@@ -303,13 +303,13 @@ export function EditVehicleForm({
             setFuelType(e.target.value);
             clearAi("fuel_type");
           }}
-        />
+        /></label>
         <AiBadge field="fuel_type" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Capacité réservoir (L)</label>
+          <label className="block"><span className="label">Capacité réservoir (L)</span>
           <input
             className="input"
             type="number"
@@ -318,11 +318,11 @@ export function EditVehicleForm({
               setTankCapacity(e.target.value);
               clearAi("tank_capacity_liters");
             }}
-          />
+          /></label>
           <AiBadge field="tank_capacity_liters" />
         </div>
         <div>
-          <label className="label">Capacité AdBlue (L)</label>
+          <label className="block"><span className="label">Capacité AdBlue (L)</span>
           <input
             className="input"
             type="number"
@@ -331,14 +331,14 @@ export function EditVehicleForm({
               setAdblueCapacity(e.target.value);
               clearAi("adblue_capacity_liters");
             }}
-          />
+          /></label>
           <AiBadge field="adblue_capacity_liters" />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">PTAC (kg)</label>
+          <label className="block"><span className="label">PTAC (kg)</span>
           <input
             className="input"
             type="number"
@@ -347,11 +347,11 @@ export function EditVehicleForm({
               setPtac(e.target.value);
               clearAi("ptac_kg");
             }}
-          />
+          /></label>
           <AiBadge field="ptac_kg" />
         </div>
         <div>
-          <label className="label">Consommation de référence (L/100km)</label>
+          <label className="block"><span className="label">Consommation de référence (L/100km)</span>
           <input
             className="input"
             type="number"
@@ -361,27 +361,27 @@ export function EditVehicleForm({
               setReferenceConsumption(e.target.value);
               clearAi("reference_consumption_l_100km");
             }}
-          />
+          /></label>
           <AiBadge field="reference_consumption_l_100km" />
         </div>
       </div>
 
       <div>
-        <label className="label">Kilométrage initial</label>
-        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} />
+        <label className="block"><span className="label">Kilométrage initial</span>
+        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Statut</label>
+        <label className="block"><span className="label">Statut</span>
         <select className="input" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
           {Object.entries(STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
       <div>
-        <label className="label">Service</label>
+        <label className="block"><span className="label">Service</span>
         <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
           <option value="">Aucun</option>
           {services.map((s) => (
@@ -389,10 +389,10 @@ export function EditVehicleForm({
               {s.name}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
       <div>
-        <label className="label">Chauffeur assigné</label>
+        <label className="block"><span className="label">Chauffeur assigné</span>
         <select className="input" value={assignedDriverId} onChange={(e) => setAssignedDriverId(e.target.value)}>
           <option value="">Aucun</option>
           {drivers.map((d) => (
@@ -400,8 +400,8 @@ export function EditVehicleForm({
               {d.full_name}
             </option>
           ))}
-        </select>
-        <p className="mt-1 text-xs text-navy/40">
+        </select></label>
+        <p className="mt-1 text-xs text-navy/60">
           C&apos;est ce véhicule que le chauffeur retrouve dans &quot;Mon véhicule&quot;. Il peut aussi prendre
           lui-même un véhicule non assigné.
         </p>

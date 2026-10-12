@@ -66,7 +66,7 @@ export default async function HomePage() {
     <main className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
+          <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
           <span className="font-display text-xl font-extrabold">GODAC</span>
         </div>
         <nav className="flex items-center gap-4">
@@ -105,13 +105,13 @@ export default async function HomePage() {
         <div className="absolute inset-y-0 left-[58%] w-28 bg-gradient-to-r from-paper to-transparent" />
 
         <div className="relative mx-auto flex h-full max-w-6xl flex-col justify-center gap-6 px-6 py-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-navy/50">
+          <p className="text-xs font-semibold uppercase tracking-widest text-navy/65">
             Gestion de flotte • Carburant • Entretien • Documents • Équipes
           </p>
           <h1 className="max-w-lg text-4xl leading-[1.1] xl:text-5xl">
             Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
           </h1>
-          <p className="max-w-md text-lg text-navy/60">
+          <p className="max-w-md text-lg text-navy/70">
             Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
             chauffeurs, de vos entretiens, de votre carburant et de vos documents.
           </p>
@@ -132,8 +132,8 @@ export default async function HomePage() {
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
             {TRUST_STATS.map((stat) => (
-              <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
-                <stat.icon className="h-4 w-4 text-teal-ink" />
+              <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
+                <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
                 {stat.label}
               </div>
             ))}
@@ -148,7 +148,7 @@ export default async function HomePage() {
         <h1 className="text-4xl leading-[1.1] sm:text-5xl">
           Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
         </h1>
-        <p className="max-w-xl text-lg text-navy/60">
+        <p className="max-w-xl text-lg text-navy/70">
           Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
           chauffeurs, de vos entretiens, de votre carburant et de vos documents.
         </p>
@@ -172,8 +172,8 @@ export default async function HomePage() {
         </a>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
           {TRUST_STATS.map((stat) => (
-            <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/60">
-              <stat.icon className="h-4 w-4 text-teal-ink" />
+            <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
+              <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
               {stat.label}
             </div>
           ))}
@@ -194,7 +194,7 @@ export default async function HomePage() {
         <div className="mb-14 text-center">
           <span className="badge-teal mb-4 inline-block">Comment ça marche</span>
           <h2 className="text-2xl sm:text-3xl">GODAC, en un coup d&apos;œil</h2>
-          <p className="mx-auto mt-3 max-w-xl text-navy/60">
+          <p className="mx-auto mt-3 max-w-xl text-navy/70">
             De la pompe à la comptabilité, tout ce qu&apos;une PME de transport gère au
             quotidien, réuni dans un seul outil.
           </p>
@@ -210,7 +210,7 @@ export default async function HomePage() {
                 <feature.icon className="h-5 w-5 text-teal-ink" />
               </span>
               <h3 className="text-base">{feature.title}</h3>
-              <p className="text-sm text-navy/55">{feature.description}</p>
+              <p className="text-sm text-navy/65">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -221,13 +221,13 @@ export default async function HomePage() {
           <div>
             <h2 className="text-xl sm:text-2xl">Une gestion plus simple. Plus de sérénité.</h2>
             <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 sm:justify-start">
-              <span className="flex items-center gap-2 text-sm text-navy/60">
+              <span className="flex items-center gap-2 text-sm text-navy/70">
                 <IconFileText className="h-4 w-4 text-teal-ink" /> Moins de papier
               </span>
-              <span className="flex items-center gap-2 text-sm text-navy/60">
+              <span className="flex items-center gap-2 text-sm text-navy/70">
                 <IconChartBar className="h-4 w-4 text-teal-ink" /> Plus d&apos;efficacité
               </span>
-              <span className="flex items-center gap-2 text-sm text-navy/60">
+              <span className="flex items-center gap-2 text-sm text-navy/70">
                 <IconTruck className="h-4 w-4 text-teal-ink" /> Des équipes sereines
               </span>
             </div>
@@ -244,16 +244,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <footer className="flex flex-col items-center gap-2 border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/35">
+      <footer className="flex flex-col items-center gap-2 border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/60">
         <p>© {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.</p>
         <div className="flex gap-4">
-          <Link href="/mentions-legales" className="hover:text-navy/60 hover:underline">
+          <Link href="/mentions-legales" className="hover:text-navy hover:underline">
             Mentions légales
           </Link>
-          <Link href="/cgu" className="hover:text-navy/60 hover:underline">
+          <Link href="/cgu" className="hover:text-navy hover:underline">
             CGU
           </Link>
-          <Link href="/confidentialite" className="hover:text-navy/60 hover:underline">
+          <Link href="/confidentialite" className="hover:text-navy hover:underline">
             Confidentialité
           </Link>
         </div>

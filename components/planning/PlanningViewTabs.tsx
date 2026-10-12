@@ -68,7 +68,7 @@ export function PlanningViewTabs({
           <button
             key={v.key}
             className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              view === v.key ? "bg-white shadow-sm" : "text-navy/50 hover:text-navy"
+              view === v.key ? "bg-white shadow-sm" : "text-navy/65 hover:text-navy"
             }`}
             onClick={() => goTo(v.key)}
           >
@@ -80,7 +80,7 @@ export function PlanningViewTabs({
         Aujourd&apos;hui
       </button>
       {services.length > 0 && (
-        <select className="input !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
+        <select aria-label="Filtrer par service" className="input !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
           <option value="">Tous les services</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>

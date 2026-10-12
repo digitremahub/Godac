@@ -166,19 +166,21 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
       <StepIndicator step={step} />
 
       {error && (
-        <Card className="mb-4 border-orange/40 bg-orange/10 text-orange-ink">{error}</Card>
+        <div role="alert">
+          <Card className="mb-4 border-orange/40 bg-orange/10 text-orange-ink">{error}</Card>
+        </div>
       )}
 
       {step === "org" && (
         <Card className="flex max-w-md flex-col gap-4">
           <div>
-            <label className="label">Nom de votre entreprise de transport</label>
+            <label className="block"><span className="label">Nom de votre entreprise de transport</span>
             <input
               className="input"
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
               placeholder="ex: Sud Express 66"
-            />
+            /></label>
           </div>
           <button className="btn-primary" disabled={busy || !organizationName} onClick={submitOrganization}>
             {busy ? "Création…" : "Créer mon organisation"}
@@ -220,7 +222,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               Véhicules — CSV ou Excel (colonnes : immatriculation, type, capacité cuve,
               kilométrage, service)
             </p>
-            <input
+            <input aria-label="Fichier véhicules (CSV ou Excel)"
               type="file"
               accept=".csv,.xlsx,.xls"
               className="input"
@@ -232,7 +234,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
             <p className="label">
               Chauffeurs / équipe — CSV ou Excel (colonnes : nom, email, rôle, téléphone, service)
             </p>
-            <input
+            <input aria-label="Fichier chauffeurs et équipe (CSV ou Excel)"
               type="file"
               accept=".csv,.xlsx,.xls"
               className="input"
@@ -269,13 +271,13 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
             <div key={i} className="grid grid-cols-4 gap-3">
               <input
                 className="input"
-                placeholder="Nom (ex: Cuve Gasoil A)"
+                aria-label="Nom" placeholder="Nom (ex: Cuve Gasoil A)"
                 value={tank.name}
                 onChange={(e) =>
                   setTanks((prev) => prev.map((t, idx) => (idx === i ? { ...t, name: e.target.value } : t)))
                 }
               />
-              <select
+              <select aria-label="Type de carburant"
                 className="input"
                 value={tank.fuel_type}
                 onChange={(e) =>
@@ -290,7 +292,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               <input
                 className="input"
                 type="number"
-                placeholder="Capacité (L)"
+                aria-label="Capacité (L)" placeholder="Capacité (L)"
                 value={tank.capacity_liters}
                 onChange={(e) =>
                   setTanks((prev) => prev.map((t, idx) => (idx === i ? { ...t, capacity_liters: e.target.value } : t)))
@@ -299,7 +301,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               <input
                 className="input"
                 type="number"
-                placeholder="Index totaliseur actuel"
+                aria-label="Index totaliseur actuel" placeholder="Index totaliseur actuel"
                 value={tank.current_totalizer_index}
                 onChange={(e) =>
                   setTanks((prev) =>
@@ -333,7 +335,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
       {step === "subscribe" && (
         <Card className="flex flex-col gap-4">
-          <h3 className="text-xl">Récapitulatif de votre abonnement</h3>
+          <h2 className="text-xl">Récapitulatif de votre abonnement</h2>
           <SubscriptionSummary catalog={catalog} planId={planId} selectedModuleKeys={selectedModuleKeys} />
           <button className="btn-primary" disabled={busy} onClick={submitCheckout}>
             {busy ? "Redirection vers Stripe…" : "Passer au paiement"}
@@ -379,7 +381,7 @@ function SubscriptionSummary({
         <span>{plan?.monthly_base_price ?? 0} €/mois</span>
       </div>
       {plan && plan.setup_price > 0 && (
-        <div className="flex justify-between text-navy/50">
+        <div className="flex justify-between text-navy/65">
           <span>Mise en service (unique)</span>
           <span>{plan.setup_price} €</span>
         </div>
@@ -391,7 +393,7 @@ function SubscriptionSummary({
             <span>{a.price?.monthly_price ?? 0} €/mois</span>
           </div>
           {a.price && a.price.setup_price > 0 && (
-            <div className="flex justify-between text-navy/50">
+            <div className="flex justify-between text-navy/65">
               <span>Mise en service — {a.module.name} (unique)</span>
               <span>{a.price.setup_price} €</span>
             </div>
@@ -403,7 +405,7 @@ function SubscriptionSummary({
         <span className="font-display font-extrabold text-teal-ink">{total.toFixed(2)} €/mois</span>
       </div>
       {setupTotal > 0 && (
-        <div className="flex justify-between text-xs text-navy/40">
+        <div className="flex justify-between text-xs text-navy/60">
           <span>Dont mise en service, une seule fois</span>
           <span>{setupTotal.toFixed(2)} €</span>
         </div>

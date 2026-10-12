@@ -70,27 +70,27 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {error && <p className="text-xs text-orange-ink">{error}</p>}
-      <input className="input !py-1 text-sm" type="number" placeholder="Litres livrés" value={liters} onChange={(e) => setLiters(e.target.value)} />
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
+      <input className="input !py-1 text-sm" type="number" aria-label="Litres livrés" placeholder="Litres livrés" value={liters} onChange={(e) => setLiters(e.target.value)} />
       <input
         className="input !py-1 text-sm"
         type="number"
-        placeholder="Prix/L (optionnel)"
+        aria-label="Prix/L (optionnel)" placeholder="Prix/L (optionnel)"
         value={unitPrice}
         onChange={(e) => setUnitPrice(e.target.value)}
       />
       <input
         className="input !py-1 text-sm"
-        placeholder="Fournisseur (optionnel)"
+        aria-label="Fournisseur (optionnel)" placeholder="Fournisseur (optionnel)"
         value={supplier}
         onChange={(e) => setSupplier(e.target.value)}
       />
-      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/50">
+      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/65">
         {invoiceFile ? invoiceFile.name : "📎 Joindre la facture (optionnel)"}
         <input
           type="file"
           accept="application/pdf,image/*"
-          className="hidden"
+          className="sr-only"
           onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
         />
       </label>

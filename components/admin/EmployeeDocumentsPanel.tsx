@@ -74,16 +74,16 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
   return (
     <Card className="flex flex-col gap-3">
       <p className="text-sm font-medium">Documents</p>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       {documents.length === 0 ? (
-        <p className="text-xs text-navy/40">Aucun document déposé.</p>
+        <p className="text-xs text-navy/60">Aucun document déposé.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {documents.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{doc.docType}</span>
-              <span className="flex items-center gap-2 text-xs text-navy/40">
+              <span className="flex items-center gap-2 text-xs text-navy/60">
                 {new Date(doc.uploadedAt).toLocaleDateString("fr-FR")}
                 {doc.downloadUrl && (
                   <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
@@ -97,7 +97,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <select aria-label="Type de document"
           className="input !w-auto !py-1.5 text-sm"
           value={docType}
           onChange={(e) => setDocType(e.target.value as (typeof DOC_TYPES)[number])}
@@ -113,7 +113,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
           <input
             type="file"
             accept="image/*,application/pdf"
-            className="hidden"
+            className="sr-only"
             disabled={status === "uploading"}
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />

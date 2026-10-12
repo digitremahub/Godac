@@ -35,13 +35,13 @@ export function StaffSupportRequestsList({ requests }: { requests: Row[] }) {
     }
   }
 
-  if (requests.length === 0) return <p className="text-sm text-navy/40">Aucune demande transmise au support GODAC.</p>;
+  if (requests.length === 0) return <p className="text-sm text-navy/60">Aucune demande transmise au support GODAC.</p>;
 
   return (
     <div className="flex flex-col gap-2">
       {requests.map((r) => (
         <div key={r.id} className="rounded-lg border border-navy/10 p-3 text-sm">
-          <p className="text-navy/50">
+          <p className="text-navy/65">
             {r.organizationName} · {new Date(r.createdAt).toLocaleString("fr-FR")} · {STATUS_LABELS[r.status]}
           </p>
           <p className="mb-2">{r.question}</p>
@@ -49,7 +49,7 @@ export function StaffSupportRequestsList({ requests }: { requests: Row[] }) {
             <div className="flex gap-2">
               <input
                 className="input !py-1 text-xs"
-                placeholder="Réponse…"
+                aria-label="Réponse" placeholder="Réponse…"
                 value={drafts[r.id] ?? ""}
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
               />

@@ -23,7 +23,7 @@ export function BarChartCard({ title, data, valueSuffix, formatValue }: { title:
     <Card>
       <p className="mb-3 text-sm font-medium">{title}</p>
       {data.length === 0 ? (
-        <p className="py-8 text-center text-xs text-navy/40">Pas assez de données sur la période.</p>
+        <p className="py-8 text-center text-xs text-navy/60">Pas assez de données sur la période.</p>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>

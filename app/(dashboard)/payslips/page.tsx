@@ -73,7 +73,7 @@ export default async function PayslipsPage() {
                 {MONTH_LABEL.format(new Date(p.period_start))}
               </span>
               <span className="flex items-center gap-3">
-                <span className="text-xs text-navy/40">
+                <span className="text-xs text-navy/60">
                   {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
                 </span>
                 {p.downloadUrl && (

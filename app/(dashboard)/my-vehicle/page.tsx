@@ -45,7 +45,7 @@ export default async function MyVehiclePage() {
         <Card className="flex flex-col gap-3">
           <div>
             <p className="text-xl">{myVehicle.registration}</p>
-            <p className="text-sm text-navy/50">
+            <p className="text-sm text-navy/65">
               {myVehicle.type} · {STATUS_LABELS[myVehicle.status] ?? myVehicle.status} ·{" "}
               {(myVehicle as any).services?.name ?? "Sans service"}
             </p>
@@ -53,15 +53,15 @@ export default async function MyVehiclePage() {
           <div className="flex justify-around text-center">
             <div>
               <p className="text-lg">{myVehicle.tank_capacity_liters ? `${myVehicle.tank_capacity_liters} L` : "—"}</p>
-              <p className="text-xs text-navy/40">Réservoir</p>
+              <p className="text-xs text-navy/60">Réservoir</p>
             </div>
             <div>
               <p className="text-lg">{consumption30d !== null ? `${consumption30d} L/100km` : "—"}</p>
-              <p className="text-xs text-navy/40">30 derniers jours</p>
+              <p className="text-xs text-navy/60">30 derniers jours</p>
             </div>
             <div>
               <p className="text-lg">{consumption90d !== null ? `${consumption90d} L/100km` : "—"}</p>
-              <p className="text-xs text-navy/40">90 derniers jours</p>
+              <p className="text-xs text-navy/60">90 derniers jours</p>
             </div>
           </div>
           <Link href={`/v/${myVehicle.id}`} className="btn-primary text-center">
@@ -101,7 +101,7 @@ export default async function MyVehiclePage() {
             <Card key={v.id} className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-medium">{v.registration}</p>
-                <p className="text-xs text-navy/50">{v.type}</p>
+                <p className="text-xs text-navy/65">{v.type}</p>
               </div>
               <VehicleAssignmentActions vehicleId={v.id} claim={true} label="Prendre ce véhicule" />
             </Card>

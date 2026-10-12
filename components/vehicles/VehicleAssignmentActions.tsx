@@ -40,7 +40,7 @@ export function VehicleAssignmentActions({
       <button className={claim ? "btn-primary" : "btn-secondary"} disabled={busy} onClick={run}>
         {busy ? "…" : label}
       </button>
-      {error && <p className="text-xs text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
     </div>
   );
 }

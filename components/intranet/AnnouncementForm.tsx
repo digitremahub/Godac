@@ -49,19 +49,19 @@ export function AnnouncementForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle annonce</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div>
-        <label className="label">Titre</label>
-        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Note de service, convocation..." />
+        <label className="block"><span className="label">Titre</span>
+        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Note de service, convocation…" /></label>
       </div>
       <div>
-        <label className="label">Message</label>
-        <textarea className="input min-h-24" value={body} onChange={(e) => setBody(e.target.value)} />
+        <label className="block"><span className="label">Message</span>
+        <textarea className="input min-h-24" value={body} onChange={(e) => setBody(e.target.value)} /></label>
       </div>
       <div className="flex flex-wrap items-end gap-4">
         <div>
-          <label className="label">Destinataires</label>
+          <label className="block"><span className="label">Destinataires</span>
           <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
             <option value="">Toute l&apos;organisation</option>
             {services.map((s) => (
@@ -69,7 +69,7 @@ export function AnnouncementForm({ services }: { services: ServiceOption[] }) {
                 {s.name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
         <label className="flex items-center gap-2 text-sm text-navy/70">
           <input type="checkbox" checked={requiresAck} onChange={(e) => setRequiresAck(e.target.checked)} />

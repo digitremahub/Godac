@@ -31,7 +31,7 @@ export function OdometerHistory({ readings }: { readings: OdometerReading[] }) {
     <Card>
       <div className="mb-3 flex items-baseline justify-between">
         <h3 className="text-base">Suivi kilométrique</h3>
-        <p className="text-sm text-navy/50">
+        <p className="text-sm text-navy/65">
           Dernier relevé : <span className="font-semibold text-navy">{latest.km.toLocaleString("fr-FR")} km</span>
           {" · "}
           {new Date(latest.at).toLocaleDateString("fr-FR")}
@@ -40,10 +40,10 @@ export function OdometerHistory({ readings }: { readings: OdometerReading[] }) {
       <ul className="flex flex-col gap-1.5">
         {sorted.slice(0, 12).map((r, i) => (
           <li key={i} className="flex items-center justify-between border-t border-navy/5 pt-1.5 text-sm first:border-0 first:pt-0">
-            <span className="text-navy/60">{r.label}</span>
+            <span className="text-navy/70">{r.label}</span>
             <span className="flex items-center gap-3">
               <span className="font-medium">{r.km.toLocaleString("fr-FR")} km</span>
-              <span className="text-xs text-navy/40">{new Date(r.at).toLocaleDateString("fr-FR")}</span>
+              <span className="text-xs text-navy/60">{new Date(r.at).toLocaleDateString("fr-FR")}</span>
             </span>
           </li>
         ))}

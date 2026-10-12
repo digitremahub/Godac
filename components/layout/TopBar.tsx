@@ -31,14 +31,16 @@ export function TopBar({
           type="button"
           onClick={onMenuClick}
           aria-label="Ouvrir le menu"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-navy/60 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:hidden"
+          aria-controls="navigation-principale"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-navy/70 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:hidden"
         >
           <IconMenu className="h-5 w-5" />
         </button>
         <Link
           href="/dashboard"
           title="Accueil"
-          className="hidden h-9 w-9 items-center justify-center rounded-lg text-navy/50 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:flex"
+          aria-label="Accueil"
+          className="hidden h-9 w-9 items-center justify-center rounded-lg text-navy/65 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:flex"
         >
           <IconGrid className="h-5 w-5" />
         </Link>
@@ -46,19 +48,20 @@ export function TopBar({
           href="/"
           target="_blank"
           rel="noreferrer"
-          className="hidden text-sm text-navy/40 transition-colors hover:text-navy md:inline"
+          className="hidden text-sm text-navy/60 transition-colors hover:text-navy md:inline"
         >
-          Site vitrine ↗
+          Site vitrine <span aria-hidden="true">↗</span>
+          <span className="sr-only"> (nouvel onglet)</span>
         </Link>
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal-ink ring-1 ring-teal/20">
+          <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal-ink ring-1 ring-teal/20">
             {initials(fullName)}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight">{fullName}</p>
             <div className="mt-0.5 hidden items-center gap-1.5 sm:flex">
               <span className="badge-teal">{ROLE_LABELS[role]}</span>
-              {roleTitle && <span className="truncate text-xs text-navy/40">{roleTitle}</span>}
+              {roleTitle && <span className="truncate text-xs text-navy/60">{roleTitle}</span>}
             </div>
           </div>
         </div>
