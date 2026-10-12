@@ -5,6 +5,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
 import { Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { postLoginPath } from "@/lib/auth/post-login";
 
 /**
  * The two faces of the same badge scan: a driver who has never set a
@@ -50,7 +51,7 @@ export function DriverPinFlow({
     try {
       const { attempted } = await tryPasskeyLogin({ user_id: id });
       if (attempted) {
-        window.location.href = "/dashboard";
+        window.location.href = postLoginPath();
         return;
       }
       setBusy(false);
@@ -65,7 +66,7 @@ export function DriverPinFlow({
   async function signIn(withPin: string) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: withPin });
     if (signInError) throw new Error("Code PIN incorrect.");
-    window.location.href = "/dashboard";
+    window.location.href = postLoginPath();
   }
 
   async function submitSetup(e: React.FormEvent) {

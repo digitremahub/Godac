@@ -3,16 +3,39 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays } from "@/lib/planning/dates";
+import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays, parisCalendarDate } from "@/lib/planning/dates";
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-const MAX_VISIBLE_PER_DAY = 3;
 
-const STATUS_BADGE: Record<string, string> = {
-  planned: "badge-neutral",
-  in_progress: "badge-gold",
-  done: "badge-teal",
+const STATUS_DOT: Record<string, string> = {
+  planned: "bg-navy/30",
+  in_progress: "bg-gold",
+  done: "bg-teal",
 };
+const STATUS_CHIP: Record<string, string> = {
+  planned: "bg-navy/[0.07] text-navy",
+  in_progress: "bg-gold/25 text-navy",
+  done: "bg-teal/20 text-navy",
+};
+
+const timeFmt = (iso: string) =>
+  new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+
+/** One tour on one line: status dot, n°, truck, hours — readable at a glance on a phone. */
+function TourLine({ entry }: { entry: any }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-sm">
+      <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[entry.status] ?? "bg-navy/30"}`} />
+      <span className="shrink-0 font-semibold tabular-nums">n°{entry.tour_number}</span>
+      <span className="min-w-0 truncate text-navy/70">{entry.vehicles?.registration ?? "—"}</span>
+      <span className="ml-auto shrink-0 tabular-nums text-navy/70">
+        {timeFmt(entry.start_at)}
+        {entry.end_at ? `–${timeFmt(entry.end_at)}` : ""}
+      </span>
+      <span className="sr-only">{STATUS_LABEL[entry.status] ?? entry.status}</span>
+    </div>
+  );
+}
 const STATUS_LABEL: Record<string, string> = {
   planned: "Prévue",
   in_progress: "En cours",
@@ -80,7 +103,8 @@ export default async function MyPlanningPage({
     );
   }
 
-  const view: ViewMode = params.view === "day" || params.view === "month" ? params.view : "week";
+  // Month first: the driver's question is « quand je travaille ce mois-ci ».
+  const view: ViewMode = params.view === "day" || params.view === "week" ? params.view : "month";
   // `week` is the old param name (still linked to from elsewhere); `anchor` is the new one.
   const anchorInput = params.anchor ?? params.week;
   const anchor = anchorInput && !Number.isNaN(Date.parse(anchorInput)) ? toISODate(new Date(anchorInput)) : todayISO();
@@ -103,6 +127,13 @@ export default async function MyPlanningPage({
     .lt("start_at", `${queryEnd}T00:00:00`)
     .order("start_at");
 
+  const entriesByDay = new Map<string, any[]>();
+  for (const e of (entries ?? []) as any[]) {
+    const d = parisCalendarDate(e.start_at);
+    entriesByDay.set(d, [...(entriesByDay.get(d) ?? []), e]);
+  }
+  const today = parisCalendarDate(new Date().toISOString());
+
   const dayCount = Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000);
   const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i));
 
@@ -111,7 +142,7 @@ export default async function MyPlanningPage({
       <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées." />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {(["day", "week", "month"] as const).map((v) => (
+        {(["month", "week", "day"] as const).map((v) => (
           <Link
             key={v}
             href={`/planning/mine?view=${v}&anchor=${anchor}`}
@@ -132,79 +163,102 @@ export default async function MyPlanningPage({
         </Link>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy/65">
+        {(["planned", "in_progress", "done"] as const).map((st) => (
+          <span key={st} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[st]}`} />
+            {STATUS_LABEL[st]}
+          </span>
+        ))}
+      </div>
+
       {view === "month" && calendarDays ? (
-        <div className="grid grid-cols-7 gap-1.5 text-xs">
-          {DAY_LABELS.map((l) => (
-            <div key={l} className="px-1 text-navy/60">
-              {l}
-            </div>
-          ))}
-          {calendarDays.map((dayISO) => {
-            const dayEntries = (entries ?? []).filter((e: any) => e.start_at.slice(0, 10) === dayISO);
-            const inMonth = dayISO.slice(0, 7) === anchor.slice(0, 7);
-            return (
-              <Link
-                key={dayISO}
-                href={`/planning/mine?view=day&anchor=${dayISO}`}
-                className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                  inMonth ? "bg-white" : "bg-navy/[0.04] text-navy/60"
-                }`}
-              >
-                <span className="font-medium">{Number(dayISO.slice(8, 10))}</span>
-                {dayEntries.slice(0, MAX_VISIBLE_PER_DAY).map((e: any) => (
-                  <span
-                    key={e.id}
-                    className={`truncate rounded px-1 text-[11px] ${
-                      e.status === "done" ? "bg-teal/15 text-navy/70" : e.status === "in_progress" ? "bg-gold/20 text-navy/70" : "bg-navy/10 text-navy/70"
-                    }`}
-                  >
-                    n°{e.tour_number}
-                  </span>
-                ))}
-                {dayEntries.length > MAX_VISIBLE_PER_DAY && (
-                  <span className="text-[11px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      ) : (entries ?? []).length === 0 ? (
-        <EmptyState title="Aucune tournée sur cette période" description="Rien ne vous est encore assigné." />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {days.map((dayISO) => {
-            const dayEntries = (entries ?? []).filter((e: any) => e.start_at.slice(0, 10) === dayISO);
-            if (dayEntries.length === 0) return null;
-            return (
-              <div key={dayISO}>
-                <p className="mb-2 text-sm font-medium capitalize text-navy/70">
-                  {new Date(`${dayISO}T00:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}
-                </p>
-                <div className="flex flex-col gap-2">
-                  {dayEntries.map((entry: any) => (
-                    <Card key={entry.id} className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-medium">
-                          Tournée n°{entry.tour_number} {entry.services ? `· ${entry.services.name}` : ""}
-                        </p>
-                        <p className="text-sm text-navy/70">{entry.vehicles?.registration ?? "Véhicule non précisé"}</p>
-                        <p className="text-xs text-navy/60">
-                          {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
-                          {entry.end_at
-                            ? ` → ${new Date(entry.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}`
-                            : ""}
-                        </p>
-                      </div>
-                      <span className={STATUS_BADGE[entry.status] ?? "badge-neutral"}>
-                        {STATUS_LABEL[entry.status] ?? entry.status}
-                      </span>
-                    </Card>
-                  ))}
-                </div>
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            {DAY_LABELS.map((l) => (
+              <div key={l} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-navy/60">
+                {l}
               </div>
-            );
-          })}
+            ))}
+            {calendarDays.map((dayISO) => {
+              const dayEntries = entriesByDay.get(dayISO) ?? [];
+              const inMonth = dayISO.slice(0, 7) === anchor.slice(0, 7);
+              const first = dayEntries[0];
+              return (
+                <Link
+                  key={dayISO}
+                  href={`/planning/mine?view=day&anchor=${dayISO}`}
+                  aria-label={`${Number(dayISO.slice(8, 10))} : ${dayEntries.length ? dayEntries.map((e) => `tournée ${e.tour_number}`).join(", ") : "repos"}`}
+                  className={`flex min-h-[58px] flex-col gap-1 rounded-lg border p-1 sm:min-h-[78px] sm:p-1.5 ${
+                    !inMonth ? "border-transparent opacity-40" : first ? "border-navy/10 bg-white" : "border-navy/[0.06] bg-transparent"
+                  } ${dayISO === today ? "ring-2 ring-teal-ink/50" : ""}`}
+                >
+                  <span className={`text-right text-xs font-semibold tabular-nums ${dayISO === today ? "text-teal-ink" : ""}`}>
+                    {Number(dayISO.slice(8, 10))}
+                  </span>
+                  {first && (
+                    <span className={`truncate rounded px-1 py-0.5 text-center text-[11px] font-semibold tabular-nums ${STATUS_CHIP[first.status] ?? STATUS_CHIP.planned}`}>
+                      {first.tour_number}
+                    </span>
+                  )}
+                  {dayEntries.length > 1 && <span className="text-center text-[11px] text-navy/60">+{dayEntries.length - 1}</span>}
+                </Link>
+              );
+            })}
+          </div>
+
+          <Card className="!p-0">
+            <h2 className="px-4 pt-4 sm:px-5">Tournées du mois</h2>
+            {(entries ?? []).filter((e: any) => parisCalendarDate(e.start_at).startsWith(anchor.slice(0, 7))).length === 0 ? (
+              <p className="px-4 pb-4 pt-2 text-sm text-navy/65 sm:px-5">Aucune tournée ce mois-ci.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-navy/[0.07]">
+                {Array.from(entriesByDay.entries())
+                  .filter(([d]) => d.startsWith(anchor.slice(0, 7)))
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([d, list]) => (
+                    <li key={d} className={`flex gap-3 px-4 py-2.5 sm:px-5 ${d === today ? "bg-teal/[0.06]" : ""}`}>
+                      <span className="w-14 shrink-0 text-sm font-semibold capitalize tabular-nums text-navy/70">
+                        {new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", timeZone: "UTC" })}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        {list.map((e) => (
+                          <TourLine key={e.id} entry={e} />
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </Card>
         </div>
+      ) : (
+        <Card className="!p-0">
+          <ul className="divide-y divide-navy/[0.07]">
+            {days.map((dayISO) => {
+              const dayEntries = entriesByDay.get(dayISO) ?? [];
+              return (
+                <li key={dayISO} className={`flex gap-3 px-4 py-3 sm:px-5 ${dayISO === today ? "bg-teal/[0.06]" : ""}`}>
+                  <span className="w-16 shrink-0 text-sm font-semibold capitalize tabular-nums">
+                    {new Date(`${dayISO}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: view === "day" ? "long" : undefined, timeZone: "UTC" })}
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    {dayEntries.length === 0 ? (
+                      <span className="text-sm text-navy/50">Repos</span>
+                    ) : (
+                      dayEntries.map((e) => (
+                        <div key={e.id} className="flex flex-col">
+                          <TourLine entry={e} />
+                          {e.services?.name && <span className="pl-[18px] text-xs text-navy/60">{e.services.name}</span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
     </div>
   );

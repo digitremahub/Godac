@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
 import { IconFingerprint } from "@/components/layout/icons";
+import { postLoginPath } from "@/lib/auth/post-login";
 
 /**
  * Sign-up (and a first sign-in) is always magic link / OTP — Supabase
@@ -33,7 +34,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     try {
       const { attempted } = await tryPasskeyLogin({ email });
       if (attempted) {
-        window.location.href = "/dashboard";
+        window.location.href = postLoginPath();
         return;
       }
       setPasskeyUnavailable(true);
@@ -54,14 +55,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       if (usePassword) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.href = "/dashboard";
+        window.location.href = postLoginPath();
         return;
       }
 
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}${postLoginPath()}`,
           // Only meaningful on sign-up (a returning user's metadata is
           // already set) — this is what
           // app/api/onboarding/create-organization/route.ts and

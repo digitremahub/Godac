@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const todayEnd = new Date(todayStart);
   todayEnd.setDate(todayEnd.getDate() + 1);
 
-  const [openRes, plannedRes, qualificationsRes] = await Promise.all([
+  const [openRes, plannedRes, qualificationsRes, assignedRes] = await Promise.all([
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, start_km, vehicles(id, registration)")
@@ -48,6 +48,16 @@ export async function GET(req: Request) {
     // (see app/api/tours POST's own comment on why the service
     // otherwise just follows the scanned vehicle).
     supabase.from("user_services").select("services(id, name)").eq("user_id", driverId),
+    // The truck this driver is assigned to (Flotte > véhicule >
+    // « Chauffeur assigné ») — StartTourFlow pre-selects it so a
+    // driver with their own truck never has to scan its QR.
+    supabase
+      .from("vehicles")
+      .select("id, registration")
+      .eq("organization_id", appUser.organization_id)
+      .eq("assigned_driver_id", driverId)
+      .eq("status", "active")
+      .limit(1),
   ]);
 
   if (openRes.error) return NextResponse.json({ error: openRes.error.message }, { status: 500 });
@@ -55,6 +65,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     tour: openRes.data,
     plannedToday: plannedRes.data?.[0] ?? null,
+    assignedVehicle: assignedRes.data?.[0] ?? null,
     polyvalentServices: qualifiedServices.length >= 2 ? qualifiedServices : null,
   });
 }

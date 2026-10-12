@@ -94,6 +94,15 @@ export function StartTourFlow({
         setPlannedToday(json.plannedToday ?? null);
         setPolyvalentServices(json.polyvalentServices ?? null);
         if (json.plannedToday && !tourNumber) setTourNumber(json.plannedToday.tour_number);
+        // Planned vehicle first, otherwise the driver's own assigned
+        // truck: pre-selected, no QR scan — « Changer » below if they
+        // took another one today.
+        const defaultVehicle = json.plannedToday?.vehicles ?? json.assignedVehicle ?? null;
+        if (defaultVehicle && !json.tour) {
+          setVehicleId(defaultVehicle.id);
+          setRegistration(defaultVehicle.registration);
+          setVehicleChanged(false);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur inattendue");
       } finally {
@@ -244,6 +253,24 @@ export function StartTourFlow({
   return (
     <Card className="flex flex-col gap-3">
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-navy px-4 py-3 text-white">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.12em] text-white/60">Véhicule</p>
+          <p className="font-display text-lg font-bold">{registration ?? "—"}</p>
+        </div>
+        <button
+          type="button"
+          className="btn !px-3 !py-2 text-sm text-white ring-1 ring-inset ring-white/25 hover:bg-white/10"
+          onClick={() => {
+            setVehicleId(null);
+            setRegistration(null);
+            setShowScanner(true);
+          }}
+        >
+          <IconRefresh className="h-4 w-4" /> Changer
+        </button>
+      </div>
 
       {plannedToday && (
         <p className="rounded-lg bg-teal/10 px-3 py-2 text-xs text-teal-ink">

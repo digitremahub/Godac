@@ -58,6 +58,7 @@ export function FloatingChatWidget({
   }, [searchParams, assistantAvailable, pathname, router]);
   const [conversations, setConversations] = useState<ConversationTab[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [contactQuery, setContactQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [unreadBySender, setUnreadBySender] = useState<Record<string, { full_name: string; unreadCount: number }>>({});
 
@@ -127,6 +128,7 @@ export function FloatingChatWidget({
 
   async function togglePicker() {
     setPickerOpen((v) => !v);
+    setContactQuery("");
     if (!contacts) {
       const res = await fetch("/api/messenger/contacts");
       const json = await res.json();
@@ -218,11 +220,15 @@ export function FloatingChatWidget({
 
       {open && (
         <div className="fixed bottom-[11rem] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-pop lg:bottom-24">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-navy/10 bg-navy/[0.04] px-2 pt-2">
+          <div className="flex items-end border-b border-navy/10 bg-navy/[0.04]">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-2 pt-2">
             {assistantAvailable && (
               <button
                 className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium ${activeKey === "assistant" ? "bg-white" : "text-navy/65"}`}
-                onClick={() => setActiveKey("assistant")}
+                onClick={() => {
+                  setActiveKey("assistant");
+                  setPickerOpen(false);
+                }}
               >
                 Assistant
               </button>
@@ -234,7 +240,13 @@ export function FloatingChatWidget({
                   activeKey === `conv:${c.contactId}` ? "bg-white" : "text-navy/65"
                 }`}
               >
-                <button onClick={() => setActiveKey(`conv:${c.contactId}`)} className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setActiveKey(`conv:${c.contactId}`);
+                    setPickerOpen(false);
+                  }}
+                  className="flex items-center gap-1"
+                >
                   {c.contactName.split(" ")[0]}
                   {unreadBySender[c.contactId] && activeKey !== `conv:${c.contactId}` && <span className="h-1.5 w-1.5 rounded-full bg-orange" />}
                 </button>
@@ -248,41 +260,68 @@ export function FloatingChatWidget({
                 </button>
               </div>
             ))}
+          </div>
             {messengerAvailable && (
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  className="rounded-t-lg px-2 py-1.5 text-xs text-navy/65 hover:text-navy"
-                  onClick={togglePicker}
-                  aria-label="Nouvelle conversation"
-                  aria-expanded={pickerOpen}
-                >
-                  <span aria-hidden="true">+</span>
-                </button>
-                {pickerOpen && (
-                  <div className="absolute right-0 top-full z-50 max-h-48 w-44 overflow-y-auto rounded-lg border border-navy/10 bg-white py-1 shadow-xl">
-                    {!contacts ? (
-                      <p className="px-3 py-1.5 text-xs text-navy/60">Chargement…</p>
-                    ) : contacts.length === 0 ? (
-                      <p className="px-3 py-1.5 text-xs text-navy/60">Aucun collègue.</p>
-                    ) : (
-                      contacts.map((c) => (
-                        <button
-                          key={c.id}
-                          className="block w-full px-3 py-1.5 text-left text-xs hover:bg-navy/[0.04]"
-                          onClick={() => openConversation(c.id, c.full_name)}
-                        >
-                          {c.full_name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                className={`mb-1 mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg font-semibold ${
+                  pickerOpen ? "bg-navy text-teal" : "bg-white text-navy shadow-card hover:bg-paper"
+                }`}
+                onClick={togglePicker}
+                aria-label="Nouvelle conversation"
+                aria-expanded={pickerOpen}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
             )}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
+            {pickerOpen && (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="border-b border-navy/[0.08] p-3">
+                  <p className="mb-2 text-sm font-semibold">Nouvelle conversation</p>
+                  <input
+                    className="input"
+                    aria-label="Rechercher un collègue"
+                    placeholder="Rechercher un collègue…"
+                    value={contactQuery}
+                    onChange={(e) => setContactQuery(e.target.value)}
+                    autoComplete="off"
+                  />
+                </div>
+                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
+                  {!contacts ? (
+                    <li className="px-4 py-3 text-sm text-navy/60">Chargement…</li>
+                  ) : contacts.filter((c) => c.full_name.toLowerCase().includes(contactQuery.trim().toLowerCase())).length === 0 ? (
+                    <li className="px-4 py-3 text-sm text-navy/60">Aucun collègue trouvé.</li>
+                  ) : (
+                    contacts
+                      .filter((c) => c.full_name.toLowerCase().includes(contactQuery.trim().toLowerCase()))
+                      .map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-sm hover:bg-navy/[0.04]"
+                            onClick={() => openConversation(c.id, c.full_name)}
+                          >
+                            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-teal">
+                              {c.full_name
+                                .split(/\s+/)
+                                .map((p) => p[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()}
+                            </span>
+                            <span className="truncate">{c.full_name}</span>
+                          </button>
+                        </li>
+                      ))
+                  )}
+                </ul>
+              </div>
+            )}
+            <div className={pickerOpen ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
             {assistantAvailable && (
               <div className={activeKey === "assistant" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
                 <AssistantTabBody
@@ -315,6 +354,7 @@ export function FloatingChatWidget({
                 Choisissez une conversation ou démarrez-en une nouvelle (+).
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
