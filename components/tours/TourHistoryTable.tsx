@@ -75,7 +75,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[820px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -109,7 +109,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                         className="input !h-7 !w-16 !py-0.5 !text-xs"
                         type="number"
                         min={0}
-                        placeholder="Départ"
+                        aria-label="Km au départ" placeholder="Départ"
                         value={startKm}
                         onChange={(e) => setStartKm(e.target.value)}
                       />
@@ -118,7 +118,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                         className="input !h-7 !w-16 !py-0.5 !text-xs"
                         type="number"
                         min={0}
-                        placeholder="Retour"
+                        aria-label="Km au retour" placeholder="Retour"
                         value={endKm}
                         onChange={(e) => setEndKm(e.target.value)}
                       />
@@ -138,10 +138,10 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                   <td className="py-2">
                     {editing ? (
                       <div className="flex gap-1">
-                        <button className="btn-primary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={() => save(r.id)}>
+                        <button className="btn-primary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={() => save(r.id)}>
                           OK
                         </button>
-                        <button className="btn-secondary !h-6 !px-2 !py-0 !text-[11px]" disabled={busy} onClick={cancelEdit}>
+                        <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={busy} onClick={cancelEdit}>
                           Annuler
                         </button>
                       </div>

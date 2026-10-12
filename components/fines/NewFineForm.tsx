@@ -93,10 +93,10 @@ export function NewFineForm({ vehicles }: { vehicles: VehicleOption[] }) {
         }}
       />
       {readNotice && <p className="text-xs text-gold-ink">{readNotice}</p>}
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div>
-        <label className="label">Véhicule</label>
+        <label className="block"><span className="label">Véhicule</span>
         <select className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
           <option value="">Choisir…</option>
           {vehicles.map((v) => (
@@ -104,26 +104,26 @@ export function NewFineForm({ vehicles }: { vehicles: VehicleOption[] }) {
               {v.registration}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="label">Date de l&apos;infraction</label>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <label className="block"><span className="label">Date de l&apos;infraction</span>
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         </div>
         <div className="flex-1">
-          <label className="label">Heure</label>
-          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <label className="block"><span className="label">Heure</span>
+          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
         </div>
       </div>
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="label">Montant (€)</label>
-          <input className="input" type="number" min={0} step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label className="block"><span className="label">Montant (€)</span>
+          <input className="input" type="number" min={0} step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
         </div>
         <div className="flex-1">
-          <label className="label">Référence (optionnel)</label>
-          <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} />
+          <label className="block"><span className="label">Référence (optionnel)</span>
+          <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} /></label>
         </div>
       </div>
 

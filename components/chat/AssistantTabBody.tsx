@@ -60,14 +60,18 @@ export function AssistantTabBody({
                       <button
                         className={`text-xs ${m.feedback === true ? "opacity-100" : "opacity-40 hover:opacity-100"}`}
                         onClick={() => onVote(m.id, true)}
+                        aria-label="Réponse utile"
+                        aria-pressed={m.feedback === true}
                       >
-                        👍
+                        <span aria-hidden="true">👍</span>
                       </button>
                       <button
                         className={`text-xs ${m.feedback === false ? "opacity-100" : "opacity-40 hover:opacity-100"}`}
                         onClick={() => onVote(m.id, false)}
+                        aria-label="Réponse pas utile"
+                        aria-pressed={m.feedback === false}
                       >
-                        👎
+                        <span aria-hidden="true">👎</span>
                       </button>
                     </div>
                   )}
@@ -90,7 +94,7 @@ export function AssistantTabBody({
             )}
           </div>
         )}
-        {error && <p className="mt-2 text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-orange-ink">{error}</p>}
       </div>
 
       <div className="border-t border-navy/10 p-3">
@@ -99,7 +103,7 @@ export function AssistantTabBody({
             className="input flex-1 !py-2 text-sm"
             value={input}
             maxLength={MAX_MESSAGE_LENGTH}
-            placeholder="Écris ta question…"
+            aria-label="Écris ta question" placeholder="Écris ta question…"
             disabled={busy}
             onKeyDown={(e) => e.key === "Enter" && onSend()}
             onChange={(e) => onInputChange(e.target.value)}
@@ -112,11 +116,11 @@ export function AssistantTabBody({
           <button className="text-xs text-navy/65 underline" disabled={busy} onClick={onEscalate}>
             Parler à quelqu&apos;un
           </button>
-          <span className="text-[10px] text-navy/60">
+          <span className="text-xs text-navy/60">
             {input.length}/{MAX_MESSAGE_LENGTH}
           </span>
         </div>
-        <p className="mt-1.5 text-[10px] text-navy/60">Assistant automatique. Ne saisis pas d&apos;informations personnelles sensibles.</p>
+        <p className="mt-1.5 text-xs text-navy/60">Assistant automatique. Ne saisis pas d&apos;informations personnelles sensibles.</p>
       </div>
     </div>
   );

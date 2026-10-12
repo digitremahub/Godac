@@ -35,7 +35,7 @@ export function DriverSignupsList({ requests }: { requests: SignupRequest[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {requests.map((r) => {
         const serviceNames = (r.user_services ?? []).map((us) => us.services?.name).filter(Boolean).join(", ");
         return (

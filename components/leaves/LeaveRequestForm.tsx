@@ -54,33 +54,33 @@ export function LeaveRequestForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Nouvelle demande de congé</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {sent && <p className="text-sm text-teal-ink">Demande envoyée, en attente de validation.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p role="status" className="text-sm text-teal-ink">Demande envoyée, en attente de validation.</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
         {services.length > 1 && (
           <div>
-            <label className="label">Service</label>
+            <label className="block"><span className="label">Service</span>
             <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
-            </select>
+            </select></label>
           </div>
         )}
         <div>
-          <label className="label">Du</label>
-          <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <label className="block"><span className="label">Du</span>
+          <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Au</label>
-          <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <label className="block"><span className="label">Au</span>
+          <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
         </div>
         <div className={services.length > 1 ? "sm:col-span-1" : "sm:col-span-2"}>
-          <label className="label">Motif (optionnel)</label>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Congés payés, RTT…" />
+          <label className="block"><span className="label">Motif (optionnel)</span>
+          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Congés payés, RTT…" /></label>
         </div>
       </div>
       <button

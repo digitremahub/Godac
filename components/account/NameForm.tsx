@@ -86,32 +86,36 @@ export function NameForm({
   return (
     <Card className="flex max-w-md flex-col gap-4">
       <h3 className="text-lg">Profil</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {saved && <p className="text-sm text-teal-ink">Profil mis à jour.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {saved && <p role="status" className="text-sm text-teal-ink">Profil mis à jour.</p>}
       <div>
-        <label className="label">Nom complet</label>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="block"><span className="label">Nom complet</span>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Téléphone (optionnel)</label>
+        <label className="block"><span className="label">Téléphone (optionnel)</span>
         <input
           className="input"
           type="tel"
+          autoComplete="tel"
           placeholder="ex: 06 12 34 56 78"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-        />
+        /></label>
       </div>
       {showContactEmail && (
         <div>
-          <label className="label">Email de notification (optionnel)</label>
+          <label className="block"><span className="label">Email de notification (optionnel)</span>
           <input
             className="input"
             type="email"
+            name="email"
+            autoComplete="email"
+            spellCheck={false}
             placeholder="votre-email@exemple.fr"
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
-          />
+          /></label>
           <p className="mt-1 text-xs text-navy/60">
             Votre connexion par badge/PIN reste inchangée — cette adresse sert uniquement à recevoir les alertes et
             convocations par email.
@@ -120,13 +124,13 @@ export function NameForm({
       )}
       {showAddress && (
         <div>
-          <label className="label">Adresse du domicile (optionnel)</label>
+          <label className="block"><span className="label">Adresse du domicile (optionnel)</span>
           <input
             className="input"
             placeholder="ex: 12 rue de la Paix, 75002 Paris"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-          />
+          /></label>
           <p className="mt-1 text-xs text-navy/60">
             Sert uniquement à estimer la distance d&apos;un retour direct à domicile en fin de tournée.
           </p>

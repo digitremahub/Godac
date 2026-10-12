@@ -56,15 +56,15 @@ export function PasswordForm() {
           passe permet aussi de vous connecter sans avoir accès à votre boîte mail.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {saved && <p className="text-sm text-teal-ink">Mot de passe enregistré.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {saved && <p role="status" className="text-sm text-teal-ink">Mot de passe enregistré.</p>}
       <div>
-        <label className="label">Nouveau mot de passe</label>
-        <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <label className="block"><span className="label">Nouveau mot de passe</span>
+        <input type="password" autoComplete="new-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Confirmer le mot de passe</label>
-        <input type="password" className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <label className="block"><span className="label">Confirmer le mot de passe</span>
+        <input type="password" autoComplete="new-password" className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></label>
       </div>
       <button className="btn-primary self-start" disabled={busy || !password || !confirm} onClick={save}>
         {busy ? "Enregistrement…" : "Enregistrer le mot de passe"}

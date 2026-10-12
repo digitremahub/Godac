@@ -41,11 +41,11 @@ export function VehicleFleetTable({ vehicles }: { vehicles: VehicleRow[] }) {
       <div className="flex flex-wrap gap-2">
         <input
           className="input !w-56"
-          placeholder="Rechercher une immatriculation…"
+          aria-label="Rechercher une immatriculation" placeholder="Rechercher une immatriculation…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select className="input !w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+        <select aria-label="Filtrer par type" className="input !w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">Tous les types</option>
           {types.map((t) => (
             <option key={t} value={t}>
@@ -53,7 +53,7 @@ export function VehicleFleetTable({ vehicles }: { vehicles: VehicleRow[] }) {
             </option>
           ))}
         </select>
-        <select className="input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select aria-label="Filtrer par statut" className="input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">Tous les statuts</option>
           {Object.entries(STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>

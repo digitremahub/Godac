@@ -45,14 +45,14 @@ export function MeetingRequestForm() {
   return (
     <Card className="flex flex-col gap-3">
       <h3 className="text-lg">Demander un rendez-vous</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div>
-        <label className="label">Motif</label>
-        <textarea className="input" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <label className="block"><span className="label">Motif</span>
+        <textarea className="input" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Date souhaitée (optionnel)</label>
-        <input className="input" type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} />
+        <label className="block"><span className="label">Date souhaitée (optionnel)</span>
+        <input className="input" type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} /></label>
       </div>
       <div className="flex gap-2">
         <button className="btn-primary" disabled={busy || !reason} onClick={submit}>

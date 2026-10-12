@@ -298,6 +298,7 @@ export function PlanningGrid({
   }
 
   async function removeEntry(entryId: string) {
+    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
     setBusyId(entryId);
     setError(null);
     try {
@@ -408,30 +409,30 @@ export function PlanningGrid({
           ))}
       </div>
 
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
-      {duplicateSummary && <p className="text-sm text-teal-ink">{duplicateSummary}</p>}
-      {bulkSummary && <p className="text-sm text-teal-ink">{bulkSummary}</p>}
+      {duplicateSummary && <p role="status" className="text-sm text-teal-ink">{duplicateSummary}</p>}
+      {bulkSummary && <p role="status" className="text-sm text-teal-ink">{bulkSummary}</p>}
 
       {formOpen && (
         <Card className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
           <div>
-            <label className="label">Service</label>
+            <label className="block"><span className="label">Service</span>
             <select className="input !w-auto" value={formService} onChange={(e) => setFormService(e.target.value)}>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
-            </select>
+            </select></label>
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm">
             <input type="checkbox" checked={formWholeWeek} onChange={(e) => setFormWholeWeek(e.target.checked)} />
             Toute la semaine
           </label>
           {formWholeWeek ? (
-            <div className="flex flex-col gap-1">
-              <label className="label">Jours</label>
+            <div className="flex flex-col gap-1" role="group" aria-labelledby="planning-form-days">
+              <p className="label" id="planning-form-days">Jours</p>
               <div className="flex gap-1">
                 {DAY_LABELS.map((label, i) => (
                   <button
@@ -440,6 +441,7 @@ export function PlanningGrid({
                     className={`rounded-md px-2 py-1 text-xs ${
                       formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/5 text-navy/60"
                     }`}
+                    aria-pressed={formDays.has(i)}
                     onClick={() => toggleFormDay(i)}
                   >
                     {label}
@@ -449,31 +451,31 @@ export function PlanningGrid({
             </div>
           ) : (
             <div>
-              <label className="label">Jour</label>
+              <label className="block"><span className="label">Jour</span>
               <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
                 {days.map((d, i) => (
                   <option key={d} value={d}>
                     {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
                   </option>
                 ))}
-              </select>
+              </select></label>
             </div>
           )}
           <div>
-            <label className="label">Heure</label>
-            <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} />
+            <label className="block"><span className="label">Heure</span>
+            <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} /></label>
           </div>
           <div>
-            <label className="label">N° de tournée</label>
+            <label className="block"><span className="label">N° de tournée</span>
             <input
               className="input !w-auto"
               value={formTourNumber}
               onChange={(e) => setFormTourNumber(e.target.value)}
               placeholder="ex: T-042"
-            />
+            /></label>
           </div>
           <div>
-            <label className="label">Chauffeur</label>
+            <label className="block"><span className="label">Chauffeur</span>
             <select className="input !w-auto" value={formDriverId} onChange={(e) => selectDriver(e.target.value)}>
               <option value="">Choisir…</option>
               {drivers.map((d) => {
@@ -485,10 +487,10 @@ export function PlanningGrid({
                   </option>
                 );
               })}
-            </select>
+            </select></label>
           </div>
           <div>
-            <label className="label">Véhicule</label>
+            <label className="block"><span className="label">Véhicule</span>
             <select className="input !w-auto" value={formVehicleId} onChange={(e) => setFormVehicleId(e.target.value)}>
               <option value="">Choisir…</option>
               {vehicles
@@ -498,7 +500,7 @@ export function PlanningGrid({
                     {v.registration}
                   </option>
                 ))}
-            </select>
+            </select></label>
           </div>
           <button
             className="btn-primary shrink-0"
@@ -600,9 +602,9 @@ export function PlanningGrid({
                                   className="input !h-7 !py-0.5 !text-xs"
                                   value={editTourNumber}
                                   onChange={(e) => setEditTourNumber(e.target.value)}
-                                  placeholder="N° tournée"
+                                  aria-label="N° tournée" placeholder="N° tournée"
                                 />
-                                <select
+                                <select aria-label="Chauffeur"
                                   className="input !h-7 !py-0.5 !text-xs"
                                   value={editDriverId}
                                   onChange={(e) => setEditDriverId(e.target.value)}
@@ -614,7 +616,7 @@ export function PlanningGrid({
                                     </option>
                                   ))}
                                 </select>
-                                <select
+                                <select aria-label="Véhicule"
                                   className="input !h-7 !py-0.5 !text-xs"
                                   value={editVehicleId}
                                   onChange={(e) => setEditVehicleId(e.target.value)}
@@ -626,7 +628,7 @@ export function PlanningGrid({
                                     </option>
                                   ))}
                                 </select>
-                                <input
+                                <input aria-label="Heure"
                                   className="input !h-7 !py-0.5 !text-xs"
                                   type="time"
                                   value={editTime}
@@ -634,13 +636,13 @@ export function PlanningGrid({
                                 />
                                 <div className="flex gap-1">
                                   <button
-                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-xs"
                                     onClick={() => saveEdit(entry)}
                                   >
                                     OK
                                   </button>
                                   <button
-                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-xs"
                                     onClick={cancelEdit}
                                   >
                                     Annuler
@@ -649,8 +651,8 @@ export function PlanningGrid({
                               </div>
                             ) : duplicatingEntryId === entry.id ? (
                               <div className="flex flex-col gap-1">
-                                <label className="text-[10px] text-navy/60">Dupliquer vers le</label>
-                                <input
+                                <label className="text-xs text-navy/60">Dupliquer vers le</label>
+                                <input aria-label="Dupliquer vers le"
                                   className="input !h-7 !py-0.5 !text-xs"
                                   type="date"
                                   value={duplicateTargetDate}
@@ -658,14 +660,14 @@ export function PlanningGrid({
                                 />
                                 <div className="flex gap-1">
                                   <button
-                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-xs"
                                     disabled={!duplicateTargetDate || busyId === entry.id}
                                     onClick={() => confirmDuplicateEntry(entry.id)}
                                   >
                                     OK
                                   </button>
                                   <button
-                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-[11px]"
+                                    className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-xs"
                                     onClick={cancelDuplicatePicker}
                                   >
                                     Annuler

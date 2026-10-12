@@ -93,7 +93,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   return (
     <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
       <div>
-        <h2 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h2>
+        <h1 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h1>
         <p className="mt-1 text-sm text-navy/65">
           {usePassword
             ? "Connectez-vous avec le mot de passe défini depuis votre compte."
@@ -102,41 +102,48 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       </div>
       {mode === "sign-up" && (
         <div>
-          <label className="label">Nom et prénom</label>
+          <label className="block"><span className="label">Nom et prénom</span>
           <input
             type="text"
+            name="name"
+            autoComplete="name"
             required
             className="input"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Jean Dupont"
-          />
+          /></label>
         </div>
       )}
       <div>
-        <label className="label">Email professionnel</label>
+        <label className="block"><span className="label">Email professionnel</span>
         <input
           type="email"
+          name="email"
+          autoComplete="email"
+          spellCheck={false}
           required
           className="input"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="vous@entreprise.fr"
-        />
+        /></label>
       </div>
       {mode === "sign-in" && usePassword && (
         <div>
-          <label className="label">Mot de passe</label>
+          <label className="block"><span className="label">Mot de passe</span>
           <input
             type="password"
+            name="password"
+            autoComplete="current-password"
             required
             className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-          />
+          /></label>
         </div>
       )}
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {passkeyUnavailable && (
         <p className="text-xs text-navy/60">Aucune clé Face ID / empreinte enregistrée pour cet email sur cet appareil.</p>
       )}

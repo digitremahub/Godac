@@ -50,25 +50,25 @@ export function ConvocationButton({ employeeId }: { employeeId: string }) {
         <button className="btn-secondary" onClick={() => setOpen(true)}>
           📋 Convoquer
         </button>
-        {sent && <p className="text-xs text-teal-ink">Convocation envoyée.</p>}
+        {sent && <p role="status" className="text-xs text-teal-ink">Convocation envoyée.</p>}
       </div>
     );
   }
 
   return (
     <Card className="flex max-w-sm flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div>
-        <label className="label">Motif *</label>
-        <textarea className="input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <label className="block"><span className="label">Motif *</span>
+        <textarea className="input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Date et heure (optionnel)</label>
-        <input className="input" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <label className="block"><span className="label">Date et heure (optionnel)</span>
+        <input className="input" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Lieu (optionnel)</label>
-        <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} />
+        <label className="block"><span className="label">Lieu (optionnel)</span>
+        <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} /></label>
       </div>
       <div className="flex gap-2">
         <button className="btn-primary" disabled={busy || !reason.trim()} onClick={submit}>

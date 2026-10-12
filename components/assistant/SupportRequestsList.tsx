@@ -83,7 +83,7 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {requests.map((r) => (
         <Card key={r.id} className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
@@ -117,7 +117,7 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
               <textarea
                 className="input"
                 rows={2}
-                placeholder="Ta réponse…"
+                aria-label="Ta réponse" placeholder="Ta réponse…"
                 value={responseDrafts[r.id] ?? ""}
                 onChange={(e) => setResponseDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
               />

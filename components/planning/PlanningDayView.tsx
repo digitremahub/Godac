@@ -108,6 +108,7 @@ export function PlanningDayView({
   }
 
   async function removeEntry(entryId: string) {
+    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
     setBusyId(entryId);
     setError(null);
     try {
@@ -135,7 +136,7 @@ export function PlanningDayView({
           Jour suiv. →
         </button>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
 
       {sorted.length === 0 ? (
@@ -156,9 +157,9 @@ export function PlanningDayView({
                           className="input !w-auto !py-1"
                           value={editTourNumber}
                           onChange={(ev) => setEditTourNumber(ev.target.value)}
-                          placeholder="N° tournée"
+                          aria-label="N° tournée" placeholder="N° tournée"
                         />
-                        <select className="input !w-auto !py-1" value={editDriverId} onChange={(ev) => setEditDriverId(ev.target.value)}>
+                        <select aria-label="Chauffeur" className="input !w-auto !py-1" value={editDriverId} onChange={(ev) => setEditDriverId(ev.target.value)}>
                           <option value="">Chauffeur…</option>
                           {drivers.map((d) => (
                             <option key={d.id} value={d.id}>
@@ -166,7 +167,7 @@ export function PlanningDayView({
                             </option>
                           ))}
                         </select>
-                        <select className="input !w-auto !py-1" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
+                        <select aria-label="Véhicule" className="input !w-auto !py-1" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
                           <option value="">Véhicule…</option>
                           {vehicles.map((v) => (
                             <option key={v.id} value={v.id}>
@@ -174,7 +175,7 @@ export function PlanningDayView({
                             </option>
                           ))}
                         </select>
-                        <input className="input !w-auto !py-1" type="time" value={editTime} onChange={(ev) => setEditTime(ev.target.value)} />
+                        <input aria-label="Heure" className="input !w-auto !py-1" type="time" value={editTime} onChange={(ev) => setEditTime(ev.target.value)} />
                         <div className="flex gap-1">
                           <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === e.id} onClick={() => saveEdit(e)}>
                             OK

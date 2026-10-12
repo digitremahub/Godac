@@ -61,24 +61,24 @@ export function EditTankForm({
 
   return (
     <Card className="flex flex-col gap-3">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div>
-        <label className="label">Nom</label>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="block"><span className="label">Nom</span>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Type</label>
+        <label className="block"><span className="label">Type</span>
         <select className="input" value={fuelType} onChange={(e) => setFuelType(e.target.value as "diesel" | "adblue")}>
           <option value="diesel">Diesel</option>
           <option value="adblue">AdBlue</option>
-        </select>
+        </select></label>
       </div>
       <div>
-        <label className="label">Capacité (L)</label>
-        <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+        <label className="block"><span className="label">Capacité (L)</span>
+        <input className="input" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Service</label>
+        <label className="block"><span className="label">Service</span>
         <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
           <option value="">Aucun</option>
           {services.map((s) => (
@@ -86,7 +86,7 @@ export function EditTankForm({
               {s.name}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
       <div className="flex gap-2">
         <button className="btn-primary" disabled={busy || !name || !capacity} onClick={save}>

@@ -189,7 +189,7 @@ export function PayrollTable({
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       {payslipsEnabled && (
         <div className="mb-3 flex items-center gap-3">
           <button className="btn-secondary !px-3 !py-1.5 text-sm" disabled={bulkBusy || missingCount === 0} onClick={generateAllMissing}>
@@ -235,7 +235,7 @@ export function PayrollTable({
                           type="number"
                           min={0}
                           step={0.01}
-                          placeholder="Brut"
+                          aria-label="Salaire brut" placeholder="Brut"
                           value={edit.monthlyGross}
                           onChange={(e) => setEdit({ ...edit, monthlyGross: e.target.value })}
                         />
@@ -244,14 +244,14 @@ export function PayrollTable({
                           type="number"
                           min={0}
                           step={0.01}
-                          placeholder="Net"
+                          aria-label="Salaire net" placeholder="Net"
                           value={edit.monthlyNet}
                           onChange={(e) => setEdit({ ...edit, monthlyNet: e.target.value })}
                         />
                       </div>
                     </td>
                     <td className="py-2">
-                      <input
+                      <input aria-label="Heures contractuelles"
                         className="input !h-7 !w-20 !py-0.5 !text-xs"
                         type="number"
                         min={0.01}
@@ -264,10 +264,10 @@ export function PayrollTable({
                     <td className="py-2 text-navy/60">—</td>
                     <td className="py-2">
                       <div className="flex gap-1">
-                        <button className="btn-primary !h-6 !px-2 !py-0 !text-[11px]" disabled={busyId === row.driver_id} onClick={() => save(row)}>
+                        <button className="btn-primary !h-6 !px-2 !py-0 !text-xs" disabled={busyId === row.driver_id} onClick={() => save(row)}>
                           OK
                         </button>
-                        <button className="btn-secondary !h-6 !px-2 !py-0 !text-[11px]" disabled={busyId === row.driver_id} onClick={cancelEdit}>
+                        <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={busyId === row.driver_id} onClick={cancelEdit}>
                           Annuler
                         </button>
                       </div>
@@ -314,7 +314,7 @@ export function PayrollTable({
                             type="number"
                             min={0}
                             step={0.01}
-                            placeholder="Panier repas €"
+                            aria-label="Panier repas €" placeholder="Panier repas €"
                             value={mealVouchers}
                             onChange={(e) => setMealVouchers(e.target.value)}
                           />
@@ -323,24 +323,24 @@ export function PayrollTable({
                             type="number"
                             min={0}
                             step={0.01}
-                            placeholder="Prime €"
+                            aria-label="Prime €" placeholder="Prime €"
                             value={bonus}
                             onChange={(e) => setBonus(e.target.value)}
                           />
                         </div>
                         <div className="flex gap-1">
                           <button
-                            className="btn-primary !h-6 !px-2 !py-0 !text-[11px]"
+                            className="btn-primary !h-6 !px-2 !py-0 !text-xs"
                             disabled={genBusyId === row.driver_id}
                             onClick={() => generateOne(row)}
                           >
                             {genBusyId === row.driver_id ? "…" : "Générer"}
                           </button>
-                          <button className="btn-secondary !h-6 !px-2 !py-0 !text-[11px]" disabled={genBusyId === row.driver_id} onClick={cancelGenerate}>
+                          <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={genBusyId === row.driver_id} onClick={cancelGenerate}>
                             Annuler
                           </button>
                         </div>
-                        {genError && <p className="text-[10px] text-orange-ink">{genError}</p>}
+                        {genError && <p role="alert" className="text-xs text-orange-ink">{genError}</p>}
                       </div>
                     ) : (
                       <button className="btn-secondary !h-7 !px-2 !py-0.5 !text-xs" onClick={() => startGenerate(row)}>

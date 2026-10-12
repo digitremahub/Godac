@@ -102,16 +102,16 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
   return (
     <Card className="flex flex-col gap-4">
       <h3 className="text-lg">Services</h3>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="label">Nom</label>
-          <input className="input" placeholder="ex: Longue distance" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="block"><span className="label">Nom</span>
+          <input className="input" placeholder="ex: Longue distance" value={name} onChange={(e) => setName(e.target.value)} /></label>
         </div>
         <div className="w-32">
-          <label className="label">Code</label>
-          <input className="input" placeholder="ex: LD" value={code} onChange={(e) => setCode(e.target.value)} />
+          <label className="block"><span className="label">Code</span>
+          <input className="input" placeholder="ex: LD" value={code} onChange={(e) => setCode(e.target.value)} /></label>
         </div>
         <button className="btn-primary shrink-0" disabled={busy || !name} onClick={addService}>
           Ajouter
@@ -125,7 +125,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
           {services.map((s) => (
             <li key={s.id} className="flex flex-col gap-2 rounded-lg bg-navy/5 px-3 py-2">
               <div className="flex items-center gap-3">
-                <input
+                <input aria-label="Nom du service"
                   className="input flex-1 !py-1"
                   defaultValue={s.name}
                   onBlur={(e) => e.target.value !== s.name && renameService(s.id, e.target.value)}
@@ -137,14 +137,14 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                 </button>
               </div>
               <div>
-                <label className="label">Adresse du dépôt de ce service</label>
+                <label className="block"><span className="label">Adresse du dépôt de ce service</span>
                 <input
                   className="input !py-1"
                   placeholder="ex: 1 rue du Dépôt, 69007 Lyon — laissez vide pour utiliser le dépôt de l'organisation"
                   defaultValue={s.depot_address ?? ""}
                   onBlur={(e) => e.target.value !== (s.depot_address ?? "") && updateDepotAddress(s.id, e.target.value)}
                   disabled={busy}
-                />
+                /></label>
                 {s.depot_address && (
                   <p className="mt-1 flex gap-3 text-sm">
                     <a

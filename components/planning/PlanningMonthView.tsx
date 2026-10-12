@@ -75,12 +75,12 @@ export function PlanningMonthView({
             >
               <span className="font-medium">{Number(day.slice(8, 10))}</span>
               {dayEntries.slice(0, MAX_VISIBLE_PER_DAY).map((e) => (
-                <span key={e.id} className="truncate rounded bg-teal/15 px-1 text-[10px] text-navy/70">
+                <span key={e.id} className="truncate rounded bg-teal/15 px-1 text-[11px] text-navy/70">
                   n°{e.tour_number}
                 </span>
               ))}
               {dayEntries.length > MAX_VISIBLE_PER_DAY && (
-                <span className="text-[10px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
+                <span className="text-[11px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
               )}
             </Link>
           );

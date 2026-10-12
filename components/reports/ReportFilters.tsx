@@ -50,16 +50,16 @@ export function ReportFilters({
   return (
     <Card className="mb-4 flex flex-wrap items-end gap-3">
       <div>
-        <label className="label">Du</label>
-        <input className="input !w-auto" type="date" value={localFrom} onChange={(e) => setLocalFrom(e.target.value)} />
+        <label className="block"><span className="label">Du</span>
+        <input className="input !w-auto" type="date" value={localFrom} onChange={(e) => setLocalFrom(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Au</label>
-        <input className="input !w-auto" type="date" value={localTo} onChange={(e) => setLocalTo(e.target.value)} />
+        <label className="block"><span className="label">Au</span>
+        <input className="input !w-auto" type="date" value={localTo} onChange={(e) => setLocalTo(e.target.value)} /></label>
       </div>
       {services.length > 0 && (
         <div>
-          <label className="label">Service</label>
+          <label className="block"><span className="label">Service</span>
           <select className="input !w-auto" value={selectedService} onChange={(e) => apply({ service: e.target.value })}>
             <option value="">Tous les services</option>
             {services.map((s) => (
@@ -67,12 +67,12 @@ export function ReportFilters({
                 {s.name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
       )}
       {drivers.length > 0 && (
         <div>
-          <label className="label">Chauffeur</label>
+          <label className="block"><span className="label">Chauffeur</span>
           <select className="input !w-auto" value={selectedDriver} onChange={(e) => apply({ driver: e.target.value })}>
             <option value="">Tous les chauffeurs</option>
             {drivers.map((d) => (
@@ -80,7 +80,7 @@ export function ReportFilters({
                 {d.full_name}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
       )}
       <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => apply({})}>

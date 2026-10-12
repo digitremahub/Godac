@@ -49,7 +49,7 @@ export function StaffSupportRequestsList({ requests }: { requests: Row[] }) {
             <div className="flex gap-2">
               <input
                 className="input !py-1 text-xs"
-                placeholder="Réponse…"
+                aria-label="Réponse" placeholder="Réponse…"
                 value={drafts[r.id] ?? ""}
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))}
               />

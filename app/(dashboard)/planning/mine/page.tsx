@@ -154,7 +154,7 @@ export default async function MyPlanningPage({
                 {dayEntries.slice(0, MAX_VISIBLE_PER_DAY).map((e: any) => (
                   <span
                     key={e.id}
-                    className={`truncate rounded px-1 text-[10px] ${
+                    className={`truncate rounded px-1 text-[11px] ${
                       e.status === "done" ? "bg-teal/15 text-navy/70" : e.status === "in_progress" ? "bg-gold/20 text-navy/70" : "bg-navy/10 text-navy/70"
                     }`}
                   >
@@ -162,7 +162,7 @@ export default async function MyPlanningPage({
                   </span>
                 ))}
                 {dayEntries.length > MAX_VISIBLE_PER_DAY && (
-                  <span className="text-[10px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
+                  <span className="text-[11px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
                 )}
               </Link>
             );

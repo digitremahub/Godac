@@ -49,23 +49,26 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
       <div>
-        <h2 className="text-xl">Mot de passe oublié</h2>
+        <h1 className="text-xl">Mot de passe oublié</h1>
         <p className="mt-1 text-sm text-navy/65">
           On vous envoie un lien pour choisir un nouveau mot de passe.
         </p>
       </div>
       <div>
-        <label className="label">Email professionnel</label>
+        <label className="block"><span className="label">Email professionnel</span>
         <input
           type="email"
+          name="email"
+          autoComplete="email"
+          spellCheck={false}
           required
           className="input"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="vous@entreprise.fr"
-        />
+        /></label>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <button type="submit" className="btn-primary" disabled={busy || !email}>
         {busy ? "Envoi…" : "Recevoir le lien de réinitialisation"}
       </button>

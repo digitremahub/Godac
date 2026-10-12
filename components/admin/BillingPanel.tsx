@@ -63,7 +63,7 @@ export function BillingPanel({ plan, status, hasStripeCustomer }: { plan: string
         )}
       </Card>
 
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {PLANS.map((p) => (

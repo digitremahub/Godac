@@ -235,15 +235,26 @@ export function FloatingChatWidget({
                   {c.contactName.split(" ")[0]}
                   {unreadBySender[c.contactId] && activeKey !== `conv:${c.contactId}` && <span className="h-1.5 w-1.5 rounded-full bg-orange" />}
                 </button>
-                <button onClick={() => closeConversation(c.contactId)} className="text-navy/60 hover:text-orange-ink">
-                  ✕
+                <button
+                  type="button"
+                  onClick={() => closeConversation(c.contactId)}
+                  aria-label={`Fermer la conversation avec ${c.contactName}`}
+                  className="text-navy/60 hover:text-orange-ink"
+                >
+                  <span aria-hidden="true">✕</span>
                 </button>
               </div>
             ))}
             {messengerAvailable && (
               <div className="relative shrink-0">
-                <button className="rounded-t-lg px-2 py-1.5 text-xs text-navy/65 hover:text-navy" onClick={togglePicker}>
-                  +
+                <button
+                  type="button"
+                  className="rounded-t-lg px-2 py-1.5 text-xs text-navy/65 hover:text-navy"
+                  onClick={togglePicker}
+                  aria-label="Nouvelle conversation"
+                  aria-expanded={pickerOpen}
+                >
+                  <span aria-hidden="true">+</span>
                 </button>
                 {pickerOpen && (
                   <div className="absolute right-0 top-full z-50 max-h-48 w-44 overflow-y-auto rounded-lg border border-navy/10 bg-white py-1 shadow-xl">

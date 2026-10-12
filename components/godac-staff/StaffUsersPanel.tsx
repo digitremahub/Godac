@@ -66,7 +66,7 @@ export function StaffUsersPanel({ users }: { users: StaffUserRow[] }) {
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[640px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -83,7 +83,7 @@ export function StaffUsersPanel({ users }: { users: StaffUserRow[] }) {
               <td className="py-2">{u.full_name}</td>
               <td className="py-2">{u.email}</td>
               <td className="py-2">
-                <select
+                <select aria-label="Rôle"
                   className="input !w-auto !py-1"
                   value={u.role}
                   disabled={busyId === u.id}

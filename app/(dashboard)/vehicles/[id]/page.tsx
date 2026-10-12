@@ -20,7 +20,7 @@ function SpecProvenance({ field, specSources, label }: { field: string; specSour
   const source = specSources?.[field];
   if (!source || source.origin !== "ia") return null;
   return (
-    <p className="text-[11px] text-gold-ink">
+    <p className="text-xs text-gold-ink">
       {label ? `${label} : ` : ""}🤖 Estimé par IA{source.confirmed ? ", confirmé" : " — à vérifier"}
     </p>
   );

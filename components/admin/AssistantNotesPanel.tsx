@@ -56,6 +56,7 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
   }
 
   async function remove(id: string) {
+    if (!window.confirm("Supprimer cette note ?")) return;
     setBusy(true);
     setError(null);
     try {
@@ -78,11 +79,11 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
           en plus du guide d&apos;utilisation — ne cochez aucun rôle pour la rendre visible par tous.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
-        <input className="input" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea className="input" rows={3} placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
+        <input className="input" aria-label="Titre" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <textarea className="input" rows={3} aria-label="Contenu" placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
         <div className="flex flex-wrap gap-2">
           {ROLES.map((r) => (
             <label key={r} className="flex items-center gap-1.5 text-xs">

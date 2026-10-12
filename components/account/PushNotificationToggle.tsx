@@ -77,7 +77,7 @@ export function PushNotificationToggle() {
           <button className={subscribed ? "btn-secondary self-start" : "btn-primary self-start"} disabled={busy} onClick={toggle}>
             {busy ? "…" : subscribed ? "Désactiver" : "Activer les notifications"}
           </button>
-          {error && <p className="text-xs text-orange-ink">{error}</p>}
+          {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
         </>
       )}
     </Card>

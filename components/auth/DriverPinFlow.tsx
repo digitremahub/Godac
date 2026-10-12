@@ -108,7 +108,7 @@ export function DriverPinFlow({
     return (
       <Card className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
         <div>
-          <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
+          <h1 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1>
           <p className="mt-1 text-sm text-navy/65">
             {pinJustCreated ? "Votre code est créé. " : ""}Votre compte doit encore être validé par un responsable avant que
             vous puissiez vous connecter — vous serez prévenu.
@@ -123,14 +123,14 @@ export function DriverPinFlow({
     return (
       <Card className="flex w-full max-w-sm flex-col gap-4">
         <div>
-          <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
+          <h1 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1>
           <p className="mt-1 text-sm text-navy/65">
             Première connexion : créez votre code PIN (4 à 6 chiffres). Vous le ressaisirez à chaque connexion.
           </p>
         </div>
         <form onSubmit={submitSetup} className="flex flex-col gap-3">
           <div>
-            <label className="label">Code PIN</label>
+            <label className="block"><span className="label">Code PIN</span>
             <input
               className="input"
               type="password"
@@ -139,10 +139,10 @@ export function DriverPinFlow({
               required
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-            />
+            /></label>
           </div>
           <div>
-            <label className="label">Confirmez le code PIN</label>
+            <label className="block"><span className="label">Confirmez le code PIN</span>
             <input
               className="input"
               type="password"
@@ -151,9 +151,9 @@ export function DriverPinFlow({
               required
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value)}
-            />
+            /></label>
           </div>
-          {error && <p className="text-sm text-orange-ink">{error}</p>}
+          {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
           <button type="submit" className="btn-primary" disabled={busy || !pin || !confirmPin}>
             {busy ? "Création…" : pendingApproval ? "Créer mon code" : "Créer mon code et me connecter"}
           </button>
@@ -165,7 +165,7 @@ export function DriverPinFlow({
   return (
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
-        <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
+        <h1 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1>
         <p className="mt-1 text-sm text-navy/65">Entrez votre code PIN pour vous connecter.</p>
       </div>
       {hasPasskey && (
@@ -182,7 +182,7 @@ export function DriverPinFlow({
       )}
       <form onSubmit={submitLogin} className="flex flex-col gap-3">
         <div>
-          <label className="label">Code PIN</label>
+          <label className="block"><span className="label">Code PIN</span>
           <input
             className="input"
             type="password"
@@ -192,9 +192,9 @@ export function DriverPinFlow({
             autoFocus
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-          />
+          /></label>
         </div>
-        {error && <p className="text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy || !pin}>
           {busy ? "Connexion…" : "Me connecter"}
         </button>

@@ -47,11 +47,11 @@ export function EmailForm({ currentEmail }: { currentEmail: string }) {
           effet qu&apos;après avoir cliqué le lien qu&apos;il contient.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {sent && <p className="text-sm text-teal-ink">Email de confirmation envoyé à {email}.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p role="status" className="text-sm text-teal-ink">Email de confirmation envoyé à {email}.</p>}
       <div>
-        <label className="label">Nouvelle adresse</label>
-        <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <label className="block"><span className="label">Nouvelle adresse</span>
+        <input type="email" name="email" autoComplete="email" spellCheck={false} className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       </div>
       <button
         className="btn-primary self-start"

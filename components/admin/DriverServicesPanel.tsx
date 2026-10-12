@@ -85,7 +85,7 @@ export function DriverServicesPanel({
       <p className="text-xs text-navy/60">
         Un chauffeur peut être formé sur plusieurs services à la fois — cochez chacun et précisez son niveau.
       </p>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div className="flex flex-col gap-2">
         {services.map((s) => {
           const status = assignments.get(s.id);
@@ -96,7 +96,7 @@ export function DriverServicesPanel({
                 {s.name}
               </label>
               {status !== undefined && (
-                <select
+                <select aria-label={`Statut de qualification — ${s.name}`}
                   className="input !w-auto !py-1 text-sm"
                   value={status}
                   onChange={(e) => setStatus(s.id, e.target.value as QualificationStatus)}
@@ -117,7 +117,7 @@ export function DriverServicesPanel({
         <button className="btn-primary !px-3 !py-1.5 text-sm" disabled={busy} onClick={save}>
           {busy ? "Enregistrement…" : "Enregistrer"}
         </button>
-        {saved && <span className="text-sm text-teal-ink">Enregistré.</span>}
+        {saved && <span role="status" className="text-sm text-teal-ink">Enregistré.</span>}
       </div>
     </Card>
   );

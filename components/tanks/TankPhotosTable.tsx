@@ -60,7 +60,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[760px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -93,14 +93,14 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
                 </td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input className="input !w-24 !py-1" type="number" value={reading} onChange={(e) => setReading(e.target.value)} />
+                    <input aria-label="Index lu (L)" className="input !w-24 !py-1" type="number" value={reading} onChange={(e) => setReading(e.target.value)} />
                   ) : (
                     p.totalizerReading != null ? `${p.totalizerReading.toLocaleString("fr-FR")} L` : "—"
                   )}
                 </td>
                 <td className="py-2 text-navy/70">
                   {isEditing ? (
-                    <input className="input !py-1" value={note} onChange={(e) => setNote(e.target.value)} />
+                    <input aria-label="Note" className="input !py-1" value={note} onChange={(e) => setNote(e.target.value)} />
                   ) : (
                     p.note ?? "—"
                   )}

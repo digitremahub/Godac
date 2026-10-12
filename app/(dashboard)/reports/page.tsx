@@ -235,20 +235,20 @@ async function PhotosView({
             {r.startUrl && (
               <a href={r.startUrl} target="_blank" rel="noreferrer" className="flex-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.startUrl} alt="Rapport départ" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
-                <p className="mt-0.5 text-center text-[11px] text-navy/60">Départ</p>
+                <img loading="lazy" src={r.startUrl} alt="Rapport départ" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
+                <p className="mt-0.5 text-center text-xs text-navy/60">Départ</p>
               </a>
             )}
             {r.endUrl && (
               <a href={r.endUrl} target="_blank" rel="noreferrer" className="flex-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.endUrl} alt="Rapport retour" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
-                <p className="mt-0.5 text-center text-[11px] text-navy/60">Retour</p>
+                <img loading="lazy" src={r.endUrl} alt="Rapport retour" className="h-28 w-full rounded-lg border border-navy/10 object-cover" />
+                <p className="mt-0.5 text-center text-xs text-navy/60">Retour</p>
               </a>
             )}
           </div>
           {(r.report_bl_number || r.report_stops_total !== null || r.report_packages_count !== null) && (
-            <p className="rounded-lg bg-navy/5 px-2 py-1 text-[11px] text-navy/70">
+            <p className="rounded-lg bg-navy/5 px-2 py-1 text-xs text-navy/70">
               {[
                 r.report_bl_number && `BL ${r.report_bl_number}`,
                 r.report_stops_total !== null && `${r.report_stops_total} arrêts`,

@@ -56,7 +56,7 @@ export function JoinLinkCard({ token }: { token: string }) {
         valider&quot;).
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <canvas ref={canvasRef} className="rounded-lg border border-navy/10" />
+        <canvas ref={canvasRef} role="img" aria-label="QR code du lien d’inscription chauffeur" className="rounded-lg border border-navy/10" />
         <div className="flex flex-1 flex-col gap-2">
           <code className="break-all rounded-lg bg-navy/5 px-3 py-2 text-xs">{url}</code>
           <div className="flex gap-2">
@@ -69,7 +69,7 @@ export function JoinLinkCard({ token }: { token: string }) {
           </div>
         </div>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
     </Card>
   );
 }

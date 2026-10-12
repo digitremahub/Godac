@@ -85,25 +85,25 @@ export function FuelEntryForm({
       {ocrNotice && <p className="rounded-lg bg-gold/10 p-3 text-sm text-gold-ink">{ocrNotice}</p>}
 
       <div>
-        <label className="label">Date et heure</label>
+        <label className="block"><span className="label">Date et heure</span>
         <input
           type="datetime-local"
           className="input"
           value={values.occurred_at}
           onChange={(e) => set("occurred_at", e.target.value)}
-        />
+        /></label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Index totaliseur avant (L)</label>
+          <label className="block"><span className="label">Index totaliseur avant (L)</span>
           <input
             type="number"
             step="0.01"
             className="input"
             value={values.totalizer_before}
             onChange={(e) => set("totalizer_before", e.target.value)}
-          />
+          /></label>
           {totalizerOcrEnabled && (
             <div className="mt-1.5">
               <CounterPhotoCapture
@@ -120,14 +120,14 @@ export function FuelEntryForm({
           )}
         </div>
         <div>
-          <label className="label">Index totaliseur après (L) *</label>
+          <label className="block"><span className="label">Index totaliseur après (L) *</span>
           <input
             type="number"
             step="0.01"
             className="input"
             value={values.totalizer_after}
             onChange={(e) => set("totalizer_after", e.target.value)}
-          />
+          /></label>
           {totalizerOcrEnabled && (
             <div className="mt-1.5">
               <CounterPhotoCapture
@@ -146,37 +146,37 @@ export function FuelEntryForm({
       </div>
 
       <div>
-        <label className="label">Kilométrage du véhicule</label>
+        <label className="block"><span className="label">Kilométrage du véhicule</span>
         <input
           type="number"
           step="1"
           className="input"
           value={values.vehicle_km}
           onChange={(e) => set("vehicle_km", e.target.value)}
-        />
+        /></label>
       </div>
 
       {showPriceFields ? (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Litres *</label>
+            <label className="block"><span className="label">Litres *</span>
             <input
               type="number"
               step="0.01"
               className="input"
               value={values.liters}
               onChange={(e) => set("liters", e.target.value)}
-            />
+            /></label>
           </div>
           <div>
-            <label className="label">Prix unitaire (€/L) *</label>
+            <label className="block"><span className="label">Prix unitaire (€/L) *</span>
             <input
               type="number"
               step="0.0001"
               className="input"
               value={values.unit_price}
               onChange={(e) => set("unit_price", e.target.value)}
-            />
+            /></label>
           </div>
         </div>
       ) : (
@@ -188,8 +188,8 @@ export function FuelEntryForm({
       )}
 
       <div>
-        <label className="label">Station (optionnel)</label>
-        <input className="input" value={values.station_name} onChange={(e) => set("station_name", e.target.value)} />
+        <label className="block"><span className="label">Station (optionnel)</span>
+        <input className="input" value={values.station_name} onChange={(e) => set("station_name", e.target.value)} /></label>
       </div>
 
       <button className="btn-primary" disabled={busy} onClick={submit}>

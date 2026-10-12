@@ -115,7 +115,7 @@ export function VehicleImportPanel() {
           Fermer
         </button>
       </div>
-      <input
+      <input aria-label="Fichier d’import véhicules (CSV ou Excel)"
         type="file"
         accept=".csv,.xlsx,.xls"
         className="input"
@@ -134,8 +134,8 @@ export function VehicleImportPanel() {
           ))}
         </ul>
       )}
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {summary && <p className="text-sm text-teal-ink">{summary}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {summary && <p role="status" className="text-sm text-teal-ink">{summary}</p>}
       {importedVehicleIds.length > 0 && !completeSummary && (
         <div className="flex items-center justify-between rounded-lg bg-gold/10 p-3">
           <p className="text-sm text-gold-ink">Compléter automatiquement les champs vides (réservoir, PTAC…) pour les véhicules importés ?</p>
@@ -144,7 +144,7 @@ export function VehicleImportPanel() {
           </button>
         </div>
       )}
-      {completeSummary && <p className="text-sm text-teal-ink">{completeSummary}</p>}
+      {completeSummary && <p role="status" className="text-sm text-teal-ink">{completeSummary}</p>}
       <div className="flex justify-end">
         <button className="btn-primary" disabled={busy || vehicles.length === 0} onClick={submitImport}>
           {busy ? "Import en cours…" : "Importer"}

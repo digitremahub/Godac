@@ -58,7 +58,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
 
   return (
     <Card className="overflow-x-auto">
-      {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[980px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>

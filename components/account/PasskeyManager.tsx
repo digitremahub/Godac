@@ -70,6 +70,7 @@ export function PasskeyManager() {
   }
 
   async function remove(id: string) {
+    if (!window.confirm("Retirer cette clé ? Cet appareil ne pourra plus se connecter par Face ID / empreinte.")) return;
     setBusy(true);
     setError(null);
     try {
@@ -92,7 +93,7 @@ export function PasskeyManager() {
           connexion habituel reste disponible en secours.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {credentials && credentials.length > 0 && (
         <ul className="flex flex-col gap-2">
           {credentials.map((c) => (

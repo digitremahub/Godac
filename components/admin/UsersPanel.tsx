@@ -249,46 +249,46 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
           <div className="flex-1">
-            <label className="label">Nom</label>
-            <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <label className="block"><span className="label">Nom</span>
+            <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} /></label>
           </div>
           {mode === "email" && (
             <div className="flex-1">
-              <label className="label">Email</label>
-              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <label className="block"><span className="label">Email</span>
+              <input className="input" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} /></label>
             </div>
           )}
           <div className="flex-1">
-            <label className="label">Téléphone (optionnel)</label>
+            <label className="block"><span className="label">Téléphone (optionnel)</span>
             <input
               className="input"
               type="tel"
               placeholder="ex: 06 12 34 56 78"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-            />
+            /></label>
           </div>
           <div>
-            <label className="label">Rôle (permissions)</label>
+            <label className="block"><span className="label">Rôle (permissions)</span>
             <select className="input" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
               {roleOptions.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABELS[r]}
                 </option>
               ))}
-            </select>
+            </select></label>
           </div>
           <div className="flex-1">
-            <label className="label">Titre affiché (optionnel)</label>
+            <label className="block"><span className="label">Titre affiché (optionnel)</span>
             <input
               className="input"
               placeholder="ex: Chef de dépôt"
               value={roleTitle}
               onChange={(e) => setRoleTitle(e.target.value)}
-            />
+            /></label>
           </div>
           <div>
-            <label className="label">Service</label>
+            <label className="block"><span className="label">Service</span>
             <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
               <option value="">Aucun</option>
               {services.map((s) => (
@@ -296,7 +296,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                   {s.name}
                 </option>
               ))}
-            </select>
+            </select></label>
           </div>
           {mode === "email" ? (
             <button className="btn-primary shrink-0" disabled={busy || !email} onClick={invite}>
@@ -314,8 +314,8 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
             : "Aucun email n'est envoyé : imprimez le badge QR affiché après la création et remettez-le au chauffeur. Il scanne son badge pour créer son propre code PIN à la première connexion."}
         </p>
       </Card>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
-      {sent && <p className="text-sm text-teal-ink">Invitation envoyée par email.</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {sent && <p role="status" className="text-sm text-teal-ink">Invitation envoyée par email.</p>}
 
       {newBadge && (
         <Card className="flex flex-col items-center gap-3">
@@ -351,7 +351,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                 <tr key={u.id} className="border-t border-navy/5">
                   <td className="py-2">
                     {isEditing ? (
-                      <input className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                      <input aria-label="Nom" className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
                     ) : (
                       <Link href={`/admin/users/${u.id}`} className="text-teal-ink hover:underline">
                         {u.full_name}
@@ -360,7 +360,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                   </td>
                   <td className="py-2 text-navy/70">
                     {isEditing ? (
-                      <input
+                      <input aria-label="Titre affiché"
                         className="input !py-1"
                         placeholder="ex: Chef de dépôt"
                         value={editRoleTitle}
@@ -379,7 +379,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                   </td>
                   <td className="py-2 text-navy/70">
                     {isEditing ? (
-                      <input
+                      <input aria-label="Téléphone"
                         className="input !py-1"
                         type="tel"
                         placeholder="ex: 06 12 34 56 78"
@@ -392,7 +392,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                   </td>
                   <td className="py-2">
                     {isEditing ? (
-                      <select className="input !w-auto !py-1" value={editServiceId} onChange={(e) => setEditServiceId(e.target.value)}>
+                      <select aria-label="Service" className="input !w-auto !py-1" value={editServiceId} onChange={(e) => setEditServiceId(e.target.value)}>
                         <option value="">Aucun</option>
                         {services.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -405,7 +405,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     )}
                   </td>
                   <td className="py-2">
-                    <select
+                    <select aria-label="Rôle"
                       className="input !w-auto !py-1"
                       value={u.role}
                       disabled={busy}

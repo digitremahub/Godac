@@ -95,7 +95,7 @@ export function LeavePlanningCalendar({
           ⚠️ {approvedWithoutReplacement} congé(s) approuvé(s) sans remplaçant assigné ce mois-ci.
         </p>
       )}
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="grid grid-cols-7 gap-1.5 text-xs">
         {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((l) => (
@@ -117,12 +117,12 @@ export function LeavePlanningCalendar({
               {dayLeaves.slice(0, 2).map((l) => (
                 <span
                   key={l.id}
-                  className={`truncate rounded px-1 text-[10px] ${l.replacementDriverId ? "bg-teal/15 text-navy/70" : "bg-orange-ink/15 text-orange-ink"}`}
+                  className={`truncate rounded px-1 text-[11px] ${l.replacementDriverId ? "bg-teal/15 text-navy/70" : "bg-orange-ink/15 text-orange-ink"}`}
                 >
                   {l.driverName.split(" ")[0]}
                 </span>
               ))}
-              {dayLeaves.length > 2 && <span className="text-[10px] text-navy/60">+{dayLeaves.length - 2}</span>}
+              {dayLeaves.length > 2 && <span className="text-[11px] text-navy/60">+{dayLeaves.length - 2}</span>}
             </div>
           );
         })}
@@ -146,7 +146,7 @@ export function LeavePlanningCalendar({
               {l.status === "approved" && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-navy/65">Remplaçant</label>
-                  <select
+                  <select aria-label="Remplaçant"
                     className="input !w-auto !py-1 text-xs"
                     value={l.replacementDriverId ?? ""}
                     disabled={busyId === l.id}

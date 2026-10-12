@@ -75,7 +75,7 @@ export function OcrReviewCard({ entry }: { entry: any }) {
         </div>
 
         <div>
-          {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+          {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
           <FuelEntryForm
             initialValues={{
               occurred_at: entry.occurred_at?.slice(0, 16),

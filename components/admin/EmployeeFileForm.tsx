@@ -98,10 +98,10 @@ export function EmployeeFileForm({
   return (
     <Card className="flex flex-col gap-3">
       <p className="text-sm font-medium">Dossier RH</p>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="label">Type de contrat</label>
+          <label className="block"><span className="label">Type de contrat</span>
           <select className="input" value={contractType} onChange={(e) => setContractType(e.target.value as ContractType)}>
             <option value="">—</option>
             {(Object.keys(CONTRACT_TYPE_LABELS) as ContractType[]).map((ct) => (
@@ -109,60 +109,60 @@ export function EmployeeFileForm({
                 {CONTRACT_TYPE_LABELS[ct]}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
         <div>
-          <label className="label">Statut</label>
+          <label className="block"><span className="label">Statut</span>
           <select className="input" value={hrStatus} onChange={(e) => setHrStatus(e.target.value as HrStatus)}>
             {(Object.keys(HR_STATUS_LABELS) as HrStatus[]).map((st) => (
               <option key={st} value={st}>
                 {HR_STATUS_LABELS[st]}
               </option>
             ))}
-          </select>
+          </select></label>
         </div>
         <div>
-          <label className="label">Date d&apos;embauche</label>
-          <input className="input" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} />
+          <label className="block"><span className="label">Date d&apos;embauche</span>
+          <input className="input" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Fin de contrat (si CDD/intérim)</label>
-          <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} />
+          <label className="block"><span className="label">Fin de contrat (si CDD/intérim)</span>
+          <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Date de naissance</label>
-          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          <label className="block"><span className="label">Date de naissance</span>
+          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></label>
           <p className="mt-1 text-sm text-navy/65">
             Recalcule automatiquement le code de secours du badge (initiales + mois/année, ex: FT11/88).
           </p>
         </div>
         <div>
-          <label className="label">Matricule</label>
-          <input className="input" value={matricule} onChange={(e) => setMatricule(e.target.value)} />
+          <label className="block"><span className="label">Matricule</span>
+          <input className="input" value={matricule} onChange={(e) => setMatricule(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">N° de sécurité sociale</label>
-          <input className="input" value={socialSecurityNumber} onChange={(e) => setSocialSecurityNumber(e.target.value)} />
+          <label className="block"><span className="label">N° de sécurité sociale</span>
+          <input className="input" value={socialSecurityNumber} onChange={(e) => setSocialSecurityNumber(e.target.value)} /></label>
         </div>
         <div className="sm:col-span-2">
-          <label className="label">Qualification / classification conventionnelle</label>
+          <label className="block"><span className="label">Qualification / classification conventionnelle</span>
           <input
             className="input"
             placeholder="ex: Groupe 7, coefficient 150V"
             value={classification}
             onChange={(e) => setClassification(e.target.value)}
-          />
+          /></label>
         </div>
       </div>
       <div>
-        <label className="label">Notes RH (usage interne direction)</label>
-        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <label className="block"><span className="label">Notes RH (usage interne direction)</span>
+        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
       </div>
       <div className="flex items-center gap-3">
         <button className="btn-primary !px-3 !py-1.5 text-sm self-start" disabled={busy} onClick={save}>
           {busy ? "Enregistrement…" : "Enregistrer"}
         </button>
-        {saved && <span className="text-sm text-teal-ink">Enregistré.</span>}
+        {saved && <span role="status" className="text-sm text-teal-ink">Enregistré.</span>}
       </div>
     </Card>
   );

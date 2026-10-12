@@ -96,7 +96,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
           paie ou auprès de votre expert-comptable — GODAC ne les calcule pas.
         </p>
       </div>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       {lines.length === 0 ? (
         <p className="text-sm text-navy/60">Aucune ligne configurée — les bulletins affichent l&apos;estimation globale.</p>
@@ -104,14 +104,14 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
         <ul className="flex flex-col gap-2">
           {lines.map((l) => (
             <li key={l.id} className="flex items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
-              <input
+              <input aria-label="Libellé"
                 className="input flex-1 !py-1"
                 defaultValue={l.label}
                 onBlur={(e) => e.target.value !== l.label && updateLine(l.id, { label: e.target.value })}
                 disabled={busy}
               />
               <div className="flex items-center gap-1">
-                <input
+                <input aria-label="% salarial"
                   className="input !w-20 !py-1"
                   type="number"
                   step="0.01"
@@ -124,7 +124,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
                 <span className="text-xs text-navy/60">% salarial</span>
               </div>
               <div className="flex items-center gap-1">
-                <input
+                <input aria-label="% patronal"
                   className="input !w-20 !py-1"
                   type="number"
                   step="0.01"
@@ -146,16 +146,16 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="label">Libellé</label>
-          <input className="input" placeholder="ex: Sécurité sociale" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <label className="block"><span className="label">Libellé</span>
+          <input className="input" placeholder="ex: Sécurité sociale" value={label} onChange={(e) => setLabel(e.target.value)} /></label>
         </div>
         <div className="w-28">
-          <label className="label">% salarial</label>
-          <input className="input" type="number" step="0.01" min={0} max={100} value={salarialRate} onChange={(e) => setSalarialRate(e.target.value)} />
+          <label className="block"><span className="label">% salarial</span>
+          <input className="input" type="number" step="0.01" min={0} max={100} value={salarialRate} onChange={(e) => setSalarialRate(e.target.value)} /></label>
         </div>
         <div className="w-28">
-          <label className="label">% patronal</label>
-          <input className="input" type="number" step="0.01" min={0} max={100} value={patronalRate} onChange={(e) => setPatronalRate(e.target.value)} />
+          <label className="block"><span className="label">% patronal</span>
+          <input className="input" type="number" step="0.01" min={0} max={100} value={patronalRate} onChange={(e) => setPatronalRate(e.target.value)} /></label>
         </div>
         <button className="btn-primary shrink-0" disabled={busy || !label} onClick={addLine}>
           Ajouter

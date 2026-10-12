@@ -168,6 +168,7 @@ export function PlanningKanbanView({
   }
 
   async function removeEntry(entryId: string) {
+    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
     setBusyId(entryId);
     setError(null);
     try {
@@ -220,7 +221,7 @@ export function PlanningKanbanView({
           plusieurs services différents jours de la semaine).
         </p>
       )}
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
 
       {mode === "driver" ? (
@@ -276,9 +277,9 @@ export function PlanningKanbanView({
                             className="input !h-7 !py-0.5 !text-xs"
                             value={editTourNumber}
                             onChange={(ev) => setEditTourNumber(ev.target.value)}
-                            placeholder="N° tournée"
+                            aria-label="N° tournée" placeholder="N° tournée"
                           />
-                          <select className="input !h-7 !py-0.5 !text-xs" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
+                          <select aria-label="Véhicule" className="input !h-7 !py-0.5 !text-xs" value={editVehicleId} onChange={(ev) => setEditVehicleId(ev.target.value)}>
                             <option value="">Véhicule…</option>
                             {vehicles.map((v) => (
                               <option key={v.id} value={v.id}>
@@ -286,17 +287,17 @@ export function PlanningKanbanView({
                               </option>
                             ))}
                           </select>
-                          <input
+                          <input aria-label="Heure"
                             className="input !h-7 !py-0.5 !text-xs"
                             type="time"
                             value={editTime}
                             onChange={(ev) => setEditTime(ev.target.value)}
                           />
                           <div className="flex gap-1">
-                            <button className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-[11px]" onClick={() => saveEdit(e)}>
+                            <button className="btn-primary !h-6 flex-1 !px-1 !py-0 !text-xs" onClick={() => saveEdit(e)}>
                               OK
                             </button>
-                            <button className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-[11px]" onClick={cancelEdit}>
+                            <button className="btn-secondary !h-6 flex-1 !px-1 !py-0 !text-xs" onClick={cancelEdit}>
                               Annuler
                             </button>
                           </div>

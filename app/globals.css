@@ -80,6 +80,19 @@
   [id] {
     scroll-margin-top: 5rem;
   }
+  /* Photo/file pickers are a styled <label> around a visually hidden
+     (sr-only, still focusable) file input: the ring goes on the label. */
+  label:has(> input[type="file"].sr-only) {
+    position: relative;
+  }
+  label:has(> input[type="file"]:focus-visible) {
+    outline: 2px solid theme("colors.teal-ink");
+    outline-offset: 2px;
+  }
+  /* Figures in every data table line up column-wise (liters, €, km). */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
   body {
     @apply text-navy font-body antialiased;
     background-color: var(--color-paper);

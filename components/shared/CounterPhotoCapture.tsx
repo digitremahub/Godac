@@ -67,9 +67,9 @@ export function CounterPhotoCapture({
     <div className="flex flex-col gap-1.5">
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="Compteur" className="h-16 w-28 rounded-lg border border-navy/10 object-cover" />
+        <img width={112} height={64} src={preview} alt="Compteur" className="h-16 w-28 rounded-lg border border-navy/10 object-cover" />
       )}
-      <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1 text-xs">
+      <label className="btn-secondary min-h-[44px] w-full cursor-pointer justify-center text-center !py-1 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
         {(status === "idle" || status === "error" || status === "done") && `📷 ${label}`}
@@ -77,12 +77,12 @@ export function CounterPhotoCapture({
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           disabled={status === "uploading" || status === "extracting"}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
-      {error && <p className="text-[11px] text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
     </div>
   );
 }

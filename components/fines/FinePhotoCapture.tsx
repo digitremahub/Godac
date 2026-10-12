@@ -51,7 +51,7 @@ export function FinePhotoCapture({
     <div className="flex flex-col gap-1.5">
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="Avis de contravention" className="h-24 w-36 rounded-lg border border-navy/10 object-cover" />
+        <img width={144} height={96} src={preview} alt="Avis de contravention" className="h-24 w-36 rounded-lg border border-navy/10 object-cover" />
       )}
       <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
         {status === "uploading" && "Envoi…"}
@@ -61,12 +61,12 @@ export function FinePhotoCapture({
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           disabled={status === "uploading" || status === "extracting"}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
-      {error && <p className="text-[11px] text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
     </div>
   );
 }

@@ -82,7 +82,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
 
   return (
     <div className="flex flex-col gap-2">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[640px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -107,14 +107,14 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                 <td className="py-2">{l.entry_count}</td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input className="input !w-24 !py-1" type="number" value={litersValue} onChange={(e) => setLitersValue(e.target.value)} />
+                    <input aria-label="Litres" className="input !w-24 !py-1" type="number" value={litersValue} onChange={(e) => setLitersValue(e.target.value)} />
                   ) : (
                     `${liters.toLocaleString("fr-FR")} L`
                   )}
                 </td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
+                    <input aria-label="Montant (€)" className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
                   ) : (
                     `${amount.toLocaleString("fr-FR")} €`
                   )}

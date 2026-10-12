@@ -73,22 +73,22 @@ export function TourReportPhotoCapture({
     <div className="flex flex-col gap-1.5">
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="Rapport de tournée" className="h-20 w-32 rounded-lg border border-navy/10 object-cover" />
+        <img width={128} height={80} src={preview} alt="Rapport de tournée" className="h-20 w-32 rounded-lg border border-navy/10 object-cover" />
       )}
-      {isPdf && fileName && <p className="text-[11px] text-navy/65">📄 {fileName}</p>}
-      <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
+      {isPdf && fileName && <p className="text-xs text-navy/65">📄 {fileName}</p>}
+      <label className="btn-secondary min-h-[44px] w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
         {(status === "idle" || status === "error" || status === "done") && `📎 ${label}`}
         <input
           type="file"
           accept="image/*,application/pdf"
-          className="hidden"
+          className="sr-only"
           disabled={status === "uploading" || status === "extracting"}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
-      {error && <p className="text-[11px] text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
     </div>
   );
 }

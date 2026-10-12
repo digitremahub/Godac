@@ -152,7 +152,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
     const state = aiFields[field];
     if (!state) return null;
     return (
-      <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-gold-ink">
+      <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-gold-ink">
         🤖 Estimé par IA{state.confidence ? ` · ${CONFIDENCE_LABELS[state.confidence] ?? state.confidence}` : ""}
         {!state.confirmed && (
           <button type="button" className="underline" onClick={() => confirmAi(field)}>
@@ -165,36 +165,36 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
 
   return (
     <Card className="flex max-w-lg flex-col gap-4">
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div>
-        <label className="label">Immatriculation</label>
-        <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} />
+        <label className="block"><span className="label">Immatriculation</span>
+        <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} /></label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Marque</label>
-          <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="ex: Renault Trucks" />
+          <label className="block"><span className="label">Marque</span>
+          <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="ex: Renault Trucks" /></label>
         </div>
         <div>
-          <label className="label">Modèle</label>
-          <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="ex: D Wide" />
+          <label className="block"><span className="label">Modèle</span>
+          <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="ex: D Wide" /></label>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Année (optionnel)</label>
-          <input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+          <label className="block"><span className="label">Année (optionnel)</span>
+          <input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} /></label>
         </div>
         <div>
-          <label className="label">Boîte de vitesses (optionnel)</label>
+          <label className="block"><span className="label">Boîte de vitesses (optionnel)</span>
           <select className="input" value={gearbox} onChange={(e) => setGearbox(e.target.value)}>
             <option value="">Non précisé</option>
             <option value="manuelle">Manuelle</option>
             <option value="automatique">Automatique</option>
-          </select>
+          </select></label>
         </div>
       </div>
 
@@ -202,7 +202,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
         <button type="button" className="btn-secondary self-start" disabled={aiBusy || !brand || !model} onClick={completeByAi}>
           {aiBusy ? "Estimation en cours…" : "🤖 Compléter par IA"}
         </button>
-        {aiError && <p className="text-xs text-orange-ink">{aiError}</p>}
+        {aiError && <p role="alert" className="text-xs text-orange-ink">{aiError}</p>}
         {variants.length > 0 && (
           <div className="mt-1 flex flex-col gap-1 rounded-lg bg-gold/10 p-3 text-sm">
             <p className="text-gold-ink">Plusieurs versions possibles — choisissez la vôtre :</p>
@@ -223,7 +223,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
       </div>
 
       <div>
-        <label className="label">Type</label>
+        <label className="block"><span className="label">Type</span>
         <select
           className="input"
           value={type}
@@ -235,12 +235,12 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
           <option value="VL">VL (véhicule léger)</option>
           <option value="PL">PL (poids lourd)</option>
           <option value="SPL">SPL (semi-remorque)</option>
-        </select>
+        </select></label>
         <AiBadge field="type" />
       </div>
 
       <div>
-        <label className="label">Carburant (optionnel)</label>
+        <label className="block"><span className="label">Carburant (optionnel)</span>
         <input
           className="input"
           value={fuelType}
@@ -249,13 +249,13 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
             clearAi("fuel_type");
           }}
           placeholder="ex: diesel"
-        />
+        /></label>
         <AiBadge field="fuel_type" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Capacité réservoir (L)</label>
+          <label className="block"><span className="label">Capacité réservoir (L)</span>
           <input
             className="input"
             type="number"
@@ -264,11 +264,11 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
               setTankCapacity(e.target.value);
               clearAi("tank_capacity_liters");
             }}
-          />
+          /></label>
           <AiBadge field="tank_capacity_liters" />
         </div>
         <div>
-          <label className="label">Capacité AdBlue (L)</label>
+          <label className="block"><span className="label">Capacité AdBlue (L)</span>
           <input
             className="input"
             type="number"
@@ -277,14 +277,14 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
               setAdblueCapacity(e.target.value);
               clearAi("adblue_capacity_liters");
             }}
-          />
+          /></label>
           <AiBadge field="adblue_capacity_liters" />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">PTAC (kg)</label>
+          <label className="block"><span className="label">PTAC (kg)</span>
           <input
             className="input"
             type="number"
@@ -293,11 +293,11 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
               setPtac(e.target.value);
               clearAi("ptac_kg");
             }}
-          />
+          /></label>
           <AiBadge field="ptac_kg" />
         </div>
         <div>
-          <label className="label">Consommation de référence (L/100km)</label>
+          <label className="block"><span className="label">Consommation de référence (L/100km)</span>
           <input
             className="input"
             type="number"
@@ -307,18 +307,18 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
               setReferenceConsumption(e.target.value);
               clearAi("reference_consumption_l_100km");
             }}
-          />
+          /></label>
           <AiBadge field="reference_consumption_l_100km" />
         </div>
       </div>
 
       <div>
-        <label className="label">Kilométrage actuel *</label>
-        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} />
+        <label className="block"><span className="label">Kilométrage actuel *</span>
+        <input className="input" type="number" value={initialKm} onChange={(e) => setInitialKm(e.target.value)} /></label>
       </div>
 
       <div>
-        <label className="label">Service</label>
+        <label className="block"><span className="label">Service</span>
         <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
           <option value="">Aucun</option>
           {services.map((s) => (
@@ -326,7 +326,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
               {s.name}
             </option>
           ))}
-        </select>
+        </select></label>
       </div>
 
       <button className="btn-primary" disabled={busy || !registration || !initialKm} onClick={submit}>

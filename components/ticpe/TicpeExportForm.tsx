@@ -36,17 +36,17 @@ export function TicpeExportForm() {
   return (
     <Card className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
       <div>
-        <label className="label">Du</label>
-        <input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} />
+        <label className="block"><span className="label">Du</span>
+        <input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></label>
       </div>
       <div>
-        <label className="label">Au</label>
-        <input type="date" className="input" value={end} onChange={(e) => setEnd(e.target.value)} />
+        <label className="block"><span className="label">Au</span>
+        <input type="date" className="input" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
       <button className="btn-primary" disabled={busy} onClick={generate}>
         {busy ? "Génération…" : "Générer l'export TICPE"}
       </button>
-      {error && <p className="text-sm text-orange-ink">{error}</p>}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
     </Card>
   );
 }

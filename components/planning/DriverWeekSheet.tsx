@@ -161,6 +161,7 @@ export function DriverWeekSheet({
   }
 
   async function removeEntry(id: string) {
+    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
     setRowBusyId(id);
     setError(null);
     try {
@@ -194,13 +195,13 @@ export function DriverWeekSheet({
           </button>
         </div>
 
-        {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
+        {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
         {warning && <p className="mb-2 text-sm text-gold-ink">⚠️ {warning}</p>}
 
         <div className="mb-4 flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
           <p className="text-sm font-medium">Affecter toute la semaine</p>
           <div className="flex flex-wrap gap-2">
-            <select className="input !w-auto" value={bulkService} onChange={(e) => setBulkService(e.target.value)}>
+            <select aria-label="Service" className="input !w-auto" value={bulkService} onChange={(e) => setBulkService(e.target.value)}>
               <option value="">Service…</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -208,7 +209,7 @@ export function DriverWeekSheet({
                 </option>
               ))}
             </select>
-            <select className="input !w-auto" value={bulkVehicle} onChange={(e) => setBulkVehicle(e.target.value)}>
+            <select aria-label="Véhicule" className="input !w-auto" value={bulkVehicle} onChange={(e) => setBulkVehicle(e.target.value)}>
               <option value="">Véhicule…</option>
               {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -220,9 +221,9 @@ export function DriverWeekSheet({
               className="input !w-auto"
               value={bulkTour}
               onChange={(e) => setBulkTour(e.target.value)}
-              placeholder="N° tournée"
+              aria-label="N° tournée" placeholder="N° tournée"
             />
-            <input className="input !w-auto" type="time" value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} />
+            <input aria-label="Heure" className="input !w-auto" type="time" value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} />
           </div>
           <div className="flex gap-1">
             {DAY_LABELS.map((label, i) => (
@@ -243,7 +244,7 @@ export function DriverWeekSheet({
           >
             {busy ? "Envoi…" : "Affecter"}
           </button>
-          {bulkSummary && <p className="text-xs text-teal-ink">{bulkSummary}</p>}
+          {bulkSummary && <p role="status" className="text-xs text-teal-ink">{bulkSummary}</p>}
         </div>
 
         <p className="mb-2 text-sm font-medium">Cette semaine</p>
@@ -259,16 +260,16 @@ export function DriverWeekSheet({
                       className="input !w-auto !py-1 text-sm"
                       value={editTour}
                       onChange={(e) => setEditTour(e.target.value)}
-                      placeholder="N° tournée"
+                      aria-label="N° tournée" placeholder="N° tournée"
                     />
-                    <select className="input !w-auto !py-1 text-sm" value={editService} onChange={(e) => setEditService(e.target.value)}>
+                    <select aria-label="Service" className="input !w-auto !py-1 text-sm" value={editService} onChange={(e) => setEditService(e.target.value)}>
                       {services.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
                         </option>
                       ))}
                     </select>
-                    <select className="input !w-auto !py-1 text-sm" value={editVehicle} onChange={(e) => setEditVehicle(e.target.value)}>
+                    <select aria-label="Véhicule" className="input !w-auto !py-1 text-sm" value={editVehicle} onChange={(e) => setEditVehicle(e.target.value)}>
                       <option value="">Véhicule…</option>
                       {vehicles.map((v) => (
                         <option key={v.id} value={v.id}>
@@ -276,7 +277,7 @@ export function DriverWeekSheet({
                         </option>
                       ))}
                     </select>
-                    <input
+                    <input aria-label="Heure"
                       className="input !w-auto !py-1 text-sm"
                       type="time"
                       value={editTime}

@@ -66,7 +66,7 @@ export default async function HomePage() {
     <main className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
+          <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
           <span className="font-display text-xl font-extrabold">GODAC</span>
         </div>
         <nav className="flex items-center gap-4">
@@ -133,7 +133,7 @@ export default async function HomePage() {
           <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
             {TRUST_STATS.map((stat) => (
               <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
-                <stat.icon className="h-4 w-4 text-teal-ink" />
+                <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
                 {stat.label}
               </div>
             ))}
@@ -173,7 +173,7 @@ export default async function HomePage() {
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
           {TRUST_STATS.map((stat) => (
             <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
-              <stat.icon className="h-4 w-4 text-teal-ink" />
+              <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
               {stat.label}
             </div>
           ))}
@@ -247,13 +247,13 @@ export default async function HomePage() {
       <footer className="flex flex-col items-center gap-2 border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/60">
         <p>© {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.</p>
         <div className="flex gap-4">
-          <Link href="/mentions-legales" className="hover:text-navy/70 hover:underline">
+          <Link href="/mentions-legales" className="hover:text-navy hover:underline">
             Mentions légales
           </Link>
-          <Link href="/cgu" className="hover:text-navy/70 hover:underline">
+          <Link href="/cgu" className="hover:text-navy hover:underline">
             CGU
           </Link>
-          <Link href="/confidentialite" className="hover:text-navy/70 hover:underline">
+          <Link href="/confidentialite" className="hover:text-navy hover:underline">
             Confidentialité
           </Link>
         </div>
