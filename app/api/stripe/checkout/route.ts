@@ -3,6 +3,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
+import { blockInDemo } from "@/lib/demo/guard";
 
 /**
  * Builds the subscription price from the org's chosen plan
@@ -21,6 +22,8 @@ export async function POST() {
   }
 
   const appUser = await requireAppUser();
+  const demoBlocked = await blockInDemo(appUser.organization_id);
+  if (demoBlocked) return demoBlocked;
   const supabase = await createServerSupabaseClient();
 
   const [{ data: organization }, { plans, modules }] = await Promise.all([

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { blockInDemo } from "@/lib/demo/guard";
 
 /** Module 9: opens the Stripe-hosted billing portal for the org's subscription. */
 export async function POST() {
@@ -13,6 +14,8 @@ export async function POST() {
   }
 
   const appUser = await requireAppUser();
+  const demoBlocked = await blockInDemo(appUser.organization_id);
+  if (demoBlocked) return demoBlocked;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut gérer l'abonnement" }, { status: 403 });
   }

@@ -20,6 +20,7 @@ export function DashboardShell({
   messengerAvailable,
   currentUserId,
   organizationId,
+  isDemo = false,
   children,
 }: {
   role: UserRole;
@@ -35,6 +36,8 @@ export function DashboardShell({
   messengerAvailable: boolean;
   currentUserId: string;
   organizationId: string;
+  /** « Transports Démo » — shows the demo banner with the way out to a real account. */
+  isDemo?: boolean;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -76,6 +79,16 @@ export function DashboardShell({
         onNavigate={() => setDrawerOpen(false)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
+        {isDemo && (
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-gold px-4 py-2 text-center text-sm text-navy">
+            <span>
+              <strong>Mode démo</strong> — entreprise et données fictives, remises à zéro chaque nuit.
+            </span>
+            <a href="/demo/exit" className="font-semibold underline underline-offset-2 hover:no-underline">
+              Créer mon espace GODAC
+            </a>
+          </div>
+        )}
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
         <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
           <div className="mx-auto w-full max-w-7xl">{children}</div>
