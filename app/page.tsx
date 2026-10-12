@@ -243,12 +243,9 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Voice / proof ── */}
-      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:py-24">
+      <section className="mx-auto max-w-6xl px-5 py-12 sm:px-6 lg:py-16">
         <figure className="mx-auto max-w-3xl text-center">
-          <blockquote className="font-display text-[22px] font-bold leading-snug sm:text-[30px]">
-            «&nbsp;Un chauffeur malade lundi matin&nbsp;: remplaçant trouvé en 2&nbsp;clics.&nbsp;»
-          </blockquote>
-          <figcaption className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-navy/65">
+          <figcaption className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-navy/65">
             {["Planning partagé avec les chauffeurs", "Alertes en temps réel", "Données hébergées en France"].map((t) => (
               <span key={t} className="flex items-center gap-2">
                 <IconCheck className="h-4 w-4 text-teal-ink" />
