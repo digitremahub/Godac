@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { DayStrip, type StripTour } from "@/components/planning/DayStrip";
 import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays, parisCalendarDate } from "@/lib/planning/dates";
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -133,6 +134,20 @@ export default async function MyPlanningPage({
     entriesByDay.set(d, [...(entriesByDay.get(d) ?? []), e]);
   }
   const today = parisCalendarDate(new Date().toISOString());
+  const toursByDay: Record<string, StripTour[]> = {};
+  for (const [d, list] of entriesByDay) {
+    toursByDay[d] = list.map((e) => ({
+      id: e.id,
+      tour_number: e.tour_number,
+      start_at: e.start_at,
+      end_at: e.end_at,
+      status: e.status,
+      registration: e.vehicles?.registration ?? null,
+    }));
+  }
+  const monthTourDays = Object.keys(toursByDay)
+    .filter((d) => d.startsWith(anchor.slice(0, 7)))
+    .sort();
 
   const dayCount = Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000);
   const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i));
@@ -207,31 +222,19 @@ export default async function MyPlanningPage({
             })}
           </div>
 
-          <Card className="!p-0">
-            <h2 className="px-4 pt-4 sm:px-5">Tournées du mois</h2>
-            {(entries ?? []).filter((e: any) => parisCalendarDate(e.start_at).startsWith(anchor.slice(0, 7))).length === 0 ? (
-              <p className="px-4 pb-4 pt-2 text-sm text-navy/65 sm:px-5">Aucune tournée ce mois-ci.</p>
+          <Card>
+            <h2 className="mb-3">Tournées du mois</h2>
+            {monthTourDays.length === 0 ? (
+              <p className="text-sm text-navy/65">Aucune tournée ce mois-ci.</p>
             ) : (
-              <ul className="mt-2 divide-y divide-navy/[0.07]">
-                {Array.from(entriesByDay.entries())
-                  .filter(([d]) => d.startsWith(anchor.slice(0, 7)))
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([d, list]) => (
-                    <li key={d} className={`flex gap-3 px-4 py-2.5 sm:px-5 ${d === today ? "bg-teal/[0.06]" : ""}`}>
-                      <span className="w-14 shrink-0 text-sm font-semibold capitalize tabular-nums text-navy/70">
-                        {new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", timeZone: "UTC" })}
-                      </span>
-                      <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        {list.map((e) => (
-                          <TourLine key={e.id} entry={e} />
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-              </ul>
+              <DayStrip days={monthTourDays} toursByDay={toursByDay} today={today} hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`} />
             )}
           </Card>
         </div>
+      ) : view === "week" ? (
+        <Card>
+          <DayStrip days={days} toursByDay={toursByDay} today={today} hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`} />
+        </Card>
       ) : (
         <Card className="!p-0">
           <ul className="divide-y divide-navy/[0.07]">

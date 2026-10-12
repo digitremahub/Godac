@@ -1,27 +1,35 @@
+import Link from "next/link";
 import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
 
 export default function MentionsLegalesPage() {
   return (
     <LegalPageLayout title="Mentions légales">
       <p>
-        Le site et l&apos;application GODAC sont édités par [À COMPLÉTER : raison sociale], [À COMPLÉTER : forme
-        juridique], au capital de [À COMPLÉTER : montant] euros, immatriculée au RCS de [À COMPLÉTER : ville] sous le
-        numéro SIRET [À COMPLÉTER : numéro SIRET], dont le siège social est situé [À COMPLÉTER : adresse].
-      </p>
-      <p>
-        Numéro de TVA intracommunautaire : [À COMPLÉTER].
+        <strong>Éditeur.</strong> Le site et l&apos;application GODAC sont édités à titre individuel par François.
         <br />
-        Directeur de la publication : [À COMPLÉTER : nom].
+        Directeur de la publication : François.
         <br />
-        Contact : [À COMPLÉTER : adresse email ou téléphone].
+        Contact : <a href="mailto:contact@godac.fr" className="text-teal-ink hover:underline">contact@godac.fr</a>
       </p>
       <p>
-        Hébergement : le site et l&apos;application sont hébergés par [À COMPLÉTER : hébergeur, ex. Vercel Inc.],
-        [À COMPLÉTER : adresse de l&apos;hébergeur]. La base de données est hébergée par Supabase (Supabase Inc.).
+        <strong>Hébergement du site et de l&apos;application.</strong> Vercel Inc., 440 N Barranca Ave #4133, Covina,
+        CA 91723, États-Unis — vercel.com. Les traitements serveur sont exécutés dans la région de Paris (France).
       </p>
       <p>
-        Le présent document est un modèle à compléter avant toute mise en production — il ne constitue pas des
-        mentions légales valides en l&apos;état.
+        <strong>Hébergement des données.</strong> Supabase, 970 Toa Payoh North #07-04, Singapour 318992 —
+        supabase.com. La base de données et les fichiers sont stockés sur des serveurs situés à Paris (France).
+      </p>
+      <p>
+        <strong>Propriété intellectuelle.</strong> La marque GODAC, son logo, les textes, visuels et le logiciel sont
+        protégés. Toute reproduction ou réutilisation, totale ou partielle, sans autorisation écrite préalable est
+        interdite.
+      </p>
+      <p>
+        <strong>Données personnelles.</strong> Le traitement des données est décrit dans la{" "}
+        <Link href="/confidentialite" className="text-teal-ink hover:underline">
+          politique de confidentialité
+        </Link>
+        .
       </p>
     </LegalPageLayout>
   );
