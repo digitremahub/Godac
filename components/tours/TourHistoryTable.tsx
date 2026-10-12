@@ -77,7 +77,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
   return (
     <Card className="overflow-x-auto">
       {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
-      <table className="w-full min-w-[820px] text-sm">
+      <table className="w-full min-w-[820px] text-sm [&_td]:whitespace-nowrap [&_td]:pr-4 [&_th]:whitespace-nowrap [&_th]:pr-4">
         <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
