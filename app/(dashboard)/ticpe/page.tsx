@@ -76,7 +76,7 @@ export default async function TicpePage() {
             <tbody>
               {exports.map((exp: any) => (
                 <tr key={exp.id} className="border-t border-navy/5">
-                  <td className="py-2">{new Date(exp.created_at).toLocaleString("fr-FR")}</td>
+                  <td className="py-2">{new Date(exp.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
                   <td className="py-2">
                     {exp.period_start} → {exp.period_end}
                   </td>

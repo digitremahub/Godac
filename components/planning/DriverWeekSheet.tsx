@@ -133,7 +133,7 @@ export function DriverWeekSheet({
     setEditTour(entry.tour_number);
     setEditService(entry.service_id);
     setEditVehicle(entry.vehicle_id ?? "");
-    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false }));
   }
 
   async function saveEdit(entry: PlanningEntry) {
@@ -300,8 +300,8 @@ export function DriverWeekSheet({
                   className={`flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm ${rowBusyId === entry.id ? "opacity-40" : ""}`}
                 >
                   <span>
-                    {new Date(entry.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}{" "}
-                    {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · n°{entry.tour_number} ·{" "}
+                    {new Date(entry.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric" })}{" "}
+                    {new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })} · n°{entry.tour_number} ·{" "}
                     {serviceNameById.get(entry.service_id) ?? "—"} · {vehicleRegById.get(entry.vehicle_id ?? "") ?? "—"}
                   </span>
                   <span className="flex items-center gap-2 shrink-0">

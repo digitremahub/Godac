@@ -225,7 +225,7 @@ async function PhotosView({
           <div className="flex items-center justify-between">
             <p className="font-medium">n°{r.tour_number}</p>
             <span className="text-xs text-navy/60">
-              {new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+              {new Date(r.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short" })}
             </span>
           </div>
           <p className="text-xs text-navy/70">

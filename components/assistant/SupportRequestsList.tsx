@@ -89,7 +89,7 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-navy/65">
-                {r.requesterName} · {new Date(r.createdAt).toLocaleString("fr-FR")}
+                {r.requesterName} · {new Date(r.createdAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}
                 {r.recipient === "support_godac" && " · transmis au support GODAC"}
               </p>
               <p>{r.question}</p>

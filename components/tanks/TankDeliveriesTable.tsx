@@ -75,7 +75,7 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
         <tbody>
           {deliveries.map((d) => (
             <tr key={d.id} className="border-t border-navy/5">
-              <td className="py-2">{new Date(d.deliveredAt).toLocaleDateString("fr-FR")}</td>
+              <td className="py-2">{new Date(d.deliveredAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</td>
               <td className="py-2">{d.tankName}</td>
               <td className="py-2">{d.liters.toLocaleString("fr-FR")} L</td>
               <td className="py-2">{d.unitPrice ? `${d.unitPrice} €` : "—"}</td>

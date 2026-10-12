@@ -4,6 +4,7 @@ import { PageHeader, StatTile, Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
 import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
+import { AssistedClock } from "@/components/time-clock/AssistedClock";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import type { AppUser } from "@/lib/auth/session";
 
@@ -100,9 +101,19 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
   if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
   if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/maintenance" });
 
+  // Pointage assisté only concerns someone who also drives.
+  const autoClockEnabled =
+    isManagerChauffeur && enabledModules.includes("time_clock")
+      ? Boolean(
+          (await supabase.from("organizations").select("auto_clock_enabled").eq("id", appUser.organization_id).single()).data
+            ?.auto_clock_enabled,
+        )
+      : false;
+
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Vue d'ensemble de votre équipe." />
+      {autoClockEnabled && <AssistedClock hasOpenTour={Boolean(openTour)} />}
 
       {isManagerChauffeur && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -132,7 +143,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
                   <span className="text-xs text-navy/60">
-                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </li>
               ))}

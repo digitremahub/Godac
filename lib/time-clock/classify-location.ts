@@ -1,6 +1,6 @@
 import { haversineDistanceKm, type Coordinates } from "@/lib/business/fuel-profitability";
 
-const MATCH_RADIUS_KM = 0.3; // 300 m — GPS on a phone easily drifts that much
+export const MATCH_RADIUS_KM = 0.3; // 300 m — GPS on a phone easily drifts that much
 
 export type LocationLabel = "depot" | "domicile" | "autre" | "inconnu";
 
@@ -25,8 +25,8 @@ export function classifyLocation(point: Coordinates | null, depots: Coordinates[
 }
 
 export const LOCATION_LABEL_DISPLAY: Record<LocationLabel, string> = {
-  depot: "🏭 Dépôt",
-  domicile: "🏠 Domicile",
-  autre: "📍 Autre lieu",
+  depot: "Dépôt",
+  domicile: "Domicile",
+  autre: "Autre lieu",
   inconnu: "— position inconnue",
 };

@@ -77,7 +77,7 @@ export function MessageThread({
                 </button>
               )}
               <p className="text-xs text-navy/60">
-                {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                {new Date(m.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
           </div>

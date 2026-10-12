@@ -74,7 +74,7 @@ export default async function GodacStaffPage() {
                 <td className="py-2">{ocrByOrg.get(org.id) ? "Activé" : "Désactivé"}</td>
                 <td className="py-2">{org.vehicles?.[0]?.count ?? 0}</td>
                 <td className="py-2">{org.users?.[0]?.count ?? 0}</td>
-                <td className="py-2">{new Date(org.created_at).toLocaleDateString("fr-FR")}</td>
+                <td className="py-2">{new Date(org.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</td>
                 <td className="py-2">
                   <Link href={`/godac-staff/${org.id}`} className="text-teal-ink hover:underline">
                     Utilisateurs / rôles

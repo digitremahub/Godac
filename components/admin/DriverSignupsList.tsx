@@ -46,7 +46,7 @@ export function DriverSignupsList({ requests }: { requests: SignupRequest[] }) {
                 {r.phone ?? "Pas de téléphone"} · {serviceNames || "Aucun service choisi"}
               </p>
               <p className="text-xs text-navy/60">
-                Inscrit le {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                Inscrit le {new Date(r.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">

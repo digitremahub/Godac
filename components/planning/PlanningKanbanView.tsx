@@ -136,7 +136,7 @@ export function PlanningKanbanView({
     setEditingId(entry.id);
     setEditTourNumber(entry.tour_number);
     setEditVehicleId(entry.vehicle_id ?? "");
-    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false }));
   }
 
   function cancelEdit() {
@@ -306,8 +306,8 @@ export function PlanningKanbanView({
                       ) : (
                         <>
                           <p className="text-navy/65">
-                            {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })} ·{" "}
-                            {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(e.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric" })} ·{" "}
+                            {new Date(e.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                           </p>
                           <p className="text-navy/60">{e.vehicles?.registration ?? "—"}</p>
                         </>
@@ -374,8 +374,8 @@ export function PlanningKanbanView({
                         </div>
                         <p className="text-navy/65">
                           n°{e.tour_number} ·{" "}
-                          {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}{" "}
-                          {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(e.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric" })}{" "}
+                          {new Date(e.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                         </p>
                         {otherServices.length > 0 && <p className="text-navy/60">Aussi qualifié : {otherServices.join(", ")}</p>}
                       </div>

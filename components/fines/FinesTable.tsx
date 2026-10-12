@@ -74,7 +74,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
         <tbody>
           {fines.map((f) => (
             <tr key={f.id} className="border-t border-navy/5">
-              <td className="py-2">{new Date(f.infraction_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
+              <td className="py-2">{new Date(f.infraction_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" })}</td>
               <td className="py-2">{f.vehicles?.registration ?? "—"}</td>
               <td className="py-2">{f.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</td>
               <td className="py-2">{f.reference ?? "—"}</td>

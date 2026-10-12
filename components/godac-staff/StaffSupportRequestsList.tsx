@@ -42,7 +42,7 @@ export function StaffSupportRequestsList({ requests }: { requests: Row[] }) {
       {requests.map((r) => (
         <div key={r.id} className="rounded-lg border border-navy/10 p-3 text-sm">
           <p className="text-navy/65">
-            {r.organizationName} · {new Date(r.createdAt).toLocaleString("fr-FR")} · {STATUS_LABELS[r.status]}
+            {r.organizationName} · {new Date(r.createdAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} · {STATUS_LABELS[r.status]}
           </p>
           <p className="mb-2">{r.question}</p>
           {r.status !== "resolved" && (

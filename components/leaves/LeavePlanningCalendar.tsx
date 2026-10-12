@@ -84,7 +84,7 @@ export function LeavePlanningCalendar({
           ← Mois préc.
         </button>
         <span className="text-sm text-navy/70">
-          {new Date(year, monthNum - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+          {new Date(year, monthNum - 1, 1).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", month: "long", year: "numeric" })}
         </span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, 1))}>
           Mois suiv. →
@@ -140,7 +140,7 @@ export function LeavePlanningCalendar({
                   {l.driverName} <span className="text-xs text-navy/60">({l.serviceName})</span>
                 </p>
                 <p className="text-xs text-navy/65">
-                  {new Date(l.startDate).toLocaleDateString("fr-FR")} → {new Date(l.endDate).toLocaleDateString("fr-FR")}
+                  {new Date(l.startDate).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} → {new Date(l.endDate).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                 </p>
               </div>
               <span className={STATUS_BADGES[l.status]}>{STATUS_LABELS[l.status]}</span>

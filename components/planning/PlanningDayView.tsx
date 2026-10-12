@@ -72,7 +72,7 @@ export function PlanningDayView({
     setEditTourNumber(entry.tour_number);
     setEditDriverId(entry.driver_id ?? "");
     setEditVehicleId(entry.vehicle_id ?? "");
-    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false }));
   }
 
   function cancelEdit() {
@@ -132,7 +132,7 @@ export function PlanningDayView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, -1))}>
           ← Jour préc.
         </button>
-        <span className="text-sm text-navy/70">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+        <span className="text-sm text-navy/70">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" })}</span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, 1))}>
           Jour suiv. →
         </button>
@@ -189,7 +189,7 @@ export function PlanningDayView({
                     ) : (
                       <div key={e.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm">
                         <span>
-                          {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · n°{e.tour_number} ·{" "}
+                          {new Date(e.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })} · n°{e.tour_number} ·{" "}
                           {e.users?.full_name ?? "—"} · {e.vehicles?.registration ?? "—"}
                         </span>
                         <span className="flex items-center gap-2">

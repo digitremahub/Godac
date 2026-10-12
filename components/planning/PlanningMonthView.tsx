@@ -49,7 +49,7 @@ export function PlanningMonthView({
           ← Mois préc.
         </button>
         <span className="text-sm text-navy/70">
-          {new Date(currentYear, currentMonthNum - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+          {new Date(currentYear, currentMonthNum - 1, 1).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", month: "long", year: "numeric" })}
         </span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, 1))}>
           Mois suiv. →

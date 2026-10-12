@@ -31,7 +31,7 @@ export function WashHistory({ washes }: { washes: WashRecord[] }) {
             <span className="text-navy/70">{labels(w)}</span>
             <span className="flex items-center gap-3">
               <span className="text-navy/60">{w.driverName}</span>
-              <span className="text-xs text-navy/60">{new Date(w.created_at).toLocaleDateString("fr-FR")}</span>
+              <span className="text-xs text-navy/60">{new Date(w.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</span>
             </span>
           </li>
         ))}

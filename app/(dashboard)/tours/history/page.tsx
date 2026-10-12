@@ -216,14 +216,14 @@ export default async function TourHistoryPage({
             const returnDelta = estimateReturnDistanceDeltaKm(r.return_type, serviceDepotCoords ?? orgDepotCoords, homeCoords);
             return {
               id: r.id,
-              dateLabel: new Date(r.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
+              dateLabel: new Date(r.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" }),
               driverName: r.users?.full_name ?? null,
               serviceName: r.services?.name ?? "—",
               vehicleRegistration: r.vehicles?.registration ?? "—",
               tourNumber: r.tour_number,
               scheduleLabel:
-                new Date(r.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
-                (r.end_at ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : " → en cours"),
+                new Date(r.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) +
+                (r.end_at ? ` → ${new Date(r.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}` : " → en cours"),
               startKm: r.start_km,
               endKm: r.end_km,
               startPhotoPath: r.start_photo_path,

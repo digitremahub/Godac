@@ -48,7 +48,7 @@ export function ConvocationsList({ convocations, canManage }: { convocations: Co
             <div>
               <p className="font-medium">{canManage ? c.employeeName : "Vous êtes convoqué(e)"}</p>
               <p className="text-xs text-navy/60">
-                {c.scheduledAt ? new Date(c.scheduledAt).toLocaleString("fr-FR") : "Date non précisée"}
+                {c.scheduledAt ? new Date(c.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" }) : "Date non précisée"}
                 {c.location && ` · ${c.location}`}
               </p>
             </div>

@@ -43,7 +43,7 @@ function buildShareText(entry: PlanningEntry): string {
   const lines = [
     `Tournée n°${entry.tour_number}`,
     entry.vehicles ? `Véhicule : ${entry.vehicles.registration}` : null,
-    `Départ prévu : ${date.toLocaleDateString("fr-FR")} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`,
+    `Départ prévu : ${date.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} à ${date.toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}`,
   ];
   return lines.filter((l): l is string => l !== null).join("\n");
 }
@@ -261,7 +261,7 @@ export function PlanningGrid({
     setEditTourNumber(entry.tour_number);
     setEditDriverId(entry.driver_id ?? "");
     setEditVehicleId(entry.vehicle_id ?? "");
-    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+    setEditTime(new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false }));
   }
 
   function cancelEdit() {
@@ -399,7 +399,7 @@ export function PlanningGrid({
               onClick={validatePlanning}
               title={
                 validatedAt
-                  ? `Déjà envoyé le ${new Date(validatedAt).toLocaleDateString("fr-FR")} à ${new Date(validatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — cliquez pour renvoyer avec les changements`
+                  ? `Déjà envoyé le ${new Date(validatedAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} à ${new Date(validatedAt).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })} — cliquez pour renvoyer avec les changements`
                   : undefined
               }
             >
@@ -691,7 +691,7 @@ export function PlanningGrid({
                                 )}
                                 <p className="text-navy/60">{entry.vehicles?.registration ?? "—"}</p>
                                 <p className="text-navy/60">
-                                  {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                  {new Date(entry.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                                 </p>
                               </>
                             )}

@@ -81,7 +81,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
               <tr key={p.id} className="border-t border-navy/5 align-top">
                 <td className="py-2">{p.tankName}</td>
                 <td className="py-2">{p.submittedByName}</td>
-                <td className="py-2">{new Date(p.createdAt).toLocaleString("fr-FR")}</td>
+                <td className="py-2">{new Date(p.createdAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
                 <td className="py-2">
                   {p.photoUrl ? (
                     <a href={p.photoUrl} target="_blank" rel="noreferrer" className="text-teal-ink hover:underline">

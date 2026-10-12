@@ -192,15 +192,15 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                     {(tours as any[]).map((t) => (
                       <tr key={t.id} className="border-t border-navy/5">
                         <td className="py-2">
-                          {new Date(t.start_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                          {new Date(t.start_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" })}
                         </td>
                         <td className="py-2">{t.users?.full_name ?? "—"}</td>
                         <td className="py-2">{t.services?.name ?? "—"}</td>
                         <td className="py-2">n°{t.tour_number}</td>
                         <td className="py-2">
-                          {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(t.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
                           {t.end_at
-                            ? ` → ${new Date(t.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                            ? ` → ${new Date(t.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}`
                             : " → en cours"}
                         </td>
                       </tr>
