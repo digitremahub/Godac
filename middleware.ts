@@ -12,6 +12,8 @@ const PUBLIC_PATHS = [
   "/mentions-legales",
   "/cgu",
   "/confidentialite",
+  // « Voir la démo » signs the visitor into the demo organization.
+  "/demo",
 ];
 const PUBLIC_PREFIXES = [
   "/api/webhooks",

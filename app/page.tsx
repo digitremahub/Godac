@@ -67,7 +67,7 @@ const FEATURES = [
   },
 ];
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: { demo?: string } }) {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -110,9 +110,9 @@ export default async function HomePage() {
                   {primaryCta.label}
                   <IconArrowRight className="h-5 w-5" />
                 </Link>
-                <a href="#comment-ca-marche" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/20 hover:bg-white/10">
+                <a href="#demo" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/20 hover:bg-white/10">
                   <IconPlay className="h-4 w-4 text-teal" />
-                  Voir comment ça marche
+                  Voir la démo
                 </a>
               </div>
               <ul className="flex flex-wrap gap-x-6 gap-y-2">
@@ -162,6 +162,44 @@ export default async function HomePage() {
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      {/* ── Demo ── */}
+      <section id="demo" className="scroll-mt-6 bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
+          <div className="mx-auto mb-10 max-w-2xl text-center">
+            <p className="kicker !text-teal-ink">Démo en accès libre</p>
+            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Essayez GODAC tout de suite, sans compte.</h2>
+            <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+              Une entreprise de transport fictive, avec ses camions, ses chauffeurs, ses pleins et ses tournées. Cliquez, vous y êtes.
+            </p>
+            {searchParams.demo === "indisponible" && (
+              <p role="alert" className="mt-4 text-sm font-semibold text-orange-ink">
+                La démo est momentanément indisponible. Réessayez dans un instant.
+              </p>
+            )}
+          </div>
+          <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+            {[
+              { href: "/demo?as=direction", title: "Côté direction", text: "Tableau de bord, flotte, carburant, planning, alertes et salaires.", icon: IconChartBar },
+              { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Tournée du jour, pleins, présences et papiers du camion, sur mobile.", icon: IconTruck },
+            ].map((d) => (
+              <a key={d.href} href={d.href} className="card-hover group flex flex-col gap-4">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy text-teal">
+                  <d.icon className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block font-display text-lg font-bold">{d.title}</span>
+                  <span className="mt-1 block text-sm text-navy/65">{d.text}</span>
+                </span>
+                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-teal-ink">
+                  Ouvrir la démo
+                  <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -27,7 +27,7 @@ export default async function DashboardLayout({
   const isFieldRole = appUser.role === "chauffeur" || appUser.role === "manager_chauffeur";
   const [enabledModuleKeys, { data: organization }, activeTour] = await Promise.all([
     getEnabledModuleKeys(supabase, appUser.organization_id),
-    supabase.from("organizations").select("name, logo_url, accent_color").eq("id", appUser.organization_id).single(),
+    supabase.from("organizations").select("name, logo_url, accent_color, is_demo").eq("id", appUser.organization_id).single(),
     isFieldRole
       ? supabase.from("planning_entries").select("id").eq("driver_id", appUser.id).eq("status", "in_progress").maybeSingle()
       : Promise.resolve({ data: null }),
@@ -42,6 +42,7 @@ export default async function DashboardLayout({
 
   return (
     <DashboardShell
+      isDemo={Boolean((organization as { is_demo?: boolean } | null)?.is_demo)}
       role={appUser.role}
       enabledModuleKeys={enabledModuleKeys}
       organizationName={organization?.name ?? "GODAC"}

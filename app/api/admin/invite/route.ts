@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { inviteOrganizationMember } from "@/lib/auth/invitations";
+import { blockInDemo } from "@/lib/demo/guard";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut inviter des utilisateurs" }, { status: 403 });
   }
+  const demoBlocked = await blockInDemo(appUser.organization_id);
+  if (demoBlocked) return demoBlocked;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {

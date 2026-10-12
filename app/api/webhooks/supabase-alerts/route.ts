@@ -45,6 +45,11 @@ export async function POST(req: Request) {
 
   const supabase = createAdminSupabaseClient();
 
+  // Mode démo: alerts still appear in the app, but never leave it as
+  // emails or push notifications (the demo accounts are fictional).
+  const { data: demoCheck } = await supabase.from("organizations").select("is_demo").eq("id", alert.organization_id).maybeSingle();
+  if (demoCheck?.is_demo) return NextResponse.json({ skipped: "demo" });
+
   const [{ data: organization }, { data: recipients }] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", alert.organization_id).single(),
     alert.recipient_user_id
