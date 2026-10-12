@@ -5,6 +5,9 @@ import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
 import { VehicleActionsPanel } from "@/components/vehicles/VehicleActionsPanel";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { VehiclePapersCard } from "@/components/vehicles/VehiclePapersCard";
+import { listVehicleDocuments } from "@/lib/vehicles/documents";
+import { parisCalendarDate } from "@/lib/planning/dates";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "En service",
@@ -37,6 +40,7 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
 
   if (!vehicle) notFound();
   const hasActiveTourHere = Boolean(activeTour);
+  const documents = await listVehicleDocuments(supabase, vehicle.id);
 
   return (
     <div className="mx-auto max-w-md">
@@ -48,6 +52,7 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
         enabledModuleKeys={enabledModuleKeys}
         hasActiveTourHere={hasActiveTourHere}
       />
+      <VehiclePapersCard vehicleId={vehicle.id} documents={documents} today={parisCalendarDate(new Date().toISOString())} />
       {/* Only the driver currently on tour with this vehicle (not just
           anyone who scanned it) sees its badge here — matches the
           same in_progress query used for hasActiveTourHere above, so
