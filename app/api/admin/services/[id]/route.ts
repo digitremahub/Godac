@@ -13,6 +13,10 @@ const bodySchema = z.object({
   // heures planning/badge de /payroll, et l'estimation de distance
   // "retour direct à domicile" (/tours/history).
   depot_address: z.string().trim().min(1).nullable().optional(),
+  // Chef d'équipe du service — affiché à chaque chauffeur rattaché.
+  team_leader_name: z.string().trim().max(120).nullable().optional(),
+  team_leader_phone: z.string().trim().max(40).nullable().optional(),
+  team_leader_email: z.string().trim().email().max(200).nullable().optional().or(z.literal("").transform(() => null)),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .from("services")
     .update(updateFields)
     .eq("id", id)
-    .select("id, name, code, depot_address")
+    .select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

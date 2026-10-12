@@ -10,6 +10,9 @@ interface ServiceRow {
   name: string;
   code: string | null;
   depot_address: string | null;
+  team_leader_name: string | null;
+  team_leader_phone: string | null;
+  team_leader_email: string | null;
 }
 
 export function ServicesPanel({ services }: { services: ServiceRow[] }) {
@@ -62,13 +65,17 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
   }
 
   async function updateDepotAddress(id: string, depotAddress: string) {
+    await patchService(id, { depot_address: depotAddress || null });
+  }
+
+  async function patchService(id: string, patch: Record<string, string | null>) {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/admin/services/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ depot_address: depotAddress || null }),
+        body: JSON.stringify(patch),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -137,6 +144,27 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                   Supprimer
                 </button>
               </div>
+              <fieldset className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <legend className="label">Chef d&apos;équipe (affiché à chaque chauffeur du service)</legend>
+                {([
+                  ["team_leader_name", "Nom", "ex : Karim B.", "text"],
+                  ["team_leader_phone", "Téléphone", "06 12 34 56 78", "tel"],
+                  ["team_leader_email", "E-mail", "chef@entreprise.fr", "email"],
+                ] as const).map(([field, label, placeholder, type]) => (
+                  <label key={field} className="block">
+                    <span className="sr-only">{label}</span>
+                    <input
+                      className="input !py-1"
+                      type={type}
+                      aria-label={`${label} du chef d'équipe`}
+                      placeholder={`${label} — ${placeholder}`}
+                      defaultValue={s[field] ?? ""}
+                      onBlur={(e) => e.target.value.trim() !== (s[field] ?? "") && patchService(s.id, { [field]: e.target.value.trim() || null })}
+                      disabled={busy}
+                    />
+                  </label>
+                ))}
+              </fieldset>
               <div>
                 <label className="block"><span className="label">Adresse du dépôt de ce service</span>
                 <input

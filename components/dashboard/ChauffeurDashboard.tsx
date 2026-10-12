@@ -99,6 +99,7 @@ export async function ChauffeurDashboard({
   ]);
 
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
+
   const weekToursByDay: Record<string, StripTour[]> = {};
   for (const t of (upcomingRes.data ?? []) as any[]) {
     const day = parisCalendarDate(t.start_at);
@@ -115,6 +116,20 @@ export async function ChauffeurDashboard({
   const recentEntries = (recentEntriesRes.data ?? []) as any[];
   const openAlerts = (openAlertsRes.data ?? []) as any[];
   const presence = presenceByDay((presenceRes.data ?? []) as { start_at: string; end_at: string | null; status: string }[], month);
+
+  // Team leader(s) of the driver's service(s), and the villages of
+  // today's tour (the one in progress, else today's planned one).
+  const todayTourNumber = openTour?.tour_number ?? weekToursByDay[todayParis]?.[0]?.tour_number ?? null;
+  const [{ data: myServiceRows }, { data: todayRoute }] = await Promise.all([
+    supabase.from("user_services").select("services(id, name, team_leader_name, team_leader_phone, team_leader_email)").eq("user_id", appUser.id),
+    todayTourNumber && planningEnabled
+      ? supabase.from("tour_routes").select("tour_number, notes, tour_route_villages(name, postal_code, notes, position)").eq("tour_number", todayTourNumber).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const teamLeaders = ((myServiceRows ?? []) as any[])
+    .map((r) => r.services)
+    .filter((sv) => sv && (sv.team_leader_name || sv.team_leader_phone || sv.team_leader_email));
+  const todayVillages = (((todayRoute as any)?.tour_route_villages ?? []) as any[]).sort((a, b) => a.position - b.position);
 
   return (
     <div>
@@ -140,6 +155,48 @@ export async function ChauffeurDashboard({
           </Link>
         )}
       </div>
+
+      {(teamLeaders.length > 0 || todayVillages.length > 0) && (
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {todayVillages.length > 0 && (
+            <Card>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg">Villages de la tournée {todayTourNumber}</h2>
+                <Link href="/tours/routes" className="text-sm text-teal-ink hover:underline">
+                  Détails
+                </Link>
+              </div>
+              <ol className="flex flex-wrap gap-1.5">
+                {todayVillages.map((v: any, i: number) => (
+                  <li key={i} className="flex items-center gap-1.5 rounded-full bg-navy/[0.045] py-1 pl-1 pr-3 text-sm">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
+                    {v.name}
+                  </li>
+                ))}
+              </ol>
+              {(todayRoute as any)?.notes && <p className="mt-3 whitespace-pre-line text-sm text-navy/70">{(todayRoute as any).notes}</p>}
+            </Card>
+          )}
+          {teamLeaders.map((sv: any) => (
+            <Card key={sv.id}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-navy/55">Mon chef d&apos;équipe · {sv.name}</p>
+              <p className="mt-1 font-display text-lg font-bold">{sv.team_leader_name ?? "—"}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sv.team_leader_phone && (
+                  <a href={`tel:${sv.team_leader_phone.replace(/\s+/g, "")}`} className="btn-primary !py-2 text-sm">
+                    Appeler · {sv.team_leader_phone}
+                  </a>
+                )}
+                {sv.team_leader_email && (
+                  <a href={`mailto:${sv.team_leader_email}`} className="btn-secondary !py-2 text-sm">
+                    E-mail
+                  </a>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="mb-6">
         <PresenceCalendar

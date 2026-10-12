@@ -25,6 +25,7 @@ import {
   IconCoins,
   IconChatBubble,
   IconChartBar,
+  IconMapPin,
 } from "@/components/layout/icons";
 
 interface NavItem {
@@ -67,6 +68,7 @@ const SECTIONS: NavSection[] = [
       { href: "/tours/help", label: "J'entre pour un collègue", icon: IconUsers, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/planning/mine", label: "Mon planning", icon: IconCalendar, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/planning", label: "Planning", icon: IconCalendar, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
+      { href: "/tours/routes", label: "Tournées & villages", icon: IconMapPin, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
       { href: "/tours/history", label: "Historique des tournées", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
     ],
   },
