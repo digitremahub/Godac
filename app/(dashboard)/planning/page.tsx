@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
+import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planning/PlanningDuplicatesBanner";
+import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
@@ -139,12 +141,30 @@ export default async function PlanningPage({
     selectedService: params.service ?? "",
   };
 
+  // Duplicated planned entries (± 60 days) — direction only, the only
+  // role allowed to delete them (app/api/planning/entries/[id]/remove-duplicate).
+  let duplicates: DuplicateRow[] = [];
+  if (appUser.role === "direction") {
+    const { data: windowEntries } = await supabase
+      .from("planning_entries")
+      .select("id, driver_id, tour_number, start_at, status, created_at, users!planning_entries_driver_id_fkey(full_name)")
+      .gte("start_at", new Date(Date.now() - 60 * 86_400_000).toISOString())
+      .lt("start_at", new Date(Date.now() + 60 * 86_400_000).toISOString());
+    const day = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" });
+    duplicates = plannedDuplicates((windowEntries ?? []) as any[]).map(({ entry, duplicateOf }: any) => ({
+      id: entry.id,
+      label: `${entry.users?.full_name?.trim() ?? "Chauffeur"} · ${day(entry.start_at)} · n°${entry.tour_number}`,
+      reason: duplicateOf.status === "planned" ? `déjà prévue (n°${duplicateOf.tour_number})` : `tournée n°${duplicateOf.tour_number} déjà ${duplicateOf.status === "done" ? "effectuée" : "en cours"}`,
+    }));
+  }
+
   return (
     <div>
       <PageHeader
         title="Planning"
         description="Tous les services, véhicules et chauffeurs — glissez une affectation vers un autre jour pour la déplacer."
       />
+      {duplicates.length > 0 && <PlanningDuplicatesBanner duplicates={duplicates} />}
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
       {view === "week" && (
         <PlanningGrid
