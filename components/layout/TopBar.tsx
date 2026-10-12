@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { SignOutButton } from "@/components/layout/SignOutButton";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { IconExternal, IconMenu } from "@/components/layout/icons";
 import type { UserRole } from "@/lib/types/domain";
 
@@ -48,7 +49,8 @@ export function TopBar({
         </Link>
       </div>
 
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+        <NotificationBell />
         <Link href="/account" className="flex min-w-0 items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-navy/[0.04]">
           <div
             aria-hidden="true"

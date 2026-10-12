@@ -15,10 +15,13 @@ export function QrScanner({
   expected,
   onScan,
   label,
+  allowManual = true,
 }: {
   expected: ScanPayload["type"];
   onScan: (payload: ScanPayload) => void;
   label: string;
+  /** Off where the visitor isn't signed in yet — the driver-code lookup needs a session. */
+  allowManual?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -89,10 +92,12 @@ export function QrScanner({
         </div>
       )}
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      <button className="text-xs text-navy/65 underline" onClick={() => setManualInput((v) => !v)}>
-        {manualInput ? "Réessayer la caméra" : "Saisir le code manuellement"}
-      </button>
-      {manualInput && (
+      {allowManual && (
+        <button className="text-xs text-navy/65 underline" onClick={() => setManualInput((v) => !v)}>
+          {manualInput ? "Réessayer la caméra" : "Saisir le code manuellement"}
+        </button>
+      )}
+      {allowManual && manualInput && (
         <ManualScanInput expected={expected} onScan={onScan} />
       )}
     </div>
