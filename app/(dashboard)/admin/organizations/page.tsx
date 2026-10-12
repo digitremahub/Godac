@@ -25,7 +25,7 @@ export default async function OrganizationSettingsPage() {
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       isModuleEnabled(supabase, appUser.organization_id, "assistant"),
       isDirection ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
-      supabase.from("services").select("id, name, code, depot_address").order("name"),
+      supabase.from("services").select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email").order("name"),
       supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
       supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
       isDirection

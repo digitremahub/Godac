@@ -154,7 +154,7 @@ export default function ConfidentialitePage() {
             de travail et la paie.
           </li>
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
-          <li>Conversations avec l&apos;assistant* : 1 an après le dernier message.</li>
+          <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>

@@ -7,8 +7,8 @@ export const RETENTION_DAYS = {
   questionLog: 90,
   /** GPS point recorded at clock-in/out (the clock times themselves are kept). */
   clockGps: 365,
-  /** Assistant conversations, counted from their last message. */
-  assistantConversations: 365,
+  /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
+  assistantConversations: 90,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
