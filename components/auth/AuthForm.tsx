@@ -82,7 +82,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     return (
       <div className="card max-w-sm text-center">
         <p className="text-lg">📩 Vérifiez votre boîte mail</p>
-        <p className="mt-2 text-sm text-navy/60">
+        <p className="mt-2 text-sm text-navy/70">
           Un lien de connexion a été envoyé à <span className="text-navy">{email}</span>.
           Cliquez dessus pour {mode === "sign-in" ? "vous connecter" : "créer votre compte"}.
         </p>
@@ -94,7 +94,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
       <div>
         <h2 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h2>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           {usePassword
             ? "Connectez-vous avec le mot de passe défini depuis votre compte."
             : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
@@ -138,7 +138,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
       {passkeyUnavailable && (
-        <p className="text-xs text-navy/40">Aucune clé Face ID / empreinte enregistrée pour cet email sur cet appareil.</p>
+        <p className="text-xs text-navy/60">Aucune clé Face ID / empreinte enregistrée pour cet email sur cet appareil.</p>
       )}
       <button
         type="submit"
@@ -156,13 +156,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="text-sm text-navy/50 hover:text-navy hover:underline"
+            className="text-sm text-navy/65 hover:text-navy hover:underline"
             onClick={() => setUsePassword((v) => !v)}
           >
             {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}
           </button>
           {usePassword && (
-            <Link href="/forgot-password" className="text-sm text-navy/50 hover:text-navy hover:underline">
+            <Link href="/forgot-password" className="text-sm text-navy/65 hover:text-navy hover:underline">
               Mot de passe oublié ?
             </Link>
           )}

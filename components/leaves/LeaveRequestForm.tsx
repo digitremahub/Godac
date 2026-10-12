@@ -45,7 +45,7 @@ export function LeaveRequestForm({ services }: { services: ServiceOption[] }) {
 
   if (services.length === 0) {
     return (
-      <Card className="text-sm text-navy/50">
+      <Card className="text-sm text-navy/65">
         Vous n&apos;êtes rattaché à aucun service — contactez votre direction pour pouvoir demander un congé.
       </Card>
     );
@@ -80,7 +80,7 @@ export function LeaveRequestForm({ services }: { services: ServiceOption[] }) {
         </div>
         <div className={services.length > 1 ? "sm:col-span-1" : "sm:col-span-2"}>
           <label className="label">Motif (optionnel)</label>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Congés payés, RTT..." />
+          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Congés payés, RTT…" />
         </div>
       </div>
       <button

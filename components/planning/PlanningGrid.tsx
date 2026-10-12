@@ -378,7 +378,7 @@ export function PlanningGrid({
           <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(prevWeek, selectedService)}>
             ← Semaine préc.
           </button>
-          <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+          <span className="text-sm text-navy/70">Semaine du {weekStart.split("-").reverse().join("/")}</span>
           <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(nextWeek, selectedService)}>
             Semaine suiv. →
           </button>
@@ -404,7 +404,7 @@ export function PlanningGrid({
               {validating ? "Envoi…" : validatedAt ? "✓ Envoyé — revalider" : "✅ Valider et envoyer"}
             </button>
           ) : (
-            <span className="text-xs text-navy/40">Sélectionnez un service pour valider son planning</span>
+            <span className="text-xs text-navy/60">Sélectionnez un service pour valider son planning</span>
           ))}
       </div>
 
@@ -438,7 +438,7 @@ export function PlanningGrid({
                     key={i}
                     type="button"
                     className={`rounded-md px-2 py-1 text-xs ${
-                      formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/5 text-navy/40"
+                      formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/5 text-navy/60"
                     }`}
                     onClick={() => toggleFormDay(i)}
                   >
@@ -521,9 +521,9 @@ export function PlanningGrid({
         <table className="w-full min-w-[900px] border-separate border-spacing-2">
           <thead>
             <tr>
-              <th className="w-40 text-left text-xs text-navy/40">Service</th>
+              <th className="w-40 text-left text-xs text-navy/60">Service</th>
               {days.map((d, i) => (
-                <th key={d} className="text-left text-xs text-navy/40">
+                <th key={d} className="text-left text-xs text-navy/60">
                   {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
                 </th>
               ))}
@@ -565,7 +565,7 @@ export function PlanningGrid({
                               <span className="flex items-center gap-1">
                                 {entry.status === "planned" && editingId !== entry.id && (
                                   <button
-                                    className="text-navy/30 hover:text-teal-ink"
+                                    className="text-navy/60 hover:text-teal-ink"
                                     onClick={() => startEdit(entry)}
                                     aria-label="Modifier"
                                     title="Modifier"
@@ -575,7 +575,7 @@ export function PlanningGrid({
                                 )}
                                 {duplicatingEntryId !== entry.id && (
                                   <button
-                                    className="text-navy/30 hover:text-teal-ink"
+                                    className="text-navy/60 hover:text-teal-ink"
                                     onClick={() => openDuplicatePicker(entry)}
                                     aria-label="Dupliquer"
                                     title="Dupliquer"
@@ -585,7 +585,7 @@ export function PlanningGrid({
                                 )}
                                 {entry.status === "planned" && (
                                   <button
-                                    className="text-navy/30 hover:text-orange-ink"
+                                    className="text-navy/60 hover:text-orange-ink"
                                     onClick={() => removeEntry(entry.id)}
                                     aria-label="Supprimer"
                                   >
@@ -649,7 +649,7 @@ export function PlanningGrid({
                               </div>
                             ) : duplicatingEntryId === entry.id ? (
                               <div className="flex flex-col gap-1">
-                                <label className="text-[10px] text-navy/40">Dupliquer vers le</label>
+                                <label className="text-[10px] text-navy/60">Dupliquer vers le</label>
                                 <input
                                   className="input !h-7 !py-0.5 !text-xs"
                                   type="date"
@@ -678,16 +678,16 @@ export function PlanningGrid({
                                 {entry.driver_id && entry.users ? (
                                   <button
                                     type="button"
-                                    className="text-navy/60 underline-offset-2 hover:underline"
+                                    className="text-navy/70 underline-offset-2 hover:underline"
                                     onClick={() => setOpenDriverSheet({ id: entry.driver_id!, full_name: entry.users!.full_name })}
                                   >
                                     {entry.users.full_name}
                                   </button>
                                 ) : (
-                                  <p className="text-navy/60">—</p>
+                                  <p className="text-navy/70">—</p>
                                 )}
-                                <p className="text-navy/40">{entry.vehicles?.registration ?? "—"}</p>
-                                <p className="text-navy/40">
+                                <p className="text-navy/60">{entry.vehicles?.registration ?? "—"}</p>
+                                <p className="text-navy/60">
                                   {new Date(entry.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                                 </p>
                               </>

@@ -49,7 +49,7 @@ export function MessageThread({
   }
 
   if (messages.length === 0) {
-    return <p className="text-xs text-navy/40">Aucun message échangé pour l&apos;instant.</p>;
+    return <p className="text-xs text-navy/60">Aucun message échangé pour l&apos;instant.</p>;
   }
 
   return (
@@ -66,7 +66,7 @@ export function MessageThread({
             <div className="mt-0.5 flex items-center justify-end gap-1.5">
               {m.sender_id === currentUserId && (
                 <button
-                  className="text-[10px] text-navy/30 hover:text-orange-ink"
+                  className="text-[10px] text-navy/60 hover:text-orange-ink"
                   disabled={busyId === m.id}
                   onClick={() => del(m.id)}
                   title="Supprimer"
@@ -74,7 +74,7 @@ export function MessageThread({
                   🗑
                 </button>
               )}
-              <p className="text-[10px] text-navy/35">
+              <p className="text-[10px] text-navy/60">
                 {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>

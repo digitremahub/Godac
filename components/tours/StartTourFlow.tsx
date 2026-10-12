@@ -186,7 +186,7 @@ export function StartTourFlow({
   }
 
   if (loadingPlan) {
-    return <p className="text-sm text-navy/60">Chargement…</p>;
+    return <p className="text-sm text-navy/70">Chargement…</p>;
   }
 
   if (!vehicleId) {
@@ -213,7 +213,7 @@ export function StartTourFlow({
   }
 
   if (checking) {
-    return <p className="text-sm text-navy/60">Vérification…</p>;
+    return <p className="text-sm text-navy/70">Vérification…</p>;
   }
 
   if (openTour) {

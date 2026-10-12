@@ -62,7 +62,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
     <Card className="overflow-x-auto">
       {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[760px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Cuve</th>
             <th className="pb-2">Envoyée par</th>
@@ -98,7 +98,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
                     p.totalizerReading != null ? `${p.totalizerReading.toLocaleString("fr-FR")} L` : "—"
                   )}
                 </td>
-                <td className="py-2 text-navy/60">
+                <td className="py-2 text-navy/70">
                   {isEditing ? (
                     <input className="input !py-1" value={note} onChange={(e) => setNote(e.target.value)} />
                   ) : (
@@ -120,7 +120,7 @@ export function TankPhotosTable({ photos, canReview }: { photos: TankPhotoRow[];
                         <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === p.id} onClick={() => saveEdit(p.id, false)}>
                           Enregistrer
                         </button>
-                        <button className="text-xs text-navy/40" disabled={busyId === p.id} onClick={() => setEditingId(null)}>
+                        <button className="text-xs text-navy/60" disabled={busyId === p.id} onClick={() => setEditingId(null)}>
                           Annuler
                         </button>
                       </div>

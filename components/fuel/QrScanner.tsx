@@ -89,7 +89,7 @@ export function QrScanner({
         </div>
       )}
       {error && <p className="text-sm text-orange-ink">{error}</p>}
-      <button className="text-xs text-navy/50 underline" onClick={() => setManualInput((v) => !v)}>
+      <button className="text-xs text-navy/65 underline" onClick={() => setManualInput((v) => !v)}>
         {manualInput ? "Réessayer la caméra" : "Saisir le code manuellement"}
       </button>
       {manualInput && (
@@ -152,7 +152,7 @@ function ManualScanInput({
       </div>
       {expected === "driver" && (
         <div className="flex flex-col gap-1.5 border-t border-navy/10 pt-3">
-          <p className="text-xs text-navy/50">
+          <p className="text-xs text-navy/65">
             Pas de badge sous la main ? Le chauffeur peut donner son code (initiales + mois/année de naissance, ex: FT11/88) :
           </p>
           <div className="flex gap-2">

@@ -77,7 +77,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
     <Card className="overflow-x-auto">
       {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[820px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             {showDriverColumn && <th className="pb-2">Chauffeur</th>}
@@ -113,7 +113,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                         value={startKm}
                         onChange={(e) => setStartKm(e.target.value)}
                       />
-                      <span className="text-navy/30">→</span>
+                      <span className="text-navy/60">→</span>
                       <input
                         className="input !h-7 !w-16 !py-0.5 !text-xs"
                         type="number"
@@ -131,7 +131,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                 </td>
                 <td className="py-2">
                   {r.returnLabel}
-                  {r.returnDeltaLabel && <span className="ml-1 text-xs text-navy/40">{r.returnDeltaLabel}</span>}
+                  {r.returnDeltaLabel && <span className="ml-1 text-xs text-navy/60">{r.returnDeltaLabel}</span>}
                 </td>
                 <td className="py-2">{r.statusLabel}</td>
                 {canEditKm && (
@@ -147,7 +147,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                       </div>
                     ) : (
                       <div className="flex flex-col items-start gap-1">
-                        <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(r)} aria-label="Modifier les km" title="Modifier les km">
+                        <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(r)} aria-label="Modifier les km" title="Modifier les km">
                           ✎ Km
                         </button>
                         {!r.startPhotoPath && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}

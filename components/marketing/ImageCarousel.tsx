@@ -54,7 +54,7 @@ export function ImageCarousel({ slides }: { slides: Slide[] }) {
             type="button"
             aria-label={`Voir : ${s.alt}`}
             onClick={() => setActive(i)}
-            className={`h-1.5 rounded-full transition-all ${i === active ? "w-6 bg-teal" : "w-1.5 bg-navy/15 hover:bg-navy/25"}`}
+            className={`h-1.5 rounded-full transition-[width,background-color] ${i === active ? "w-6 bg-teal" : "w-1.5 bg-navy/15 hover:bg-navy/25"}`}
           />
         ))}
       </div>

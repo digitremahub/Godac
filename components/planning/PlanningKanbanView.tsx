@@ -195,7 +195,7 @@ export function PlanningKanbanView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(weekStart, -7))}>
           ← Semaine préc.
         </button>
-        <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+        <span className="text-sm text-navy/70">Semaine du {weekStart.split("-").reverse().join("/")}</span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(weekStart, 7))}>
           Semaine suiv. →
         </button>
@@ -215,7 +215,7 @@ export function PlanningKanbanView({
         </span>
       </div>
       {mode === "service" && (
-        <p className="text-xs text-navy/50">
+        <p className="text-xs text-navy/65">
           Glissez la tournée d&apos;un chauffeur polyvalent vers un autre service pour la réaffecter (un polyvalent peut travailler sur
           plusieurs services différents jours de la semaine).
         </p>
@@ -242,7 +242,7 @@ export function PlanningKanbanView({
                   <button type="button" className="hover:underline" onClick={() => setOpenDriverSheet(driver)}>
                     {driver.full_name}
                   </button>{" "}
-                  <span className="text-xs text-navy/40">({driverEntries.length})</span>
+                  <span className="text-xs text-navy/60">({driverEntries.length})</span>
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {driverEntries.map((e) => (
@@ -260,10 +260,10 @@ export function PlanningKanbanView({
                           <span className={STATUS_BADGE[e.status] ?? "badge-neutral"}>{STATUS_LABEL[e.status] ?? e.status}</span>
                           {e.status === "planned" && editingId !== e.id && (
                             <>
-                              <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
+                              <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
                                 ✎
                               </button>
-                              <button className="text-navy/30 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
+                              <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
                                 ×
                               </button>
                             </>
@@ -303,16 +303,16 @@ export function PlanningKanbanView({
                         </div>
                       ) : (
                         <>
-                          <p className="text-navy/50">
+                          <p className="text-navy/65">
                             {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })} ·{" "}
                             {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                           </p>
-                          <p className="text-navy/40">{e.vehicles?.registration ?? "—"}</p>
+                          <p className="text-navy/60">{e.vehicles?.registration ?? "—"}</p>
                         </>
                       )}
                     </div>
                   ))}
-                  {driverEntries.length === 0 && <p className="px-1 text-xs text-navy/30">Rien cette semaine</p>}
+                  {driverEntries.length === 0 && <p className="px-1 text-xs text-navy/60">Rien cette semaine</p>}
                 </div>
               </div>
             );
@@ -342,7 +342,7 @@ export function PlanningKanbanView({
                 }}
               >
                 <p className="mb-2 px-1 text-sm font-medium">
-                  {service.name} <span className="text-xs text-navy/40">({serviceEntries.length})</span>
+                  {service.name} <span className="text-xs text-navy/60">({serviceEntries.length})</span>
                 </p>
                 <div className="flex flex-col gap-1.5">
                   {serviceEntries.map((e) => {
@@ -370,16 +370,16 @@ export function PlanningKanbanView({
                           )}
                           <span className="badge-gold">Polyvalent</span>
                         </div>
-                        <p className="text-navy/50">
+                        <p className="text-navy/65">
                           n°{e.tour_number} ·{" "}
                           {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}{" "}
                           {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
-                        {otherServices.length > 0 && <p className="text-navy/40">Aussi qualifié : {otherServices.join(", ")}</p>}
+                        {otherServices.length > 0 && <p className="text-navy/60">Aussi qualifié : {otherServices.join(", ")}</p>}
                       </div>
                     );
                   })}
-                  {serviceEntries.length === 0 && <p className="px-1 text-xs text-navy/30">Aucune tournée polyvalente ici cette semaine</p>}
+                  {serviceEntries.length === 0 && <p className="px-1 text-xs text-navy/60">Aucune tournée polyvalente ici cette semaine</p>}
                 </div>
               </div>
             );

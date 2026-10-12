@@ -82,7 +82,7 @@ export function DriverServicesPanel({
   return (
     <Card className="flex flex-col gap-3">
       <p className="text-sm font-medium">Services qualifiés</p>
-      <p className="text-xs text-navy/40">
+      <p className="text-xs text-navy/60">
         Un chauffeur peut être formé sur plusieurs services à la fois — cochez chacun et précisez son niveau.
       </p>
       {error && <p className="text-sm text-orange-ink">{error}</p>}
@@ -111,7 +111,7 @@ export function DriverServicesPanel({
             </div>
           );
         })}
-        {services.length === 0 && <p className="text-xs text-navy/40">Aucun service dans l&apos;organisation.</p>}
+        {services.length === 0 && <p className="text-xs text-navy/60">Aucun service dans l&apos;organisation.</p>}
       </div>
       <div className="flex items-center gap-3">
         <button className="btn-primary !px-3 !py-1.5 text-sm" disabled={busy} onClick={save}>

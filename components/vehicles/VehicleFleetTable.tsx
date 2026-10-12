@@ -68,7 +68,7 @@ export function VehicleFleetTable({ vehicles }: { vehicles: VehicleRow[] }) {
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="text-left text-navy/40">
+            <thead className="text-left text-navy/60">
               <tr>
                 <th className="pb-2">Immatriculation</th>
                 <th className="pb-2">Type</th>

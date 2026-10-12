@@ -84,7 +84,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
     <div className="flex flex-col gap-2">
       {error && <p className="text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Pleins</th>
@@ -128,7 +128,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                       <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => saveCorrection(l.id)}>
                         Enregistrer
                       </button>
-                      <button className="text-xs text-navy/40" disabled={busyId === l.id} onClick={() => setEditingId(null)}>
+                      <button className="text-xs text-navy/60" disabled={busyId === l.id} onClick={() => setEditingId(null)}>
                         Annuler
                       </button>
                     </div>

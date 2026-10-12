@@ -41,7 +41,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-lg">{a.title}</h3>
-              <p className="text-xs text-navy/40">
+              <p className="text-xs text-navy/60">
                 {a.authorName} · {a.serviceName ?? "Toute l'organisation"} · {new Date(a.createdAt).toLocaleString("fr-FR")}
               </p>
             </div>

@@ -78,7 +78,7 @@ export function TankPhotoCapture({ tankId }: { tankId: string }) {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
       </label>
-      <button className="text-xs text-navy/40 hover:text-navy/70" onClick={() => setCapturing(false)} disabled={busy}>
+      <button className="text-xs text-navy/60 hover:text-navy/70" onClick={() => setCapturing(false)} disabled={busy}>
         Annuler
       </button>
     </div>

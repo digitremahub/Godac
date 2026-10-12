@@ -48,7 +48,7 @@ export function PlanningMonthView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, -1))}>
           ← Mois préc.
         </button>
-        <span className="text-sm text-navy/60">
+        <span className="text-sm text-navy/70">
           {new Date(currentYear, currentMonthNum - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
         </span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, 1))}>
@@ -58,7 +58,7 @@ export function PlanningMonthView({
 
       <div className="grid grid-cols-7 gap-1.5 text-xs">
         {DAY_LABELS.map((l) => (
-          <div key={l} className="px-1 text-navy/40">
+          <div key={l} className="px-1 text-navy/60">
             {l}
           </div>
         ))}
@@ -70,7 +70,7 @@ export function PlanningMonthView({
               key={day}
               href={`/planning?view=day&day=${day}${selectedService ? `&service=${selectedService}` : ""}`}
               className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                inMonth ? "bg-white" : "bg-navy/5 text-navy/30"
+                inMonth ? "bg-white" : "bg-navy/5 text-navy/60"
               }`}
             >
               <span className="font-medium">{Number(day.slice(8, 10))}</span>
@@ -80,7 +80,7 @@ export function PlanningMonthView({
                 </span>
               ))}
               {dayEntries.length > MAX_VISIBLE_PER_DAY && (
-                <span className="text-[10px] text-navy/40">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
+                <span className="text-[10px] text-navy/60">+{dayEntries.length - MAX_VISIBLE_PER_DAY}</span>
               )}
             </Link>
           );

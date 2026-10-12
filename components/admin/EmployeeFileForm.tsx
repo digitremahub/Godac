@@ -132,7 +132,7 @@ export function EmployeeFileForm({
         <div>
           <label className="label">Date de naissance</label>
           <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-          <p className="mt-1 text-sm text-navy/50">
+          <p className="mt-1 text-sm text-navy/65">
             Recalcule automatiquement le code de secours du badge (initiales + mois/année, ex: FT11/88).
           </p>
         </div>

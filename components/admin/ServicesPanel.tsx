@@ -119,7 +119,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
       </div>
 
       {services.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucun service configuré.</p>
+        <p className="text-sm text-navy/60">Aucun service configuré.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {services.map((s) => (
@@ -131,7 +131,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                   onBlur={(e) => e.target.value !== s.name && renameService(s.id, e.target.value)}
                   disabled={busy}
                 />
-                <span className="w-16 text-sm text-navy/40">{s.code ?? "—"}</span>
+                <span className="w-16 text-sm text-navy/60">{s.code ?? "—"}</span>
                 <button className="btn-danger !px-2 !py-1 text-xs" disabled={busy} onClick={() => deleteService(s.id)}>
                   Supprimer
                 </button>

@@ -90,7 +90,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
     <Card className="flex flex-col gap-4">
       <div>
         <h3 className="text-lg">Détail des cotisations (bulletins de paie)</h3>
-        <p className="text-sm text-navy/50">
+        <p className="text-sm text-navy/65">
           Chaque ligne ajoutée ici remplace la mention globale "Cotisations sociales (estimation)" sur les bulletins
           générés par une ligne détaillée (taux salarial appliqué au brut). Taux à reprendre de votre logiciel de
           paie ou auprès de votre expert-comptable — GODAC ne les calcule pas.
@@ -99,7 +99,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
       {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       {lines.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucune ligne configurée — les bulletins affichent l&apos;estimation globale.</p>
+        <p className="text-sm text-navy/60">Aucune ligne configurée — les bulletins affichent l&apos;estimation globale.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {lines.map((l) => (
@@ -121,7 +121,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
                   onBlur={(e) => Number(e.target.value) !== l.salarial_rate && updateLine(l.id, { salarial_rate: Number(e.target.value) || 0 })}
                   disabled={busy}
                 />
-                <span className="text-xs text-navy/40">% salarial</span>
+                <span className="text-xs text-navy/60">% salarial</span>
               </div>
               <div className="flex items-center gap-1">
                 <input
@@ -134,7 +134,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
                   onBlur={(e) => Number(e.target.value) !== l.patronal_rate && updateLine(l.id, { patronal_rate: Number(e.target.value) || 0 })}
                   disabled={busy}
                 />
-                <span className="text-xs text-navy/40">% patronal</span>
+                <span className="text-xs text-navy/60">% patronal</span>
               </div>
               <button className="btn-danger !px-2 !py-1 text-xs" disabled={busy} onClick={() => deleteLine(l.id)}>
                 Supprimer

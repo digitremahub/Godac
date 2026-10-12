@@ -72,7 +72,7 @@ export function MessageForm({
       {photo && (
         <div className="flex items-center gap-2">
           <img src={photo.previewUrl} alt="Photo à envoyer" className="h-16 w-16 rounded-lg object-cover" />
-          <button className="text-xs text-navy/40 underline" disabled={busy} onClick={clearPhoto}>
+          <button className="text-xs text-navy/60 underline" disabled={busy} onClick={clearPhoto}>
             Retirer
           </button>
         </div>

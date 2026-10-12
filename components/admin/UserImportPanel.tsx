@@ -74,7 +74,7 @@ export function UserImportPanel() {
     <Card className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <p className="label">Fichier CSV ou Excel — colonnes : nom, email, rôle, téléphone, service</p>
-        <button className="shrink-0 text-sm text-navy/50 hover:text-navy" onClick={() => setOpen(false)}>
+        <button className="shrink-0 text-sm text-navy/65 hover:text-navy" onClick={() => setOpen(false)}>
           Fermer
         </button>
       </div>

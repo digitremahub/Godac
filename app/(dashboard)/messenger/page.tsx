@@ -72,7 +72,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[240px_1fr]">
         <Card className="flex flex-col gap-1 !p-2">
           {(colleagues ?? []).length === 0 ? (
-            <p className="p-2 text-xs text-navy/40">Aucun autre collègue actif.</p>
+            <p className="p-2 text-xs text-navy/60">Aucun autre collègue actif.</p>
           ) : (
             (colleagues ?? []).map((c) => (
               <Link

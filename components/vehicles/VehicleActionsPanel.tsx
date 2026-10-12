@@ -26,7 +26,7 @@ export function VehicleActionsPanel({
   if (showWash) {
     return (
       <div className="flex flex-col gap-3">
-        <button className="self-start text-sm text-navy/50 hover:text-navy" onClick={() => setShowWash(false)}>
+        <button className="self-start text-sm text-navy/65 hover:text-navy" onClick={() => setShowWash(false)}>
           ← Retour aux actions
         </button>
         <WashForm vehicleId={vehicleId} vehicleType={vehicleType} />

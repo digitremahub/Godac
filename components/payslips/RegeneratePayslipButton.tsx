@@ -54,7 +54,7 @@ export function RegeneratePayslipButton({
 
   if (!open) {
     return (
-      <button type="button" className="text-xs text-navy/40 hover:text-teal-ink hover:underline" onClick={() => setOpen(true)}>
+      <button type="button" className="text-xs text-navy/60 hover:text-teal-ink hover:underline" onClick={() => setOpen(true)}>
         🔄 Mettre à jour
       </button>
     );

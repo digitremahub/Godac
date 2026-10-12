@@ -77,13 +77,13 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
       {error && <p className="text-sm text-orange-ink">{error}</p>}
 
       {documents.length === 0 ? (
-        <p className="text-xs text-navy/40">Aucun document déposé.</p>
+        <p className="text-xs text-navy/60">Aucun document déposé.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {documents.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{doc.docType}</span>
-              <span className="flex items-center gap-2 text-xs text-navy/40">
+              <span className="flex items-center gap-2 text-xs text-navy/60">
                 {new Date(doc.uploadedAt).toLocaleDateString("fr-FR")}
                 {doc.downloadUrl && (
                   <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">

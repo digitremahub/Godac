@@ -131,7 +131,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-lg">Tournées en cours</h2>
           {ongoingTours.length === 0 ? (
-            <p className="text-sm text-navy/40">Aucune tournée en cours actuellement.</p>
+            <p className="text-sm text-navy/60">Aucune tournée en cours actuellement.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {ongoingTours.map((t) => (
@@ -139,7 +139,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
                   <span>
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
-                  <span className="text-xs text-navy/40">
+                  <span className="text-xs text-navy/60">
                     depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </li>
@@ -151,7 +151,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         <Card>
           <h2 className="mb-3 text-lg">Consommation (30 jours)</h2>
           {consumptionRanking.length === 0 ? (
-            <p className="text-sm text-navy/40">Pas assez de données pour établir un classement.</p>
+            <p className="text-sm text-navy/60">Pas assez de données pour établir un classement.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (
@@ -182,7 +182,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
                   <span>
                     {d.tanks?.name ?? "—"} · {d.supplier ?? "—"} · {d.liters?.toLocaleString("fr-FR")} L
                   </span>
-                  <span className="text-xs text-navy/40">{new Date(d.delivered_at).toLocaleDateString("fr-FR")}</span>
+                  <span className="text-xs text-navy/60">{new Date(d.delivered_at).toLocaleDateString("fr-FR")}</span>
                 </li>
               ))}
             </ul>

@@ -60,10 +60,10 @@ export function OcrReviewCard({ entry }: { entry: any }) {
           {entry.photoUrl ? (
             <img src={entry.photoUrl} alt="Ticket" className="max-h-96 w-full rounded-xl object-contain" />
           ) : (
-            <p className="text-sm text-navy/40">Aucune photo disponible</p>
+            <p className="text-sm text-navy/60">Aucune photo disponible</p>
           )}
           {entry.ocr_confidence && (
-            <div className="mt-2 text-xs text-navy/40">
+            <div className="mt-2 text-xs text-navy/60">
               Confiance OCR:{" "}
               {Object.entries(entry.ocr_confidence)
                 .filter(([, v]) => v !== null)

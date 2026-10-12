@@ -51,7 +51,7 @@ export function PasswordForm() {
     <Card className="flex max-w-md flex-col gap-4">
       <div>
         <h3 className="text-lg">Mot de passe</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Optionnel — vous pouvez toujours vous connecter par lien magique. Définir un mot de
           passe permet aussi de vous connecter sans avoir accès à votre boîte mail.
         </p>

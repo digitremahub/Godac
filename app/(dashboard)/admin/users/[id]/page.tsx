@@ -197,22 +197,22 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <p className="text-sm text-navy/50">{u.auth_method === "pin" ? "Connexion" : "Email"}</p>
+          <p className="text-sm text-navy/65">{u.auth_method === "pin" ? "Connexion" : "Email"}</p>
           <p>{u.auth_method === "pin" ? (u.pin_set_at ? "Badge + PIN" : "Badge — PIN non créé") : u.email}</p>
         </Card>
         <Card>
-          <p className="text-sm text-navy/50">Titre affiché</p>
+          <p className="text-sm text-navy/65">Titre affiché</p>
           <p>{u.role_title ?? "—"}</p>
         </Card>
         <Card>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-navy/50">Service</p>
+            <p className="text-sm text-navy/65">Service</p>
             {qualificationBadge && <span className={qualificationBadge.className}>{qualificationBadge.label}</span>}
           </div>
           <p>{serviceNames || "—"}</p>
         </Card>
         <Card>
-          <p className="text-sm text-navy/50">Statut</p>
+          <p className="text-sm text-navy/65">Statut</p>
           <span className={u.active ? "badge-teal" : "badge-neutral"}>{u.active ? "Actif" : "Inactif"}</span>
         </Card>
       </div>
@@ -235,15 +235,15 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <Card className="mb-6 flex flex-col gap-2">
           <p className="text-sm font-medium">Coordonnées</p>
           <div>
-            <p className="text-xs text-navy/40">Téléphone</p>
+            <p className="text-xs text-navy/60">Téléphone</p>
             <p className="text-sm">{u.phone ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-navy/40">Adresse</p>
+            <p className="text-xs text-navy/60">Adresse</p>
             <p className="text-sm">{u.address ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-navy/40">Email de contact</p>
+            <p className="text-xs text-navy/60">Email de contact</p>
             <p className="text-sm">{u.contact_email ?? "—"}</p>
           </div>
         </Card>
@@ -261,7 +261,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
             <div>
-              <p className="text-xs text-navy/40">Salaire mensuel brut / net</p>
+              <p className="text-xs text-navy/60">Salaire mensuel brut / net</p>
               <p className="text-sm">
                 {contract?.monthly_gross_salary !== null && contract?.monthly_gross_salary !== undefined
                   ? `${Number(contract.monthly_gross_salary).toLocaleString("fr-FR")} €`
@@ -273,11 +273,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               </p>
             </div>
             <div>
-              <p className="text-xs text-navy/40">Heures contractuelles mensuelles</p>
+              <p className="text-xs text-navy/60">Heures contractuelles mensuelles</p>
               <p className="text-sm">{contract ? Number(contract.contractual_monthly_hours) : "—"}</p>
             </div>
             <div>
-              <p className="text-xs text-navy/40">Taux horaire brut / net</p>
+              <p className="text-xs text-navy/60">Taux horaire brut / net</p>
               <p className="text-sm">
                 {hourlyRates?.grossPerHour !== null && hourlyRates?.grossPerHour !== undefined
                   ? `${hourlyRates.grossPerHour.toFixed(2)} €`
@@ -320,19 +320,19 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
               <Card className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Dossier RH</p>
                 <div>
-                  <p className="text-xs text-navy/40">Type de contrat</p>
+                  <p className="text-xs text-navy/60">Type de contrat</p>
                   <p className="text-sm">
                     {employeeFile?.contract_type ? CONTRACT_TYPE_LABELS[employeeFile.contract_type] ?? employeeFile.contract_type : "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-navy/40">Date d&apos;embauche</p>
+                  <p className="text-xs text-navy/60">Date d&apos;embauche</p>
                   <p className="text-sm">
                     {employeeFile?.hire_date ? new Date(employeeFile.hire_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) : "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-navy/40">Fin de contrat</p>
+                  <p className="text-xs text-navy/60">Fin de contrat</p>
                   <p className="text-sm">
                     {employeeFile?.contract_end_date
                       ? new Date(employeeFile.contract_end_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })
@@ -353,14 +353,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             </Link>
           </div>
           {payslipsWithUrls.length === 0 ? (
-            <p className="text-xs text-navy/40">{isSelf ? "Aucun bulletin généré." : "Aucun bulletin généré pour ce chauffeur."}</p>
+            <p className="text-xs text-navy/60">{isSelf ? "Aucun bulletin généré." : "Aucun bulletin généré pour ce chauffeur."}</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {payslipsWithUrls.map((p) => (
                 <li key={p.id} className="flex items-center justify-between text-sm">
                   <span>{PAYSLIP_MONTH_LABEL.format(new Date(p.period_start))}</span>
                   <span className="flex items-center gap-3">
-                    <span className="text-xs text-navy/40">
+                    <span className="text-xs text-navy/60">
                       {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
                     </span>
                     {p.downloadUrl && (
@@ -387,7 +387,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             </Link>
           </div>
           {(recentLeaves ?? []).length === 0 ? (
-            <p className="text-xs text-navy/40">Aucune demande de congé.</p>
+            <p className="text-xs text-navy/60">Aucune demande de congé.</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {(recentLeaves ?? []).map((lr: any, i: number) => (
@@ -396,7 +396,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                     {new Date(lr.start_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} →{" "}
                     {new Date(lr.end_date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                   </span>
-                  <span className="text-xs text-navy/40">{LEAVE_STATUS_LABELS[lr.status] ?? lr.status}</span>
+                  <span className="text-xs text-navy/60">{LEAVE_STATUS_LABELS[lr.status] ?? lr.status}</span>
                 </li>
               ))}
             </ul>
@@ -414,7 +414,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           </div>
           {(tourHistory ?? []).length === 0 ? (
             <Card>
-              <p className="text-xs text-navy/40">Aucune tournée enregistrée pour ce chauffeur.</p>
+              <p className="text-xs text-navy/60">Aucune tournée enregistrée pour ce chauffeur.</p>
             </Card>
           ) : (
             <Card className="flex flex-col gap-1.5">
@@ -431,7 +431,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                     — n°{t.tour_number}
                     {t.vehicles ? ` (${t.vehicles.registration})` : ""}
                   </span>
-                  <span className="text-xs text-navy/40">{TOUR_STATUS_LABELS[t.status] ?? t.status}</span>
+                  <span className="text-xs text-navy/60">{TOUR_STATUS_LABELS[t.status] ?? t.status}</span>
                 </div>
               ))}
             </Card>

@@ -112,7 +112,7 @@ export function NameForm({
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
           />
-          <p className="mt-1 text-xs text-navy/40">
+          <p className="mt-1 text-xs text-navy/60">
             Votre connexion par badge/PIN reste inchangée — cette adresse sert uniquement à recevoir les alertes et
             convocations par email.
           </p>
@@ -127,7 +127,7 @@ export function NameForm({
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
-          <p className="mt-1 text-xs text-navy/40">
+          <p className="mt-1 text-xs text-navy/60">
             Sert uniquement à estimer la distance d&apos;un retour direct à domicile en fin de tournée.
           </p>
         </div>

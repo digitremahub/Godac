@@ -138,7 +138,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
       </button>
 
       {tanks.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucune cuve configurée.</p>
+        <p className="text-sm text-navy/60">Aucune cuve configurée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {tanks.map((t) => (
@@ -152,7 +152,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
               <span className={t.fuel_type === "diesel" ? "badge-teal" : "badge-gold"}>
                 {t.fuel_type === "diesel" ? "Diesel" : "AdBlue"}
               </span>
-              <span className="text-sm text-navy/40">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
+              <span className="text-sm text-navy/60">{t.capacity_liters.toLocaleString("fr-FR")} L</span>
               <select
                 className="input !w-auto !py-1"
                 defaultValue={t.service_id ?? ""}

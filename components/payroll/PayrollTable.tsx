@@ -195,11 +195,11 @@ export function PayrollTable({
           <button className="btn-secondary !px-3 !py-1.5 text-sm" disabled={bulkBusy || missingCount === 0} onClick={generateAllMissing}>
             {bulkBusy ? "Génération…" : `Générer les fiches manquantes (${missingCount})`}
           </button>
-          {bulkSummary && <p className="text-xs text-navy/60">{bulkSummary}</p>}
+          {bulkSummary && <p className="text-xs text-navy/70">{bulkSummary}</p>}
         </div>
       )}
       <table className="w-full min-w-[980px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Chauffeur</th>
             <th className="pb-2">Tournées</th>
@@ -260,8 +260,8 @@ export function PayrollTable({
                         onChange={(e) => setEdit({ ...edit, contractualHours: e.target.value })}
                       />
                     </td>
-                    <td className="py-2 text-navy/30">—</td>
-                    <td className="py-2 text-navy/30">—</td>
+                    <td className="py-2 text-navy/60">—</td>
+                    <td className="py-2 text-navy/60">—</td>
                     <td className="py-2">
                       <div className="flex gap-1">
                         <button className="btn-primary !h-6 !px-2 !py-0 !text-[11px]" disabled={busyId === row.driver_id} onClick={() => save(row)}>
@@ -292,7 +292,7 @@ export function PayrollTable({
                         : "—"}
                     </td>
                     <td className="py-2">
-                      <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(row)} aria-label="Modifier" title="Modifier">
+                      <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(row)} aria-label="Modifier" title="Modifier">
                         ✎
                       </button>
                     </td>
@@ -303,7 +303,7 @@ export function PayrollTable({
                     {row.payslip_generated ? (
                       <span className="badge-teal">✓ Générée</span>
                     ) : row.monthly_gross_salary === null || row.monthly_net_salary === null ? (
-                      <span className="text-xs text-navy/30" title="Renseignez le salaire brut/net pour générer une fiche">
+                      <span className="text-xs text-navy/60" title="Renseignez le salaire brut/net pour générer une fiche">
                         Salaire non renseigné
                       </span>
                     ) : generatingId === row.driver_id ? (

@@ -46,9 +46,9 @@ export function QrCodeBadge({
     <div className="flex w-56 flex-col items-center gap-2 rounded-2xl bg-white p-4 text-navy print:shadow-none">
       <canvas ref={canvasRef} />
       <p className="text-center font-display text-sm font-extrabold">{title}</p>
-      {subtitle && <p className="text-center text-xs text-navy/60">{subtitle}</p>}
+      {subtitle && <p className="text-center text-xs text-navy/70">{subtitle}</p>}
       {code && (
-        <p className="text-center text-xs text-navy/50">
+        <p className="text-center text-xs text-navy/65">
           Code de secours : <span className="font-mono font-semibold tracking-widest text-navy">{code}</span>
         </p>
       )}

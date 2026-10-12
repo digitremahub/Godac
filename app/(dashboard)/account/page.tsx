@@ -66,7 +66,7 @@ export default async function AccountPage() {
 
       <Card className="flex max-w-md flex-col gap-2">
         <div>
-          <p className="text-sm text-navy/50">Rôle</p>
+          <p className="text-sm text-navy/65">Rôle</p>
           <p>{ROLE_LABELS[appUser.role]}</p>
         </div>
       </Card>
@@ -82,7 +82,7 @@ export default async function AccountPage() {
             </Link>
           </div>
           {payslipsWithUrls.length === 0 ? (
-            <p className="text-xs text-navy/40">Aucun bulletin généré.</p>
+            <p className="text-xs text-navy/60">Aucun bulletin généré.</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {payslipsWithUrls.map((p) => (

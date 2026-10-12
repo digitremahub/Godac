@@ -42,7 +42,7 @@ export function EmailForm({ currentEmail }: { currentEmail: string }) {
     <Card className="flex max-w-md flex-col gap-4">
       <div>
         <h3 className="text-lg">Adresse email</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Un email de confirmation sera envoyé à la nouvelle adresse — le changement ne prend
           effet qu&apos;après avoir cliqué le lien qu&apos;il contient.
         </p>

@@ -33,7 +33,7 @@ export default async function ModulesPage() {
         <div className="mb-12 text-center">
           <span className="badge-teal mb-4 inline-block">4 plans selon votre flotte + modules à la carte</span>
           <h1 className="text-4xl md:text-5xl">Choisissez votre plan, ajoutez ce dont vous avez besoin</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-navy/60">
+          <p className="mx-auto mt-4 max-w-2xl text-navy/70">
             Chaque plan est dimensionné pour votre nombre de véhicules et inclut tout le socle
             opérationnel et RH ; les modules avancés restent activables à la carte.
           </p>
@@ -51,14 +51,14 @@ export default async function ModulesPage() {
             return (
               <div key={m.key} className="card flex flex-col gap-3">
                 <h3 className="text-lg">{m.name}</h3>
-                <p className="flex-1 text-sm text-navy/60">{m.description}</p>
+                <p className="flex-1 text-sm text-navy/70">{m.description}</p>
                 {alwaysIncluded ? (
                   <p className="text-sm text-teal-ink">Inclus dans tous les plans</p>
                 ) : (
                   cheapestPrice && (
                     <p className="font-display text-xl font-extrabold text-gold-ink">
                       à partir de {cheapestPrice.monthly_price} €*
-                      <span className="text-sm font-normal text-navy/40">/mois</span>
+                      <span className="text-sm font-normal text-navy/60">/mois</span>
                     </p>
                   )
                 )}
@@ -67,10 +67,10 @@ export default async function ModulesPage() {
           })}
         </div>
 
-        <p className="mb-8 text-center text-xs text-navy/40">
+        <p className="mb-8 text-center text-xs text-navy/60">
           * Tarifs mensuels, hors frais de mise en service éventuels (facturés une seule fois,
           voir le détail sous chaque plan). Plus de 150 véhicules ?{" "}
-          <Link href="mailto:contact@godac.fr" className="underline hover:text-navy/60">
+          <Link href="mailto:contact@godac.fr" className="underline hover:text-navy/70">
             Contactez-nous
           </Link>{" "}
           pour une offre Enterprise sur mesure.

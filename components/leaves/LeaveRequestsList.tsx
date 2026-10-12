@@ -86,7 +86,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
     <Card className="overflow-x-auto">
       {error && <p className="mb-3 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[720px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Chauffeur</th>
             <th className="pb-2">Service</th>
@@ -104,7 +104,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
               <tr key={leave.id} className="border-t border-navy/5 align-top">
                 <td className="py-2">
                   {leave.driverName}
-                  {leave.isOwn && <span className="ml-2 text-xs text-navy/30">(vous)</span>}
+                  {leave.isOwn && <span className="ml-2 text-xs text-navy/60">(vous)</span>}
                 </td>
                 <td className="py-2">{leave.serviceName}</td>
                 <td className="py-2">
@@ -119,7 +119,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                     </>
                   )}
                 </td>
-                <td className="py-2 text-navy/60">
+                <td className="py-2 text-navy/70">
                   {isEditing ? (
                     <input className="input !py-1" value={editReason} onChange={(e) => setEditReason(e.target.value)} />
                   ) : (

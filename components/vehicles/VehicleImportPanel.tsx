@@ -111,7 +111,7 @@ export function VehicleImportPanel() {
           Fichier CSV ou Excel — colonnes : immatriculation, type, capacité cuve, kilométrage,
           service, marque, modèle (optionnel)
         </p>
-        <button className="shrink-0 text-sm text-navy/50 hover:text-navy" onClick={() => setOpen(false)}>
+        <button className="shrink-0 text-sm text-navy/65 hover:text-navy" onClick={() => setOpen(false)}>
           Fermer
         </button>
       </div>

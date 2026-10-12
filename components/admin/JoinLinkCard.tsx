@@ -50,7 +50,7 @@ export function JoinLinkCard({ token }: { token: string }) {
   return (
     <Card className="flex flex-col gap-3">
       <p className="text-sm font-medium">Auto-inscription chauffeur</p>
-      <p className="text-xs text-navy/40">
+      <p className="text-xs text-navy/60">
         Un seul lien/QR à afficher au dépôt — chaque nouveau chauffeur le scanne pour créer lui-même son compte. Son
         compte reste en attente jusqu&apos;à validation par un chef de service ou la direction (voir &quot;Chauffeurs à
         valider&quot;).

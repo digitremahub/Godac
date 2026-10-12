@@ -152,17 +152,23 @@ export function Sidebar({
 
   return (
     <nav
-      className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-navy/10 bg-white/95 p-4 backdrop-blur-sm transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:bg-white/70 ${
-        open ? "translate-x-0" : "-translate-x-full"
+      id="navigation-principale"
+      aria-label="Navigation principale"
+      // Off-canvas on mobile: `invisible` (delayed until the slide-out
+      // finishes) takes the closed drawer's links out of the tab order
+      // and the accessibility tree, not just off-screen.
+      className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-5 overflow-y-auto overscroll-contain border-r border-navy/10 bg-white/95 p-4 backdrop-blur-sm transition-[transform,visibility] duration-200 ease-in-out lg:visible lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:bg-white/70 ${
+        open ? "visible translate-x-0" : "invisible -translate-x-full"
       }`}
     >
       <Link href="/dashboard" title="Accueil" className="flex items-center gap-2.5 px-2 pt-1" onClick={onNavigate}>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt={organizationName ?? "Logo"} className="h-9 w-9 rounded-lg object-contain ring-1 ring-navy/10" />
+          <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 rounded-lg object-contain ring-1 ring-navy/10" />
         ) : (
           <div
-            className="h-9 w-9 rounded-lg shadow-[0_2px_10px_-2px_var(--tw-shadow-color)]"
+            aria-hidden="true"
+            className="h-9 w-9 shrink-0 rounded-lg shadow-[0_2px_10px_-2px_var(--tw-shadow-color)]"
             style={{ backgroundColor: accent, "--tw-shadow-color": `${accent}80` } as React.CSSProperties}
           />
         )}
@@ -180,15 +186,16 @@ export function Sidebar({
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
-                className={`group relative flex min-h-[44px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                  active ? "bg-navy/[0.08]" : "text-navy/60 hover:bg-navy/[0.05] hover:text-navy"
+                aria-current={active ? "page" : undefined}
+                className={`group relative flex min-h-[44px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                  active ? "bg-navy/[0.08]" : "text-navy/70 hover:bg-navy/[0.05] hover:text-navy"
                 }`}
                 style={active ? { color: accentText } : undefined}
               >
                 {active && (
-                  <span className="absolute -left-4 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accent }} />
+                  <span aria-hidden="true" className="absolute -left-4 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accent }} />
                 )}
-                <Icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "" : "text-navy/35 group-hover:text-navy/60"}`} />
+                <Icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "" : "text-navy/60 group-hover:text-navy/70"}`} />
                 <span className="truncate">{item.label}</span>
               </Link>
             );

@@ -109,7 +109,7 @@ export function DriverPinFlow({
       <Card className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
         <div>
           <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
-          <p className="mt-1 text-sm text-navy/50">
+          <p className="mt-1 text-sm text-navy/65">
             {pinJustCreated ? "Votre code est créé. " : ""}Votre compte doit encore être validé par un responsable avant que
             vous puissiez vous connecter — vous serez prévenu.
           </p>
@@ -124,7 +124,7 @@ export function DriverPinFlow({
       <Card className="flex w-full max-w-sm flex-col gap-4">
         <div>
           <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
-          <p className="mt-1 text-sm text-navy/50">
+          <p className="mt-1 text-sm text-navy/65">
             Première connexion : créez votre code PIN (4 à 6 chiffres). Vous le ressaisirez à chaque connexion.
           </p>
         </div>
@@ -166,14 +166,14 @@ export function DriverPinFlow({
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
         <h2 className="text-xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h2>
-        <p className="mt-1 text-sm text-navy/50">Entrez votre code PIN pour vous connecter.</p>
+        <p className="mt-1 text-sm text-navy/65">Entrez votre code PIN pour vous connecter.</p>
       </div>
       {hasPasskey && (
         <>
           <button type="button" className="btn-primary" disabled={busy} onClick={unlockWithPasskey}>
             {busy ? "…" : "🔓 Face ID / empreinte"}
           </button>
-          <div className="flex items-center gap-2 text-xs text-navy/30">
+          <div className="flex items-center gap-2 text-xs text-navy/60">
             <div className="h-px flex-1 bg-navy/10" />
             ou
             <div className="h-px flex-1 bg-navy/10" />

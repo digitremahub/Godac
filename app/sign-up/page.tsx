@@ -9,13 +9,13 @@ export default function SignUpPage() {
         <span className="font-display text-xl font-extrabold">GODAC</span>
       </Link>
       <AuthForm mode="sign-up" />
-      <p className="text-sm text-navy/40">
+      <p className="text-sm text-navy/60">
         Déjà un compte ?{" "}
         <Link href="/sign-in" className="text-teal-ink hover:underline">
           Se connecter
         </Link>
       </p>
-      <div className="flex gap-3 text-xs text-navy/30">
+      <div className="flex gap-3 text-xs text-navy/60">
         <Link href="/mentions-legales" className="hover:underline">
           Mentions légales
         </Link>

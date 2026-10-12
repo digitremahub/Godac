@@ -25,15 +25,15 @@ export function PlanPicker({
             }`}
           >
             <h3 className="text-base">{plan.name}</h3>
-            <p className="text-xs text-navy/50">
+            <p className="text-xs text-navy/65">
               {plan.vehicle_max ? `${plan.vehicle_min}–${plan.vehicle_max} véhicules` : `${plan.vehicle_min}+ véhicules`}
             </p>
             <p className="font-display text-2xl font-extrabold text-teal-ink">
               {plan.monthly_base_price} €{plan.setup_price > 0 ? "*" : ""}
-              <span className="text-sm font-normal text-navy/40">/mois</span>
+              <span className="text-sm font-normal text-navy/60">/mois</span>
             </p>
             {plan.setup_price > 0 && (
-              <p className="text-xs text-navy/40">* + {plan.setup_price} € de mise en service, une seule fois</p>
+              <p className="text-xs text-navy/60">* + {plan.setup_price} € de mise en service, une seule fois</p>
             )}
           </button>
         );

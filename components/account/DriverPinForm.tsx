@@ -48,7 +48,7 @@ export function DriverPinForm({ pinAlreadySet }: { pinAlreadySet: boolean }) {
     <Card className="flex max-w-md flex-col gap-4">
       <div>
         <h3 className="text-lg">Connexion par badge (code PIN)</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           {pinAlreadySet
             ? "Activée — scannez votre badge ci-dessus pour vous connecter avec ce code. Vous pouvez le changer ici."
             : "Activez un code PIN (4 à 6 chiffres) : vous pourrez ensuite vous connecter en scannant votre badge, sans mot de passe à retenir. Cela remplace votre mot de passe actuel."}

@@ -85,7 +85,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         value={supplier}
         onChange={(e) => setSupplier(e.target.value)}
       />
-      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/50">
+      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/65">
         {invoiceFile ? invoiceFile.name : "📎 Joindre la facture (optionnel)"}
         <input
           type="file"

@@ -40,24 +40,24 @@ export function PricingSimulator({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-2 text-sm text-navy/60">1. Choisissez votre plan</p>
+        <p className="mb-2 text-sm text-navy/70">1. Choisissez votre plan</p>
         <PlanPicker plans={plans} selected={planId} onChange={setPlanId} />
       </div>
 
       <div>
-        <p className="mb-2 text-sm text-navy/60">2. Ajoutez des modules complémentaires</p>
+        <p className="mb-2 text-sm text-navy/70">2. Ajoutez des modules complémentaires</p>
         <ModuleSelector modules={modules} prices={prices} planId={planId} selected={selectedModuleKeys} onChange={setSelectedModuleKeys} />
       </div>
 
       <Card className="flex flex-col gap-3 border-teal/30 bg-teal/5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-navy/60">Estimation pour le plan {plan?.name}</p>
+          <p className="text-sm text-navy/70">Estimation pour le plan {plan?.name}</p>
           <p className="font-display text-3xl font-extrabold text-teal-ink">
             {total.toFixed(2)} €{setupTotal > 0 ? "*" : ""}
-            <span className="text-base font-normal text-navy/40">/mois</span>
+            <span className="text-base font-normal text-navy/60">/mois</span>
           </p>
           {setupTotal > 0 && (
-            <p className="text-xs text-navy/40">* + {setupTotal.toFixed(2)} € de mise en service, une seule fois</p>
+            <p className="text-xs text-navy/60">* + {setupTotal.toFixed(2)} € de mise en service, une seule fois</p>
           )}
         </div>
         <Link href="/sign-up" className="btn-primary shrink-0">

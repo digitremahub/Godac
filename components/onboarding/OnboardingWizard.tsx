@@ -379,7 +379,7 @@ function SubscriptionSummary({
         <span>{plan?.monthly_base_price ?? 0} €/mois</span>
       </div>
       {plan && plan.setup_price > 0 && (
-        <div className="flex justify-between text-navy/50">
+        <div className="flex justify-between text-navy/65">
           <span>Mise en service (unique)</span>
           <span>{plan.setup_price} €</span>
         </div>
@@ -391,7 +391,7 @@ function SubscriptionSummary({
             <span>{a.price?.monthly_price ?? 0} €/mois</span>
           </div>
           {a.price && a.price.setup_price > 0 && (
-            <div className="flex justify-between text-navy/50">
+            <div className="flex justify-between text-navy/65">
               <span>Mise en service — {a.module.name} (unique)</span>
               <span>{a.price.setup_price} €</span>
             </div>
@@ -403,7 +403,7 @@ function SubscriptionSummary({
         <span className="font-display font-extrabold text-teal-ink">{total.toFixed(2)} €/mois</span>
       </div>
       {setupTotal > 0 && (
-        <div className="flex justify-between text-xs text-navy/40">
+        <div className="flex justify-between text-xs text-navy/60">
           <span>Dont mise en service, une seule fois</span>
           <span>{setupTotal.toFixed(2)} €</span>
         </div>

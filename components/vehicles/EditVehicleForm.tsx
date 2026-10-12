@@ -401,7 +401,7 @@ export function EditVehicleForm({
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-navy/40">
+        <p className="mt-1 text-xs text-navy/60">
           C&apos;est ce véhicule que le chauffeur retrouve dans &quot;Mon véhicule&quot;. Il peut aussi prendre
           lui-même un véhicule non assigné.
         </p>

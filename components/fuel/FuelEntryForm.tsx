@@ -181,7 +181,7 @@ export function FuelEntryForm({
         </div>
       ) : (
         derivedLiters !== null && (
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             Litres (calculés depuis le compteur) : <span className="font-medium text-navy">{derivedLiters} L</span>
           </p>
         )

@@ -225,7 +225,7 @@ export function NewFuelEntryWizard({
     return (
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             {vehicle?.registration} · {tank?.name}
           </p>
           <div>
@@ -259,7 +259,7 @@ export function NewFuelEntryWizard({
     return (
       <div className="flex flex-col gap-4">
         <Card>
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             {vehicle?.registration} · {tank?.name} · {vehicleKm} km
           </p>
         </Card>

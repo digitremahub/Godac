@@ -176,7 +176,7 @@ export function EndTourFlow({
   }
 
   if (loadingTour) {
-    return <p className="text-sm text-navy/60">Chargement…</p>;
+    return <p className="text-sm text-navy/70">Chargement…</p>;
   }
 
   if (none) {
@@ -211,13 +211,13 @@ export function EndTourFlow({
   }
 
   if (checking) {
-    return <p className="text-sm text-navy/60">Vérification…</p>;
+    return <p className="text-sm text-navy/70">Vérification…</p>;
   }
 
   return (
     <Card className="flex flex-col gap-3">
       {error && <p className="text-sm text-orange-ink">{error}</p>}
-      <p className="text-sm text-navy/60">
+      <p className="text-sm text-navy/70">
         Tournée n°{openTour?.tour_number} — {registration ?? openTour?.vehicles?.registration}
       </p>
 

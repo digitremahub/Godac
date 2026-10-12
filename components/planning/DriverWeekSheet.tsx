@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface ServiceOption {
   id: string;
@@ -55,6 +55,14 @@ export function DriverWeekSheet({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const [bulkService, setBulkService] = useState(services[0]?.id ?? "");
   const [bulkVehicle, setBulkVehicle] = useState("");
@@ -170,15 +178,18 @@ export function DriverWeekSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="driver-week-sheet-title"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between">
           <div>
-            <p className="font-display text-lg font-bold">{driver.full_name}</p>
-            <p className="text-xs text-navy/40">Semaine du {weekStart.split("-").reverse().join("/")}</p>
+            <h2 id="driver-week-sheet-title" className="font-display text-lg font-bold">{driver.full_name}</h2>
+            <p className="text-xs text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</p>
           </div>
-          <button className="text-xl text-navy/40 hover:text-navy" onClick={onClose} aria-label="Fermer">
+          <button type="button" className="flex h-11 w-11 items-center justify-center rounded-lg text-xl text-navy/60 hover:bg-navy/[0.05] hover:text-navy" onClick={onClose} aria-label="Fermer">
             ×
           </button>
         </div>
@@ -218,7 +229,7 @@ export function DriverWeekSheet({
               <button
                 key={i}
                 type="button"
-                className={`rounded-md px-2 py-1 text-xs ${bulkDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-white text-navy/40"}`}
+                className={`rounded-md px-2 py-1 text-xs ${bulkDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-white text-navy/60"}`}
                 onClick={() => toggleBulkDay(i)}
               >
                 {label}
@@ -237,7 +248,7 @@ export function DriverWeekSheet({
 
         <p className="mb-2 text-sm font-medium">Cette semaine</p>
         {driverEntries.length === 0 ? (
-          <p className="text-xs text-navy/40">Rien cette semaine pour l&apos;instant.</p>
+          <p className="text-xs text-navy/60">Rien cette semaine pour l&apos;instant.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {driverEntries.map((entry) =>
@@ -295,10 +306,10 @@ export function DriverWeekSheet({
                     <span className="badge-neutral">{STATUS_LABEL[entry.status] ?? entry.status}</span>
                     {entry.status === "planned" && (
                       <>
-                        <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(entry)} aria-label="Modifier">
+                        <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(entry)} aria-label="Modifier">
                           ✎
                         </button>
-                        <button className="text-navy/30 hover:text-orange-ink" onClick={() => removeEntry(entry.id)} aria-label="Supprimer">
+                        <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(entry.id)} aria-label="Supprimer">
                           ×
                         </button>
                       </>

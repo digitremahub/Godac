@@ -68,7 +68,7 @@ export function StaffUsersPanel({ users }: { users: StaffUserRow[] }) {
     <Card className="overflow-x-auto">
       {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Nom</th>
             <th className="pb-2">Email</th>

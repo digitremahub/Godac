@@ -53,6 +53,12 @@ export function DashboardShell({
 
   return (
     <div className="flex min-h-screen">
+      <a
+        href="#contenu"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lg"
+      >
+        Aller au contenu
+      </a>
       {drawerOpen && (
         <div
           className="fixed inset-0 z-40 bg-navy/40 lg:hidden"
@@ -71,7 +77,7 @@ export function DashboardShell({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
-        <main className={`flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 ${showActionBar ? "pb-20 lg:pb-8" : ""}`}>
+        <main id="contenu" tabIndex={-1} className={`flex-1 focus:outline-none overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 ${showActionBar ? "pb-20 lg:pb-8" : ""}`}>
           {children}
         </main>
       </div>

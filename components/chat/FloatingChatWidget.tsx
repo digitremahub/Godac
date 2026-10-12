@@ -218,7 +218,7 @@ export function FloatingChatWidget({
           <div className="flex items-center gap-1 overflow-x-auto border-b border-navy/10 bg-navy/5 px-2 pt-2">
             {assistantAvailable && (
               <button
-                className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium ${activeKey === "assistant" ? "bg-white" : "text-navy/50"}`}
+                className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium ${activeKey === "assistant" ? "bg-white" : "text-navy/65"}`}
                 onClick={() => setActiveKey("assistant")}
               >
                 🤖 Assistant
@@ -228,29 +228,29 @@ export function FloatingChatWidget({
               <div
                 key={c.contactId}
                 className={`flex shrink-0 items-center gap-1 rounded-t-lg px-2 py-1.5 text-xs font-medium ${
-                  activeKey === `conv:${c.contactId}` ? "bg-white" : "text-navy/50"
+                  activeKey === `conv:${c.contactId}` ? "bg-white" : "text-navy/65"
                 }`}
               >
                 <button onClick={() => setActiveKey(`conv:${c.contactId}`)} className="flex items-center gap-1">
                   {c.contactName.split(" ")[0]}
                   {unreadBySender[c.contactId] && activeKey !== `conv:${c.contactId}` && <span className="h-1.5 w-1.5 rounded-full bg-orange" />}
                 </button>
-                <button onClick={() => closeConversation(c.contactId)} className="text-navy/30 hover:text-orange-ink">
+                <button onClick={() => closeConversation(c.contactId)} className="text-navy/60 hover:text-orange-ink">
                   ✕
                 </button>
               </div>
             ))}
             {messengerAvailable && (
               <div className="relative shrink-0">
-                <button className="rounded-t-lg px-2 py-1.5 text-xs text-navy/50 hover:text-navy" onClick={togglePicker}>
+                <button className="rounded-t-lg px-2 py-1.5 text-xs text-navy/65 hover:text-navy" onClick={togglePicker}>
                   +
                 </button>
                 {pickerOpen && (
                   <div className="absolute right-0 top-full z-50 max-h-48 w-44 overflow-y-auto rounded-lg border border-navy/10 bg-white py-1 shadow-xl">
                     {!contacts ? (
-                      <p className="px-3 py-1.5 text-xs text-navy/40">Chargement…</p>
+                      <p className="px-3 py-1.5 text-xs text-navy/60">Chargement…</p>
                     ) : contacts.length === 0 ? (
-                      <p className="px-3 py-1.5 text-xs text-navy/40">Aucun collègue.</p>
+                      <p className="px-3 py-1.5 text-xs text-navy/60">Aucun collègue.</p>
                     ) : (
                       contacts.map((c) => (
                         <button
@@ -297,7 +297,7 @@ export function FloatingChatWidget({
               </div>
             ))}
             {!activeKey && (
-              <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-navy/40">
+              <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-navy/60">
                 Choisissez une conversation ou démarrez-en une nouvelle (+).
               </div>
             )}

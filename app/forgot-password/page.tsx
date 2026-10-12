@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
         <span className="font-display text-xl font-extrabold">GODAC</span>
       </Link>
       <ForgotPasswordForm />
-      <p className="text-sm text-navy/40">
+      <p className="text-sm text-navy/60">
         <Link href="/sign-in" className="text-teal-ink hover:underline">
           Retour à la connexion
         </Link>

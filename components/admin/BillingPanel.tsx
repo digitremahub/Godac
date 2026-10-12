@@ -52,7 +52,7 @@ export function BillingPanel({ plan, status, hasStripeCustomer }: { plan: string
     <div className="flex flex-col gap-4">
       <Card className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-navy/50">Plan actuel</p>
+          <p className="text-sm text-navy/65">Plan actuel</p>
           <p className="text-xl capitalize">{plan}</p>
           <span className="badge-neutral mt-1">{STATUS_LABELS[status] ?? status}</span>
         </div>
@@ -69,7 +69,7 @@ export function BillingPanel({ plan, status, hasStripeCustomer }: { plan: string
         {PLANS.map((p) => (
           <Card key={p.id} className="flex flex-col gap-3">
             <h3 className="text-lg">{p.name}</h3>
-            <p className="text-sm text-navy/60">{p.description}</p>
+            <p className="text-sm text-navy/70">{p.description}</p>
             <button
               className={p.id === plan ? "btn-secondary" : "btn-primary"}
               disabled={busy || p.id === plan}

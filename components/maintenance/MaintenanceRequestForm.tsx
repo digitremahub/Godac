@@ -121,7 +121,7 @@ export function MaintenanceRequestForm({
   }
 
   if (vehicles.length === 0) {
-    return <Card className="text-sm text-navy/50">Aucun véhicule disponible pour ouvrir une demande.</Card>;
+    return <Card className="text-sm text-navy/65">Aucun véhicule disponible pour ouvrir une demande.</Card>;
   }
 
   return (

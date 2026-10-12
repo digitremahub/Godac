@@ -82,7 +82,7 @@ export function LeavePlanningCalendar({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, -1))}>
           ← Mois préc.
         </button>
-        <span className="text-sm text-navy/60">
+        <span className="text-sm text-navy/70">
           {new Date(year, monthNum - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
         </span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, 1))}>
@@ -99,7 +99,7 @@ export function LeavePlanningCalendar({
 
       <div className="grid grid-cols-7 gap-1.5 text-xs">
         {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((l) => (
-          <div key={l} className="px-1 text-navy/40">
+          <div key={l} className="px-1 text-navy/60">
             {l}
           </div>
         ))}
@@ -110,7 +110,7 @@ export function LeavePlanningCalendar({
             <div
               key={day}
               className={`flex min-h-[64px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                inMonth ? "bg-white" : "bg-navy/5 text-navy/30"
+                inMonth ? "bg-white" : "bg-navy/5 text-navy/60"
               }`}
             >
               <span className="font-medium">{Number(day.slice(8, 10))}</span>
@@ -122,7 +122,7 @@ export function LeavePlanningCalendar({
                   {l.driverName.split(" ")[0]}
                 </span>
               ))}
-              {dayLeaves.length > 2 && <span className="text-[10px] text-navy/40">+{dayLeaves.length - 2}</span>}
+              {dayLeaves.length > 2 && <span className="text-[10px] text-navy/60">+{dayLeaves.length - 2}</span>}
             </div>
           );
         })}
@@ -136,16 +136,16 @@ export function LeavePlanningCalendar({
             <Card key={l.id} className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-medium">
-                  {l.driverName} <span className="text-xs text-navy/40">({l.serviceName})</span>
+                  {l.driverName} <span className="text-xs text-navy/60">({l.serviceName})</span>
                 </p>
-                <p className="text-xs text-navy/50">
+                <p className="text-xs text-navy/65">
                   {new Date(l.startDate).toLocaleDateString("fr-FR")} → {new Date(l.endDate).toLocaleDateString("fr-FR")}
                 </p>
               </div>
               <span className={STATUS_BADGES[l.status]}>{STATUS_LABELS[l.status]}</span>
               {l.status === "approved" && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-navy/50">Remplaçant</label>
+                  <label className="text-xs text-navy/65">Remplaçant</label>
                   <select
                     className="input !w-auto !py-1 text-xs"
                     value={l.replacementDriverId ?? ""}

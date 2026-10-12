@@ -53,7 +53,7 @@ export function AnnouncementForm({ services }: { services: ServiceOption[] }) {
 
       <div>
         <label className="label">Titre</label>
-        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Note de service, convocation..." />
+        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Note de service, convocation…" />
       </div>
       <div>
         <label className="label">Message</label>

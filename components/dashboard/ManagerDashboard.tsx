@@ -108,7 +108,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
           <Card className="flex flex-col items-center justify-center gap-3 py-8 text-center">
             {openTour ? (
               <>
-                <p className="mb-1 text-sm text-navy/60">
+                <p className="mb-1 text-sm text-navy/70">
                   Tournée n°{openTour.tour_number} en cours
                   {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
                 </p>
@@ -118,7 +118,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
               </>
             ) : (
               <>
-                <p className="mb-3 text-sm text-navy/60">Aucune tournée en cours</p>
+                <p className="mb-3 text-sm text-navy/70">Aucune tournée en cours</p>
                 <Link href="/tours/start" className="btn-primary block w-full text-center">
                   🚚 Démarrer une tournée
                 </Link>
@@ -141,7 +141,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-lg">Tournées en cours</h2>
           {ongoingTours.length === 0 ? (
-            <p className="text-sm text-navy/40">Aucune tournée en cours actuellement.</p>
+            <p className="text-sm text-navy/60">Aucune tournée en cours actuellement.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {ongoingTours.map((t) => (
@@ -149,7 +149,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
                   <span>
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
-                  <span className="text-xs text-navy/40">
+                  <span className="text-xs text-navy/60">
                     depuis {new Date(t.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </li>
@@ -161,7 +161,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
         <Card>
           <h2 className="mb-3 text-lg">Consommation (30 jours)</h2>
           {consumptionRanking.length === 0 ? (
-            <p className="text-sm text-navy/40">Pas assez de données pour établir un classement.</p>
+            <p className="text-sm text-navy/60">Pas assez de données pour établir un classement.</p>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (

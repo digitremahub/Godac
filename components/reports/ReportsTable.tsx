@@ -153,7 +153,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
     <Card className="overflow-x-auto">
       {error && <p className="mb-2 text-sm text-orange-ink">{error}</p>}
       <table className="w-full min-w-[1420px] text-sm">
-        <thead className="text-left text-navy/40">
+        <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             <th className="pb-2">Chauffeur</th>
@@ -230,7 +230,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                     </div>
                   ) : (
                     <button
-                      className="text-navy/30 hover:text-teal-ink"
+                      className="text-navy/60 hover:text-teal-ink"
                       onClick={() => startEdit(r)}
                       aria-label="Modifier"
                       title="Modifier"

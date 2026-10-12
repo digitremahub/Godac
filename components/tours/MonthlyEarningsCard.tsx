@@ -31,7 +31,7 @@ export function MonthlyEarningsCard({
 }) {
   if (!hasContract) {
     return (
-      <Card className="mb-4 text-sm text-navy/50">
+      <Card className="mb-4 text-sm text-navy/65">
         💰 Votre salaire estimé ce mois-ci s&apos;affichera ici une fois votre contrat renseigné par la direction.
       </Card>
     );
@@ -39,7 +39,7 @@ export function MonthlyEarningsCard({
 
   return (
     <Card className="mb-4 flex flex-col gap-1">
-      <p className="text-sm text-navy/50">💰 Votre salaire estimé ce mois-ci</p>
+      <p className="text-sm text-navy/65">💰 Votre salaire estimé ce mois-ci</p>
       <p className="text-sm">
         {formatHours(workedHours)} travaillées
         {absenceWeekdays > 0 ? ` + ${absenceWeekdays} jour(s) d'absence rémunéré(s)` : ""}
@@ -50,9 +50,9 @@ export function MonthlyEarningsCard({
           {estimate.net !== null ? ` · ${formatEuros(estimate.net)} net` : ""}
         </p>
       ) : (
-        <p className="text-sm text-navy/40">Taux horaire non renseigné.</p>
+        <p className="text-sm text-navy/60">Taux horaire non renseigné.</p>
       )}
-      <p className="text-xs text-navy/30">Estimation indicative — ne remplace pas votre bulletin de paie.</p>
+      <p className="text-xs text-navy/60">Estimation indicative — ne remplace pas votre bulletin de paie.</p>
     </Card>
   );
 }

@@ -130,7 +130,7 @@ export function PlanningDayView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, -1))}>
           ← Jour préc.
         </button>
-        <span className="text-sm text-navy/60">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+        <span className="text-sm text-navy/70">{new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(day, 1))}>
           Jour suiv. →
         </button>
@@ -194,10 +194,10 @@ export function PlanningDayView({
                           <span className={STATUS_BADGE[e.status] ?? "badge-neutral"}>{STATUS_LABEL[e.status] ?? e.status}</span>
                           {e.status === "planned" && (
                             <>
-                              <button className="text-navy/30 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
+                              <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
                                 ✎
                               </button>
-                              <button className="text-navy/30 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
+                              <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
                                 ×
                               </button>
                             </>

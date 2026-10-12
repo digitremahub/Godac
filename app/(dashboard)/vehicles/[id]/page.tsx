@@ -179,7 +179,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             ) : (
               <Card className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
-                  <thead className="text-left text-navy/40">
+                  <thead className="text-left text-navy/60">
                     <tr>
                       <th className="pb-2">Date</th>
                       <th className="pb-2">Chauffeur</th>
@@ -227,39 +227,39 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col items-center gap-4">
           {(v.brand || v.model) && (
             <Card className="w-full">
-              <p className="text-sm text-navy/50">Modèle</p>
+              <p className="text-sm text-navy/65">Modèle</p>
               <p className="text-lg">
                 {[v.brand, v.model].filter(Boolean).join(" ")}
                 {v.model_year ? ` (${v.model_year})` : ""}
               </p>
-              {v.gearbox && <p className="text-xs text-navy/40">Boîte {v.gearbox}</p>}
+              {v.gearbox && <p className="text-xs text-navy/60">Boîte {v.gearbox}</p>}
             </Card>
           )}
           <Card>
-            <p className="text-sm text-navy/50">Capacité réservoir</p>
+            <p className="text-sm text-navy/65">Capacité réservoir</p>
             <p className="text-xl">{v.tank_capacity_liters ? `${v.tank_capacity_liters} L` : "Non renseignée"}</p>
             <SpecProvenance field="tank_capacity_liters" specSources={v.spec_sources} />
           </Card>
           <Card className="w-full">
-            <p className="mb-2 text-sm text-navy/50">Caractéristiques techniques</p>
+            <p className="mb-2 text-sm text-navy/65">Caractéristiques techniques</p>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-navy/40">Carburant</p>
+                <p className="text-navy/60">Carburant</p>
                 <p>{v.fuel_type ?? "—"}</p>
                 <SpecProvenance field="fuel_type" specSources={v.spec_sources} />
               </div>
               <div>
-                <p className="text-navy/40">AdBlue</p>
+                <p className="text-navy/60">AdBlue</p>
                 <p>{v.adblue_capacity_liters ? `${v.adblue_capacity_liters} L` : "—"}</p>
                 <SpecProvenance field="adblue_capacity_liters" specSources={v.spec_sources} />
               </div>
               <div>
-                <p className="text-navy/40">PTAC</p>
+                <p className="text-navy/60">PTAC</p>
                 <p>{v.ptac_kg ? `${v.ptac_kg} kg` : "—"}</p>
                 <SpecProvenance field="ptac_kg" specSources={v.spec_sources} />
               </div>
               <div>
-                <p className="text-navy/40">Conso. référence</p>
+                <p className="text-navy/60">Conso. référence</p>
                 <p>{v.reference_consumption_l_100km ? `${v.reference_consumption_l_100km} L/100km` : "—"}</p>
                 <SpecProvenance field="reference_consumption_l_100km" specSources={v.spec_sources} />
               </div>
@@ -267,23 +267,23 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             <SpecProvenance field="type" specSources={v.spec_sources} label="Type" />
           </Card>
           <Card>
-            <p className="text-sm text-navy/50">Chauffeur assigné</p>
+            <p className="text-sm text-navy/65">Chauffeur assigné</p>
             <p className="text-xl">{v.users?.full_name ?? "Aucun"}</p>
           </Card>
           <Card className="w-full">
-            <p className="mb-2 text-sm text-navy/50">Consommation moyenne</p>
+            <p className="mb-2 text-sm text-navy/65">Consommation moyenne</p>
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl">{consumption30d !== null ? `${consumption30d} L/100km` : "—"}</p>
-                <p className="text-xs text-navy/40">30 derniers jours</p>
+                <p className="text-xs text-navy/60">30 derniers jours</p>
               </div>
               <div>
                 <p className="text-xl">{consumption90d !== null ? `${consumption90d} L/100km` : "—"}</p>
-                <p className="text-xs text-navy/40">90 derniers jours</p>
+                <p className="text-xs text-navy/60">90 derniers jours</p>
               </div>
             </div>
             {consumption30d === null && consumption90d === null && (
-              <p className="mt-2 text-xs text-navy/40">Pas assez de relevés kilométriques pour calculer la consommation.</p>
+              <p className="mt-2 text-xs text-navy/60">Pas assez de relevés kilométriques pour calculer la consommation.</p>
             )}
           </Card>
           <div className="w-full">

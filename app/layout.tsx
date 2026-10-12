@@ -31,7 +31,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1BE4C1",
+  // Matches the page background (paper) so the mobile browser chrome
+  // blends into the app instead of a bright teal band above it.
+  themeColor: "#F6F7FB",
 };
 
 export default function RootLayout({

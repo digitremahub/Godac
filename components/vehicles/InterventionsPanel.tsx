@@ -181,7 +181,7 @@ export function InterventionsPanel({
       </div>
 
       {interventions.length === 0 ? (
-        <p className="text-sm text-navy/40">Aucune intervention enregistrée.</p>
+        <p className="text-sm text-navy/60">Aucune intervention enregistrée.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {interventions.map((i) => {
@@ -216,8 +216,8 @@ export function InterventionsPanel({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{i.type}</p>
-                      {i.description && <p className="text-navy/50">{i.description}</p>}
-                      {i.odometer_km !== null && <p className="text-xs text-navy/40">{i.odometer_km} km</p>}
+                      {i.description && <p className="text-navy/65">{i.description}</p>}
+                      {i.odometer_km !== null && <p className="text-xs text-navy/60">{i.odometer_km} km</p>}
                       {i.appointment_needed && <span className="badge-gold">RDV garage à prévoir</span>}
                       {i.photoUrls.length > 0 && (
                         <div className="mt-1 flex gap-1">

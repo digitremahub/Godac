@@ -48,7 +48,7 @@ export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEn
     <div className="flex w-32 flex-col gap-1">
       <TourReportPhotoCapture label={stage === "start" ? "Rapport départ" : "Rapport retour"} onCaptured={handleCaptured} />
       {error && <p className="text-[10px] text-orange-ink">{error}</p>}
-      <button className="text-[10px] text-navy/40 underline" onClick={() => setOpen(false)}>
+      <button className="text-[10px] text-navy/60 underline" onClick={() => setOpen(false)}>
         Annuler
       </button>
     </div>

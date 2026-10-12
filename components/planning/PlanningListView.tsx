@@ -114,7 +114,7 @@ export function PlanningListView({
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(weekStart, -7))}>
           ← Semaine préc.
         </button>
-        <span className="text-sm text-navy/60">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+        <span className="text-sm text-navy/70">Semaine du {weekStart.split("-").reverse().join("/")}</span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addDays(weekStart, 7))}>
           Semaine suiv. →
         </button>
@@ -127,7 +127,7 @@ export function PlanningListView({
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-navy/40">
+            <thead className="text-left text-navy/60">
               <tr>
                 <th className="pb-2">Date</th>
                 <th className="pb-2">Service</th>
@@ -202,7 +202,7 @@ export function PlanningListView({
                       {e.driver_id && (
                         <button
                           type="button"
-                          className="text-navy/30 hover:text-teal-ink"
+                          className="text-navy/60 hover:text-teal-ink"
                           title="Fiche chauffeur"
                           aria-label="Fiche chauffeur"
                           onClick={() => {
@@ -239,7 +239,7 @@ export function PlanningListView({
                     {e.status === "planned" && (
                       <button
                         type="button"
-                        className="text-navy/30 hover:text-orange-ink"
+                        className="text-navy/60 hover:text-orange-ink"
                         onClick={() => removeEntry(e.id)}
                         aria-label="Supprimer"
                         title="Supprimer"

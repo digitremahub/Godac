@@ -87,7 +87,7 @@ export function PasskeyManager() {
     <Card className="flex max-w-md flex-col gap-3">
       <div>
         <h3 className="text-lg">Face ID / empreinte</h3>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Connectez-vous plus vite sur cet appareil, sans retaper votre code ou attendre un email. Votre moyen de
           connexion habituel reste disponible en secours.
         </p>
@@ -99,11 +99,11 @@ export function PasskeyManager() {
             <li key={c.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2 text-sm">
               <span>
                 {c.device_name ?? "Appareil"}
-                <span className="ml-2 text-xs text-navy/40">
+                <span className="ml-2 text-xs text-navy/60">
                   ajouté le {new Date(c.created_at).toLocaleDateString("fr-FR")}
                 </span>
               </span>
-              <button className="text-navy/30 hover:text-orange-ink" disabled={busy} onClick={() => remove(c.id)} aria-label="Retirer">
+              <button className="text-navy/60 hover:text-orange-ink" disabled={busy} onClick={() => remove(c.id)} aria-label="Retirer">
                 ×
               </button>
             </li>

@@ -308,7 +308,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
             </button>
           )}
         </div>
-        <p className="text-xs text-navy/40">
+        <p className="text-xs text-navy/60">
           {mode === "email"
             ? "Le titre affiché est libre (ex: \"Chef de dépôt\", \"Assistante RH\") — c'est le rôle choisi ci-dessus qui détermine les permissions réelles dans GODAC."
             : "Aucun email n'est envoyé : imprimez le badge QR affiché après la création et remettez-le au chauffeur. Il scanne son badge pour créer son propre code PIN à la première connexion."}
@@ -319,7 +319,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
       {newBadge && (
         <Card className="flex flex-col items-center gap-3">
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/70">
             Fiche créée pour <strong>{newBadge.fullName}</strong> — imprimez ce badge et remettez-le lui. Il le
             scanne pour créer son code PIN et se connecter.
           </p>
@@ -332,7 +332,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="text-left text-navy/40">
+          <thead className="text-left text-navy/60">
             <tr>
               <th className="pb-2">Nom</th>
               <th className="pb-2">Titre</th>
@@ -358,7 +358,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                       </Link>
                     )}
                   </td>
-                  <td className="py-2 text-navy/60">
+                  <td className="py-2 text-navy/70">
                     {isEditing ? (
                       <input
                         className="input !py-1"
@@ -377,7 +377,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                       u.email
                     )}
                   </td>
-                  <td className="py-2 text-navy/60">
+                  <td className="py-2 text-navy/70">
                     {isEditing ? (
                       <input
                         className="input !py-1"

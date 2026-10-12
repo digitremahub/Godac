@@ -75,7 +75,7 @@ export function TourReportPhotoCapture({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={preview} alt="Rapport de tournée" className="h-20 w-32 rounded-lg border border-navy/10 object-cover" />
       )}
-      {isPdf && fileName && <p className="text-[11px] text-navy/50">📄 {fileName}</p>}
+      {isPdf && fileName && <p className="text-[11px] text-navy/65">📄 {fileName}</p>}
       <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}

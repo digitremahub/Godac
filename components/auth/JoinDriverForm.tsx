@@ -51,7 +51,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
         <h2 className="text-xl">Créer mon compte chauffeur</h2>
-        <p className="mt-1 text-sm text-navy/50">
+        <p className="mt-1 text-sm text-navy/65">
           Un responsable devra valider votre compte avant que vous puissiez vous connecter — vous pouvez créer votre code
           PIN dès maintenant, ça ira plus vite ensuite.
         </p>
@@ -70,7 +70,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
             onChange={(e) => setCompanyName(e.target.value)}
             placeholder="Nom de votre entreprise"
           />
-          <p className="mt-1 text-xs text-navy/40">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
+          <p className="mt-1 text-xs text-navy/60">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
         </div>
         <div>
           <label className="label">Téléphone (optionnel)</label>
