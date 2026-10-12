@@ -166,15 +166,13 @@ export function Sidebar({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" />
         ) : (
-          <div
-            aria-hidden="true"
-            className="h-9 w-9 shrink-0 rounded-lg"
-            style={{ backgroundColor: accent }}
-          />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/brand/godac-symbol.svg" alt="" width={43} height={36} className="h-9 w-auto shrink-0" />
         )}
         <span className="min-w-0">
           <span className="block truncate font-display text-[15px] font-bold leading-tight">{organizationName ?? "GODAC"}</span>
-          <span className="block text-[11px] font-medium uppercase tracking-[0.12em] text-white/60">GODAC</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/godac-wordmark-white.svg" alt="GODAC" width={51} height={10} className="mt-1 block h-2.5 w-auto opacity-70" />
         </span>
       </Link>
 

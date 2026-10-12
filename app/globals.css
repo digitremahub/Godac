@@ -276,3 +276,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Logo wordmark: ink letters on light theme, white letters on dark theme. */
+.brand-white {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-ink {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .brand-white {
+    display: inline;
+  }
+}
+:root[data-theme="dark"] .brand-ink {
+  display: none;
+}
+:root[data-theme="dark"] .brand-white {
+  display: inline;
+}

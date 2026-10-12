@@ -13,8 +13,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "GODAC";
   const options = {
     body: data.body || "",
-    icon: "/icon",
-    badge: "/icon",
+    icon: "/brand/app-icon-192.png",
+    badge: "/brand/app-icon-192.png",
     data: { url: data.url || "/dashboard" },
   };
 

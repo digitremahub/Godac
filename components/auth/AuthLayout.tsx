@@ -16,7 +16,7 @@ const PREVIEW = [
 ];
 
 export function BrandMark({ inverted = false }: { inverted?: boolean }) {
-  return <Wordmark inverted={inverted} className="text-2xl" />;
+  return <Wordmark inverted={inverted} height={32} />;
 }
 
 /**
