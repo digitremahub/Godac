@@ -9,6 +9,7 @@ import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { TourReportPhotoCapture } from "@/components/shared/TourReportPhotoCapture";
 import { Card, EmptyState } from "@/components/ui";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
+import { IconCamera, IconCheck, IconRefresh } from "@/components/layout/icons";
 
 interface OpenTour {
   id: string;
@@ -201,10 +202,10 @@ export function StartTourFlow({
             <span className="font-medium">{plannedToday.vehicles.registration}</span>.
           </p>
           <button className="btn-primary w-full justify-center" onClick={confirmPlannedVehicle}>
-            ✅ Commencer avec {plannedToday.vehicles.registration}
+            <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Commencer avec {plannedToday.vehicles.registration}
           </button>
           <button className="btn-secondary w-full justify-center text-sm" onClick={() => setShowScanner(true)}>
-            🔄 Changement de véhicule — scanner le véhicule remplaçant
+            <IconRefresh className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Changement de véhicule — scanner le véhicule remplaçant
           </button>
         </Card>
       );
@@ -305,11 +306,11 @@ export function StartTourFlow({
       <fieldset>
         <legend className="label">État du véhicule *</legend>
         <div className="flex flex-col gap-2">
-          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/[0.04] p-3 text-sm">
             <input type="radio" name="vehicle-ok" checked={vehicleOk === true} onChange={() => setVehicleOk(true)} />
             Contrôle visuel effectué, véhicule conforme
           </label>
-          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-navy/[0.04] p-3 text-sm">
             <input type="radio" name="vehicle-ok" checked={vehicleOk === false} onChange={() => setVehicleOk(false)} />
             Problème constaté
           </label>
@@ -328,7 +329,7 @@ export function StartTourFlow({
             /></label>
           </div>
           <label className="btn-secondary w-full cursor-pointer justify-center text-center text-xs">
-            {problemPhotoFile ? "Photo sélectionnée ✓" : "📷 Photo du problème (optionnel)"}
+            {problemPhotoFile ? <>Photo sélectionnée <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /></> : <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo du problème (optionnel)</>}
             <input
               type="file"
               accept="image/*"

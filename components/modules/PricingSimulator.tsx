@@ -52,7 +52,7 @@ export function PricingSimulator({
       <Card className="flex flex-col gap-3 border-teal/30 bg-teal/5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-navy/70">Estimation pour le plan {plan?.name}</p>
-          <p className="font-display text-3xl font-extrabold text-teal-ink">
+          <p className="text-3xl font-bold tabular-nums text-teal-ink">
             {total.toFixed(2)} €{setupTotal > 0 ? "*" : ""}
             <span className="text-base font-normal text-navy/60">/mois</span>
           </p>

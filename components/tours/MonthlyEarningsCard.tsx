@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui";
+import { IconCoins } from "@/components/layout/icons";
 
 function formatHours(hours: number): string {
   const h = Math.floor(hours);
@@ -32,14 +33,14 @@ export function MonthlyEarningsCard({
   if (!hasContract) {
     return (
       <Card className="mb-4 text-sm text-navy/65">
-        💰 Votre salaire estimé ce mois-ci s&apos;affichera ici une fois votre contrat renseigné par la direction.
+        <IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Votre salaire estimé ce mois-ci s&apos;affichera ici une fois votre contrat renseigné par la direction.
       </Card>
     );
   }
 
   return (
     <Card className="mb-4 flex flex-col gap-1">
-      <p className="text-sm text-navy/65">💰 Votre salaire estimé ce mois-ci</p>
+      <p className="text-sm text-navy/65"><IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Votre salaire estimé ce mois-ci</p>
       <p className="text-sm">
         {formatHours(workedHours)} travaillées
         {absenceWeekdays > 0 ? ` + ${absenceWeekdays} jour(s) d'absence rémunéré(s)` : ""}

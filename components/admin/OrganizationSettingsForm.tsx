@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { textSafeVariant } from "@/lib/theme/contrast";
+import { IconMapPin, IconNavigation } from "@/components/layout/icons";
 
 const DEFAULT_ACCENT = "#1BE4C1";
 
@@ -136,9 +137,9 @@ export function OrganizationSettingsForm({
         <div className="flex items-center gap-4">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img width={56} height={56} src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-navy/5 p-1" />
+            <img width={56} height={56} src={logo} alt="Logo de l'organisation" className="h-14 w-14 rounded-lg object-contain bg-navy/[0.04] p-1" />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-navy/5 text-xs text-navy/60">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-navy/[0.04] text-xs text-navy/60">
               Aucun
             </div>
           )}
@@ -167,7 +168,7 @@ export function OrganizationSettingsForm({
           />
           <span className="text-sm text-navy/65">{accent}</span>
         </div>
-        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-navy/5 p-3 text-sm">
+        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-navy/[0.04] p-3 text-sm">
           <div className="flex items-center gap-2">
             <span className="h-5 w-5 shrink-0 rounded" style={{ backgroundColor: accent }} />
             Sur les boutons et badges — votre couleur exacte.
@@ -181,7 +182,7 @@ export function OrganizationSettingsForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
+      <div className="flex items-center justify-between rounded-lg bg-navy/[0.04] p-3">
         <div>
           <p className="font-medium">Module OCR</p>
           <p className="text-sm text-navy/65">
@@ -197,7 +198,7 @@ export function OrganizationSettingsForm({
         </button>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-navy/5 p-3">
+      <div className="flex items-center justify-between rounded-lg bg-navy/[0.04] p-3">
         <div>
           <p className="font-medium">Photo du compteur kilométrique obligatoire</p>
           <p className="text-sm text-navy/65">
@@ -242,7 +243,7 @@ export function OrganizationSettingsForm({
               rel="noreferrer"
               className="text-teal-ink underline"
             >
-              🗺️ Google Maps
+              <IconMapPin className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Google Maps
             </a>
             <a
               href={`https://waze.com/ul?q=${encodeURIComponent(depotAddressValue.trim())}&navigate=yes`}
@@ -250,7 +251,7 @@ export function OrganizationSettingsForm({
               rel="noreferrer"
               className="text-teal-ink underline"
             >
-              🚗 Waze
+              <IconNavigation className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Waze
             </a>
           </p>
         )}
@@ -260,7 +261,7 @@ export function OrganizationSettingsForm({
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg bg-navy/5 p-3">
+      <div className="flex flex-col gap-3 rounded-lg bg-navy/[0.04] p-3">
         <p className="font-medium">Identité légale (fiche employeur)</p>
         <p className="text-sm text-navy/65">
           Affichée dans l&apos;encadré employeur des fiches de paie générées — chaque champ renseigné y apparaît, les champs vides sont simplement omis.

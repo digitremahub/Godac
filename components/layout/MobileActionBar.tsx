@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { UserRole } from "@/lib/types/domain";
 import { IconClock, IconFlag, IconPlusCircle, IconWrench, IconCalendar } from "@/components/layout/icons";
 
@@ -24,6 +27,7 @@ export function MobileActionBar({
   enabledModuleKeys: string[];
   hasActiveTour: boolean;
 }) {
+  const pathname = usePathname() ?? "";
   if (role !== "chauffeur" && role !== "manager_chauffeur") return null;
 
   const enabled = new Set(enabledModuleKeys);
@@ -44,22 +48,30 @@ export function MobileActionBar({
   return (
     <nav
       aria-label="Actions rapides"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-navy/10 bg-white/95 backdrop-blur-sm lg:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-3 bottom-3 z-30 lg:hidden"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-navy/70 transition-colors active:bg-navy/[0.05]"
-          >
-            <Icon className="h-5 w-5" />
-            <span className="text-xs font-medium">{item.label}</span>
-          </Link>
-        );
-      })}
+      <ul className="flex rounded-2xl bg-navy/95 p-1.5 shadow-pop backdrop-blur-md">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const path = item.href.split("?")[0]!;
+          const active = pathname === path || pathname.startsWith(`${path}/`);
+          return (
+            <li key={item.href} className="flex-1">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl text-xs font-semibold transition-colors ${
+                  active ? "bg-white/10 text-teal" : "text-white/75 active:bg-white/10"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

@@ -248,7 +248,7 @@ async function PhotosView({
             )}
           </div>
           {(r.report_bl_number || r.report_stops_total !== null || r.report_packages_count !== null) && (
-            <p className="rounded-lg bg-navy/5 px-2 py-1 text-xs text-navy/70">
+            <p className="rounded-lg bg-navy/[0.04] px-2 py-1 text-xs text-navy/70">
               {[
                 r.report_bl_number && `BL ${r.report_bl_number}`,
                 r.report_stops_total !== null && `${r.report_stops_total} arrêts`,

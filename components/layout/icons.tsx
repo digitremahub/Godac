@@ -269,3 +269,142 @@ export function IconChatBubble(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconLogOut(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </Svg>
+  );
+}
+
+export function IconExternal(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10 14" />
+      <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </Svg>
+  );
+}
+
+export function IconArrowRight(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </Svg>
+  );
+}
+
+export function IconCheck(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m5 12 5 5L20 7" />
+    </Svg>
+  );
+}
+
+export function IconPlay(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M7 5v14l11-7Z" />
+    </Svg>
+  );
+}
+
+export function IconFingerprint(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 11v3a8 8 0 0 1-1.5 4.7" />
+      <path d="M8.5 13.5V11a3.5 3.5 0 0 1 7 0v1.5" />
+      <path d="M15.5 16a14 14 0 0 1-.9 4" />
+      <path d="M5 15.5V11a7 7 0 0 1 12.5-4.3" />
+      <path d="M19 11v1.5" />
+    </Svg>
+  );
+}
+
+export function IconPaperclip(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8L13.3 3a3.7 3.7 0 0 1 5.2 5.2l-8.7 8.7a1.8 1.8 0 0 1-2.6-2.6l8-8" />
+    </Svg>
+  );
+}
+
+export function IconAlertTriangle(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </Svg>
+  );
+}
+
+export function IconPencil(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </Svg>
+  );
+}
+
+export function IconCopy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </Svg>
+  );
+}
+
+export function IconMapPin(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </Svg>
+  );
+}
+
+export function IconNavigation(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m3 11 19-9-9 19-2-8Z" />
+    </Svg>
+  );
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
+      <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M3 21v-5h5" />
+    </Svg>
+  );
+}
+
+export function IconTrash(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </Svg>
+  );
+}
+
+export function IconSparkles(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z" />
+      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z" />
+    </Svg>
+  );
+}

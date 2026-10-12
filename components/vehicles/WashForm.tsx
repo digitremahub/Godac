@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui";
 import type { VehicleType } from "@/lib/types/domain";
+import { IconCamera, IconWashing } from "@/components/layout/icons";
 
 export function WashForm({ vehicleId, vehicleType }: { vehicleId: string; vehicleType: VehicleType }) {
   const router = useRouter();
@@ -60,7 +61,7 @@ export function WashForm({ vehicleId, vehicleType }: { vehicleId: string; vehicl
   if (done) {
     return (
       <Card className="flex flex-col items-center gap-2 py-8 text-center">
-        <p className="text-lg">🧽 Lavage enregistré</p>
+        <p className="text-lg"><IconWashing className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Lavage enregistré</p>
         <button className="btn-secondary mt-2" onClick={() => router.refresh()}>
           OK
         </button>
@@ -88,7 +89,7 @@ export function WashForm({ vehicleId, vehicleType }: { vehicleId: string; vehicl
         )}
       </div>
       <label className="btn-secondary w-full cursor-pointer justify-center text-center">
-        {photo ? "📷 Photo ajoutée" : "📷 Photo (optionnel)"}
+        {photo ? <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo ajoutée</> : <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo (optionnel)</>}
         <input
           type="file"
           accept="image/*"

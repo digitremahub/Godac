@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { IconAlertTriangle, IconPencil } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -196,9 +197,9 @@ export function DriverWeekSheet({
         </div>
 
         {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
-        {warning && <p className="mb-2 text-sm text-gold-ink">⚠️ {warning}</p>}
+        {warning && <p className="mb-2 text-sm text-gold-ink"><IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {warning}</p>}
 
-        <div className="mb-4 flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
+        <div className="mb-4 flex flex-col gap-2 rounded-lg bg-navy/[0.04] p-3">
           <p className="text-sm font-medium">Affecter toute la semaine</p>
           <div className="flex flex-wrap gap-2">
             <select aria-label="Service" className="input !w-auto" value={bulkService} onChange={(e) => setBulkService(e.target.value)}>
@@ -254,7 +255,7 @@ export function DriverWeekSheet({
           <div className="flex flex-col gap-2">
             {driverEntries.map((entry) =>
               editingId === entry.id ? (
-                <div key={entry.id} className="flex flex-col gap-1.5 rounded-lg bg-navy/5 p-2">
+                <div key={entry.id} className="flex flex-col gap-1.5 rounded-lg bg-navy/[0.04] p-2">
                   <div className="flex flex-wrap gap-1.5">
                     <input
                       className="input !w-auto !py-1 text-sm"
@@ -296,7 +297,7 @@ export function DriverWeekSheet({
               ) : (
                 <div
                   key={entry.id}
-                  className={`flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2 text-sm ${rowBusyId === entry.id ? "opacity-40" : ""}`}
+                  className={`flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm ${rowBusyId === entry.id ? "opacity-40" : ""}`}
                 >
                   <span>
                     {new Date(entry.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}{" "}
@@ -308,7 +309,7 @@ export function DriverWeekSheet({
                     {entry.status === "planned" && (
                       <>
                         <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(entry)} aria-label="Modifier">
-                          ✎
+                          <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                         </button>
                         <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(entry.id)} aria-label="Supprimer">
                           ×

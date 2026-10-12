@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { IconMegaphone } from "@/components/layout/icons";
 
 /** "Convoquer" button on a driver's fiche (admin/users/[id]) — direction and chefs d'équipe only. */
 export function ConvocationButton({ employeeId }: { employeeId: string }) {
@@ -48,7 +49,7 @@ export function ConvocationButton({ employeeId }: { employeeId: string }) {
     return (
       <div className="flex flex-col items-start gap-1">
         <button className="btn-secondary" onClick={() => setOpen(true)}>
-          📋 Convoquer
+          <IconMegaphone className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Convoquer
         </button>
         {sent && <p role="status" className="text-xs text-teal-ink">Convocation envoyée.</p>}
       </div>

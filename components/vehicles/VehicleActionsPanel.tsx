@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { UserRole, VehicleType } from "@/lib/types/domain";
 import { WashForm } from "@/components/vehicles/WashForm";
 import { Card } from "@/components/ui";
+import { IconDroplet, IconFlag, IconTruck, IconWashing, IconWrench } from "@/components/layout/icons";
 
 export function VehicleActionsPanel({
   vehicleId,
@@ -41,23 +42,23 @@ export function VehicleActionsPanel({
           href={`/${hasActiveTourHere ? "tours/end" : "tours/start"}?vehicle=${vehicleId}`}
           className="btn-primary min-h-[52px] w-full justify-center text-base"
         >
-          {hasActiveTourHere ? "🏁 Retour sur site" : "🚚 Départ de tournée"}
+          {hasActiveTourHere ? <><IconFlag className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Retour sur site</> : <><IconTruck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Départ de tournée</>}
         </Link>
       )}
 
       <Link href={`/fuel?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
-        ⛽ Plein
+        <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein
       </Link>
 
       {enabled.has("maintenance_requests") && (
         <Link href={`/maintenance?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
-          🔧 Signaler un problème
+          <IconWrench className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Signaler un problème
         </Link>
       )}
 
       {enabled.has("washes") && (
         <button className="btn-secondary min-h-[52px] w-full justify-center text-base" onClick={() => setShowWash(true)}>
-          🧽 Lavage
+          <IconWashing className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Lavage
         </button>
       )}
     </Card>

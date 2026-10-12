@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { IconCheck, IconPencil } from "@/components/layout/icons";
 
 export interface TicpeExportLine {
   id: string;
@@ -135,10 +136,10 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                   ) : (
                     <div className="flex gap-2">
                       <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => confirm(l.id)}>
-                        ✓ Correct
+                        <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Correct
                       </button>
                       <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => startEdit(l)}>
-                        ✏️ Corriger
+                        <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Corriger
                       </button>
                     </div>
                   )}

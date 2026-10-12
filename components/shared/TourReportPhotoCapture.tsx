@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
+import { IconFileText, IconPaperclip } from "@/components/layout/icons";
 
 /**
  * Lot C: captures a tour report (handheld "Statistiques Tournée"
@@ -75,11 +76,11 @@ export function TourReportPhotoCapture({
         // eslint-disable-next-line @next/next/no-img-element
         <img width={128} height={80} src={preview} alt="Rapport de tournée" className="h-20 w-32 rounded-lg border border-navy/10 object-cover" />
       )}
-      {isPdf && fileName && <p className="text-xs text-navy/65">📄 {fileName}</p>}
+      {isPdf && fileName && <p className="text-xs text-navy/65"><IconFileText className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {fileName}</p>}
       <label className="btn-secondary min-h-[44px] w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
-        {(status === "idle" || status === "error" || status === "done") && `📎 ${label}`}
+        {(status === "idle" || status === "error" || status === "done") && <><IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {label}</>}
         <input
           type="file"
           accept="image/*,application/pdf"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { SignOutButton } from "@/components/layout/SignOutButton";
-import { IconGrid, IconMenu } from "@/components/layout/icons";
+import { IconExternal, IconMenu } from "@/components/layout/icons";
 import type { UserRole } from "@/lib/types/domain";
 
 function initials(name: string) {
@@ -25,48 +25,48 @@ export function TopBar({
   onMenuClick?: () => void;
 }) {
   return (
-    <header className="flex h-16 items-center justify-between gap-3 border-b border-navy/10 bg-white/70 px-4 backdrop-blur-sm sm:px-6">
-      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-navy/[0.08] bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
           onClick={onMenuClick}
           aria-label="Ouvrir le menu"
           aria-controls="navigation-principale"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-navy/70 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:hidden"
+          className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-navy/70 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:hidden"
         >
           <IconMenu className="h-5 w-5" />
         </button>
         <Link
-          href="/dashboard"
-          title="Accueil"
-          aria-label="Accueil"
-          className="hidden h-9 w-9 items-center justify-center rounded-lg text-navy/65 transition-colors hover:bg-navy/[0.06] hover:text-navy lg:flex"
-        >
-          <IconGrid className="h-5 w-5" />
-        </Link>
-        <Link
           href="/"
           target="_blank"
           rel="noreferrer"
-          className="hidden text-sm text-navy/60 transition-colors hover:text-navy md:inline"
+          className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-navy/65 transition-colors hover:bg-navy/[0.05] hover:text-navy md:inline-flex"
         >
-          Site vitrine <span aria-hidden="true">↗</span>
+          Site vitrine
+          <IconExternal className="h-3.5 w-3.5" />
           <span className="sr-only"> (nouvel onglet)</span>
         </Link>
-        <div className="flex min-w-0 items-center gap-3">
-          <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal/30 to-teal/10 text-sm font-bold text-teal-ink ring-1 ring-teal/20">
+      </div>
+
+      <div className="flex min-w-0 items-center gap-3">
+        <Link href="/account" className="flex min-w-0 items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-navy/[0.04]">
+          <div
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-[13px] font-bold text-teal"
+          >
             {initials(fullName)}
           </div>
-          <div className="min-w-0">
+          <div className="hidden min-w-0 text-left sm:block">
             <p className="truncate text-sm font-semibold leading-tight">{fullName}</p>
-            <div className="mt-0.5 hidden items-center gap-1.5 sm:flex">
-              <span className="badge-teal">{ROLE_LABELS[role]}</span>
-              {roleTitle && <span className="truncate text-xs text-navy/60">{roleTitle}</span>}
-            </div>
+            <p className="truncate text-xs text-navy/60">
+              {ROLE_LABELS[role]}
+              {roleTitle ? ` · ${roleTitle}` : ""}
+            </p>
           </div>
-        </div>
+        </Link>
+        <span aria-hidden="true" className="hidden h-6 w-px bg-navy/10 sm:block" />
+        <SignOutButton />
       </div>
-      <SignOutButton />
     </header>
   );
 }

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { IconMapPin, IconNavigation } from "@/components/layout/icons";
 
 interface ServiceRow {
   id: string;
@@ -123,7 +124,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {services.map((s) => (
-            <li key={s.id} className="flex flex-col gap-2 rounded-lg bg-navy/5 px-3 py-2">
+            <li key={s.id} className="flex flex-col gap-2 rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
               <div className="flex items-center gap-3">
                 <input aria-label="Nom du service"
                   className="input flex-1 !py-1"
@@ -153,7 +154,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                       rel="noreferrer"
                       className="text-teal-ink underline"
                     >
-                      🗺️ Google Maps
+                      <IconMapPin className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Google Maps
                     </a>
                     <a
                       href={`https://waze.com/ul?q=${encodeURIComponent(s.depot_address)}&navigate=yes`}
@@ -161,7 +162,7 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                       rel="noreferrer"
                       className="text-teal-ink underline"
                     >
-                      🚗 Waze
+                      <IconNavigation className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Waze
                     </a>
                   </p>
                 )}

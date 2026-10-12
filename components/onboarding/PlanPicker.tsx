@@ -28,7 +28,7 @@ export function PlanPicker({
             <p className="text-xs text-navy/65">
               {plan.vehicle_max ? `${plan.vehicle_min}–${plan.vehicle_max} véhicules` : `${plan.vehicle_min}+ véhicules`}
             </p>
-            <p className="font-display text-2xl font-extrabold text-teal-ink">
+            <p className="text-2xl font-bold tabular-nums text-teal-ink">
               {plan.monthly_base_price} €{plan.setup_price > 0 ? "*" : ""}
               <span className="text-sm font-normal text-navy/60">/mois</span>
             </p>

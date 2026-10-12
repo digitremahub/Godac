@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconCamera } from "@/components/layout/icons";
 
 /**
  * Lets any driver document a tank's totalizer with a photo, no OCR
@@ -51,7 +52,7 @@ export function TankPhotoCapture({ tankId }: { tankId: string }) {
   if (!capturing) {
     return (
       <button className="btn-secondary w-full" onClick={() => setCapturing(true)}>
-        📷 Photo de l&apos;index
+        <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo de l&apos;index
       </button>
     );
   }

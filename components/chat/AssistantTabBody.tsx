@@ -53,7 +53,7 @@ export function AssistantTabBody({
           <div className="flex flex-col gap-2">
             {messages.map((m) => (
               <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "user" ? "bg-teal/20 text-navy" : "bg-navy/5 text-navy"}`}>
+                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "user" ? "bg-teal/20 text-navy" : "bg-navy/[0.04] text-navy"}`}>
                   <p className="whitespace-pre-wrap">{m.content}</p>
                   {m.role === "assistant" && !m.id.startsWith("tmp-") && (
                     <div className="mt-1.5 flex gap-2">

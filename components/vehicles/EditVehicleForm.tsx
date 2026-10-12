@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import type { AiVehicleSpecs } from "@/lib/vehicles/ai-specs";
+import { IconSparkles } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -207,7 +208,7 @@ export function EditVehicleForm({
     if (!state || state.origin !== "ia") return null;
     return (
       <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-gold-ink">
-        🤖 Estimé par IA
+        <IconSparkles className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Estimé par IA
         {!state.confirmed && (
           <button type="button" className="underline" onClick={() => confirmAi(field)}>
             confirmer
@@ -255,7 +256,7 @@ export function EditVehicleForm({
 
       <div className="flex flex-col gap-1">
         <button type="button" className="btn-secondary self-start" disabled={aiBusy || !brand || !model} onClick={completeByAi}>
-          {aiBusy ? "Estimation en cours…" : "🤖 Compléter les champs vides par IA"}
+          {aiBusy ? "Estimation en cours…" : <><IconSparkles className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Compléter les champs vides par IA</>}
         </button>
         {aiError && <p role="alert" className="text-xs text-orange-ink">{aiError}</p>}
         {variants.length > 0 && (
@@ -265,7 +266,7 @@ export function EditVehicleForm({
               <button
                 key={i}
                 type="button"
-                className="rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-navy/5"
+                className="rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-navy/[0.04]"
                 onClick={() => applyVariant(v)}
               >
                 {v.label}

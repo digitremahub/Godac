@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
+import { IconPencil } from "@/components/layout/icons";
 
 export interface TourHistoryRow {
   id: string;
@@ -148,7 +149,7 @@ export function TourHistoryTable({ rows, showDriverColumn, canEditKm }: { rows: 
                     ) : (
                       <div className="flex flex-col items-start gap-1">
                         <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(r)} aria-label="Modifier les km" title="Modifier les km">
-                          ✎ Km
+                          <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Km
                         </button>
                         {!r.startPhotoPath && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}
                         {!r.endPhotoPath && <AttachReportPhotoButton planningEntryId={r.id} stage="end" />}

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconPaperclip } from "@/components/layout/icons";
 
 export interface TankDeliveryRow {
   id: string;
@@ -86,7 +87,7 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
                   </a>
                 ) : canManage ? (
                   <label className="cursor-pointer text-xs text-navy/65 underline">
-                    {busyId === d.id ? "Envoi…" : "📎 Joindre"}
+                    {busyId === d.id ? "Envoi…" : <><IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Joindre</>}
                     <input
                       type="file"
                       accept="application/pdf,image/*"

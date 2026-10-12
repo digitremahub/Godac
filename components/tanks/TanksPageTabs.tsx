@@ -16,7 +16,7 @@ export function TanksPageTabs({ tab }: { tab: string }) {
   }
 
   return (
-    <div className="mb-4 flex rounded-lg bg-navy/5 p-1" style={{ width: "fit-content" }}>
+    <div className="mb-4 flex rounded-lg bg-navy/[0.04] p-1" style={{ width: "fit-content" }}>
       {TABS.map((t) => (
         <button
           key={t.key}

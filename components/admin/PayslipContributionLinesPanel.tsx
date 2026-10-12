@@ -103,7 +103,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
       ) : (
         <ul className="flex flex-col gap-2">
           {lines.map((l) => (
-            <li key={l.id} className="flex items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
+            <li key={l.id} className="flex items-center gap-3 rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
               <input aria-label="Libellé"
                 className="input flex-1 !py-1"
                 defaultValue={l.label}

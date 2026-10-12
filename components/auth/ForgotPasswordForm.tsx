@@ -36,8 +36,8 @@ export function ForgotPasswordForm() {
 
   if (sent) {
     return (
-      <div className="card max-w-sm text-center">
-        <p className="text-lg">📩 Vérifiez votre boîte mail</p>
+      <div className="card text-center">
+        <p className="font-display text-lg font-bold">Vérifiez votre boîte mail</p>
         <p className="mt-2 text-sm text-navy/70">
           Si un compte existe pour <span className="text-navy">{email}</span>, un lien de
           réinitialisation vient de lui être envoyé.
@@ -47,9 +47,9 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
+    <form onSubmit={submit} className="card flex w-full flex-col gap-5 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
       <div>
-        <h1 className="text-xl">Mot de passe oublié</h1>
+        <h1 className="text-2xl sm:text-[28px]">Mot de passe oublié</h1>
         <p className="mt-1 text-sm text-navy/65">
           On vous envoie un lien pour choisir un nouveau mot de passe.
         </p>

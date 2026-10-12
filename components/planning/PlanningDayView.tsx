@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
+import { IconAlertTriangle, IconPencil } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -137,7 +138,7 @@ export function PlanningDayView({
         </button>
       </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
+      {warning && <p className="text-sm text-gold-ink"><IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {warning}</p>}
 
       {sorted.length === 0 ? (
         <EmptyState title="Aucune tournée ce jour-là" />
@@ -152,7 +153,7 @@ export function PlanningDayView({
                 <div className="flex flex-col gap-1.5">
                   {serviceEntries.map((e) =>
                     editingId === e.id ? (
-                      <div key={e.id} className="flex flex-col gap-1 rounded-lg bg-navy/5 p-2 sm:flex-row sm:items-center sm:flex-wrap">
+                      <div key={e.id} className="flex flex-col gap-1 rounded-lg bg-navy/[0.04] p-2 sm:flex-row sm:items-center sm:flex-wrap">
                         <input
                           className="input !w-auto !py-1"
                           value={editTourNumber}
@@ -186,7 +187,7 @@ export function PlanningDayView({
                         </div>
                       </div>
                     ) : (
-                      <div key={e.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2 text-sm">
+                      <div key={e.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm">
                         <span>
                           {new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · n°{e.tour_number} ·{" "}
                           {e.users?.full_name ?? "—"} · {e.vehicles?.registration ?? "—"}
@@ -196,7 +197,7 @@ export function PlanningDayView({
                           {e.status === "planned" && (
                             <>
                               <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
-                                ✎
+                                <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                               </button>
                               <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
                                 ×

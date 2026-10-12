@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { IconTrash } from "@/components/layout/icons";
 
 export interface MessageRow {
   id: string;
@@ -56,7 +57,7 @@ export function MessageThread({
     <>
       {messages.map((m) => (
         <div key={m.id} className={`flex ${m.sender_id === currentUserId ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[75%] rounded-xl px-3 py-1.5 text-sm ${m.sender_id === currentUserId ? "bg-teal/15" : "bg-navy/5"}`}>
+          <div className={`max-w-[75%] rounded-xl px-3 py-1.5 text-sm ${m.sender_id === currentUserId ? "bg-teal/15" : "bg-navy/[0.04]"}`}>
             {m.photoUrl && (
               <a href={m.photoUrl} target="_blank" rel="noreferrer">
                 <img loading="lazy" src={m.photoUrl} alt="Photo envoyée" className="mb-1 max-h-64 max-w-full rounded-lg object-contain" />
@@ -72,7 +73,7 @@ export function MessageThread({
                   title="Supprimer"
                   aria-label="Supprimer le message"
                 >
-                  <span aria-hidden="true">🗑</span>
+                  <IconTrash className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                 </button>
               )}
               <p className="text-xs text-navy/60">

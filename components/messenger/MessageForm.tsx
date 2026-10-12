@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconCamera } from "@/components/layout/icons";
 
 export function MessageForm({
   recipientId,
@@ -79,7 +80,7 @@ export function MessageForm({
       )}
       <div className="flex gap-2">
         <label className="btn-secondary shrink-0 cursor-pointer !px-3">
-          📷
+          <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
           <input
             ref={fileInputRef}
             type="file"

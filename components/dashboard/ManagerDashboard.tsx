@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
+import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import type { AppUser } from "@/lib/auth/session";
 
@@ -105,26 +106,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
 
       {isManagerChauffeur && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Card className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-            {openTour ? (
-              <>
-                <p className="mb-1 text-sm text-navy/70">
-                  Tournée n°{openTour.tour_number} en cours
-                  {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
-                </p>
-                <Link href="/tours/end" className="btn-primary block w-full text-center">
-                  🏁 Terminer ma tournée
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className="mb-3 text-sm text-navy/70">Aucune tournée en cours</p>
-                <Link href="/tours/start" className="btn-primary block w-full text-center">
-                  🚚 Démarrer une tournée
-                </Link>
-              </>
-            )}
-          </Card>
+          <TourHeroCard openTour={openTour} />
           <QrCodeBadge type="driver" id={appUser.id} title={appUser.full_name} subtitle="Mon badge chauffeur — à présenter à la pompe" />
         </div>
       )}
@@ -145,7 +127,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {ongoingTours.map((t) => (
-                <li key={t.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={t.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
@@ -165,7 +147,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (
-                <li key={v.registration} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={v.registration} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>{v.registration}</span>
                   <span className="font-medium">{v.consumption} L/100km</span>
                 </li>

@@ -89,6 +89,16 @@
     outline: 2px solid theme("colors.teal-ink");
     outline-offset: 2px;
   }
+  /* Thin, low-contrast scrollbar on the navy sidebar. */
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  .sidebar-scroll :focus-visible {
+    outline-color: theme("colors.teal");
+  }
+  .sidebar-scroll {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
   /* Figures in every data table line up column-wise (liters, €, km). */
   table {
     font-variant-numeric: tabular-nums;
@@ -106,8 +116,18 @@
   h2,
   h3,
   h4 {
-    @apply font-display font-extrabold tracking-tight;
+    @apply font-display font-bold tracking-tight;
     text-wrap: balance;
+  }
+  /* Syne's 800 is very wide at display sizes — 700 for headings, the
+     ExtraBold stays on the wordmark. */
+  h1 {
+    @apply font-bold;
+  }
+  /* Section titles inside cards: one consistent, quieter size. */
+  .card h2,
+  .card h3 {
+    @apply text-base font-bold leading-snug sm:text-[17px];
   }
   ::selection {
     background-color: rgba(15, 118, 110, 0.18);
@@ -132,47 +152,80 @@
 }
 
 @layer components {
+  /* Surfaces — a hairline border and a soft two-layer shadow instead of
+     the old heavy drop shadow: reads as "elevated", not "floating". */
   .card {
-    @apply rounded-2xl border border-navy/10 bg-white p-6 shadow-[0_1px_2px_0_rgba(10,15,30,0.04),0_8px_24px_-12px_rgba(10,15,30,0.12)] transition-colors duration-200;
+    @apply rounded-2xl border border-navy/[0.08] bg-white p-5 shadow-card transition-[border-color,box-shadow] duration-200 sm:p-6;
   }
   .card-hover {
-    @apply card cursor-pointer hover:border-navy/20 hover:shadow-[0_1px_2px_0_rgba(10,15,30,0.04),0_12px_28px_-10px_rgba(10,15,30,0.16)];
+    @apply card cursor-pointer hover:border-navy/15 hover:shadow-raised;
+  }
+
+  /* Buttons — one height (40px, 44px on touch), one radius, no glow. */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold leading-5 transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 sm:py-2.5;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-semibold text-navy shadow-[0_4px_16px_-4px_rgba(27,228,193,0.5)] transition-[filter,box-shadow,transform] duration-150 hover:brightness-105 hover:shadow-[0_6px_20px_-4px_rgba(27,228,193,0.65)] active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:active:scale-100;
+    @apply btn bg-teal text-navy shadow-[inset_0_-1px_0_rgba(10,15,30,0.12),0_1px_2px_rgba(10,15,30,0.08)] hover:bg-[#3AEACB];
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-navy/15 bg-navy/[0.02] px-4 py-2.5 font-semibold text-navy transition-[border-color,background-color,transform] duration-150 hover:border-navy/25 hover:bg-navy/[0.05] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
+    @apply btn border border-navy/[0.12] bg-white text-navy shadow-[0_1px_2px_rgba(10,15,30,0.05)] hover:border-navy/20 hover:bg-paper;
+  }
+  .btn-dark {
+    @apply btn bg-navy text-white hover:bg-[#1A2236];
+  }
+  .btn-ghost {
+    @apply btn text-navy/70 hover:bg-navy/[0.05] hover:text-navy;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 font-semibold text-white shadow-[0_4px_16px_-4px_rgba(255,107,53,0.45)] transition-[filter,transform] duration-150 hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
+    @apply btn bg-orange text-white shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[#F25A22];
   }
+
+  /* Form fields — white, 44px tall, teal focus halo. */
   .input {
-    @apply w-full rounded-lg border border-navy/15 bg-navy/[0.02] px-3 py-2 text-navy placeholder-navy/50 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-navy/25 focus:border-teal-ink/50 focus:bg-white focus:shadow-[0_0_0_3px_rgba(15,118,110,0.13)];
+    @apply w-full rounded-xl border border-navy/[0.14] bg-white px-3.5 py-2.5 text-[15px] leading-6 text-navy shadow-[0_1px_2px_rgba(10,15,30,0.04)] placeholder-navy/50 outline-none transition-[border-color,box-shadow] duration-150 hover:border-navy/25 focus:border-teal-ink/60 focus:shadow-[0_0_0_4px_rgba(15,118,110,0.12)] disabled:cursor-not-allowed disabled:bg-paper disabled:text-navy/60 sm:py-2 sm:text-sm;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-navy/60;
+    @apply mb-1.5 block text-[13px] font-semibold text-navy/80;
   }
+
+  /* Status pills with a leading dot. */
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold before:h-1.5 before:w-1.5 before:shrink-0 before:rounded-full before:bg-current before:opacity-80 before:content-[''];
   }
   .badge-teal {
-    @apply badge bg-teal/10 text-teal-ink ring-1 ring-inset ring-teal/25;
+    @apply badge bg-teal/[0.12] text-teal-ink;
   }
   .badge-orange {
-    @apply badge bg-orange/10 text-orange-ink ring-1 ring-inset ring-orange/25;
+    @apply badge bg-orange/[0.12] text-orange-ink;
   }
   .badge-gold {
-    @apply badge bg-gold/10 text-gold-ink ring-1 ring-inset ring-gold/30;
+    @apply badge bg-gold/[0.18] text-gold-ink;
   }
   .badge-neutral {
-    @apply badge bg-navy/[0.05] text-navy/60 ring-1 ring-inset ring-navy/10;
+    @apply badge bg-navy/[0.06] text-navy/70;
   }
+
   .divider {
-    @apply border-t border-navy/10;
+    @apply border-t border-navy/[0.08];
   }
   .kicker {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-navy/60;
+    @apply text-xs font-semibold uppercase tracking-[0.12em] text-navy/60;
+  }
+
+  /* Data tables — every table in the app picks these up. */
+  table thead th {
+    @apply whitespace-nowrap text-xs font-semibold uppercase tracking-[0.06em] text-navy/60;
+  }
+  table tbody tr {
+    @apply transition-colors duration-100;
+  }
+  table tbody tr:hover {
+    @apply bg-navy/[0.025];
+  }
+  table td:first-child,
+  table th:first-child {
+    @apply pl-1;
   }
 }
 

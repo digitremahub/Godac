@@ -26,9 +26,15 @@ const config: Config = {
         display: ["var(--font-heading)", "sans-serif"],
         body: ["var(--font-body)", "sans-serif"],
       },
+      boxShadow: {
+        card: "0 1px 2px 0 rgba(10,15,30,0.04), 0 1px 3px 0 rgba(10,15,30,0.03)",
+        raised: "0 2px 4px -1px rgba(10,15,30,0.06), 0 12px 24px -8px rgba(10,15,30,0.12)",
+        pop: "0 24px 48px -12px rgba(10,15,30,0.25)",
+      },
       borderRadius: {
-        xl: "1rem",
-        "2xl": "1.5rem",
+        xl: "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
       },
     },
   },

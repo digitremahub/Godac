@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addDays } from "@/lib/planning/dates";
 import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
+import { IconAlertTriangle, IconPencil } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -222,7 +223,7 @@ export function PlanningKanbanView({
         </p>
       )}
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
+      {warning && <p className="text-sm text-gold-ink"><IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {warning}</p>}
 
       {mode === "driver" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -231,7 +232,7 @@ export function PlanningKanbanView({
             return (
               <div
                 key={driver.id}
-                className="min-w-[220px] shrink-0 rounded-xl bg-navy/5 p-2"
+                className="min-w-[220px] shrink-0 rounded-xl bg-navy/[0.04] p-2"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -262,7 +263,7 @@ export function PlanningKanbanView({
                           {e.status === "planned" && editingId !== e.id && (
                             <>
                               <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(e)} aria-label="Modifier" title="Modifier">
-                                ✎
+                                <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                               </button>
                               <button className="text-navy/60 hover:text-orange-ink" onClick={() => removeEntry(e.id)} aria-label="Supprimer" title="Supprimer">
                                 ×
@@ -328,7 +329,7 @@ export function PlanningKanbanView({
             return (
               <div
                 key={service.id}
-                className="min-w-[240px] shrink-0 rounded-xl bg-navy/5 p-2"
+                className="min-w-[240px] shrink-0 rounded-xl bg-navy/[0.04] p-2"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();

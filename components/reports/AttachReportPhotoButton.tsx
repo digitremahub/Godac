@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { TourReportPhotoCapture } from "@/components/shared/TourReportPhotoCapture";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
+import { IconPaperclip } from "@/components/layout/icons";
 
 /**
  * Recovers a tour closed without its report photo ever saving — the
@@ -39,7 +40,7 @@ export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEn
   if (!open) {
     return (
       <button className="text-xs text-orange-ink underline" onClick={() => setOpen(true)}>
-        📎 Photo manquante
+        <IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo manquante
       </button>
     );
   }

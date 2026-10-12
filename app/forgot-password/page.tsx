@@ -1,19 +1,16 @@
 import Link from "next/link";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <Link href="/" className="flex items-center gap-2.5">
-        <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
-        <span className="font-display text-xl font-extrabold">GODAC</span>
-      </Link>
+    <AuthLayout>
       <ForgotPasswordForm />
-      <p className="text-sm text-navy/60">
-        <Link href="/sign-in" className="text-teal-ink hover:underline">
+      <p className="text-center text-sm">
+        <Link href="/sign-in" className="font-semibold text-teal-ink hover:underline">
           Retour à la connexion
         </Link>
       </p>
-    </main>
+    </AuthLayout>
   );
 }

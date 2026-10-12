@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/ui";
 import { JoinDriverForm } from "@/components/auth/JoinDriverForm";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 /**
  * Self-service driver onboarding — one reusable, regenerable link/QR
@@ -29,11 +30,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <div className="flex items-center gap-2.5">
-        <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
-        <span className="font-display text-xl font-extrabold">GODAC</span>
-      </div>
+    <AuthLayout linkLogo={false}>
       {/*
         The org's own name/logo is deliberately NOT shown here — the
         company-name field in JoinDriverForm is a genuine check (the
@@ -43,6 +40,6 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         already displayed on screen, which would catch nothing.
       */}
       <JoinDriverForm token={token} services={(organization.services as { id: string; name: string }[]) ?? []} />
-    </main>
+    </AuthLayout>
   );
 }

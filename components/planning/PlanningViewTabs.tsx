@@ -63,7 +63,7 @@ export function PlanningViewTabs({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <div className="flex rounded-lg bg-navy/5 p-1">
+      <div className="flex rounded-lg bg-navy/[0.04] p-1">
         {VIEWS.map((v) => (
           <button
             key={v.key}

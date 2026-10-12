@@ -96,7 +96,7 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
             </div>
             <span className={STATUS_BADGES[r.status]}>{STATUS_LABELS[r.status]}</span>
           </div>
-          {r.conversationSummary && <p className="rounded-lg bg-navy/5 p-2 text-xs text-navy/70">{r.conversationSummary}</p>}
+          {r.conversationSummary && <p className="rounded-lg bg-navy/[0.04] p-2 text-xs text-navy/70">{r.conversationSummary}</p>}
           {r.response ? (
             <div className="rounded-lg bg-teal/10 p-2 text-sm">
               <p className="mb-1 text-xs text-navy/65">Réponse envoyée</p>

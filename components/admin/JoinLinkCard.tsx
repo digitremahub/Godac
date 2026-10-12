@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Card } from "@/components/ui";
+import { IconCheck } from "@/components/layout/icons";
 
 /**
  * Direction-only (see app/(dashboard)/admin/organizations/page.tsx —
@@ -58,10 +59,10 @@ export function JoinLinkCard({ token }: { token: string }) {
       <div className="flex flex-wrap items-center gap-4">
         <canvas ref={canvasRef} role="img" aria-label="QR code du lien d’inscription chauffeur" className="rounded-lg border border-navy/10" />
         <div className="flex flex-1 flex-col gap-2">
-          <code className="break-all rounded-lg bg-navy/5 px-3 py-2 text-xs">{url}</code>
+          <code className="break-all rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-xs">{url}</code>
           <div className="flex gap-2">
             <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={copy}>
-              {copied ? "Copié ✓" : "Copier le lien"}
+              {copied ? <>Copié <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /></> : "Copier le lien"}
             </button>
             <button className="btn-secondary !px-3 !py-1.5 text-xs text-orange-ink" disabled={busy} onClick={regenerate}>
               {busy ? "…" : "Régénérer"}

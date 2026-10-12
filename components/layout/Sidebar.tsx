@@ -26,7 +26,6 @@ import {
   IconChatBubble,
   IconChartBar,
 } from "@/components/layout/icons";
-import { textSafeVariant } from "@/lib/theme/contrast";
 
 interface NavItem {
   href: string;
@@ -131,12 +130,9 @@ export function Sidebar({
 }) {
   const pathname = usePathname() ?? "";
   const enabled = new Set(enabledModuleKeys);
+  // The org's accent is only ever used as a fill here (logo square,
+  // active indicator) — the sidebar is navy, so text stays white.
   const accent = accentColor || "#1BE4C1";
-  // A custom accent color is only guaranteed contrast-safe as a fill
-  // (the bar, the logo square below) — used directly as the active
-  // nav item's text/icon color, an arbitrary pick could fail contrast
-  // against the light background.
-  const accentText = textSafeVariant(accent);
 
   const sections = SECTIONS.map((section) => ({
     ...section,
@@ -157,27 +153,30 @@ export function Sidebar({
       // Off-canvas on mobile: `invisible` (delayed until the slide-out
       // finishes) takes the closed drawer's links out of the tab order
       // and the accessibility tree, not just off-screen.
-      className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-5 overflow-y-auto overscroll-contain border-r border-navy/10 bg-white/95 p-4 backdrop-blur-sm transition-[transform,visibility] duration-200 ease-in-out lg:visible lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:bg-white/70 ${
+      className={`sidebar-scroll fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain bg-navy px-3 pb-6 pt-4 text-white transition-[transform,visibility] duration-200 ease-in-out lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-64 lg:translate-x-0 ${
         open ? "visible translate-x-0" : "invisible -translate-x-full"
       }`}
     >
-      <Link href="/dashboard" title="Accueil" className="flex items-center gap-2.5 px-2 pt-1" onClick={onNavigate}>
+      <Link href="/dashboard" title="Accueil" className="flex items-center gap-3 rounded-xl px-2 py-1.5" onClick={onNavigate}>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 rounded-lg object-contain ring-1 ring-navy/10" />
+          <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" />
         ) : (
           <div
             aria-hidden="true"
-            className="h-9 w-9 shrink-0 rounded-lg shadow-[0_2px_10px_-2px_var(--tw-shadow-color)]"
-            style={{ backgroundColor: accent, "--tw-shadow-color": `${accent}80` } as React.CSSProperties}
+            className="h-9 w-9 shrink-0 rounded-lg"
+            style={{ backgroundColor: accent }}
           />
         )}
-        <span className="truncate font-display text-lg font-extrabold leading-tight">{organizationName ?? "GODAC"}</span>
+        <span className="min-w-0">
+          <span className="block truncate font-display text-[15px] font-bold leading-tight">{organizationName ?? "GODAC"}</span>
+          <span className="block text-[11px] font-medium uppercase tracking-[0.12em] text-white/60">GODAC</span>
+        </span>
       </Link>
 
       {sections.map((section, i) => (
-        <div key={i} className="flex flex-col gap-1">
-          {section.label && <p className="kicker px-3 pb-1">{section.label}</p>}
+        <div key={i} className="flex flex-col gap-0.5">
+          {section.label && <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">{section.label}</p>}
           {section.items.map((item) => {
             const active = item.href === activeHref;
             const Icon = item.icon;
@@ -187,15 +186,16 @@ export function Sidebar({
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
-                className={`group relative flex min-h-[44px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
-                  active ? "bg-navy/[0.08]" : "text-navy/70 hover:bg-navy/[0.05] hover:text-navy"
+                className={`group relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 lg:min-h-[38px] ${
+                  active ? "bg-white/[0.1] text-white" : "text-white/75 hover:bg-white/[0.06] hover:text-white"
                 }`}
-                style={active ? { color: accentText } : undefined}
               >
                 {active && (
-                  <span aria-hidden="true" className="absolute -left-4 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accent }} />
+                  <span aria-hidden="true" className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accent }} />
                 )}
-                <Icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "" : "text-navy/60 group-hover:text-navy/70"}`} />
+                <span style={active ? { color: accent } : undefined} className={`shrink-0 transition-colors ${active ? "" : "text-white/55 group-hover:text-white/80"}`}>
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
                 <span className="truncate">{item.label}</span>
               </Link>
             );

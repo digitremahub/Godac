@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { IconRefresh } from "@/components/layout/icons";
 
 /**
  * "En cas d'erreur" — régénère une fiche déjà générée à partir des
@@ -55,7 +56,7 @@ export function RegeneratePayslipButton({
   if (!open) {
     return (
       <button type="button" className="text-xs text-navy/60 hover:text-teal-ink hover:underline" onClick={() => setOpen(true)}>
-        🔄 Mettre à jour
+        <IconRefresh className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Mettre à jour
       </button>
     );
   }

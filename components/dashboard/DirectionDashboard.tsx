@@ -169,7 +169,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (
-                <li key={v.registration} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={v.registration} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>{v.registration}</span>
                   <span className="font-medium">{v.consumption} L/100km</span>
                 </li>

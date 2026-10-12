@@ -3,14 +3,19 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
 import Image from "next/image";
 import { ImageCarousel } from "@/components/marketing/ImageCarousel";
+import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import {
-  IconDroplet,
-  IconTruck,
+  IconArrowRight,
   IconCalendar,
-  IconFileText,
-  IconClock,
-  IconShieldCheck,
   IconChartBar,
+  IconCheck,
+  IconClock,
+  IconDroplet,
+  IconFileText,
+  IconPlay,
+  IconQrCode,
+  IconShieldCheck,
+  IconTruck,
 } from "@/components/layout/icons";
 
 const TRUST_STATS = [
@@ -27,25 +32,37 @@ const HOME_SLIDES = [
   { src: "/home/scene-gestion.png", alt: "Gestion centralisée des demandes, entretiens et documents de la flotte" },
 ];
 
+const REPLACES = ["Les tableurs Excel", "Les groupes WhatsApp", "Les tickets papier", "Les relances par téléphone"];
+
 const FEATURES = [
   {
     title: "Carburant & PMP",
-    description: "Saisie manuelle ou OCR, prix moyen pondéré recalculé automatiquement, détection d'écart de totaliseur.",
+    description: "Saisie manuelle ou OCR du ticket, prix moyen pondéré recalculé tout seul, écart de totaliseur détecté.",
     icon: IconDroplet,
   },
   {
     title: "Flotte & entretien",
-    description: "Fiches véhicules, interventions avec niveaux d'urgence, demandes chauffeur → gestionnaire.",
+    description: "Fiches véhicules, interventions par niveau d'urgence, demandes du chauffeur directement au gestionnaire.",
     icon: IconTruck,
   },
   {
-    title: "RH & planning",
-    description: "Congés avec détection de chevauchement, dossiers employés, intranet et convocations.",
+    title: "Planning & tournées",
+    description: "Planning par service, départs et retours de tournée, rapports et kilométrages au même endroit.",
+    icon: IconClock,
+  },
+  {
+    title: "App chauffeur",
+    description: "Badge QR et code PIN, plein, photo du compteur et signalement depuis le téléphone, sans formation.",
+    icon: IconQrCode,
+  },
+  {
+    title: "RH, congés & paie",
+    description: "Congés sans chevauchement, dossiers employés, convocations, fiches de paie générées chaque mois.",
     icon: IconCalendar,
   },
   {
     title: "Conformité TICPE",
-    description: "Export Excel filtré PL/SPL en self-service pour le rôle comptable, jamais les véhicules légers.",
+    description: "Export Excel filtré PL/SPL pour le comptable, jamais les véhicules légers. Prêt à déposer.",
     icon: IconFileText,
   },
 ];
@@ -62,202 +79,164 @@ export default async function HomePage() {
   const appUser = user ? await getCurrentAppUser() : null;
   const spaceHref = user ? (appUser ? "/dashboard" : "/onboarding") : null;
 
+  const primaryCta = spaceHref
+    ? { href: spaceHref, label: "Accéder à mon espace" }
+    : { href: "/sign-up", label: "Essayer GODAC" };
+
   return (
-    <main className="min-h-screen">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2.5">
-          <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
-          <span className="font-display text-xl font-extrabold">GODAC</span>
-        </div>
-        <nav className="flex items-center gap-4">
-          <Link href="/modules" className="hidden text-sm font-medium text-navy/70 hover:text-navy sm:inline">
-            Modules & tarifs
-          </Link>
-          {spaceHref ? (
-            <Link href={spaceHref} className="btn-primary !px-5 !py-2 text-sm">
-              Accéder à mon espace
-            </Link>
-          ) : (
-            <>
-              <Link href="/sign-in" className="hidden text-sm font-medium text-navy/70 hover:text-navy sm:inline">
-                Se connecter
-              </Link>
-              <Link href="/sign-up" className="btn-primary !px-4 !py-2 text-sm sm:!px-5">
-                Essayer GODAC →
-              </Link>
-            </>
-          )}
-        </nav>
-      </header>
+    <div className="min-h-screen">
+      {/* ── Hero (marine, per the brand guide: white on deep navy) ── */}
+      <div className="relative overflow-hidden bg-navy text-[#F0F4FF]">
+        <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-20 h-[28rem] w-[28rem] rounded-full bg-teal/15 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-orange/10 blur-3xl" />
 
-      {/* Desktop: photo hero with an opaque text panel over the left side —
-          only the right ~45% (truck/laptop/floating cards) stays visible as
-          the photo, so there's no overlap with real text underneath. */}
-      <section className="relative hidden overflow-hidden lg:block lg:min-h-[620px]">
-        <Image
-          src="/home/hero-crop.png"
-          alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
-          fill
-          priority
-          className="object-cover object-top"
-        />
-        <div className="absolute inset-y-0 left-0 w-[58%] bg-paper" />
-        <div className="absolute inset-y-0 left-[58%] w-28 bg-gradient-to-r from-paper to-transparent" />
+        <SiteHeader spaceHref={spaceHref} />
 
-        <div className="relative mx-auto flex h-full max-w-6xl flex-col justify-center gap-6 px-6 py-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-navy/65">
-            Gestion de flotte • Carburant • Entretien • Documents • Équipes
-          </p>
-          <h1 className="max-w-lg text-4xl leading-[1.1] xl:text-5xl">
-            Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
-          </h1>
-          <p className="max-w-md text-lg text-navy/70">
-            Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
-            chauffeurs, de vos entretiens, de votre carburant et de vos documents.
-          </p>
-          <div className="flex flex-wrap items-center gap-5">
-            {spaceHref ? (
-              <Link href={spaceHref} className="btn-primary !px-6 !py-3">
-                Accéder à mon espace →
-              </Link>
-            ) : (
-              <Link href="/sign-up" className="btn-primary !px-6 !py-3">
-                Essayer GODAC →
-              </Link>
-            )}
-            <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">▶</span>
-              Voir comment ça marche
-            </a>
-          </div>
-          <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
-            {TRUST_STATS.map((stat) => (
-              <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
-                <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
-                {stat.label}
+        <main>
+          <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-28 lg:pt-16">
+            <div className="flex flex-col gap-7">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
+                Le système d&apos;exploitation de la PME transport
+              </p>
+              <h1 className="text-[34px] leading-[1.1] tracking-tight sm:text-5xl lg:text-[52px]">
+                Moins d&apos;imprévus, <span className="text-teal">plus de routes</span> à parcourir.
+              </h1>
+              <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
+                Carburant, flotte, entretiens, plannings, paie et documents&nbsp;: un seul outil pour tenir votre
+                entreprise de transport, du dépôt jusqu&apos;à la comptabilité.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
+                  {primaryCta.label}
+                  <IconArrowRight className="h-5 w-5" />
+                </Link>
+                <a href="#comment-ca-marche" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/20 hover:bg-white/10">
+                  <IconPlay className="h-4 w-4 text-teal" />
+                  Voir comment ça marche
+                </a>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Mobile/tablet: same content, stacked — a photo-overlay hero this
-          narrow would leave no room for legible text over the image. */}
-      <section className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-6 pb-12 pt-2 text-center lg:hidden">
-        <span className="badge-teal">SaaS pour le transport routier de marchandises</span>
-        <h1 className="text-4xl leading-[1.1] sm:text-5xl">
-          Moins d&apos;imprévus, <span className="text-teal-ink">plus de routes</span> à parcourir.
-        </h1>
-        <p className="max-w-xl text-lg text-navy/70">
-          Une solution tout-en-un pour simplifier la gestion de vos véhicules, de vos
-          chauffeurs, de vos entretiens, de votre carburant et de vos documents.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          {spaceHref ? (
-            <Link href={spaceHref} className="btn-primary !px-6 !py-3">
-              Accéder à mon espace →
-            </Link>
-          ) : (
-            <Link href="/sign-up" className="btn-primary !px-6 !py-3">
-              Essayer GODAC →
-            </Link>
-          )}
-          <Link href="/modules" className="btn-secondary !px-6 !py-3">
-            Voir les modules et les tarifs
-          </Link>
-        </div>
-        <a href="#comment-ca-marche" className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy/[0.06]">▶</span>
-          Voir comment ça marche
-        </a>
-        <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
-          {TRUST_STATS.map((stat) => (
-            <div key={stat.label} className="flex items-center gap-2 text-sm text-navy/70">
-              <stat.icon className="h-4 w-4 shrink-0 text-teal-ink" />
-              {stat.label}
+              <ul className="flex flex-wrap gap-x-6 gap-y-2">
+                {TRUST_STATS.map((stat) => (
+                  <li key={stat.label} className="flex items-center gap-2 text-sm text-white/70">
+                    <stat.icon className="h-4 w-4 shrink-0 text-teal" />
+                    {stat.label}
+                  </li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </div>
-        <div className="mt-2 w-full overflow-hidden rounded-2xl border border-navy/10 shadow-[0_20px_60px_-25px_rgba(10,15,30,0.3)]">
-          <Image
-            src="/home/hero-crop.png"
-            alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
-            width={1536}
-            height={542}
-            className="h-auto w-full object-cover"
-            priority
-          />
+
+            <div className="relative">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-pop ring-1 ring-white/10">
+                <Image
+                  src="/home/hero-crop.png"
+                  alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
+                  fill
+                  priority
+                  sizes="(min-width: 1024px) 560px, 100vw"
+                  className="object-cover object-[88%_center]"
+                />
+              </div>
+              <div aria-hidden="true" className="absolute -bottom-6 left-4 hidden items-center gap-3 rounded-2xl bg-white p-4 pr-5 text-navy shadow-pop sm:flex lg:-left-8">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-navy">
+                  <IconCheck className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold">Plein enregistré</span>
+                  <span className="block text-xs text-navy/60">PMP recalculé automatiquement</span>
+                </span>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      {/* ── What GODAC replaces ── */}
+      <section className="border-b border-navy/[0.08] bg-white">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-8 text-center sm:px-6 lg:flex-row lg:justify-between lg:text-left">
+          <p className="font-display text-lg font-bold">Le transport mérite mieux qu&apos;Excel.</p>
+          <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            {REPLACES.map((r) => (
+              <li key={r} className="flex items-center gap-2 text-sm text-navy/65">
+                <span aria-hidden="true" className="text-orange-ink">✕</span>
+                <span className="line-through decoration-navy/30">{r}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <section id="comment-ca-marche" className="mx-auto max-w-6xl scroll-mt-6 px-6 pb-24">
-        <div className="mb-14 text-center">
-          <span className="badge-teal mb-4 inline-block">Comment ça marche</span>
-          <h2 className="text-2xl sm:text-3xl">GODAC, en un coup d&apos;œil</h2>
-          <p className="mx-auto mt-3 max-w-xl text-navy/70">
-            De la pompe à la comptabilité, tout ce qu&apos;une PME de transport gère au
-            quotidien, réuni dans un seul outil.
+      {/* ── How it works ── */}
+      <section id="comment-ca-marche" className="mx-auto max-w-6xl scroll-mt-6 px-5 py-20 sm:px-6 lg:py-28">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <p className="kicker !text-teal-ink">Comment ça marche</p>
+          <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
+          <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+            De la pompe à la comptabilité, tout ce qu&apos;une PME de transport gère au quotidien, réuni dans un seul outil.
           </p>
         </div>
         <ImageCarousel slides={HOME_SLIDES} />
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((feature) => (
-            <div key={feature.title} className="card-hover flex flex-col gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal/10 ring-1 ring-teal/25">
-                <feature.icon className="h-5 w-5 text-teal-ink" />
-              </span>
-              <h3 className="text-base">{feature.title}</h3>
-              <p className="text-sm text-navy/65">{feature.description}</p>
+      {/* ── Modules ── */}
+      <section className="bg-white py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-5 sm:px-6">
+          <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-xl">
+              <p className="kicker !text-teal-ink">Modules</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Un seul réflexe. Toute la boîte.</h2>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 pb-20">
-        <div className="flex flex-col items-center gap-6 rounded-2xl border border-teal/20 bg-teal/5 px-8 py-10 text-center sm:flex-row sm:justify-between sm:text-left">
-          <div>
-            <h2 className="text-xl sm:text-2xl">Une gestion plus simple. Plus de sérénité.</h2>
-            <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 sm:justify-start">
-              <span className="flex items-center gap-2 text-sm text-navy/70">
-                <IconFileText className="h-4 w-4 text-teal-ink" /> Moins de papier
-              </span>
-              <span className="flex items-center gap-2 text-sm text-navy/70">
-                <IconChartBar className="h-4 w-4 text-teal-ink" /> Plus d&apos;efficacité
-              </span>
-              <span className="flex items-center gap-2 text-sm text-navy/70">
-                <IconTruck className="h-4 w-4 text-teal-ink" /> Des équipes sereines
-              </span>
-            </div>
+            <Link href="/modules" className="btn-secondary w-fit">
+              Modules & tarifs
+              <IconArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          {spaceHref ? (
-            <Link href={spaceHref} className="btn-primary shrink-0 !px-6 !py-3">
-              Accéder à mon espace
-            </Link>
-          ) : (
-            <Link href="/sign-up" className="btn-primary shrink-0 !px-6 !py-3">
-              Essayer GODAC
-            </Link>
-          )}
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <li key={feature.title} className="card flex flex-col gap-3 transition-[border-color,box-shadow] hover:border-navy/15 hover:shadow-raised">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy text-teal">
+                  <feature.icon className="h-5 w-5" />
+                </span>
+                <h3 className="text-lg">{feature.title}</h3>
+                <p className="text-pretty text-sm leading-relaxed text-navy/65">{feature.description}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <footer className="flex flex-col items-center gap-2 border-t border-navy/10 px-6 py-8 text-center text-sm text-navy/60">
-        <p>© {new Date().getFullYear()} GODAC — Plateforme de gestion pour le transport routier.</p>
-        <div className="flex gap-4">
-          <Link href="/mentions-legales" className="hover:text-navy hover:underline">
-            Mentions légales
-          </Link>
-          <Link href="/cgu" className="hover:text-navy hover:underline">
-            CGU
-          </Link>
-          <Link href="/confidentialite" className="hover:text-navy hover:underline">
-            Confidentialité
+      {/* ── Voice / proof ── */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:py-24">
+        <figure className="mx-auto max-w-3xl text-center">
+          <blockquote className="font-display text-[22px] font-bold leading-snug sm:text-[30px]">
+            «&nbsp;Un chauffeur malade lundi matin&nbsp;: remplaçant trouvé en 2&nbsp;clics.&nbsp;»
+          </blockquote>
+          <figcaption className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-navy/65">
+            {["Planning partagé avec les chauffeurs", "Alertes en temps réel", "Données hébergées en France"].map((t) => (
+              <span key={t} className="flex items-center gap-2">
+                <IconCheck className="h-4 w-4 text-teal-ink" />
+                {t}
+              </span>
+            ))}
+          </figcaption>
+        </figure>
+      </section>
+
+      {/* ── Final CTA ── */}
+      <section className="px-5 pb-20 sm:px-6">
+        <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-navy px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-teal/20 blur-3xl" />
+          <div className="relative">
+            <h2 className="text-[28px] leading-tight sm:text-4xl">Votre entreprise, organisée.</h2>
+            <p className="mt-3 text-white/70">Carburant, flotte, équipes et comptabilité&nbsp;: tout au même endroit.</p>
+          </div>
+          <Link href={primaryCta.href} className="btn-primary relative shrink-0 !px-7 !py-3.5 text-base">
+            {primaryCta.label}
+            <IconArrowRight className="h-5 w-5" />
           </Link>
         </div>
-      </footer>
-    </main>
+      </section>
+
+      <SiteFooter />
+    </div>
   );
 }

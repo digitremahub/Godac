@@ -78,7 +78,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
               <Link
                 key={c.id}
                 href={`/messenger?with=${c.id}`}
-                className={`rounded-lg px-3 py-2 text-sm ${c.id === contactId ? "bg-teal/10 font-medium" : "hover:bg-navy/5"}`}
+                className={`rounded-lg px-3 py-2 text-sm ${c.id === contactId ? "bg-teal/10 font-medium" : "hover:bg-navy/[0.04]"}`}
               >
                 {c.full_name}
               </Link>

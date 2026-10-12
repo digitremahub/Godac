@@ -345,7 +345,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
       {step === "done" && (
         <Card className="flex flex-col items-center gap-4 py-12 text-center">
-          <h2 className="text-xl">Votre espace GODAC est prêt 🎉</h2>
+          <h2 className="text-xl">Votre espace GODAC est prêt</h2>
           <button className="btn-primary" onClick={() => router.push("/dashboard")}>
             Accéder au tableau de bord
           </button>
@@ -402,7 +402,7 @@ function SubscriptionSummary({
       ))}
       <div className="mt-2 flex justify-between border-t border-navy/10 pt-2 text-lg text-navy">
         <span>Total</span>
-        <span className="font-display font-extrabold text-teal-ink">{total.toFixed(2)} €/mois</span>
+        <span className="font-bold tabular-nums text-teal-ink">{total.toFixed(2)} €/mois</span>
       </div>
       {setupTotal > 0 && (
         <div className="flex justify-between text-xs text-navy/60">
