@@ -84,10 +84,12 @@ export default function ConfidentialitePage() {
 
       <Section title="Lecture automatique par intelligence artificielle">
         <p>
-          Certaines fonctions lisent automatiquement une photo (ticket de carburant, compteur, amende, rapport de
-          tournée) ou répondent via l&apos;assistant. Ces contenus sont transmis à Anthropic (modèles Claude) pour
-          être analysés, puis le résultat vous est proposé pour vérification. Selon ses conditions
-          professionnelles, Anthropic n&apos;utilise pas ces données pour entraîner ses modèles.
+          La lecture automatique des photos (ticket de carburant, compteur, amende, rapport de tournée) et
+          l&apos;assistant sont des <strong>options désactivées par défaut</strong>, que seule l&apos;entreprise
+          cliente peut activer. Lorsqu&apos;elles sont activées, les contenus concernés sont transmis à Anthropic
+          (modèles Claude) pour être analysés, puis le résultat vous est proposé pour vérification. Selon ses
+          conditions professionnelles, Anthropic n&apos;utilise pas ces données pour entraîner ses modèles.
+          Lorsqu&apos;elles sont désactivées, aucune photo ni aucun fichier n&apos;est transmis à Anthropic.
         </p>
       </Section>
 
@@ -101,7 +103,7 @@ export default function ConfidentialitePage() {
             <strong>Vercel Inc.</strong> — hébergement de l&apos;application ; traitements exécutés à Paris (France).
           </li>
           <li>
-            <strong>Anthropic</strong> — lecture automatique des documents et assistant (États-Unis).
+            <strong>Anthropic</strong> — lecture automatique des documents et assistant, uniquement si l&apos;entreprise active ces options (États-Unis).
           </li>
           <li>
             <strong>Resend</strong> — envoi des e-mails transactionnels (États-Unis).
