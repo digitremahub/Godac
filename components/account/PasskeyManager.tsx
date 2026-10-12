@@ -97,7 +97,7 @@ export function PasskeyManager() {
       {credentials && credentials.length > 0 && (
         <ul className="flex flex-col gap-2">
           {credentials.map((c) => (
-            <li key={c.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2 text-sm">
+            <li key={c.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm">
               <span>
                 {c.device_name ?? "Appareil"}
                 <span className="ml-2 text-xs text-navy/60">

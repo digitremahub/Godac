@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconPaperclip } from "@/components/layout/icons";
 
 export function TankDeliveryForm({ tankId }: { tankId: string }) {
   const router = useRouter();
@@ -86,7 +87,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         onChange={(e) => setSupplier(e.target.value)}
       />
       <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-navy/20 px-2 py-1.5 text-xs text-navy/65">
-        {invoiceFile ? invoiceFile.name : "📎 Joindre la facture (optionnel)"}
+        {invoiceFile ? invoiceFile.name : <><IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Joindre la facture (optionnel)</>}
         <input
           type="file"
           accept="application/pdf,image/*"

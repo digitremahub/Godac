@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/ui";
 import { DriverPinFlow } from "@/components/auth/DriverPinFlow";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 /**
  * Landing page for a chauffeur's QR badge scanned while signed out
@@ -34,11 +35,7 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <div className="flex items-center gap-2.5">
-        <div aria-hidden="true" className="h-8 w-8 rounded-lg bg-teal shadow-[0_2px_12px_-2px_rgba(27,228,193,0.6)]" />
-        <span className="font-display text-xl font-extrabold">GODAC</span>
-      </div>
+    <AuthLayout linkLogo={false}>
       <DriverPinFlow
         id={id}
         fullName={user.full_name}
@@ -47,6 +44,6 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
         pendingApproval={user.pending_approval}
         hasPasskey={(passkeyCount ?? 0) > 0}
       />
-    </main>
+    </AuthLayout>
   );
 }

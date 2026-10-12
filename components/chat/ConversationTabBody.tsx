@@ -48,8 +48,8 @@ export function ConversationTabBody({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-navy/10 bg-navy/5 p-3">
-        <p className="font-display text-sm font-extrabold">{contactName}</p>
+      <div className="border-b border-navy/10 bg-navy/[0.04] p-3">
+        <p className="font-display text-sm font-bold">{contactName}</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3">
         {!loaded ? (

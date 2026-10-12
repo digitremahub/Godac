@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconLogOut } from "@/components/layout/icons";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -17,8 +18,15 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" className="btn-secondary !px-3 !py-1.5 text-xs" onClick={signOut} disabled={busy}>
-      {busy ? "Déconnexion…" : "Se déconnecter"}
+    <button
+      type="button"
+      className="btn-ghost !px-2.5 sm:!px-3"
+      onClick={signOut}
+      disabled={busy}
+      aria-label={busy ? "Déconnexion…" : "Se déconnecter"}
+    >
+      <IconLogOut className="h-[18px] w-[18px]" />
+      <span className="hidden sm:inline">{busy ? "Déconnexion…" : "Déconnexion"}</span>
     </button>
   );
 }

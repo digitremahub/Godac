@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
 import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
+import { IconAlertTriangle, IconUserCircle } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -121,7 +122,7 @@ export function PlanningListView({
         </button>
       </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
+      {warning && <p className="text-sm text-gold-ink"><IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {warning}</p>}
 
       {sorted.length === 0 ? (
         <EmptyState title="Aucune affectation cette semaine" />
@@ -211,7 +212,7 @@ export function PlanningListView({
                             if (d) setOpenDriverSheet(d);
                           }}
                         >
-                          👤
+                          <IconUserCircle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                         </button>
                       )}
                     </div>

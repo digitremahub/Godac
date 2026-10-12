@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { IconCamera } from "@/components/layout/icons";
 
 /**
  * Photographs a bare digit counter (tank/pump totalizer, vehicle
@@ -72,7 +73,7 @@ export function CounterPhotoCapture({
       <label className="btn-secondary min-h-[44px] w-full cursor-pointer justify-center text-center !py-1 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
-        {(status === "idle" || status === "error" || status === "done") && `📷 ${label}`}
+        {(status === "idle" || status === "error" || status === "done") && <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {label}</>}
         <input
           type="file"
           accept="image/*"

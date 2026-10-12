@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { computeHourlyRates, estimateSalary, type HourlyRates } from "@/lib/business/payroll";
+import { IconCheck, IconCoins, IconPencil } from "@/components/layout/icons";
 
 export interface PayrollRow {
   driver_id: string;
@@ -293,7 +294,7 @@ export function PayrollTable({
                     </td>
                     <td className="py-2">
                       <button className="text-navy/60 hover:text-teal-ink" onClick={() => startEdit(row)} aria-label="Modifier" title="Modifier">
-                        ✎
+                        <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                       </button>
                     </td>
                   </>
@@ -301,7 +302,7 @@ export function PayrollTable({
                 {payslipsEnabled && (
                   <td className="py-2">
                     {row.payslip_generated ? (
-                      <span className="badge-teal">✓ Générée</span>
+                      <span className="badge-teal"><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Générée</span>
                     ) : row.monthly_gross_salary === null || row.monthly_net_salary === null ? (
                       <span className="text-xs text-navy/60" title="Renseignez le salaire brut/net pour générer une fiche">
                         Salaire non renseigné
@@ -344,7 +345,7 @@ export function PayrollTable({
                       </div>
                     ) : (
                       <button className="btn-secondary !h-7 !px-2 !py-0.5 !text-xs" onClick={() => startGenerate(row)}>
-                        💶 Générer fiche
+                        <IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Générer fiche
                       </button>
                     )}
                   </td>

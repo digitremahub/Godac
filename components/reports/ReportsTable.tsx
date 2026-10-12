@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
+import { IconPencil } from "@/components/layout/icons";
 
 export interface ReportRow {
   id: string;
@@ -250,7 +251,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                       aria-label="Modifier"
                       title="Modifier"
                     >
-                      ✎
+                      <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                     </button>
                   )}
                 </td>

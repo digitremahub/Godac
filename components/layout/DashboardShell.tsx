@@ -61,7 +61,7 @@ export function DashboardShell({
       </a>
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-40 bg-navy/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-navy/50 backdrop-blur-[2px] lg:hidden"
           onClick={() => setDrawerOpen(false)}
           aria-hidden="true"
         />
@@ -77,8 +77,8 @@ export function DashboardShell({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
-        <main id="contenu" tabIndex={-1} className={`flex-1 focus:outline-none overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 ${showActionBar ? "pb-20 lg:pb-8" : ""}`}>
-          {children}
+        <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
       {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} />}

@@ -22,11 +22,15 @@ sont des projets indépendants dans le même repository.
 | Email transactionnel | Resend |
 | OCR tickets carburant / compteurs | Claude vision (Anthropic) |
 
-Charte graphique : fond clair (`paper` `#F6F7FB`), texte `navy`
-`#0A0F1E`, accents teal `#1BE4C1`, orange `#FF6B35`, gold `#F5C842`
-(variantes foncées `-ink` pour le texte, voir plus bas), police
-Poppins ExtraBold pour les titres et Inter pour le corps de texte
-(voir `tailwind.config.ts`, `app/layout.tsx` et `app/globals.css`).
+Charte graphique (Notion — « Naming & Identité de Marque GODAC V2 ») :
+marine profond `navy` `#0A0F1E` en couleur primaire (barre latérale,
+bandeaux, héros du site), fond clair `paper` `#F6F7FB` pour les écrans
+de travail, accents teal `#1BE4C1`, orange `#FF6B35`, or `#F5C842`
+(variantes foncées `-ink` pour le texte sur fond clair). Typographie :
+**Syne** pour les titres et le logo (« GODAC. », point final teal —
+`components/brand/Wordmark.tsx`), **DM Sans** pour le texte et les
+chiffres (voir `tailwind.config.ts`, `app/layout.tsx` et
+`app/globals.css`).
 
 ---
 

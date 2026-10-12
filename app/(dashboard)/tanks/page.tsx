@@ -94,7 +94,7 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
 
               <div>
                 <p className="text-sm text-navy/65">Index totaliseur courant</p>
-                <p className="font-display text-2xl font-extrabold text-teal-ink">
+                <p className="text-2xl font-bold tabular-nums text-teal-ink">
                   {tank.current_totalizer_index?.toLocaleString("fr-FR")} L
                 </p>
               </div>
@@ -104,7 +104,7 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
                   <span>Stock estimé</span>
                   <span>{tank.capacity_liters?.toLocaleString("fr-FR")} L capacité</span>
                 </div>
-                <p className={`font-display text-xl font-extrabold ${tank.current_stock_liters < 0 ? "text-orange-ink" : "text-gold-ink"}`}>
+                <p className={`text-xl font-bold tabular-nums ${tank.current_stock_liters < 0 ? "text-orange-ink" : "text-gold-ink"}`}>
                   {tank.current_stock_liters?.toLocaleString("fr-FR")} L
                 </p>
                 {tank.current_stock_liters < 0 && (

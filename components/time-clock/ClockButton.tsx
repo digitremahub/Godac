@@ -67,7 +67,12 @@ export function ClockButton({ clockedIn }: { clockedIn: boolean }) {
     <Card className="flex flex-col items-center gap-3 py-8 text-center">
       <span className={clockedIn ? "badge-teal" : "badge-neutral"}>{clockedIn ? "En poste" : "Hors poste"}</span>
       <button className={clockedIn ? "btn-secondary" : "btn-primary"} disabled={busy} onClick={toggle}>
-        {busy ? "…" : clockedIn ? "🔴 Badger la sortie" : "🟢 Badger l'entrée"}
+        {busy ? "…" : (
+        <>
+          <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${clockedIn ? "bg-orange" : "bg-teal"}`} />
+          {clockedIn ? "Badger la sortie" : "Badger l'entrée"}
+        </>
+      )}
       </button>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
       {geoWarning && <p className="text-xs text-gold-ink">{geoWarning}</p>}

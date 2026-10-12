@@ -4,6 +4,7 @@ import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
 import { ClockButton } from "@/components/time-clock/ClockButton";
+import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import type { AppUser } from "@/lib/auth/session";
 
 /**
@@ -72,34 +73,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre journée en un coup d'œil." />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-          {openTour ? (
-            <>
-              <p className="mb-1 text-sm text-navy/70">
-                Tournée n°{openTour.tour_number} en cours
-                {openTour.vehicles ? ` — ${openTour.vehicles.registration}` : ""}
-              </p>
-              <p className="mb-3 text-xs text-navy/60">
-                Départ à {new Date(openTour.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-              <Link href="/tours/end" className="btn-primary block w-full text-center">
-                🏁 Terminer la tournée
-              </Link>
-            </>
-          ) : (
-            <>
-              <p className="mb-3 text-sm text-navy/70">Aucune tournée en cours</p>
-              <Link href="/tours/start" className="btn-primary block w-full text-center">
-                🚚 Démarrer une tournée
-              </Link>
-            </>
-          )}
-          {planningEnabled && (
-            <Link href="/planning/mine" className="mt-1 block text-xs text-teal-ink hover:underline">
-              Voir mon planning →
-            </Link>
-          )}
-        </Card>
+        <TourHeroCard openTour={openTour} showPlanningLink={planningEnabled} />
 
         <div className="flex flex-col gap-4">
           <QrCodeBadge type="driver" id={appUser.id} title={appUser.full_name} subtitle="Mon badge chauffeur — à présenter à la pompe" />
@@ -130,7 +104,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
             ) : (
               <ul className="flex flex-col gap-2 text-sm">
                 {upcoming.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                  <li key={t.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                     <span>
                       n°{t.tour_number} {t.vehicles ? `— ${t.vehicles.registration}` : ""}
                     </span>
@@ -156,7 +130,7 @@ export async function ChauffeurDashboard({ appUser, enabledModules }: { appUser:
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {recentEntries.map((e) => (
-                <li key={e.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={e.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>
                     {e.vehicles?.registration ?? "—"} · {e.liters ? `${e.liters} L` : "—"}
                   </span>

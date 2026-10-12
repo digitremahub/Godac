@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { FineFields } from "@/lib/ocr/fine";
+import { IconCamera } from "@/components/layout/icons";
 
 /** Same upload-then-process shape as components/shared/TourReportPhotoCapture, for a fine notice photo. */
 export function FinePhotoCapture({
@@ -56,7 +57,7 @@ export function FinePhotoCapture({
       <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
-        {(status === "idle" || status === "error" || status === "done") && "📷 Photo du PV (lecture automatique)"}
+        {(status === "idle" || status === "error" || status === "done") && <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo du PV (lecture automatique)</>}
         <input
           type="file"
           accept="image/*"

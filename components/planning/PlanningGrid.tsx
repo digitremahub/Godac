@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
 import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
+import { IconAlertTriangle, IconCheck, IconCopy, IconPencil } from "@/components/layout/icons";
 
 interface ServiceOption {
   id: string;
@@ -385,7 +386,7 @@ export function PlanningGrid({
           </button>
         </div>
         <button className="btn-secondary ml-auto !px-3 !py-1.5 text-sm" disabled={duplicating} onClick={duplicatePreviousWeek}>
-          {duplicating ? "Copie…" : "📋 Dupliquer la semaine préc."}
+          {duplicating ? "Copie…" : <><IconCopy className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Dupliquer la semaine préc.</>}
         </button>
         <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
           + Nouvelle affectation
@@ -402,7 +403,7 @@ export function PlanningGrid({
                   : undefined
               }
             >
-              {validating ? "Envoi…" : validatedAt ? "✓ Envoyé — revalider" : "✅ Valider et envoyer"}
+              {validating ? "Envoi…" : validatedAt ? <><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Envoyé — revalider</> : <><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Valider et envoyer</>}
             </button>
           ) : (
             <span className="text-xs text-navy/60">Sélectionnez un service pour valider son planning</span>
@@ -410,7 +411,7 @@ export function PlanningGrid({
       </div>
 
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      {warning && <p className="text-sm text-gold-ink">⚠️ {warning}</p>}
+      {warning && <p className="text-sm text-gold-ink"><IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {warning}</p>}
       {duplicateSummary && <p role="status" className="text-sm text-teal-ink">{duplicateSummary}</p>}
       {bulkSummary && <p role="status" className="text-sm text-teal-ink">{bulkSummary}</p>}
 
@@ -439,7 +440,7 @@ export function PlanningGrid({
                     key={i}
                     type="button"
                     className={`rounded-md px-2 py-1 text-xs ${
-                      formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/5 text-navy/60"
+                      formDays.has(i) ? "bg-teal/20 text-teal-ink" : "bg-navy/[0.04] text-navy/60"
                     }`}
                     aria-pressed={formDays.has(i)}
                     onClick={() => toggleFormDay(i)}
@@ -572,7 +573,7 @@ export function PlanningGrid({
                                     aria-label="Modifier"
                                     title="Modifier"
                                   >
-                                    ✎
+                                    <IconPencil className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                                   </button>
                                 )}
                                 {duplicatingEntryId !== entry.id && (

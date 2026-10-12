@@ -81,7 +81,7 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
       </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
-      <div className="flex flex-col gap-2 rounded-lg bg-navy/5 p-3">
+      <div className="flex flex-col gap-2 rounded-lg bg-navy/[0.04] p-3">
         <input className="input" aria-label="Titre" placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea className="input" rows={3} aria-label="Contenu" placeholder="Contenu" value={content} onChange={(e) => setContent(e.target.value)} />
         <div className="flex flex-wrap gap-2">

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
+import { IconAlertTriangle } from "@/components/layout/icons";
 
 interface LeaveRow {
   id: string;
@@ -136,7 +137,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                   </span>
                   {leave.overlapWith.length > 0 && (
                     <p className="mt-1 text-xs text-orange-ink">
-                      ⚠ Chevauche le congé de {leave.overlapWith.join(", ")}
+                      <IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Chevauche le congé de {leave.overlapWith.join(", ")}
                     </p>
                   )}
                 </td>

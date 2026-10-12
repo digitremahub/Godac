@@ -45,7 +45,7 @@ export function QrCodeBadge({
   return (
     <div className="flex w-56 flex-col items-center gap-2 rounded-2xl bg-white p-4 text-navy print:shadow-none">
       <canvas ref={canvasRef} role="img" aria-label={`QR code — ${title}`} />
-      <p className="text-center font-display text-sm font-extrabold">{title}</p>
+      <p className="text-center font-display text-sm font-bold">{title}</p>
       {subtitle && <p className="text-center text-xs text-navy/70">{subtitle}</p>}
       {code && (
         <p className="text-center text-xs text-navy/65">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
+import { IconFingerprint } from "@/components/layout/icons";
 
 /**
  * Sign-up (and a first sign-in) is always magic link / OTP — Supabase
@@ -80,8 +81,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
   if (sent) {
     return (
-      <div className="card max-w-sm text-center">
-        <p className="text-lg">📩 Vérifiez votre boîte mail</p>
+      <div className="card text-center">
+        <p className="font-display text-lg font-bold">Vérifiez votre boîte mail</p>
         <p className="mt-2 text-sm text-navy/70">
           Un lien de connexion a été envoyé à <span className="text-navy">{email}</span>.
           Cliquez dessus pour {mode === "sign-in" ? "vous connecter" : "créer votre compte"}.
@@ -91,10 +92,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }
 
   return (
-    <form onSubmit={submit} className="card flex w-full max-w-sm flex-col gap-4">
+    <form onSubmit={submit} className="card flex w-full flex-col gap-5 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
       <div>
-        <h1 className="text-xl">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h1>
-        <p className="mt-1 text-sm text-navy/65">
+        <h1 className="text-2xl sm:text-[28px]">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h1>
+        <p className="mt-2 text-sm text-navy/65 sm:text-[15px]">
           {usePassword
             ? "Connectez-vous avec le mot de passe défini depuis votre compte."
             : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
@@ -156,7 +157,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       </button>
       {mode === "sign-in" && (
         <button type="button" className="btn-secondary" disabled={passkeyBusy || !email} onClick={usePasskey}>
-          {passkeyBusy ? "…" : "🔓 Face ID / empreinte"}
+          <IconFingerprint className="h-[18px] w-[18px]" />
+          {passkeyBusy ? "Vérification…" : "Face ID / empreinte"}
         </button>
       )}
       {mode === "sign-in" && (

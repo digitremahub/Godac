@@ -14,7 +14,7 @@ export function ReportsViewTabs({ view }: { view: string }) {
   }
 
   return (
-    <div className="mb-4 flex rounded-lg bg-navy/5 p-1" style={{ width: "fit-content" }}>
+    <div className="mb-4 flex rounded-lg bg-navy/[0.04] p-1" style={{ width: "fit-content" }}>
       {[
         { key: "table", label: "Tableau" },
         { key: "photos", label: "Photos" },

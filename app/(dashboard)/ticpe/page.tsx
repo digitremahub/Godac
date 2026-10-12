@@ -4,6 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TicpeExportForm } from "@/components/ticpe/TicpeExportForm";
+import { IconSparkles } from "@/components/layout/icons";
 
 export default async function TicpePage() {
   const appUser = await requireAppUser();
@@ -41,7 +42,7 @@ export default async function TicpePage() {
       {vehiclesToConfirm.length > 0 && (
         <Card className="mb-6 border border-gold/40 bg-gold/5">
           <p className="mb-2 text-sm text-gold-ink">
-            🤖 {vehiclesToConfirm.length} véhicule(s) ont un type (PL/SPL) estimé par IA, non confirmé — exclus de
+            <IconSparkles className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {vehiclesToConfirm.length} véhicule(s) ont un type (PL/SPL) estimé par IA, non confirmé — exclus de
             l&apos;export tant qu&apos;un humain ne l&apos;a pas vérifié sur la fiche véhicule :
           </p>
           <ul className="flex flex-col gap-1 text-sm">

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconCamera, IconX } from "@/components/layout/icons";
 
 interface VehicleOption {
   id: string;
@@ -193,10 +194,10 @@ export function MaintenanceRequestForm({
         {photos.length > 0 && (
           <ul className="flex flex-wrap gap-2">
             {photos.map((file, i) => (
-              <li key={i} className="flex items-center gap-1 rounded-lg bg-navy/5 px-2 py-1 text-xs">
+              <li key={i} className="flex items-center gap-1 rounded-lg bg-navy/[0.04] px-2 py-1 text-xs">
                 {file.name}
                 <button type="button" className="text-orange-ink" onClick={() => removePhoto(i)} aria-label={`Retirer ${file.name}`}>
-                  ✕
+                  <IconX className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                 </button>
               </li>
             ))}
@@ -204,7 +205,7 @@ export function MaintenanceRequestForm({
         )}
         {photos.length < MAX_PHOTOS && (
           <label className="btn-secondary w-full cursor-pointer justify-center text-center">
-            📷 Ajouter une photo
+            <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ajouter une photo
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"

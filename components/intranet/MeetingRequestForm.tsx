@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { IconCalendar } from "@/components/layout/icons";
 
 export function MeetingRequestForm() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export function MeetingRequestForm() {
   if (!open) {
     return (
       <button className="btn-secondary self-start" onClick={() => setOpen(true)}>
-        📅 Demander un rendez-vous
+        <IconCalendar className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Demander un rendez-vous
       </button>
     );
   }

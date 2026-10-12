@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconPaperclip } from "@/components/layout/icons";
 
 const DOC_TYPES = [
   "Contrat de travail",
@@ -109,7 +110,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
           ))}
         </select>
         <label className="btn-secondary cursor-pointer !px-3 !py-1.5 text-xs">
-          {status === "uploading" ? "Envoi…" : "📎 Ajouter un document"}
+          {status === "uploading" ? "Envoi…" : <><IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ajouter un document</>}
           <input
             type="file"
             accept="image/*,application/pdf"

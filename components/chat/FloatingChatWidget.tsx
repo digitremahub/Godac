@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AssistantTabBody, type AssistantMessage } from "@/components/chat/AssistantTabBody";
 import { ConversationTabBody } from "@/components/chat/ConversationTabBody";
+import { IconChatBubble, IconX } from "@/components/layout/icons";
 
 interface Contact {
   id: string;
@@ -201,11 +202,13 @@ export function FloatingChatWidget({
   return (
     <>
       <button
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal text-2xl shadow-[0_4px_16px_-4px_rgba(27,228,193,0.6)] lg:bottom-6"
+        type="button"
+        className="fixed bottom-[6.5rem] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-navy text-teal shadow-pop transition-transform hover:scale-105 lg:bottom-6"
         onClick={() => setOpen((v) => !v)}
         aria-label="Messages et assistant"
+        aria-expanded={open}
       >
-        {open ? "✕" : "💬"}
+        {open ? <IconX className="h-6 w-6" /> : <IconChatBubble className="h-6 w-6" />}
         {!open && totalUnread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 text-xs font-bold text-white">
             {totalUnread > 9 ? "9+" : totalUnread}
@@ -214,14 +217,14 @@ export function FloatingChatWidget({
       </button>
 
       {open && (
-        <div className="fixed bottom-[9.5rem] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-2xl lg:bottom-24">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-navy/10 bg-navy/5 px-2 pt-2">
+        <div className="fixed bottom-[11rem] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-pop lg:bottom-24">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-navy/10 bg-navy/[0.04] px-2 pt-2">
             {assistantAvailable && (
               <button
                 className={`shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-medium ${activeKey === "assistant" ? "bg-white" : "text-navy/65"}`}
                 onClick={() => setActiveKey("assistant")}
               >
-                🤖 Assistant
+                Assistant
               </button>
             )}
             {conversations.map((c) => (
@@ -241,7 +244,7 @@ export function FloatingChatWidget({
                   aria-label={`Fermer la conversation avec ${c.contactName}`}
                   className="text-navy/60 hover:text-orange-ink"
                 >
-                  <span aria-hidden="true">✕</span>
+                  <IconX className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />
                 </button>
               </div>
             ))}
@@ -266,7 +269,7 @@ export function FloatingChatWidget({
                       contacts.map((c) => (
                         <button
                           key={c.id}
-                          className="block w-full px-3 py-1.5 text-left text-xs hover:bg-navy/5"
+                          className="block w-full px-3 py-1.5 text-left text-xs hover:bg-navy/[0.04]"
                           onClick={() => openConversation(c.id, c.full_name)}
                         >
                           {c.full_name}

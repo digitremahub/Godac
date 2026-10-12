@@ -7,6 +7,7 @@ import { QrScanner } from "@/components/fuel/QrScanner";
 import { CameraCapture, type OcrCaptureResult } from "@/components/fuel/CameraCapture";
 import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { FuelEntryForm, type FuelEntryFormValues } from "@/components/fuel/FuelEntryForm";
+import { IconCamera, IconCheck, IconDroplet } from "@/components/layout/icons";
 
 interface VehicleOption {
   id: string;
@@ -128,14 +129,14 @@ export function NewFuelEntryWizard({
                 ))}
               </select>
               <button className="btn-secondary self-start" onClick={() => setScanTarget("driver")}>
-                📷 Ou scanner un badge
+                <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ou scanner un badge
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-between">
               <span className="text-sm text-navy/70">{driverLabel}</span>
               <button className="btn-secondary shrink-0" onClick={() => setScanTarget("driver")}>
-                📷 Borne partagée : scanner un badge
+                <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Borne partagée : scanner un badge
               </button>
             </div>
           )}
@@ -155,7 +156,7 @@ export function NewFuelEntryWizard({
           <p className="label">Véhicule</p>
           {vehicleLocked ? (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-navy/70">✅ {vehicle?.registration} ({vehicle?.type})</span>
+              <span className="text-sm text-navy/70"><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {vehicle?.registration} ({vehicle?.type})</span>
               <button className="btn-secondary shrink-0" onClick={() => setVehicleLocked(false)}>
                 Changer de véhicule
               </button>
@@ -180,7 +181,7 @@ export function NewFuelEntryWizard({
                 ))}
               </select>
               <button className="btn-secondary shrink-0" onClick={() => setScanTarget("vehicle")}>
-                📷 Scanner
+                <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Scanner
               </button>
             </div>
           )}
@@ -208,7 +209,7 @@ export function NewFuelEntryWizard({
                 ))}
               </select>
               <button className="btn-secondary shrink-0" onClick={() => setScanTarget("tank")}>
-                📷 Scanner
+                <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Scanner
               </button>
             </div>
           )}
@@ -264,10 +265,10 @@ export function NewFuelEntryWizard({
           </p>
         </Card>
         <button className="btn-primary" onClick={() => setPhase("ocr")}>
-          📷 Photographier le ticket (OCR)
+          <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photographier le ticket (OCR)
         </button>
         <button className="btn-secondary" onClick={() => setPhase("tank-before")}>
-          ⛽ Plein cuve (totaliseur)
+          <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein cuve (totaliseur)
         </button>
       </div>
     );
@@ -412,7 +413,7 @@ export function NewFuelEntryWizard({
     setPhase("submitted");
     if (fuelEntry?.gap_flagged) {
       setError(
-        `⚠️ Écart de totaliseur détecté (${fuelEntry.totalizer_gap} L) — une alerte a été envoyée à votre manager.`,
+        `Écart de totaliseur détecté (${fuelEntry.totalizer_gap} L) — une alerte a été envoyée à votre manager.`,
       );
     }
   }
@@ -489,7 +490,7 @@ export function NewFuelEntryWizard({
   if (phase === "submitted") {
     return (
       <Card className="flex flex-col items-center gap-4 py-10 text-center">
-        <p className="text-lg">✅ Ravitaillement enregistré</p>
+        <p className="text-lg"><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ravitaillement enregistré</p>
         {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
         <button className="btn-primary" onClick={() => router.push("/fuel")}>
           Voir l&apos;historique

@@ -142,7 +142,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
       ) : (
         <ul className="flex flex-col gap-2">
           {tanks.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-navy/5 px-3 py-2">
+            <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
               <input aria-label="Nom de la cuve"
                 className="input flex-1 !py-1"
                 defaultValue={t.name}

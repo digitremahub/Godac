@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { parseImportFile, vehicleCsvRowSchema, type VehicleCsvRow } from "@/lib/utils/csv";
+import { IconSparkles } from "@/components/layout/icons";
 
 /** API routes return either a plain string (thrown Error) or a zod .flatten() object — never {message}. */
 function apiErrorMessage(error: unknown): string {
@@ -140,7 +141,7 @@ export function VehicleImportPanel() {
         <div className="flex items-center justify-between rounded-lg bg-gold/10 p-3">
           <p className="text-sm text-gold-ink">Compléter automatiquement les champs vides (réservoir, PTAC…) pour les véhicules importés ?</p>
           <button className="btn-secondary shrink-0 !px-3 !py-1.5 text-xs" disabled={completing} onClick={completeByAi}>
-            {completing ? "En cours…" : "🤖 Compléter par IA"}
+            {completing ? "En cours…" : <><IconSparkles className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Compléter par IA</>}
           </button>
         </div>
       )}

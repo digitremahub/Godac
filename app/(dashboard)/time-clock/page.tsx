@@ -6,6 +6,7 @@ import { ClockButton } from "@/components/time-clock/ClockButton";
 import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import type { Coordinates } from "@/lib/business/fuel-profitability";
+import { IconMapPin } from "@/components/layout/icons";
 
 function formatDuration(startIso: string, endIso: string | null) {
   const start = new Date(startIso).getTime();
@@ -35,7 +36,7 @@ function mapLink(coords: Coordinates | null) {
       rel="noreferrer"
       className="ml-1 text-teal-ink underline"
     >
-      🗺️ Voir
+      <IconMapPin className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Voir
     </a>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { IconCamera } from "@/components/layout/icons";
 
 export interface OcrCaptureResult {
   fuelEntryId: string;
@@ -103,7 +104,7 @@ export function CameraCapture({
       <label className="btn-primary w-full cursor-pointer justify-center text-center">
         {status === "uploading" && "Envoi de la photo…"}
         {status === "extracting" && "Analyse du ticket…"}
-        {(status === "idle" || status === "error") && "📷 Prendre une photo du ticket"}
+        {(status === "idle" || status === "error") && <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Prendre une photo du ticket</>}
         <input
           type="file"
           accept="image/*"

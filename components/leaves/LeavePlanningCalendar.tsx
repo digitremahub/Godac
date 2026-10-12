@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { monthCalendarDays, addMonths } from "@/lib/planning/dates";
+import { IconAlertTriangle } from "@/components/layout/icons";
 
 interface LeaveRow {
   id: string;
@@ -92,7 +93,7 @@ export function LeavePlanningCalendar({
 
       {approvedWithoutReplacement > 0 && (
         <p className="rounded-lg bg-gold/10 p-3 text-sm text-gold-ink">
-          ⚠️ {approvedWithoutReplacement} congé(s) approuvé(s) sans remplaçant assigné ce mois-ci.
+          <IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {approvedWithoutReplacement} congé(s) approuvé(s) sans remplaçant assigné ce mois-ci.
         </p>
       )}
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
@@ -110,7 +111,7 @@ export function LeavePlanningCalendar({
             <div
               key={day}
               className={`flex min-h-[64px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                inMonth ? "bg-white" : "bg-navy/5 text-navy/60"
+                inMonth ? "bg-white" : "bg-navy/[0.04] text-navy/60"
               }`}
             >
               <span className="font-medium">{Number(day.slice(8, 10))}</span>

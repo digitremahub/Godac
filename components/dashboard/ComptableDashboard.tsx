@@ -135,7 +135,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {ongoingTours.map((t) => (
-                <li key={t.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={t.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>
                     {t.users?.full_name ?? "—"} · {t.vehicles?.registration ?? "—"} · n°{t.tour_number}
                   </span>
@@ -155,7 +155,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {consumptionRanking.map((v) => (
-                <li key={v.registration} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={v.registration} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>{v.registration}</span>
                   <span className="font-medium">{v.consumption} L/100km</span>
                 </li>
@@ -178,7 +178,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {missingInvoiceDeliveries.map((d) => (
-                <li key={d.id} className="flex items-center justify-between rounded-lg bg-navy/5 px-3 py-2">
+                <li key={d.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>
                     {d.tanks?.name ?? "—"} · {d.supplier ?? "—"} · {d.liters?.toLocaleString("fr-FR")} L
                   </span>

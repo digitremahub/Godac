@@ -147,7 +147,7 @@ export default async function MyPlanningPage({
                 key={dayISO}
                 href={`/planning/mine?view=day&anchor=${dayISO}`}
                 className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                  inMonth ? "bg-white" : "bg-navy/5 text-navy/60"
+                  inMonth ? "bg-white" : "bg-navy/[0.04] text-navy/60"
                 }`}
               >
                 <span className="font-medium">{Number(dayISO.slice(8, 10))}</span>

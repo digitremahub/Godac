@@ -1,16 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Inter } from "next/font/google";
+import { Syne, DM_Sans } from "next/font/google";
 import "./globals.css";
 
-const poppins = Poppins({
+// Brand guide (Notion — Naming & Identité de Marque V2): Syne for
+// titles and the logo, DM Sans for body copy.
+const syne = Syne({
   subsets: ["latin"],
   weight: ["600", "700", "800"],
   variable: "--font-heading",
   display: "swap",
 });
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-body",
   display: "swap",
 });
@@ -42,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${poppins.variable} ${inter.variable}`}>
+    <html lang="fr" className={`${syne.variable} ${dmSans.variable}`}>
       <body>{children}</body>
     </html>
   );

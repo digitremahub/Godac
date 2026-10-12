@@ -187,7 +187,7 @@ export function InterventionsPanel({
           {interventions.map((i) => {
             const isEditing = editingId === i.id;
             return (
-              <li key={i.id} className="rounded-lg bg-navy/5 px-3 py-2 text-sm">
+              <li key={i.id} className="rounded-xl bg-navy/[0.035] px-3.5 py-2.5 text-sm">
                 {isEditing ? (
                   <div className="flex flex-col gap-2">
                     <input aria-label="Type d’intervention" className="input !py-1" value={editType} onChange={(e) => setEditType(e.target.value)} />
