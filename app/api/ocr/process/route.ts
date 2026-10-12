@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { processFuelEntryOcr } from "@/lib/ocr/pipeline";
+import { isModuleEnabled } from "@/lib/organization/modules";
 
 const bodySchema = z.object({
   fuelEntryId: z.string().uuid(),
@@ -38,7 +39,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  await processFuelEntryOcr(parsed.data.fuelEntryId);
+  if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
+    await processFuelEntryOcr(parsed.data.fuelEntryId);
+  }
 
   return NextResponse.json({ ok: true });
 }

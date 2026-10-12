@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { parseTableFile, dumpRawTableText } from "@/lib/import/parse-table";
 import { extractRowsWithAI } from "@/lib/import/ai-extract";
 import { validateRows, vehicleCsvRowSchema, driverCsvRowSchema } from "@/lib/utils/csv";
@@ -24,7 +26,7 @@ const SCHEMAS = { vehicles: vehicleCsvRowSchema, drivers: driverCsvRowSchema } a
  * rather than assuming any particular structure.
  */
 export async function POST(req: Request) {
-  await requireAppUser();
+  const appUser = await requireAppUser();
 
   const form = await req.formData();
   const file = form.get("file");
@@ -49,17 +51,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ rows: deterministicRows });
   }
 
-  try {
-    const rawText = await dumpRawTableText(file);
-    const aiResult = await extractRowsWithAI(rawText, kind);
-    if (aiResult.ok && aiResult.rows.length > 0) {
-      return NextResponse.json({ rows: aiResult.rows, source: "ai" });
+  // The AI fallback reads the raw file (possibly employee data): only
+  // when the organisation allows automatic reading.
+  const supabase = await createServerSupabaseClient();
+  if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
+    try {
+      const rawText = await dumpRawTableText(file);
+      const aiResult = await extractRowsWithAI(rawText, kind);
+      if (aiResult.ok && aiResult.rows.length > 0) {
+        return NextResponse.json({ rows: aiResult.rows, source: "ai" });
+      }
+      if (!aiResult.ok) {
+        console.error("AI import fallback unavailable:", aiResult.reason);
+      }
+    } catch (e) {
+      console.error("AI import fallback failed", e);
     }
-    if (!aiResult.ok) {
-      console.error("AI import fallback unavailable:", aiResult.reason);
-    }
-  } catch (e) {
-    console.error("AI import fallback failed", e);
   }
 
   if (deterministicRows.length === 0 && parseError) {

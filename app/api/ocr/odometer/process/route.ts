@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { extractOdometerReading } from "@/lib/ocr/counter";
 
 const bodySchema = z.object({ storagePath: z.string().min(1) });
@@ -23,6 +24,12 @@ export async function POST(req: Request) {
 
   if (downloadError || !fileBlob) {
     return NextResponse.json({ error: `Téléchargement de la photo impossible: ${downloadError?.message}` }, { status: 500 });
+  }
+
+  // The photo stays attached; only the AI reading is skipped when the
+  // organisation has the "ocr" module off.
+  if (!(await isModuleEnabled(supabase, appUser.organization_id, "ocr"))) {
+    return NextResponse.json({ fields: null, error: "Lecture automatique désactivée pour votre entreprise — complétez les champs à la main." });
   }
 
   const imageBytes = Buffer.from(await fileBlob.arrayBuffer());
