@@ -7,24 +7,31 @@ import { ServicesPanel } from "@/components/admin/ServicesPanel";
 import { TanksPanel } from "@/components/admin/TanksPanel";
 import { AssistantNotesPanel } from "@/components/admin/AssistantNotesPanel";
 import { JoinLinkCard } from "@/components/admin/JoinLinkCard";
+import { PayslipContributionLinesPanel } from "@/components/admin/PayslipContributionLinesPanel";
 
 export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
-  const [{ data: organization }, ocrEnabled, assistantEnabled, { data: services }, { data: tanks }, { data: notes }] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select(
-        "name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
-      )
-      .eq("id", appUser.organization_id)
-      .single(),
-    isModuleEnabled(supabase, appUser.organization_id, "ocr"),
-    isModuleEnabled(supabase, appUser.organization_id, "assistant"),
-    supabase.from("services").select("id, name, code, depot_address").order("name"),
-    supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
-    supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
-  ]);
+  const isDirection = appUser.role === "direction";
+  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }] =
+    await Promise.all([
+      supabase
+        .from("organizations")
+        .select(
+          "name, logo_url, accent_color, require_odometer_photo, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
+        )
+        .eq("id", appUser.organization_id)
+        .single(),
+      isModuleEnabled(supabase, appUser.organization_id, "ocr"),
+      isModuleEnabled(supabase, appUser.organization_id, "assistant"),
+      isDirection ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
+      supabase.from("services").select("id, name, code, depot_address").order("name"),
+      supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
+      supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
+      isDirection
+        ? supabase.from("payslip_contribution_lines").select("id, label, salarial_rate, patronal_rate").order("created_at")
+        : Promise.resolve({ data: null }),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,6 +55,11 @@ export default async function OrganizationSettingsPage() {
       />
       <ServicesPanel services={services ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />
+      {payslipsEnabled && (
+        <PayslipContributionLinesPanel
+          lines={(contributionLines ?? []).map((l) => ({ ...l, salarial_rate: Number(l.salarial_rate), patronal_rate: Number(l.patronal_rate) }))}
+        />
+      )}
       {assistantEnabled && <AssistantNotesPanel notes={(notes ?? []) as any} />}
       {appUser.role === "direction" && organization?.driver_signup_token && (
         <JoinLinkCard token={organization.driver_signup_token} />

@@ -54,7 +54,7 @@ export async function buildPayslip({
   // dernière journée — même piège que documenté dans lib/planning/dates.ts.
   const badgeWindowEnd = addDays(periodEnd, 1);
 
-  const [{ data: employee }, { data: contract }, { data: organization }, { data: employeeFile }, { data: badgeRows }, { data: leaveRows }, { data: priorPayslips }] =
+  const [{ data: employee }, { data: contract }, { data: organization }, { data: employeeFile }, { data: badgeRows }, { data: leaveRows }, { data: priorPayslips }, { data: contributionLineRows }] =
     await Promise.all([
       supabase.from("users").select("id, full_name, role_title, address").eq("id", userId).eq("organization_id", organizationId).single(),
       supabase
@@ -89,6 +89,7 @@ export async function buildPayslip({
         .lte("start_date", periodEnd)
         .gte("end_date", periodStart),
       supabase.from("payslips").select("gross_amount, net_amount").eq("user_id", userId).gte("period_start", yearStart).lt("period_start", periodStart),
+      supabase.from("payslip_contribution_lines").select("label, salarial_rate, patronal_rate").eq("organization_id", organizationId).order("created_at"),
     ]);
 
   if (!employee) throw new PayslipBuildError("Employé introuvable.", 404);
@@ -98,6 +99,16 @@ export async function buildPayslip({
 
   const grossAmount = Number(contract.monthly_gross_salary) + bonusAmount;
   const netAmount = Number(contract.monthly_net_salary) + bonusAmount + mealVouchersAmount;
+
+  // Taux saisis une fois par la direction (voir PayslipContributionLinesPanel),
+  // appliqués ici au brut de ce bulletin — vide tant que rien n'est
+  // configuré, auquel cas generatePayslipPdf garde la ligne globale
+  // "estimation" historique.
+  const contributionLines = (contributionLineRows ?? []).map((l) => ({
+    label: l.label,
+    salarialAmount: (grossAmount * Number(l.salarial_rate)) / 100,
+    patronalAmount: (grossAmount * Number(l.patronal_rate)) / 100,
+  }));
 
   const workedHours = timeClockEnabled
     ? (badgeRows ?? []).reduce((total, b) => total + Math.max((new Date(b.clocked_out_at).getTime() - new Date(b.clocked_in_at).getTime()) / 3_600_000, 0), 0)
@@ -146,6 +157,7 @@ export async function buildPayslip({
       leaveDaysTaken,
       cumulGrossYTD,
       cumulNetYTD,
+      contributionLines: contributionLines.length > 0 ? contributionLines : null,
     });
   } catch (e) {
     console.error("buildPayslip: PDF rendering failed", e);
