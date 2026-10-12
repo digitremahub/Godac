@@ -266,7 +266,7 @@ export function EditVehicleForm({
               <button
                 key={i}
                 type="button"
-                className="rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-navy/[0.04]"
+                className="rounded-lg bg-surface px-3 py-2 text-left text-xs hover:bg-navy/[0.04]"
                 onClick={() => applyVariant(v)}
               >
                 {v.label}

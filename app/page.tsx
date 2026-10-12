@@ -86,7 +86,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
   return (
     <div className="min-h-screen">
       {/* ── Hero (marine, per the brand guide: white on deep navy) ── */}
-      <div className="relative overflow-hidden bg-navy text-[#F0F4FF]">
+      <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-20 h-[28rem] w-[28rem] rounded-full bg-teal/15 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-orange/10 blur-3xl" />
 
@@ -136,8 +136,8 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                   className="object-cover object-[88%_center]"
                 />
               </div>
-              <div aria-hidden="true" className="absolute -bottom-6 left-4 hidden items-center gap-3 rounded-2xl bg-white p-4 pr-5 text-navy shadow-pop sm:flex lg:-left-8">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-navy">
+              <div aria-hidden="true" className="absolute -bottom-6 left-4 hidden items-center gap-3 rounded-2xl bg-surface p-4 pr-5 text-navy shadow-pop sm:flex lg:-left-8">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-marine">
                   <IconCheck className="h-5 w-5" />
                 </span>
                 <span>
@@ -151,7 +151,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </div>
 
       {/* ── What GODAC replaces ── */}
-      <section className="border-b border-navy/[0.08] bg-white">
+      <section className="border-b border-navy/[0.08] bg-surface">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-8 text-center sm:px-6 lg:flex-row lg:justify-between lg:text-left">
           <p className="font-display text-lg font-bold">Le transport mérite mieux qu&apos;Excel.</p>
           <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2">
@@ -166,7 +166,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Demo ── */}
-      <section id="demo" className="scroll-mt-6 bg-white">
+      <section id="demo" className="scroll-mt-6 bg-surface">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
           <div className="mx-auto mb-10 max-w-2xl text-center">
             <p className="kicker !text-teal-ink">Démo en accès libre</p>
@@ -186,7 +186,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Tournée du jour, pleins, présences et papiers du camion, sur mobile.", icon: IconTruck },
             ].map((d) => (
               <a key={d.href} href={d.href} className="card-hover group flex flex-col gap-4">
-                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy text-teal">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
                   <d.icon className="h-5 w-5" />
                 </span>
                 <span>
@@ -216,7 +216,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Modules ── */}
-      <section className="bg-white py-20 lg:py-28">
+      <section className="bg-surface py-20 lg:py-28">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-xl">
@@ -231,7 +231,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
               <li key={feature.title} className="card flex flex-col gap-3 transition-[border-color,box-shadow] hover:border-navy/15 hover:shadow-raised">
-                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy text-teal">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
                   <feature.icon className="h-5 w-5" />
                 </span>
                 <h3 className="text-lg">{feature.title}</h3>
@@ -261,7 +261,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
 
       {/* ── Final CTA ── */}
       <section className="px-5 pb-20 sm:px-6">
-        <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-navy px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
+        <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-marine px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
           <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-teal/20 blur-3xl" />
           <div className="relative">
             <h2 className="text-[28px] leading-tight sm:text-4xl">Votre entreprise, organisée.</h2>

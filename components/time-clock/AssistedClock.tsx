@@ -92,7 +92,7 @@ export function AssistedClock({ hasOpenTour }: { hasOpenTour: boolean }) {
   return (
     <div role="status" className="mb-6 flex flex-col gap-3 rounded-2xl border border-teal/30 bg-teal/[0.08] p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal text-navy">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal text-marine">
           {banner.kind === "offer_out" ? <IconMapPin className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />}
         </span>
         <p className="text-sm">

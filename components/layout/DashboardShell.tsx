@@ -58,13 +58,13 @@ export function DashboardShell({
     <div className="flex min-h-screen">
       <a
         href="#contenu"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lg"
       >
         Aller au contenu
       </a>
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-40 bg-navy/50 backdrop-blur-[2px] lg:hidden"
+          className="fixed inset-0 z-40 bg-marine/50 backdrop-blur-[2px] lg:hidden"
           onClick={() => setDrawerOpen(false)}
           aria-hidden="true"
         />
@@ -80,7 +80,7 @@ export function DashboardShell({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {isDemo && (
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-gold px-4 py-2 text-center text-sm text-navy">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-gold px-4 py-2 text-center text-sm text-marine">
             <span>
               <strong>Mode démo</strong> — entreprise et données fictives, remises à zéro chaque nuit.
             </span>

@@ -154,7 +154,7 @@ export function Sidebar({
       // Off-canvas on mobile: `invisible` (delayed until the slide-out
       // finishes) takes the closed drawer's links out of the tab order
       // and the accessibility tree, not just off-screen.
-      className={`sidebar-scroll fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain bg-navy px-3 pb-6 pt-4 text-white transition-[transform,visibility] duration-200 ease-in-out lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-64 lg:translate-x-0 ${
+      className={`sidebar-scroll fixed inset-y-0 left-0 z-50 flex h-full w-72 shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain border-r border-white/[0.06] bg-marine px-3 pb-6 pt-4 text-white transition-[transform,visibility] duration-200 ease-in-out lg:visible lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-64 lg:translate-x-0 ${
         open ? "visible translate-x-0" : "invisible -translate-x-full"
       }`}
     >

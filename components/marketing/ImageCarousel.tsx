@@ -38,7 +38,7 @@ export function ImageCarousel({ slides }: { slides: Slide[] }) {
 
   return (
     <div
-      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-[0_20px_60px_-25px_rgba(10,15,30,0.25)]"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-navy/10 bg-surface shadow-[0_20px_60px_-25px_rgba(10,15,30,0.25)]"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setFocused(true)}
@@ -75,7 +75,7 @@ export function ImageCarousel({ slides }: { slides: Slide[] }) {
             className="group flex h-8 items-center px-1"
           >
             <span
-              className={`h-1.5 rounded-full transition-[width,background-color] ${i === active ? "w-6 bg-teal" : "w-1.5 bg-navy/25 group-hover:bg-navy/40"}`}
+              className={`h-1.5 rounded-full transition-[width,background-color] ${i === active ? "w-6 bg-teal" : "w-1.5 bg-navy/25 group-hover:bg-marine/40"}`}
             />
           </button>
         ))}

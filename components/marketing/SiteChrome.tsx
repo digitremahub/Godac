@@ -27,7 +27,7 @@ export function SiteHeader({ spaceHref }: { spaceHref?: string | null }) {
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-navy/[0.08] bg-white">
+    <footer className="border-t border-navy/[0.08] bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 text-sm text-navy/65 sm:flex-row sm:px-6">
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-3">
           <Wordmark className="text-lg" />

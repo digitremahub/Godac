@@ -111,7 +111,7 @@ export function LeavePlanningCalendar({
             <div
               key={day}
               className={`flex min-h-[64px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
-                inMonth ? "bg-white" : "bg-navy/[0.04] text-navy/60"
+                inMonth ? "bg-surface" : "bg-navy/[0.04] text-navy/60"
               }`}
             >
               <span className="font-medium">{Number(day.slice(8, 10))}</span>

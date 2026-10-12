@@ -17,7 +17,7 @@ export function TourHeroCard({
     : null;
 
   return (
-    <div className="relative flex flex-col justify-between gap-6 overflow-hidden rounded-2xl bg-navy p-6 text-white shadow-raised">
+    <div className="relative flex flex-col justify-between gap-6 overflow-hidden rounded-2xl bg-marine p-6 text-white shadow-raised">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal/20 blur-3xl"
@@ -25,7 +25,7 @@ export function TourHeroCard({
       <div className="relative flex items-start gap-4">
         <span
           aria-hidden="true"
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${openTour ? "bg-teal text-navy" : "bg-white/10 text-teal"}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${openTour ? "bg-teal text-marine" : "bg-white/10 text-teal"}`}
         >
           {openTour ? <IconTruck className="h-6 w-6" /> : <IconFlag className="h-6 w-6" />}
         </span>

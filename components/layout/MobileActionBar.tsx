@@ -51,7 +51,7 @@ export function MobileActionBar({
       className="fixed inset-x-3 bottom-3 z-30 lg:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="flex rounded-2xl bg-navy/95 p-1.5 shadow-pop backdrop-blur-md">
+      <ul className="flex rounded-2xl bg-marine/95 p-1.5 shadow-pop ring-1 ring-white/10 backdrop-blur-md">
         {items.map((item) => {
           const Icon = item.icon;
           const path = item.href.split("?")[0]!;

@@ -8,19 +8,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: "#0A0F1E",
-        paper: "#F6F7FB",
+        // Theme-aware tokens (app/globals.css): `navy` is the INK — dark
+        // text in light mode, light text in dark mode — and `paper` /
+        // `surface` the page and card backgrounds. `marine` is the brand
+        // navy as a FILL (sidebar, heroes, dark buttons) and never flips.
+        navy: "rgb(var(--c-ink) / <alpha-value>)",
+        paper: "rgb(var(--c-paper) / <alpha-value>)",
+        surface: "rgb(var(--c-surface) / <alpha-value>)",
+        marine: "#0A0F1E",
         teal: "#1BE4C1",
         orange: "#FF6B35",
         gold: "#F5C842",
-        // Deep, readable variants of the three brand accents — the
-        // bright versions above have poor contrast as *text* on the
-        // light theme's white/paper background (they're kept as-is
-        // for fills: buttons, badge backgrounds, accent bars, where
-        // it's the shape's own contrast that matters, not the page's).
-        "teal-ink": "#0F766E",
-        "orange-ink": "#C2410C",
-        "gold-ink": "#92660A",
+        // Readable text variants of the three accents: deep on light
+        // backgrounds, bright on dark ones (fills keep the brand hues).
+        "teal-ink": "rgb(var(--c-teal-ink) / <alpha-value>)",
+        "orange-ink": "rgb(var(--c-orange-ink) / <alpha-value>)",
+        "gold-ink": "rgb(var(--c-gold-ink) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-heading)", "sans-serif"],

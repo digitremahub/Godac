@@ -30,7 +30,7 @@ export default async function ModulesPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="relative overflow-hidden bg-navy text-[#F0F4FF]">
+      <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
         <SiteHeader />
         <div className="relative mx-auto max-w-3xl px-5 pb-20 pt-10 text-center sm:px-6">
