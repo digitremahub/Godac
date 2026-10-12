@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveTourActor } from "@/lib/tours/on-behalf";
 
 /**
  * The signed-in driver's own currently open tour, if any — used by
@@ -12,9 +12,13 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
  * (see app/api/tours/route.ts) instead of relying on the driver
  * retyping a matching tour number.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
+  // Same endpoint for « Dépanner un collègue »: with a valid on-behalf
+  // token this answers for the colleague instead (lib/tours/on-behalf.ts).
+  const actor = await resolveTourActor(req, appUser);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  const { db: supabase, driverId } = actor;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -25,13 +29,15 @@ export async function GET() {
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, start_km, vehicles(id, registration)")
-      .eq("driver_id", appUser.id)
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", driverId)
       .eq("status", "in_progress")
       .maybeSingle(),
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, vehicles(id, registration)")
-      .eq("driver_id", appUser.id)
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", driverId)
       .eq("status", "planned")
       .gte("start_at", todayStart.toISOString())
       .lt("start_at", todayEnd.toISOString())
@@ -41,7 +47,7 @@ export async function GET() {
     // StartTourFlow shows them a service picker only in that case
     // (see app/api/tours POST's own comment on why the service
     // otherwise just follows the scanned vehicle).
-    supabase.from("user_services").select("services(id, name)").eq("user_id", appUser.id),
+    supabase.from("user_services").select("services(id, name)").eq("user_id", driverId),
   ]);
 
   if (openRes.error) return NextResponse.json({ error: openRes.error.message }, { status: 500 });

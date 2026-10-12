@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { UserRole, VehicleType } from "@/lib/types/domain";
 import { WashForm } from "@/components/vehicles/WashForm";
 import { Card } from "@/components/ui";
-import { IconDroplet, IconFlag, IconTruck, IconWashing, IconWrench } from "@/components/layout/icons";
+import { IconDroplet, IconFlag, IconTruck, IconUsers, IconWashing, IconWrench } from "@/components/layout/icons";
 
 export function VehicleActionsPanel({
   vehicleId,
@@ -53,6 +53,12 @@ export function VehicleActionsPanel({
       {enabled.has("maintenance_requests") && (
         <Link href={`/maintenance?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
           <IconWrench className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Signaler un problème
+        </Link>
+      )}
+
+      {canDriveTours && enabled.has("planning") && (
+        <Link href={`/tours/help?vehicle=${vehicleId}`} className="btn-ghost min-h-[52px] w-full justify-center text-base">
+          <IconUsers className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Dépanner un collègue
         </Link>
       )}
 

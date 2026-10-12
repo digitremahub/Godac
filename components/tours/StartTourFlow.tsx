@@ -41,10 +41,14 @@ interface ServiceOption {
 export function StartTourFlow({
   initialVehicleId,
   requireOdometerPhoto = false,
+  onBehalf,
 }: {
   initialVehicleId?: string;
   requireOdometerPhoto?: boolean;
+  /** « Dépanner un collègue » — token from /api/tours/on-behalf, sent with every tour call. */
+  onBehalf?: { token: string; colleagueName: string };
 } = {}) {
+  const tourHeaders: Record<string, string> = onBehalf ? { "x-godac-on-behalf": onBehalf.token } : {};
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [vehicleId, setVehicleId] = useState<string | null>(null);
@@ -83,7 +87,7 @@ export function StartTourFlow({
     }
     (async () => {
       try {
-        const res = await fetch("/api/tours/open");
+        const res = await fetch("/api/tours/open", { headers: tourHeaders });
         const json = await res.json();
         if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
         setOpenTour(json.tour);
@@ -112,7 +116,7 @@ export function StartTourFlow({
     setChecking(true);
     setError(null);
     try {
-      const [openRes, vehicleRes] = await Promise.all([fetch("/api/tours/open"), fetch(`/api/vehicles/${id}`)]);
+      const [openRes, vehicleRes] = await Promise.all([fetch("/api/tours/open", { headers: tourHeaders }), fetch(`/api/vehicles/${id}`)]);
       const openJson = await openRes.json();
       if (!openRes.ok) throw new Error(typeof openJson.error === "string" ? openJson.error : "Erreur");
       setOpenTour(openJson.tour);
@@ -147,7 +151,7 @@ export function StartTourFlow({
     try {
       const res = await fetch("/api/tours", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...tourHeaders },
         body: JSON.stringify({
           vehicle_id: vehicleId,
           service_id: polyvalentServices ? serviceId : undefined,
@@ -183,7 +187,12 @@ export function StartTourFlow({
   }
 
   if (done) {
-    return <EmptyState title="Tournée démarrée" description="Le départ a été enregistré. Bonne route !" />;
+    return (
+      <EmptyState
+        title="Tournée démarrée"
+        description={onBehalf ? `Le départ de ${onBehalf.colleagueName} a été enregistré à son nom.` : "Le départ a été enregistré. Bonne route !"}
+      />
+    );
   }
 
   if (loadingPlan) {

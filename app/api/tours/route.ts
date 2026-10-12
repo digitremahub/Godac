@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
 import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
@@ -74,17 +74,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const supabase = await createServerSupabaseClient();
+  // Normally the caller's own tour; with a valid on-behalf token
+  // (« Dépanner un collègue », badge + PIN already checked), the
+  // colleague's — through the service-role client, so every query
+  // below also pins organization_id explicitly.
+  const actor = await resolveTourActor(req, appUser);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  const { db: supabase, driverId, helperId } = actor;
+  const forColleague = helperId !== null;
 
   const { data: existingOpen } = await supabase
     .from("planning_entries")
     .select("id")
-    .eq("driver_id", appUser.id)
+    .eq("organization_id", appUser.organization_id)
+    .eq("driver_id", driverId)
     .eq("status", "in_progress")
     .maybeSingle();
   if (existingOpen) {
     return NextResponse.json(
-      { error: "Vous avez déjà une tournée en cours — terminez-la avant d'en démarrer une nouvelle." },
+      {
+        error: forColleague
+          ? "Ce collègue a déjà une tournée en cours — utilisez « Terminer sa tournée »."
+          : "Vous avez déjà une tournée en cours — terminez-la avant d'en démarrer une nouvelle.",
+      },
       { status: 409 },
     );
   }
@@ -92,6 +104,7 @@ export async function POST(req: Request) {
   const { data: vehicle, error: vehicleError } = await supabase
     .from("vehicles")
     .select("id, service_id, registration")
+    .eq("organization_id", appUser.organization_id)
     .eq("id", parsed.data.vehicle_id)
     .single();
   if (vehicleError || !vehicle) {
@@ -109,11 +122,11 @@ export async function POST(req: Request) {
     const { data: qualified } = await supabase
       .from("user_services")
       .select("service_id")
-      .eq("user_id", appUser.id)
+      .eq("user_id", driverId)
       .eq("service_id", parsed.data.service_id)
       .maybeSingle();
     if (!qualified) {
-      return NextResponse.json({ error: "Vous n'êtes pas qualifié sur ce service." }, { status: 422 });
+      return NextResponse.json({ error: forColleague ? "Ce collègue n'est pas qualifié sur ce service." : "Vous n'êtes pas qualifié sur ce service." }, { status: 422 });
     }
     tourServiceId = parsed.data.service_id;
   }
@@ -138,6 +151,9 @@ export async function POST(req: Request) {
     start_km_photo_path: parsed.data.start_km_photo_path,
     start_photo_path: parsed.data.sheet_photo_path ?? null,
     start_vehicle_ok: parsed.data.vehicle_ok,
+    // Only written for a colleague-assisted start, so plain starts keep
+    // working even before migration 20260101000095 reaches a database.
+    ...(helperId ? { started_by: helperId } : {}),
     ...(reportFields
       ? {
           report_bl_number: reportFields.bl_number ?? null,
@@ -165,7 +181,8 @@ export async function POST(req: Request) {
           .from("planning_entries")
           .select("id, vehicle_id")
           .eq("id", parsed.data.planned_entry_id)
-          .eq("driver_id", appUser.id)
+          .eq("organization_id", appUser.organization_id)
+          .eq("driver_id", driverId)
           .eq("status", "planned")
           .maybeSingle()
       ).data
@@ -174,7 +191,8 @@ export async function POST(req: Request) {
           await supabase
             .from("planning_entries")
             .select("id, vehicle_id")
-            .eq("driver_id", appUser.id)
+            .eq("organization_id", appUser.organization_id)
+            .eq("driver_id", driverId)
             .eq("tour_number", parsed.data.tour_number)
             .eq("status", "planned")
             .maybeSingle()
@@ -196,7 +214,7 @@ export async function POST(req: Request) {
     ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()
     : await supabase
         .from("planning_entries")
-        .insert({ organization_id: appUser.organization_id, tour_number: tourNumber, driver_id: appUser.id, ...startFields })
+        .insert({ organization_id: appUser.organization_id, tour_number: tourNumber, driver_id: driverId, ...startFields })
         .select("id")
         .single();
 

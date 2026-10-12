@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
 
@@ -59,18 +59,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const supabase = await createServerSupabaseClient();
+  // With a valid on-behalf token (« Dépanner un collègue »), this
+  // closes the colleague's tour instead — service-role client, so the
+  // organization is pinned explicitly on every query below.
+  const actor = await resolveTourActor(req, appUser);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  const { db: supabase, driverId, helperId } = actor;
 
   const { data: tour, error: tourError } = await supabase
     .from("planning_entries")
     .select("id, vehicle_id, driver_id, status, tour_number, start_km, report_ocr_raw")
+    .eq("organization_id", appUser.organization_id)
     .eq("id", id)
     .single();
   if (tourError || !tour) {
     return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
   }
-  if (tour.driver_id !== appUser.id || tour.status !== "in_progress") {
-    return NextResponse.json({ error: "Cette tournée n'est pas ouverte pour vous." }, { status: 403 });
+  if (tour.driver_id !== driverId || tour.status !== "in_progress") {
+    return NextResponse.json(
+      { error: helperId ? "Cette tournée n'est pas ouverte pour ce collègue." : "Cette tournée n'est pas ouverte pour vous." },
+      { status: 403 },
+    );
   }
 
   const vehicleChanged = tour.vehicle_id !== parsed.data.vehicle_id;
@@ -84,6 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: newVehicle, error: vehicleError } = await supabase
       .from("vehicles")
       .select("id")
+      .eq("organization_id", appUser.organization_id)
       .eq("id", parsed.data.vehicle_id)
       .single();
     if (vehicleError || !newVehicle) {
@@ -118,6 +128,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       end_vehicle_ok: parsed.data.vehicle_ok,
       return_type: parsed.data.return_type ?? null,
       status: "done",
+      ...(helperId ? { ended_by: helperId } : {}),
       ...(reportFields
         ? {
             report_bl_number: reportFields.bl_number ?? undefined,
@@ -132,7 +143,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           }
         : {}),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("organization_id", appUser.organization_id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
