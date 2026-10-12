@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/reset-demo",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/retention",
+      "schedule": "15 3 * * *"
     }
   ]
 }

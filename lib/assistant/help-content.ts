@@ -72,3 +72,8 @@ function loadFile(file: string): string {
 export function getHelpSourcesForRole(role: UserRole): HelpSource[] {
   return GUIDES.filter((g) => g.roles.includes(role)).map((g) => ({ title: g.title, content: loadFile(g.file) }));
 }
+
+/** Every guide, for the platform-level FAQ drafting (lib/assistant/faq.ts) — never sent in a user's own chat turn. */
+export function getAllHelpSources(): HelpSource[] {
+  return GUIDES.map((g) => ({ title: g.title, content: loadFile(g.file) }));
+}

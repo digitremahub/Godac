@@ -123,17 +123,41 @@ export default function ConfidentialitePage() {
         </p>
       </Section>
 
+      <Section title="Amélioration de l'assistant (FAQ commune)">
+        <p>
+          Pour que l&apos;assistant réponde mieux, les questions qui lui sont posées alimentent une foire aux questions
+          commune à toutes les entreprises utilisatrices. Avant d&apos;être conservée, chaque question est
+          anonymisée : nom de la personne et de l&apos;entreprise, immatriculations, numéros de téléphone, e-mails et
+          numéros sont retirés, et la question est enregistrée <strong>sans aucun lien</strong> avec l&apos;entreprise ou
+          la personne qui l&apos;a posée. Les questions similaires sont ensuite regroupées et généralisées, et
+          chaque réponse est relue par l&apos;éditeur avant publication. Aucun modèle d&apos;intelligence artificielle
+          n&apos;est entraîné avec ces données : les réponses validées sont simplement fournies à l&apos;assistant
+          comme source.
+        </p>
+      </Section>
+
       <Section title="Durée de conservation">
+        <p>
+          Les durées ci-dessous suivent les recommandations de la CNIL (référentiel « gestion du personnel »,
+          fiche géolocalisation des véhicules) et les obligations légales françaises. Celles marquées d&apos;un
+          astérisque sont appliquées automatiquement chaque nuit.
+        </p>
         <ul className={list}>
           <li>Compte utilisateur : tant que le compte est actif ; l&apos;entreprise le désactive au départ du salarié, ce qui coupe aussitôt son accès.</li>
           <li>
-            Données d&apos;activité, photos et messages : pendant la durée du contrat avec l&apos;entreprise cliente,
-            puis supprimées dans un délai de 3 mois après la fin du contrat, sauf export demandé par
-            l&apos;entreprise.
+            Données d&apos;activité (tournées, carburant, planning, congés), photos et messages : pendant la durée du
+            contrat avec l&apos;entreprise cliente, puis supprimées dans les 3 mois suivant sa fin, après export si
+            l&apos;entreprise le demande.
           </li>
-          <li>Position GPS de pointage : 1 an maximum.</li>
-          <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum.</li>
-          <li>Journaux de connexion : 1 an.</li>
+          <li>
+            Heures de pointage : 5 ans maximum, durée pendant laquelle l&apos;employeur peut avoir à justifier le temps
+            de travail et la paie.
+          </li>
+          <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
+          <li>Conversations avec l&apos;assistant* : 1 an après le dernier message.</li>
+          <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
+          <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
+          <li>Journaux de connexion : 1 an maximum.</li>
           <li>Factures : 10 ans (obligation comptable).</li>
         </ul>
       </Section>
