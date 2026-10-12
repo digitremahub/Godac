@@ -93,7 +93,7 @@ export function StartTourFlow({
         setOpenTour(json.tour);
         setPlannedToday(json.plannedToday ?? null);
         setPolyvalentServices(json.polyvalentServices ?? null);
-        if (json.plannedToday && !tourNumber) setTourNumber(json.plannedToday.tour_number);
+        if (!tourNumber) setTourNumber(json.plannedToday?.tour_number ?? json.lastTourNumber ?? "");
         // Planned vehicle first, otherwise the driver's own assigned
         // truck: pre-selected, no QR scan — « Changer » below if they
         // took another one today.
@@ -131,7 +131,7 @@ export function StartTourFlow({
       setOpenTour(openJson.tour);
       setPlannedToday(openJson.plannedToday ?? null);
       setPolyvalentServices(openJson.polyvalentServices ?? null);
-      if (openJson.plannedToday && !tourNumber) setTourNumber(openJson.plannedToday.tour_number);
+      if (!tourNumber) setTourNumber(openJson.plannedToday?.tour_number ?? openJson.lastTourNumber ?? "");
       setVehicleChanged(Boolean(openJson.plannedToday?.vehicles && openJson.plannedToday.vehicles.id !== id));
       const vehicleJson = await vehicleRes.json();
       if (vehicleRes.ok) setRegistration(vehicleJson.vehicle?.registration ?? null);
@@ -313,12 +313,12 @@ export function StartTourFlow({
       )}
 
       <div>
-        <label className="block"><span className="label">Numéro de tournée (optionnel)</span>
+        <label className="block"><span className="label">Numéro de tournée</span>
         <input
           className="input"
           value={tourNumber}
           onChange={(e) => setTourNumber(e.target.value)}
-          placeholder="Laissez vide pour un numéro automatique"
+          placeholder="Ex. T106"
         /></label>
       </div>
 

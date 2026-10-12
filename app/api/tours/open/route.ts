@@ -20,12 +20,12 @@ export async function GET(req: Request) {
   if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
   const { db: supabase, driverId } = actor;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(todayStart);
-  todayEnd.setDate(todayEnd.getDate() + 1);
+  // "Today" as the driver lives it: a window around now rather than the
+  // server's UTC midnight, so an early-morning Paris tour still matches.
+  const todayStart = new Date(Date.now() - 14 * 3600_000);
+  const todayEnd = new Date(Date.now() + 14 * 3600_000);
 
-  const [openRes, plannedRes, qualificationsRes, assignedRes] = await Promise.all([
+  const [openRes, plannedRes, qualificationsRes, assignedRes, lastTourRes] = await Promise.all([
     supabase
       .from("planning_entries")
       .select("id, tour_number, start_at, start_km, vehicles(id, registration)")
@@ -58,6 +58,17 @@ export async function GET(req: Request) {
       .eq("assigned_driver_id", driverId)
       .eq("status", "active")
       .limit(1),
+    // The driver's usual tour number (e.g. T106) — prefilled when
+    // nothing is planned today, instead of an automatic number.
+    supabase
+      .from("planning_entries")
+      .select("tour_number")
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", driverId)
+      .in("status", ["in_progress", "done"])
+      .not("tour_number", "like", "________-%")
+      .order("start_at", { ascending: false })
+      .limit(1),
   ]);
 
   if (openRes.error) return NextResponse.json({ error: openRes.error.message }, { status: 500 });
@@ -66,6 +77,7 @@ export async function GET(req: Request) {
     tour: openRes.data,
     plannedToday: plannedRes.data?.[0] ?? null,
     assignedVehicle: assignedRes.data?.[0] ?? null,
+    lastTourNumber: lastTourRes.data?.[0]?.tour_number ?? null,
     polyvalentServices: qualifiedServices.length >= 2 ? qualifiedServices : null,
   });
 }
