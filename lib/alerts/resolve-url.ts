@@ -36,6 +36,9 @@ const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) =
   // assistant widget (every page, every role), not a page of its own —
   // ?assistant=1 tells FloatingChatWidget to open on it.
   support_request_resolved: "/dashboard?assistant=1",
+  // A driver asked for papers of this vehicle: open its fiche, where
+  // the documents are uploaded / made consultable.
+  vehicle_document_request: (relatedId) => (relatedId ? `/vehicles/${relatedId}#papiers` : "/vehicles"),
 };
 
 export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null): string | null {

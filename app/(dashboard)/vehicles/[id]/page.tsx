@@ -12,6 +12,9 @@ import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { OdometerHistory, type OdometerReading } from "@/components/vehicles/OdometerHistory";
 import { WashHistory, type WashRecord } from "@/components/vehicles/WashHistory";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import { VehicleDocumentsPanel } from "@/components/vehicles/VehicleDocumentsPanel";
+import { listVehicleDocuments } from "@/lib/vehicles/documents";
+import { parisCalendarDate } from "@/lib/planning/dates";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -118,6 +121,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       .map((i: any) => ({ at: i.created_at, km: i.odometer_km, label: `Intervention : ${i.type}` })),
   ];
 
+  const canManageDocuments = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const vehicleDocuments = canManageDocuments ? await listVehicleDocuments(supabase, id) : [];
+
   return (
     <div>
       <PageHeader
@@ -152,6 +158,10 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
+          {canManageDocuments && (
+            <VehicleDocumentsPanel vehicleId={id} documents={vehicleDocuments} today={parisCalendarDate(new Date().toISOString())} />
+          )}
+
           <InterventionsPanel
             vehicleId={id}
             interventions={interventionsWithPhotos}
