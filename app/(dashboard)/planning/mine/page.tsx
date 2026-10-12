@@ -227,13 +227,13 @@ export default async function MyPlanningPage({
             {monthTourDays.length === 0 ? (
               <p className="text-sm text-navy/65">Aucune tournée ce mois-ci.</p>
             ) : (
-              <DayStrip days={monthTourDays} toursByDay={toursByDay} today={today} hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`} />
+              <DayStrip days={monthTourDays} toursByDay={toursByDay} today={today} dayHrefPrefix="/planning/mine?view=day&anchor=" />
             )}
           </Card>
         </div>
       ) : view === "week" ? (
         <Card>
-          <DayStrip days={days} toursByDay={toursByDay} today={today} hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`} />
+          <DayStrip days={days} toursByDay={toursByDay} today={today} dayHrefPrefix="/planning/mine?view=day&anchor=" />
         </Card>
       ) : (
         <Card className="!p-0">

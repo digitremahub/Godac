@@ -221,7 +221,7 @@ export async function ChauffeurDashboard({
               days={weekDays}
               toursByDay={weekToursByDay}
               today={todayParis}
-              hrefForDay={(d) => `/planning/mine?view=day&anchor=${d}`}
+              dayHrefPrefix="/planning/mine?view=day&anchor="
             />
           </Card>
         )}
