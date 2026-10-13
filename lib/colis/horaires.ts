@@ -45,6 +45,17 @@ export const JOURS: { n: Jour; court: string; long: string }[] = [
   { n: 6, court: "Sam", long: "Samedi" },
   { n: 7, court: "Dim", long: "Dimanche" },
 ];
+/** Fiche « adresse pro » de l'annuaire des horaires de l'entreprise. */
+export interface FicheHoraires {
+  id: string;
+  address_key: string;
+  label: string | null;
+  address: string;
+  weekly_schedule: Semaine;
+  notes: string | null;
+  updated_at: string;
+}
+
 export const MAX_CRENEAUX = 2;
 /** Heure de départ par défaut d'une tournée (avant le départ réel). */
 export const DEPART_PAR_DEFAUT = 8 * 60;
@@ -78,7 +89,7 @@ export function afficherHeure(minutes: number): string {
 function normaliserJour(v: unknown): Creneau[] {
   if (!Array.isArray(v)) return [];
   const bruts = v
-    .map((c) => (c && typeof c === "object" ? [lireHeure((c as Creneau).open), lireHeure((c as Creneau).close)] : [null, null]))
+    .map((c): [number | null, number | null] => (c && typeof c === "object" ? [lireHeure((c as Creneau).open), lireHeure((c as Creneau).close)] : [null, null]))
     .filter((c): c is [number, number] => c[0] !== null && c[1] !== null && c[0] < c[1])
     .sort((a, b) => a[0] - b[0]);
   const fusion: [number, number][] = [];

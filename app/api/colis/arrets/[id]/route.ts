@@ -6,6 +6,7 @@ import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
+import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
@@ -18,6 +19,17 @@ const patchSchema = z.object({
   deplacer: z.enum(["haut", "bas"]).optional(),
   /** Range l'arrêt dans une autre liste de la même tournée (en fin de liste). */
   list_id: z.string().uuid().optional(),
+  /**
+   * Créneau ponctuel pour aujourd'hui (« avant 10 h » : fin seule) ;
+   * prioritaire sur les horaires de l'annuaire. null : retirer le créneau.
+   */
+  creneau: z
+    .object({ debut: z.string().nullable(), fin: z.string().nullable() })
+    .refine((c) => (c.debut === null || lireHeure(c.debut) !== null) && (c.fin === null || lireHeure(c.fin) !== null), "Heure invalide")
+    .refine((c) => c.debut !== null || c.fin !== null, "Créneau vide")
+    .refine((c) => c.debut === null || c.fin === null || lireHeure(c.debut)! < lireHeure(c.fin)!, "Créneau incohérent")
+    .nullable()
+    .optional(),
 });
 
 /** Livré / échec / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
@@ -28,7 +40,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer, list_id } = parsed.data;
+  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
@@ -75,6 +87,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (status !== "delivered") update.delivered_place = null;
   }
   if (notes !== undefined) update.notes = notes;
+  if (creneau !== undefined) {
+    const heure = (v: string | null | undefined) => (v ? ecrireHeure(lireHeure(v)!) : null);
+    Object.assign(update, { window_start: heure(creneau?.debut), window_end: heure(creneau?.fin) });
+  }
   if (adresse) {
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
