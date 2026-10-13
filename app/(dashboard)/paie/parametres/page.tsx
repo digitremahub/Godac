@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
+import { isModuleEnabled } from "@/lib/organization/modules";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
 import { FRAIS_CONVENTIONNELS, parametresLegauxAu } from "@/lib/paie/parametres";
+import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 export default async function ReglagesPaiePage() {
   const appUser = await requireAppUser();
@@ -32,14 +33,11 @@ export default async function ReglagesPaiePage() {
   return (
     <div>
       <PageHeader
-        title="Réglages de paie"
+        title="Paie & salaires"
         description={`Ce qui est propre à votre entreprise. Les taux légaux (SMIC ${legal.smicHoraire.toFixed(2).replace(".", ",")} €, plafond de la Sécurité sociale ${legal.pmss.toLocaleString("fr-FR")} €, cotisations) sont tenus à jour par GODAC.`}
-        actions={
-          <Link href="/paie" className="btn-secondary !py-2 text-sm">
-            ← Paie
-          </Link>
-        }
       />
+      <OngletsPaie actif="reglages" paie planning={await isModuleEnabled(supabase, appUser.organization_id, "planning")} />
+      <h2 className="mb-3 text-lg">Réglages de paie</h2>
       <ReglagesPaieForm
         initial={initial}
         defauts={{

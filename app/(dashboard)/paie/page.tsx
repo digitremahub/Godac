@@ -6,6 +6,7 @@ import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 import { bornesMois, moisValide } from "@/lib/paie/donnees";
 import { addMonths, currentMonth } from "@/lib/planning/dates";
+import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
@@ -17,8 +18,17 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "payslips"))) {
     return <EmptyState title="Module Fiches de paie non activé" description="Activez-le depuis Modules & tarifs." />;
   }
+  const planning = await isModuleEnabled(supabase, appUser.organization_id, "planning");
+  const onglets = <OngletsPaie actif="bulletins" paie planning={planning} />;
   const pays = await paysOrganisation(supabase, appUser.organization_id);
-  if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;
+  if (!pays.paie.moteur)
+    return (
+      <div>
+        <PageHeader title="Paie & salaires" />
+        {onglets}
+        <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />
+      </div>
+    );
   const params = await searchParams;
   const mois = moisValide(params.mois) ? params.mois : currentMonth();
   const { debut, fin } = bornesMois(mois);
@@ -38,14 +48,10 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
   return (
     <div>
       <PageHeader
-        title="Paie"
+        title="Paie & salaires"
         description="Préparez et générez les bulletins du mois : heures des tournées, congés et frais sont préremplis, les cotisations calculées automatiquement."
-        actions={
-          <Link href="/paie/parametres" className="btn-secondary !py-2 text-sm">
-            Réglages de paie
-          </Link>
-        }
       />
+      {onglets}
       {!reglages && (
         <p className="mb-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm">
           Commencez par les <Link href="/paie/parametres" className="font-semibold underline">réglages de paie</Link> : effectif, taux accident du travail,

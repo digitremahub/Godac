@@ -9,6 +9,7 @@ import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } fro
 import { computeHourlyRates } from "@/lib/business/payroll";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
+import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 interface BadgeEntry {
   user_id: string;
@@ -73,15 +74,20 @@ export default async function PayrollPage({
 
   const supabase = await createServerSupabaseClient();
   const timeClockEnabled = await isModuleEnabled(supabase, appUser.organization_id, "time_clock");
+  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
   if (!timeClockEnabled) {
+    const paie = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
     return (
-      <EmptyState
-        title="Module Pointeuse non activé"
-        description="Le calcul des salaires dépend des heures badgées (module Pointeuse électronique) — activez-le depuis les paramètres de votre organisation."
-      />
+      <div>
+        <PageHeader title={paie ? "Paie & salaires" : "Salaires"} />
+        <OngletsPaie actif="salaires" paie={paie} planning={planningEnabled} />
+        <EmptyState
+          title="Module Pointeuse non activé"
+          description="Le calcul des salaires dépend des heures badgées (module Pointeuse électronique) — activez-le depuis les paramètres de votre organisation."
+        />
+      </div>
     );
   }
-  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
 
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonth();
   const monthStart = firstOfMonth(month);
@@ -258,9 +264,10 @@ export default async function PayrollPage({
   return (
     <div>
       <PageHeader
-        title="Salaires"
+        title={payslipsEnabled ? "Paie & salaires" : "Salaires"}
         description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie, ou horaire de la tournée si aucun badge ce jour-là. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
       />
+      <OngletsPaie actif="salaires" paie={payslipsEnabled} planning={planningEnabled} />
       <PayrollFilters month={month} drivers={(drivers ?? []).map((d) => ({ id: d.id, full_name: d.full_name }))} selectedDriver={selectedDriver} />
       {rows.length === 0 ? (
         <EmptyState title="Aucun chauffeur" description="Aucun chauffeur actif à afficher." />

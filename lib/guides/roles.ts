@@ -263,8 +263,8 @@ export const GUIDES: GuideRole[] = [
       {
         titre: "Paie et RH",
         etapes: [
-          { titre: "Bulletins de paie", texte: "Paie : les heures des tournées, congés et frais sont préremplis ; vérifiez puis générez les bulletins (France). Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/paie", label: "Paie" }, module: "payslips" },
-          { titre: "Salaires et heures", texte: "Synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/payroll", label: "Salaires" }, module: "planning" },
+          { titre: "Paie & salaires", texte: "Une seule page, quatre onglets : Bulletins du mois (heures des tournées, congés et frais préremplis ; vérifiez puis générez, France), Heures & salaires (heures et pointages par chauffeur), Fiches de paie (bulletins générés, à télécharger) et Réglages. Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/paie", label: "Paie & salaires" }, module: "payslips" },
+          { titre: "Salaires et heures", texte: "Sans le module Fiches de paie : synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/payroll", label: "Salaires" }, module: "planning" },
           { titre: "Planning des congés", texte: "Vue d'ensemble des absences de l'équipe.", lien: { href: "/leaves/planning", label: "Planning congés" }, module: "leave_management" },
           { titre: "Amendes", texte: "Enregistrez les avis de contravention et désignez le conducteur dans les délais.", lien: { href: "/fines", label: "Amendes" }, module: "fines" },
         ],
