@@ -4,6 +4,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { GeneratePayslipForm } from "@/components/payslips/GeneratePayslipForm";
 import { RegeneratePayslipButton } from "@/components/payslips/RegeneratePayslipButton";
+import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
@@ -54,7 +55,11 @@ export default async function PayslipsPage() {
 
   return (
     <div>
-      <PageHeader title="Fiches de paie" description="Bulletins indicatifs générés à partir du salaire brut/net enregistré." />
+      <PageHeader
+        title={isDirection ? "Paie & salaires" : "Fiches de paie"}
+        description="Bulletins indicatifs générés à partir du salaire brut/net enregistré."
+      />
+      {isDirection && <OngletsPaie actif="fiches" paie planning={await isModuleEnabled(supabase, appUser.organization_id, "planning")} />}
 
       {isDirection && (employees ?? []).length > 0 && (
         <Card className="mb-6">

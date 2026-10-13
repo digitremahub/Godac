@@ -35,6 +35,10 @@ interface NavItem {
   icon: (props: { className?: string }) => React.ReactNode;
   /** Hidden when the org hasn't enabled this module. Omitted for core (always-on) items. */
   moduleKey?: string;
+  /** Hidden when the org HAS enabled this module (an entry another one replaces). */
+  unlessModuleKey?: string;
+  /** Other routes that belong to this entry (tabs of the same page). */
+  alsoActive?: string[];
 }
 
 interface NavSection {
@@ -82,7 +86,7 @@ const SECTIONS: NavSection[] = [
       { href: "/intranet", label: "Intranet & Convocations", icon: IconMegaphone, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "intranet" },
       { href: "/messenger", label: "Messenger", icon: IconChatBubble, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "messenger" },
       { href: "/time-clock", label: "Pointeuse", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "time_clock" },
-      { href: "/payslips", label: "Fiches de paie", icon: IconCoins, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"], moduleKey: "payslips" },
+      { href: "/payslips", label: "Fiches de paie", icon: IconCoins, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable"], moduleKey: "payslips" },
       { href: "/driver-signups", label: "Chauffeurs à valider", icon: IconUsers, allow: ["manager", "manager_chauffeur", "direction"] },
     ],
   },
@@ -91,8 +95,9 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/alerts", label: "Alertes", icon: IconBell, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/reports", label: "Rapports de tournée", icon: IconFileText, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
-      { href: "/paie", label: "Paie", icon: IconCoins, allow: ["direction"], moduleKey: "payslips" },
-      { href: "/payroll", label: "Salaires", icon: IconCoins, allow: ["direction"], moduleKey: "planning" },
+      // Paie, salaires et fiches de paie : une seule page à onglets (components/paie/OngletsPaie.tsx).
+      { href: "/paie", label: "Paie & salaires", icon: IconCoins, allow: ["direction"], moduleKey: "payslips", alsoActive: ["/payroll", "/payslips"] },
+      { href: "/payroll", label: "Salaires", icon: IconCoins, allow: ["direction"], moduleKey: "planning", unlessModuleKey: "payslips" },
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
       { href: "/contestations", label: "Contestations clients", icon: IconFileText, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "customer_disputes" },
       { href: "/fines", label: "Amendes", icon: IconFileText, allow: ["direction"], moduleKey: "fines" },
@@ -145,15 +150,21 @@ export function Sidebar({
 
   const sections = SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => item.allow.includes(role) && (!item.moduleKey || enabled.has(item.moduleKey))),
+    items: section.items.filter(
+      (item) =>
+        item.allow.includes(role) &&
+        (!item.moduleKey || enabled.has(item.moduleKey)) &&
+        (!item.unlessModuleKey || !enabled.has(item.unlessModuleKey)),
+    ),
   })).filter((section) => section.items.length > 0);
 
   // Most-specific-href-wins, so a nested route doesn't also light up
   // a shorter entry it happens to prefix.
   const allHrefs = sections.flatMap((s) => s.items.map((i) => i.href));
-  const activeHref = allHrefs
-    .filter((href) => (href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)))
-    .sort((a, b) => b.length - a.length)[0];
+  const matches = (href: string) => (href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
+  const activeHref =
+    allHrefs.filter(matches).sort((a, b) => b.length - a.length)[0] ??
+    sections.flatMap((s) => s.items).find((i) => i.alsoActive?.some(matches))?.href;
 
   return (
     <nav
