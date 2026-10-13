@@ -110,6 +110,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "",
     items: [
+      { href: "/guide", label: "Guide d'utilisation", icon: IconFileText, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
       { href: "/faq", label: "Questions fréquentes", icon: IconLifeBuoy, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
       { href: "/account", label: "Mon compte", icon: IconUserCircle, allow: ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] },
     ],
