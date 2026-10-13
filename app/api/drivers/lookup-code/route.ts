@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { normalizeDriverCodeInput } from "@/lib/business/driver-code";
 
 /**
  * Fallback driver identification for a shared fuel-entry kiosk: a
@@ -14,12 +15,11 @@ export async function GET(req: Request) {
   await requireAppUser();
   // Deux formats cohabitent : l'ancien (6 chiffres aléatoires, pour
   // les comptes sans date de naissance renseignée) et le nouveau
-  // (initiales + mois/année, ex: FT11/88, voir lib/business/driver-code.ts)
+  // (initiales + mois/année, ex: FT1188, voir lib/business/driver-code.ts)
   // — normalisé en majuscules ici pour tolérer une saisie en bas de casse
   // des initiales à la pompe.
-  const codeInput = new URL(req.url).searchParams.get("code")?.trim();
-  const code = codeInput?.toLocaleUpperCase("fr-FR");
-  if (!code || !/^[A-ZÀ-ÖØ-Þ0-9/-]{2,20}$/.test(code)) {
+  const code = normalizeDriverCodeInput(new URL(req.url).searchParams.get("code") ?? "");
+  if (!code || !/^[A-Z0-9-]{2,20}$/.test(code)) {
     return NextResponse.json({ error: "Code invalide." }, { status: 400 });
   }
 
@@ -27,7 +27,8 @@ export async function GET(req: Request) {
   const { data, error } = await supabase
     .from("users")
     .select("id, full_name")
-    .eq("driver_code", code)
+    // Anciens codes enregistrés avec une barre oblique (FT11/88) : acceptés aussi.
+    .in("driver_code", [code, code.replace(/^([A-Z]{2})(\d{2})(\d{2})/, "$1$2/$3")])
     .eq("active", true)
     .maybeSingle();
 

@@ -10,6 +10,7 @@ import { PasskeyManager } from "@/components/account/PasskeyManager";
 import { PushNotificationToggle } from "@/components/account/PushNotificationToggle";
 import { DisplayPreferences } from "@/components/account/DisplayPreferences";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { CodeSecoursNaissance } from "@/components/account/CodeSecoursNaissance";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import Link from "next/link";
 
@@ -113,6 +114,7 @@ export default async function AccountPage() {
               subtitle={pinAlreadySet ? "Scannez pour vous connecter" : "À présenter à la pompe"}
               code={driverCode ?? undefined}
             />
+            {driverCode && /^\d+$/.test(driverCode) && <CodeSecoursNaissance />}
           </div>
           <DriverPinForm pinAlreadySet={pinAlreadySet} />
         </>

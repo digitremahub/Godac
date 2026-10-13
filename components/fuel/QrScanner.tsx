@@ -158,7 +158,7 @@ function ManualScanInput({
       {expected === "driver" && (
         <div className="flex flex-col gap-1.5 border-t border-navy/10 pt-3">
           <p className="text-xs text-navy/65">
-            Pas de badge sous la main ? Le chauffeur peut donner son code (initiales + mois/année de naissance, ex: FT11/88) :
+            Pas de badge sous la main ? Le chauffeur peut donner son code (initiales + mois/année de naissance, ex : FT1188) :
           </p>
           <div className="flex gap-2">
             <input

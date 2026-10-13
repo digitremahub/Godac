@@ -18,6 +18,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
           full_name: fullName,
           company_name: companyName,
           phone: phone || undefined,
+          birth_date: birthDate,
           service_id: serviceId || undefined,
         }),
       });
@@ -71,6 +73,11 @@ export function JoinDriverForm({ token, services }: { token: string; services: S
             placeholder="Nom de votre entreprise"
           /></label>
           <p className="mt-1 text-xs text-navy/60">Doit correspondre à l&apos;entreprise propriétaire de ce lien.</p>
+        </div>
+        <div>
+          <label className="block"><span className="label">Date de naissance</span>
+          <input className="input" type="date" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></label>
+          <p className="mt-1 text-xs text-navy/60">Sert à votre code de secours : initiales + mois et année de naissance (ex : FT1188).</p>
         </div>
         <div>
           <label className="block"><span className="label">Téléphone (optionnel)</span>

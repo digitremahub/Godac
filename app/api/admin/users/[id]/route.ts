@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { computeDriverCodeBase } from "@/lib/business/driver-code";
+import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 
 const bodySchema = z.object({
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
@@ -50,40 +50,6 @@ const bodySchema = z.object({
   classification: z.string().trim().min(1).nullable().optional(),
 });
 
-/**
- * Recalcule le code de secours d'un chauffeur en "initiales +
- * mois/année de naissance" (ex: FT11/88) et le pose sur `users`,
- * avec un suffixe numérique si une collision existe déjà dans
- * l'organisation (deux chauffeurs aux mêmes initiales et au même
- * mois/année de naissance) — rare mais pas impossible, et la colonne
- * reste unique par organisation (20260101000056).
- */
-async function assignDriverCodeFromBirthDate(
-  supabase: SupabaseClient,
-  organizationId: string,
-  userId: string,
-  fullName: string,
-  birthDateISO: string,
-) {
-  const base = computeDriverCodeBase(fullName, birthDateISO);
-  let candidate = base;
-  let suffix = 2;
-  // Au plus une poignée d'organisations auront jamais plus de 1-2
-  // collisions réelles — une boucle bornée évite simplement un cas
-  // pathologique de données corrompues de tourner indéfiniment.
-  for (let attempt = 0; attempt < 50; attempt++) {
-    const { data: conflict } = await supabase
-      .from("users")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("driver_code", candidate)
-      .neq("id", userId)
-      .maybeSingle();
-    if (!conflict) break;
-    candidate = `${base}-${suffix++}`;
-  }
-  await supabase.from("users").update({ driver_code: candidate }).eq("id", userId);
-}
 
 /**
  * Role changes are a plain update to `public.users.role` — nothing
