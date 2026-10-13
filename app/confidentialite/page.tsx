@@ -48,7 +48,15 @@ export default function ConfidentialitePage() {
           </li>
           <li>
             <strong>Position GPS au moment du pointage :</strong> uniquement lorsque vous pointez, pour vérifier que
-            vous êtes au dépôt. GODAC ne suit <strong>jamais</strong> vos déplacements en continu.
+            vous êtes au dépôt.
+          </li>
+          <li>
+            <strong>Position pendant une tournée colis en cours :</strong> si l&apos;entreprise utilise le module Tournée
+            colis, la position du chauffeur est partagée avec l&apos;encadrement pour suivre la livraison (fin de tournée
+            estimée, réponse aux clients), <strong>uniquement pendant la tournée en cours</strong> et application ouverte.
+            Seule la dernière position est conservée (aucun historique de trajet) ; elle est effacée à la clôture de la
+            tournée, et le chauffeur peut la masquer à tout moment (pause). En dehors de ces moments, GODAC ne suit
+            jamais vos déplacements.
           </li>
           <li>
             <strong>Amendes :</strong> avis de contravention liés aux véhicules, pour permettre à l&apos;entreprise
@@ -159,6 +167,7 @@ export default function ConfidentialitePage() {
             de travail et la paie.
           </li>
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
+          <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée (aucun historique).</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
           <li>Tournées colis (adresses, noms et téléphones des destinataires, photos de livraison)* : 30 jours après la tournée.</li>

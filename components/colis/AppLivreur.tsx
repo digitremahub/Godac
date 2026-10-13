@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -11,6 +11,7 @@ import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import type { Itineraire } from "@/lib/colis/itineraire";
+import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
@@ -18,6 +19,9 @@ const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").the
   loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la carte…</p>,
 });
 const MEMO_VUE = "godac-livreur-vue";
+const MEMO_PARTAGE = "godac-partage-position";
+/** Fréquence d'envoi de la position à l'exploitation pendant la tournée. */
+const ENVOI_POSITION_MS = 60_000;
 
 const MEMO = "godac-tournee-colis";
 
@@ -38,6 +42,51 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
+  const [partage, setPartage] = useState(true);
+  const [maPosition, setMaPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const dernierEnvoi = useRef(0);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(MEMO_PARTAGE) === "non") setPartage(false);
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
+
+  // Pendant la tournée en cours : dernière position envoyée à l'exploitation
+  // (au plus une fois par minute, écran ouvert), jamais en dehors.
+  const runEnCours = run?.status === "in_progress" ? run.id : null;
+  useEffect(() => {
+    if (!runEnCours || !partage || !navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (p) => {
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        const maintenant = Date.now();
+        if (maintenant - dernierEnvoi.current < ENVOI_POSITION_MS) return;
+        dernierEnvoi.current = maintenant;
+        setMaPosition(pos);
+        fetch("/api/colis/position", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runEnCours, ...pos }) }).catch(() => undefined);
+      },
+      () => undefined,
+      { enableHighAccuracy: true, maximumAge: 30_000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [runEnCours, partage]);
+
+  function basculerPartage() {
+    const suivant = !partage;
+    setPartage(suivant);
+    dernierEnvoi.current = 0;
+    try {
+      localStorage.setItem(MEMO_PARTAGE, suivant ? "oui" : "non");
+    } catch {
+      /* stockage indisponible */
+    }
+    if (!suivant && runEnCours) {
+      fetch("/api/colis/position", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runEnCours, masquer: true }) }).catch(() => undefined);
+    }
+  }
 
   useEffect(() => {
     try {
@@ -124,7 +173,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   }
 
   async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status } : x)));
+    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
     if (status !== "pending") navigator.vibrate?.(40);
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
@@ -192,6 +241,15 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const suivants = pending.slice(1);
   const actives = (runs ?? []).filter((t) => t.status !== "done");
   const progression = stops.length ? Math.round((termines.length / stops.length) * 100) : 0;
+  const avancement = estimerAvancement(
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null })),
+    {
+      position: maPosition,
+      depot: run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
+      retourDepot: run?.return_to_start,
+      minutesItineraire: itineraire && !itineraire.approx ? itineraire.dureeMin : null,
+    },
+  );
   const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
@@ -233,6 +291,23 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-valuenow={progression} aria-valuemin={0} aria-valuemax={100} aria-label="Avancement">
               <div className="h-full rounded-full bg-teal transition-all" style={{ width: `${progression}%` }} />
             </div>
+            {run.status === "in_progress" && avancement.adressesRestantes > 0 && (
+              <p className="mt-2 text-xs text-white/80">
+                <strong className="text-white">{avancement.adressesRestantes}</strong> adresse{avancement.adressesRestantes > 1 ? "s" : ""} ·{" "}
+                <strong className="text-white">{avancement.colisRestants}</strong> colis restant{avancement.colisRestants > 1 ? "s" : ""}
+                {avancement.finEstimee && (
+                  <>
+                    {" "}
+                    · fin ≈ <strong className="text-teal">{heureFin(avancement.finEstimee)}</strong>
+                  </>
+                )}
+              </p>
+            )}
+            {run.status === "in_progress" && (
+              <button type="button" onClick={basculerPartage} className="mt-1 text-left text-[11px] text-white/60 underline-offset-2 hover:underline">
+                {partage ? "📍 Position partagée avec l'exploitation pendant la tournée — masquer (pause)" : "📍 Position masquée — la partager à nouveau"}
+              </button>
+            )}
             {run.status !== "loading" && stops.length > 0 && (
               <div className="mt-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
                 {(["liste", "carte"] as const).map((v) => (

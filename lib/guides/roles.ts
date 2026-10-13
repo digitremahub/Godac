@@ -41,7 +41,7 @@ const DEMARRER_CHAUFFEUR: SectionGuide = {
     {
       titre: "Autoriser la localisation et les notifications",
       texte:
-        "Acceptez la localisation quand GODAC la demande : elle sert uniquement au moment du pointage (et sur la carte de la tournée colis), jamais en continu. Les notifications vous préviennent d'un changement de planning, d'un message ou d'une alerte.",
+        "Acceptez la localisation quand GODAC la demande : elle sert au moment du pointage et, pendant une tournée colis, à montrer votre dernière position à l'exploitation (vous pouvez la masquer pendant une pause, elle est effacée en fin de tournée). Les notifications vous préviennent d'un changement de planning, d'un message ou d'une alerte.",
     },
   ],
 };
@@ -114,7 +114,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Démarrer la livraison",
         texte:
-          "« Démarrer la livraison » calcule le meilleur ordre et ouvre l'application chauffeur : l'arrêt en cours en grand, avec Appeler, SMS « j'arrive », Waze ou Google Maps. L'onglet « Carte » montre tous les arrêts et votre position.",
+          "« Démarrer la livraison » calcule le meilleur ordre et ouvre l'application chauffeur : l'arrêt en cours en grand, avec Appeler, SMS « j'arrive », Waze ou Google Maps. L'onglet « Carte » montre tous les arrêts et votre position ; en haut de l'écran, les adresses et colis restants et l'heure de fin estimée.",
         lien: { href: "/livreur", label: "Application chauffeur" },
         module: "route_optimizer",
       },
@@ -177,6 +177,13 @@ const ENCADREMENT: SectionGuide[] = [
   {
     titre: "Suivi et relation client",
     etapes: [
+      {
+        titre: "Suivre les tournées en direct",
+        texte:
+          "« Suivi des tournées » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 30 secondes.",
+        lien: { href: "/suivi", label: "Suivi des tournées" },
+        module: "route_optimizer",
+      },
       { titre: "Rapports de tournée", texte: "Kilométrages, horaires et rapports de chaque tournée terminée.", lien: { href: "/reports", label: "Rapports de tournée" }, module: "planning" },
       {
         titre: "Contestations clients",

@@ -32,7 +32,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ("erreur" in ctx) return ctx.erreur;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { error } = await ctx.supabase.from("delivery_runs").update(parsed.data).eq("id", ctx.run.id);
+  const update: Record<string, unknown> = { ...parsed.data };
+  // Début réel de la livraison (estimation de fin) ; à la clôture, la
+  // dernière position partagée est effacée (aucune conservation).
+  if (parsed.data.status === "in_progress" && !(ctx.run as { started_at?: string | null }).started_at) update.started_at = new Date().toISOString();
+  if (parsed.data.status && parsed.data.status !== "in_progress") Object.assign(update, { last_lat: null, last_lng: null, last_position_at: null });
+  const { error } = await ctx.supabase.from("delivery_runs").update(update).eq("id", ctx.run.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

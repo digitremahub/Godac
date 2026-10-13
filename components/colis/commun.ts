@@ -22,6 +22,7 @@ export interface Stop {
   phone: string | null;
   notes: string | null;
   status: "pending" | "delivered" | "failed";
+  done_at?: string | null;
   delivered_place: string | null;
   proof_photo_path: string | null;
 }
