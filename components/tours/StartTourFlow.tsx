@@ -1,5 +1,7 @@
 "use client";
 
+import { PhotosChangementVehicule } from "@/components/tours/PhotosChangementVehicule";
+import { photosManquantes, type PhotoChangement, type TypeChangement } from "@/lib/tours/changement-vehicule";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -74,6 +76,8 @@ export function StartTourFlow({
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [vehicleChanged, setVehicleChanged] = useState(false);
   const [changeReason, setChangeReason] = useState("");
+  const [changeType, setChangeType] = useState<TypeChangement>("changement");
+  const [changePhotos, setChangePhotos] = useState<PhotoChangement[]>([]);
   const [showScanner, setShowScanner] = useState(false);
 
   // Loaded up front, before any scan, so a driver whose tour was
@@ -150,7 +154,7 @@ export function StartTourFlow({
     (!requireOdometerPhoto || Boolean(startKmPhotoPath)) &&
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
-    (!vehicleChanged || changeReason.trim().length > 0) &&
+    (!vehicleChanged || (changeReason.trim().length > 0 && photosManquantes(changeType, changePhotos).length === 0)) &&
     (!polyvalentServices || Boolean(serviceId)) &&
     confirmed;
 
@@ -175,6 +179,8 @@ export function StartTourFlow({
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
           change_reason: vehicleChanged ? changeReason : undefined,
+          change_type: vehicleChanged ? changeType : undefined,
+          change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
         }),
       });
       const json = await res.json();
@@ -297,6 +303,7 @@ export function StartTourFlow({
               placeholder="ex: panne, maintenance, véhicule indisponible…"
             /></label>
           </div>
+          <PhotosChangementVehicule type={changeType} onType={setChangeType} photos={changePhotos} onPhotos={setChangePhotos} />
         </div>
       )}
 

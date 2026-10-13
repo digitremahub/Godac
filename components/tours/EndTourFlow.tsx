@@ -1,5 +1,7 @@
 "use client";
 
+import { PhotosChangementVehicule } from "@/components/tours/PhotosChangementVehicule";
+import { photosManquantes, type PhotoChangement, type TypeChangement } from "@/lib/tours/changement-vehicule";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -49,6 +51,8 @@ export function EndTourFlow({
   const [none, setNone] = useState(false);
   const [vehicleChanged, setVehicleChanged] = useState(false);
   const [changeReason, setChangeReason] = useState("");
+  const [changeType, setChangeType] = useState<TypeChangement>("changement");
+  const [changePhotos, setChangePhotos] = useState<PhotoChangement[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [endKm, setEndKm] = useState("");
   const [endKmPhotoPath, setEndKmPhotoPath] = useState("");
@@ -135,7 +139,7 @@ export function EndTourFlow({
     (!requireOdometerPhoto || Boolean(endKmPhotoPath)) &&
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
-    (!vehicleChanged || changeReason.trim().length > 0) &&
+    (!vehicleChanged || (changeReason.trim().length > 0 && photosManquantes(changeType, changePhotos).length === 0)) &&
     confirmed;
 
   async function submit() {
@@ -160,6 +164,8 @@ export function EndTourFlow({
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
           change_reason: vehicleChanged ? changeReason : undefined,
+          change_type: vehicleChanged ? changeType : undefined,
+          change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
         }),
       });
       const patchJson = await patchRes.json();
@@ -253,6 +259,7 @@ export function EndTourFlow({
               placeholder="ex: panne, maintenance, véhicule indisponible…"
             /></label>
           </div>
+          <PhotosChangementVehicule type={changeType} onType={setChangeType} photos={changePhotos} onPhotos={setChangePhotos} />
         </div>
       )}
 

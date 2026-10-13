@@ -5,6 +5,8 @@ import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
+import { libellePhoto, photoChangementSchema, photosManquantes } from "@/lib/tours/changement-vehicule";
+import { enregistrerPhotosChangement } from "@/lib/tours/photos-changement-serveur";
 import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 
 const reportFieldsSchema = z.object({
@@ -36,6 +38,9 @@ const bodySchema = z
     // at departure (checked server-side below, e.g. a breakdown
     // swap mid-tour) — never just trusted from a client-side flag.
     change_reason: z.string().min(1).optional(),
+    // Changement (photos d'état obligatoires) ou dépannage (aucune photo exigée).
+    change_type: z.enum(["changement", "depannage"]).optional(),
+    change_photos: z.array(photoChangementSchema).max(12).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.vehicle_ok && !data.problem_description) {
@@ -92,6 +97,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       { status: 422 },
     );
   }
+  // Hors dépannage : photos d'état du véhicule récupéré obligatoires.
+  if (vehicleChanged) {
+    const manquantes = photosManquantes(parsed.data.change_type, parsed.data.change_photos);
+    if (manquantes.length) {
+      return NextResponse.json(
+        { error: `Changement de véhicule : photos obligatoires manquantes (${manquantes.map(libellePhoto).join(", ")}).` },
+        { status: 422 },
+      );
+    }
+    if ((parsed.data.change_photos ?? []).some((p) => !p.path.startsWith(`${appUser.organization_id}/`))) {
+      return NextResponse.json({ error: "Chemin de photo invalide." }, { status: 403 });
+    }
+  }
   if (vehicleChanged) {
     const { data: newVehicle, error: vehicleError } = await supabase
       .from("vehicles")
@@ -134,6 +152,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       end_vehicle_ok: parsed.data.vehicle_ok,
       return_type: parsed.data.return_type ?? null,
       status: "done",
+      ...(vehicleChanged ? { vehicle_change_type: parsed.data.change_type ?? "changement" } : {}),
       ...(helperId ? { ended_by: helperId } : {}),
       ...(reportFields
         ? {
@@ -158,12 +177,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (vehicleChanged && parsed.data.change_reason) {
+    await enregistrerPhotosChangement(supabase, {
+      organizationId: appUser.organization_id,
+      planningEntryId: tour.id,
+      vehicleId: parsed.data.vehicle_id,
+      driverId,
+      stage: "retour",
+      photos: parsed.data.change_photos ?? [],
+    });
     await reportVehicleSwap(supabase, {
       organizationId: appUser.organization_id,
       plannedEntryId: tour.id,
       plannedVehicleId: tour.vehicle_id,
       actualVehicleId: parsed.data.vehicle_id,
-      reason: parsed.data.change_reason,
+      reason: parsed.data.change_type === "depannage" ? `dépannage — ${parsed.data.change_reason}` : parsed.data.change_reason,
       stage: "retour",
     });
   }

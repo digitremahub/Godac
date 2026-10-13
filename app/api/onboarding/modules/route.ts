@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleDisponible } from "@/lib/pays/pays";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
 
 const bodySchema = z.object({
   planId: z.enum(["essentiel", "starter", "pro", "business"]),
@@ -65,6 +67,8 @@ export async function POST(req: Request) {
   if (modulesError) {
     return NextResponse.json({ error: modulesError.message }, { status: 500 });
   }
+  // App Livreur : prix selon le palier d'utilisateurs de l'entreprise.
+  await synchroniserPaliers(createAdminSupabaseClient(), appUser.organization_id);
 
   return NextResponse.json({ ok: true });
 }

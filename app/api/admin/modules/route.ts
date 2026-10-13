@@ -4,6 +4,8 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleDisponible } from "@/lib/pays/pays";
 import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
 
 const bodySchema = z.object({
   selectedModuleKeys: z.array(z.string()),
@@ -66,6 +68,8 @@ export async function PATCH(req: Request) {
   if (modulesError) {
     return NextResponse.json({ error: modulesError.message }, { status: 500 });
   }
+  // App Livreur : prix selon le palier d'utilisateurs de l'entreprise.
+  await synchroniserPaliers(createAdminSupabaseClient(), appUser.organization_id);
 
   return NextResponse.json({ ok: true });
 }
