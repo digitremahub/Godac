@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { normaliserTelephone } from "@/lib/colis/telephone";
 import { cleAdresse, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const bodySchema = z.object({
@@ -10,6 +11,7 @@ const bodySchema = z.object({
   code: z.string().trim().max(120).nullable().optional(),
   adresse: z.string().trim().min(5).max(300),
   destinataire: z.string().trim().max(120).nullable().optional(),
+  telephone: z.string().trim().max(40).nullable().optional(),
 });
 
 /**
@@ -26,8 +28,9 @@ export async function POST(req: Request) {
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
-  const { data: stops } = await supabase.from("delivery_stops").select("id, parcel_code, parcel_count, address, status, position").eq("run_id", run.id);
+  const { data: stops } = await supabase.from("delivery_stops").select("id, parcel_code, parcel_count, address, phone, status, position").eq("run_id", run.id);
   const code = parsed.data.code || null;
+  const telephone = normaliserTelephone(parsed.data.telephone);
   if (code && (stops ?? []).some((s) => s.parcel_code?.split(",").includes(code))) {
     return NextResponse.json({ duplicate: true, message: "Colis déjà dans la tournée." });
   }
@@ -38,7 +41,7 @@ export async function POST(req: Request) {
     const codes = [memeAdresse.parcel_code, code].filter(Boolean).join(",") || null;
     const { data } = await supabase
       .from("delivery_stops")
-      .update({ parcel_count: memeAdresse.parcel_count + 1, parcel_code: codes })
+      .update({ parcel_count: memeAdresse.parcel_count + 1, parcel_code: codes, ...(telephone && !memeAdresse.phone ? { phone: telephone } : {}) })
       .eq("id", memeAdresse.id)
       .select(STOP_FIELDS)
       .single();
@@ -56,6 +59,7 @@ export async function POST(req: Request) {
       parcel_code: code,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
+      phone: telephone,
       lat: geo?.lat ?? null,
       lng: geo?.lng ?? null,
     })

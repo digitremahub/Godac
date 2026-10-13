@@ -1,3 +1,5 @@
+import { extraireTelephone, normaliserTelephone } from "@/lib/colis/telephone";
+
 /**
  * Contenu d'un code scanné sur un colis. Selon le transporteur, le
  * QR / Datamatrix contient soit l'adresse du destinataire (texte ou
@@ -9,11 +11,19 @@ export interface LectureCode {
   code: string | null;
   adresse: string | null;
   destinataire: string | null;
+  /** Numéro du destinataire quand l'étiquette le porte. */
+  telephone?: string | null;
 }
 
 const CP_VILLE = /\b(0[1-9]|[1-8]\d|9[0-8])\d{3}\s+[A-Za-zÀ-ÿ' -]{2,}/;
 
 export function analyserCode(brut: string): LectureCode {
+  const lu = analyserSansTelephone(brut);
+  const telephone = lu.telephone ?? (lu.adresse ? extraireTelephone(brut) : null);
+  return telephone ? { ...lu, telephone } : lu;
+}
+
+function analyserSansTelephone(brut: string): LectureCode {
   const texte = brut.replace(/\r/g, "").trim();
   if (!texte) return { code: null, adresse: null, destinataire: null };
 
@@ -26,13 +36,23 @@ export function analyserCode(brut: string): LectureCode {
         return null;
       };
       const adresse = pick("address", "adresse") ?? [pick("street", "rue"), [pick("zip", "cp", "postcode", "postal_code"), pick("city", "ville")].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      return { code: pick("tracking", "parcel", "colis", "id", "barcode"), adresse: adresse || null, destinataire: pick("name", "nom", "recipient", "destinataire") };
+      const telephone = normaliserTelephone(pick("phone", "tel", "telephone", "téléphone", "mobile"));
+      return {
+        code: pick("tracking", "parcel", "colis", "id", "barcode"),
+        adresse: adresse || null,
+        destinataire: pick("name", "nom", "recipient", "destinataire"),
+        ...(telephone ? { telephone } : {}),
+      };
     } catch {
       /* pas du JSON : on continue */
     }
   }
 
-  const lignes = texte.split(/\n|\||;/).map((l) => l.trim()).filter(Boolean);
+  // Les lignes de téléphone ne sont ni une adresse ni un numéro de colis.
+  const lignes = texte
+    .split(/\n|\||;/)
+    .map((l) => l.trim())
+    .filter((l) => l && !(extraireTelephone(l) && l.replace(/^(t[ée]l[ée]?(phone)?|mobile|portable|gsm)\s*[:.]?\s*/i, "").replace(/[\d\s.+()-]/g, "") === ""));
   const iVille = lignes.findIndex((l) => CP_VILLE.test(l));
   if (iVille >= 0 && /^\D*\d{1,4}\D.*\b\d{5}\b/.test(lignes[iVille]!) && lignes[iVille]!.match(CP_VILLE)!.index! > 3) {
     // Rue et ville sur la même ligne (« 3 avenue Foch, 69006 Lyon »).
