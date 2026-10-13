@@ -15,7 +15,7 @@ import { IconPaperclip } from "@/components/layout/icons";
  * paper report here; POSTs to app/api/reports/[id]/attach-photo,
  * which replays the live flows' OCR→column mapping.
  */
-export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEntryId: string; stage: "start" | "end" }) {
+export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEntryId: string; stage: "start" | "start_sheet" | "end" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +40,18 @@ export function AttachReportPhotoButton({ planningEntryId, stage }: { planningEn
   if (!open) {
     return (
       <button className="text-xs text-orange-ink underline" onClick={() => setOpen(true)}>
-        <IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo manquante
+        <IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" />{" "}
+        {stage === "start" ? "Scan départ manquant" : stage === "start_sheet" ? "Ajouter la feuille de départ" : "Photo retour manquante"}
       </button>
     );
   }
 
   return (
     <div className="flex w-32 flex-col gap-1">
-      <TourReportPhotoCapture label={stage === "start" ? "Rapport départ" : "Rapport retour"} onCaptured={handleCaptured} />
+      <TourReportPhotoCapture
+        label={stage === "start" ? "Scan départ (terminal)" : stage === "start_sheet" ? "Feuille de début de tournée" : "Rapport retour"}
+        onCaptured={handleCaptured}
+      />
       {error && <p role="alert" className="text-xs text-orange-ink">{error}</p>}
       <button className="text-xs text-navy/60 underline" onClick={() => setOpen(false)}>
         Annuler

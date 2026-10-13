@@ -36,6 +36,8 @@ const bodySchema = z
     // Already uploaded via TourReportPhotoCapture (app/api/ocr/tour-report/init+process),
     // unlike the problem photo below which is still uploaded after this insert returns its id.
     sheet_photo_path: z.string().optional(),
+    /** Feuille de début de tournée (photo ou PDF), en plus de l'écran du terminal. */
+    start_sheet_path: z.string().optional(),
     report_fields: reportFieldsSchema.partial().optional(),
     vehicle_ok: z.boolean(),
     problem_description: z.string().min(1).optional(),
@@ -150,6 +152,7 @@ export async function POST(req: Request) {
     start_km: parsed.data.start_km,
     start_km_photo_path: parsed.data.start_km_photo_path,
     start_photo_path: parsed.data.sheet_photo_path ?? null,
+    ...(parsed.data.start_sheet_path?.startsWith(`${appUser.organization_id}/`) ? { start_sheet_path: parsed.data.start_sheet_path } : {}),
     start_vehicle_ok: parsed.data.vehicle_ok,
     // Only written for a colleague-assisted start, so plain starts keep
     // working even before migration 20260101000095 reaches a database.

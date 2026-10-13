@@ -12,6 +12,7 @@ export interface ReportRow {
   start_at: string;
   end_at: string | null;
   start_photo_path: string | null;
+  start_sheet_path: string | null;
   end_photo_path: string | null;
   report_bl_number: string | null;
   report_stops_total: number | null;
@@ -229,6 +230,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                 <td className="py-2">
                   <div className="flex flex-col gap-1">
                     {!r.start_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}
+                    {!r.start_sheet_path && <AttachReportPhotoButton planningEntryId={r.id} stage="start_sheet" />}
                     {!r.end_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="end" />}
                   </div>
                 </td>

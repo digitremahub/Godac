@@ -62,6 +62,7 @@ export function StartTourFlow({
   const [startKm, setStartKm] = useState("");
   const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
+  const [startSheetPath, setStartSheetPath] = useState("");
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
@@ -169,6 +170,7 @@ export function StartTourFlow({
           start_km: Number(startKm),
           start_km_photo_path: startKmPhotoPath || undefined,
           sheet_photo_path: sheetPhotoPath || undefined,
+          start_sheet_path: startSheetPath || undefined,
           report_fields: reportFields ?? undefined,
           vehicle_ok: vehicleOk,
           problem_description: vehicleOk ? undefined : problemDescription,
@@ -379,10 +381,19 @@ export function StartTourFlow({
       )}
 
       <TourReportPhotoCapture
-        label="Photo du rapport de tournée (optionnel — lecture auto)"
+        label="Scan de l'écran « Statistiques Tournée » du terminal (optionnel — lecture auto)"
         onCaptured={({ photoPath, fields }) => {
           setSheetPhotoPath(photoPath);
           setReportFields(fields);
+          if (fields?.tour_number && !tourNumber) setTourNumber(fields.tour_number);
+        }}
+      />
+      <TourReportPhotoCapture
+        label="Feuille de début de tournée — photo ou PDF (optionnel)"
+        onCaptured={({ photoPath, fields }) => {
+          setStartSheetPath(photoPath);
+          // Complète ce que l'écran du terminal n'a pas donné.
+          if (fields && !reportFields) setReportFields(fields);
           if (fields?.tour_number && !tourNumber) setTourNumber(fields.tour_number);
         }}
       />
