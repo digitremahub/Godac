@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
+import { RelireScansButton } from "@/components/reports/RelireScansButton";
 import { IconPencil } from "@/components/layout/icons";
 
 export interface ReportRow {
@@ -47,10 +48,10 @@ type EditableField =
 
 const FIELD_LABELS: Record<EditableField, string> = {
   report_bl_number: "N° de BL",
-  report_stops_total: "Arrêts",
+  report_stops_total: "Arrêts (hors ramasses)",
   report_packages_count: "Colis",
   report_priority_count: "Colis prioritaires",
-  report_stops_delivered: "Arrêts livrés",
+  report_stops_delivered: "Livrés (colis remis)",
   report_packages_missing: "Colis manquants",
   report_pickups: "Ramasses",
   report_packages_picked_up: "Colis ramassés",
@@ -105,6 +106,22 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
   const [form, setForm] = useState<FormState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [relecture, setRelecture] = useState<string | null>(null);
+
+  // Relit tous les rapports affichés qui ont un scan, un par un.
+  async function relireTout() {
+    const cibles = reports.filter((r) => r.start_photo_path || r.start_sheet_path || r.end_photo_path);
+    let faits = 0;
+    let echecs = 0;
+    for (const r of cibles) {
+      setRelecture(`Relecture ${faits + echecs + 1}/${cibles.length}…`);
+      const res = await fetch(`/api/reports/${r.id}/relire`, { method: "POST" }).catch(() => null);
+      if (res?.ok) faits++;
+      else echecs++;
+    }
+    setRelecture(`${faits} rapport${faits > 1 ? "s" : ""} relu${faits > 1 ? "s" : ""}${echecs ? `, ${echecs} en échec` : ""}.`);
+    router.refresh();
+  }
 
   function startEdit(r: ReportRow) {
     setEditingId(r.id);
@@ -169,6 +186,16 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
   return (
     <Card className="overflow-x-auto">
       {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
+      {canEdit && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
+          <button className="btn-secondary !h-7 !px-3 !py-0 !text-xs" disabled={relecture?.endsWith("…")} onClick={relireTout}>
+            Relire tous les scans
+          </button>
+          <span className="text-navy/55">
+            {relecture ?? "Arrêts = stops du scan moins les ramasses · Livrés = colis REMIS. Relance la lecture des scans enregistrés."}
+          </span>
+        </div>
+      )}
       <table className="w-full min-w-[1420px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -186,12 +213,13 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
             </th>
             <th className="pb-2">Départ</th>
             <th className="pb-2">Retour</th>
-            <th className="pb-2">Arrêts</th>
-            <th className="pb-2">Livrés</th>
+            <th className="pb-2" title="Stops du scan moins les stops de ramasse">Arrêts</th>
+            <th className="pb-2" title="Colis REMIS = stops livrés">Livrés</th>
             <th className="pb-2">Colis</th>
             <th className="pb-2">Priorité</th>
             <th className="pb-2">Manquants</th>
-            <th className="pb-2">Ramassés</th>
+            <th className="pb-2" title="Stops de ramasse">Ramasses</th>
+            <th className="pb-2" title="Colis collectés lors des ramasses">Colis ramassés</th>
             <th className="pb-2">Ramenés dépôt</th>
             <th className="pb-2">En relais</th>
             {canEdit && <th className="pb-2">Photo</th>}
@@ -232,6 +260,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                     {!r.start_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="start" />}
                     {!r.start_sheet_path && <AttachReportPhotoButton planningEntryId={r.id} stage="start_sheet" />}
                     {!r.end_photo_path && <AttachReportPhotoButton planningEntryId={r.id} stage="end" />}
+                    {(r.start_photo_path || r.start_sheet_path || r.end_photo_path) && <RelireScansButton planningEntryId={r.id} />}
                   </div>
                 </td>
               )}

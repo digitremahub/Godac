@@ -19,6 +19,8 @@ export const tourReportSchema = z.object({
   tour_number: fieldSchema(z.string()),
   bl_number: fieldSchema(z.string()),
   stops_total: fieldSchema(z.number().int().nonnegative()),
+  // Total imprimé sur le scan, ramasses comprises (absent des anciennes lectures).
+  stops_scan: fieldSchema(z.number().int().nonnegative()).optional(),
   packages_count: fieldSchema(z.number().int().nonnegative()),
   priority_count: fieldSchema(z.number().int().nonnegative()),
   stops_delivered: fieldSchema(z.number().int().nonnegative()),
@@ -38,11 +40,41 @@ export const tourReportSchema = z.object({
 
 export type TourReportFields = z.infer<typeof tourReportSchema>;
 
+/**
+ * Le document imprime un total de stops qui inclut les ramasses ; GODAC
+ * compte les arrêts de LIVRAISON : stops_total = stops du scan − stops de
+ * ramasse. Fait ici (et non par l'IA) pour que le calcul soit fiable.
+ * stops_scan est conservé pour recalculer si le chauffeur corrige les
+ * ramasses (lib/ocr/arrets.ts). Accepte une réponse déjà au format final.
+ */
+export function normaliserLecture(input: unknown): unknown {
+  if (!input || typeof input !== "object") return input;
+  const lu = input as Record<string, unknown>;
+  if (lu.stops_scan === undefined) return input;
+  const stops_scan = typeof lu.stops_scan === "number" ? lu.stops_scan : null;
+  const ramasses = typeof lu.pickups === "number" ? lu.pickups : 0;
+  return { ...lu, stops_scan, stops_total: stops_scan === null ? null : Math.max(0, stops_scan - ramasses) };
+}
+
 export type TourReportOcrResult =
   | { ok: true; fields: TourReportFields; raw: unknown }
   | { ok: false; reason: string };
 
-const SYSTEM_PROMPT = `Tu lis une photo d'un rapport de tournée de livraison (écran de terminal portable type Honeywell, ou compte-rendu imprimé type DPD/transporteur). Extrais uniquement les chiffres et références explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Les champs correspondent typiquement à : numéro de tournée ("Num Tour", "Tournée"), numéro de bordereau/BL ("Num BL", "Bordereau"), nombre total d'arrêts/stops, nombre de colis, nombre de colis prioritaires ("Prio"), nombre d'arrêts livrés ("Livré"), nombre de colis non livrés/manquants, nombre de stops de ramasse ("Stop(s) ramasse"), heure de départ, heure de retour, nombre de colis ramassés (collectés chez un client, distinct du nombre de stops de ramasse), nombre de colis ramenés au dépôt (non livrés, rapportés physiquement), nombre de colis déposés en point relais. Un rapport ne contient pas forcément tous ces champs — renvoie null pour ceux qui sont absents.`;
+const SYSTEM_PROMPT = `Tu lis une photo ou un scan d'un rapport de tournée de livraison (écran de terminal portable type Honeywell « Statistiques Tournée », ou compte-rendu de tournée imprimé type DPD/transporteur). Recopie uniquement les chiffres et références explicitement lisibles — ne devine jamais une valeur absente ou floue, ne fais aucun calcul : renvoie null pour ce qui n'est pas lisible.
+
+Règles de lecture (importantes) :
+- stops_scan : le nombre de stops / arrêts TOTAL tel qu'il est imprimé sur le document (« Stops », « Nb stops », « Arrêts »). Ce total INCLUT les stops de ramasse : recopie-le tel quel, la déduction des ramasses est faite ensuite par le logiciel.
+- pickups : le nombre de STOPS de ramasse (« Stop(s) ramasse », « Ramasse », « Enlèvement »), pas le nombre de colis ramassés. Il est souvent INSCRIT À LA MAIN par le chauffeur sur la feuille (stylo, à côté de « Ramasse » ou en marge) : lis l'écriture manuscrite si elle est lisible, sinon null (le chauffeur le saisira).
+- stops_delivered : le nombre de colis REMIS (ligne « Remis », « Colis remis », « Remis destinataire »). Chez le transporteur, chaque colis remis correspond à un stop livré : c'est CE chiffre qu'il faut renvoyer comme stops livrés. N'utilise pas une autre ligne « Livré » si une ligne « Remis » existe.
+- packages_count : le nombre total de colis chargés / en charge (« Colis », « Nb colis »).
+- priority_count : colis prioritaires (« Prio », « Predict », « Express »).
+- packages_missing : colis manquants (« Manquant », « Non trouvés », « Absents au chargement »).
+- packages_returned : colis non remis et rapportés au dépôt (« Retour », « Non remis », « Rapportés »).
+- packages_relay : colis déposés en point relais (« Relais », « Pickup », « Point relais »).
+- packages_picked_up : nombre de COLIS collectés lors des ramasses (distinct du nombre de stops de ramasse).
+- tour_number : numéro de tournée (« Num Tour », « Tournée ») ; bl_number : numéro de bordereau / BL (« Num BL », « Bordereau »).
+- departure_time / return_time : heures de départ et de retour imprimées (format HH:MM).
+Un rapport ne contient pas forcément tous ces champs — renvoie null pour ceux qui sont absents.`;
 
 /**
  * Builds the right Claude content block for whatever got uploaded —
@@ -71,7 +103,7 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
     properties: {
       tour_number: { anyOf: [{ type: "string" }, { type: "null" }] },
       bl_number: { anyOf: [{ type: "string" }, { type: "null" }] },
-      stops_total: { anyOf: [{ type: "integer" }, { type: "null" }] },
+      stops_scan: { anyOf: [{ type: "integer" }, { type: "null" }] },
       packages_count: { anyOf: [{ type: "integer" }, { type: "null" }] },
       priority_count: { anyOf: [{ type: "integer" }, { type: "null" }] },
       stops_delivered: { anyOf: [{ type: "integer" }, { type: "null" }] },
@@ -86,7 +118,7 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
     required: [
       "tour_number",
       "bl_number",
-      "stops_total",
+      "stops_scan",
       "packages_count",
       "priority_count",
       "stops_delivered",
@@ -140,7 +172,7 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
     return { ok: false, reason: "AI response did not contain the expected structured output" };
   }
 
-  const parsed = tourReportSchema.safeParse(toolUse.input);
+  const parsed = tourReportSchema.safeParse(normaliserLecture(toolUse.input));
   if (!parsed.success) {
     return { ok: false, reason: `malformed AI response: ${parsed.error.message}` };
   }

@@ -7,11 +7,14 @@ import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
 import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
+import { arretsLivraison } from "@/lib/ocr/arrets";
 
 const reportFieldsSchema = z.object({
   tour_number: z.string().nullable(),
   bl_number: z.string().nullable(),
   stops_total: z.number().int().nonnegative().nullable(),
+  stops_scan: z.number().int().nonnegative().nullable().optional(),
+  pickups: z.number().int().nonnegative().nullable(),
   packages_count: z.number().int().nonnegative().nullable(),
   priority_count: z.number().int().nonnegative().nullable(),
   departure_time: z.string().nullable(),
@@ -160,7 +163,8 @@ export async function POST(req: Request) {
     ...(reportFields
       ? {
           report_bl_number: reportFields.bl_number ?? null,
-          report_stops_total: reportFields.stops_total ?? null,
+          report_stops_total: arretsLivraison(reportFields, null),
+          ...(reportFields.pickups != null ? { report_pickups: reportFields.pickups } : {}),
           report_packages_count: reportFields.packages_count ?? null,
           report_priority_count: reportFields.priority_count ?? null,
           report_departure_time: reportFields.departure_time ?? null,

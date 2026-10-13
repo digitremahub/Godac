@@ -5,9 +5,12 @@ import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
+import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 
 const reportFieldsSchema = z.object({
   bl_number: z.string().nullable(),
+  stops_total: z.number().int().nonnegative().nullable(),
+  stops_scan: z.number().int().nonnegative().nullable().optional(),
   stops_delivered: z.number().int().nonnegative().nullable(),
   packages_missing: z.number().int().nonnegative().nullable(),
   pickups: z.number().int().nonnegative().nullable(),
@@ -115,6 +118,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const reportFields = parsed.data.report_fields;
+  const lectures = (tour.report_ocr_raw as { start?: LectureArrets; start_sheet?: LectureArrets } | null) ?? {};
+  const lectureDepart = lectures.start?.stops_scan != null || lectures.start?.stops_total != null ? lectures.start : lectures.start_sheet;
+  const arretsDeLivraison = reportFields ? arretsLivraison(lectureDepart, reportFields) : null;
 
   const { error } = await supabase
     .from("planning_entries")
@@ -132,9 +138,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(reportFields
         ? {
             report_bl_number: reportFields.bl_number ?? undefined,
+            // Stops du scan − ramasses (voir lib/ocr/arrets.ts).
+            ...(arretsDeLivraison !== null ? { report_stops_total: arretsDeLivraison } : {}),
             report_stops_delivered: reportFields.stops_delivered ?? null,
             report_packages_missing: reportFields.packages_missing ?? null,
-            report_pickups: reportFields.pickups ?? null,
+            // Saisie du chauffeur (ou lecture manuscrite) ; garde celle du départ sinon.
+            report_pickups: reportFields.pickups ?? undefined,
             report_return_time: reportFields.return_time ?? null,
             report_packages_picked_up: reportFields.packages_picked_up ?? null,
             report_packages_returned: reportFields.packages_returned ?? null,
