@@ -244,7 +244,8 @@ export function OrganizationSettingsForm({
           <p className="text-sm text-navy/65">
             À l&apos;ouverture de l&apos;application, un salarié à moins de 300&nbsp;m du dépôt de son service est pointé
             automatiquement (annulable) ; la sortie lui est proposée en fin de journée. La position n&apos;est lue qu&apos;à ce
-            moment, jamais en continu. Informez vos salariés avant d&apos;activer (règles CNIL sur la géolocalisation).
+            moment, jamais en continu. Activé d&apos;office pour toutes les entreprises : informez vos salariés (règles CNIL sur la
+            géolocalisation), ou désactivez-le ici.
             Nécessite le module Pointeuse et l&apos;adresse du dépôt de chaque service.
           </p>
         </div>
