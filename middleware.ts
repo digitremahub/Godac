@@ -11,7 +11,12 @@ const PUBLIC_PATHS = [
   "/auth/confirm",
   "/mentions-legales",
   "/cgu",
+  "/cgv",
+  "/dpa",
+  "/sla",
   "/confidentialite",
+  "/contact",
+  "/bon-de-commande",
   // « Voir la démo » signs the visitor into the demo organization.
   "/demo",
 ];
@@ -29,6 +34,7 @@ const PUBLIC_PREFIXES = [
   // has no account yet scans this before ever signing in.
   "/join",
   "/api/public/driver-signup",
+  "/api/public/demo-request",
 ];
 
 function isPublicPath(pathname: string): boolean {

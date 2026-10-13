@@ -12,6 +12,9 @@ export function SiteHeader({ spaceHref }: { spaceHref?: string | null }) {
         <Link href="/modules" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-white/75 hover:text-white sm:inline-block">
           Modules & tarifs
         </Link>
+        <Link href="/contact" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-white/75 hover:text-white md:inline-block">
+          Demander une démo
+        </Link>
         {!spaceHref && (
           <Link href="/sign-in" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-white/75 hover:text-white sm:inline-block">
             Se connecter
@@ -33,7 +36,13 @@ export function SiteFooter() {
           <Wordmark height={24} />
           <span>© {new Date().getFullYear()} · Gestion et Optimisation Des Assets et Carburant</span>
         </div>
-        <nav aria-label="Liens légaux" className="flex gap-5">
+        <nav aria-label="Liens légaux" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+          <Link href="/contact" className="hover:text-navy hover:underline">
+            Contact
+          </Link>
+          <Link href="/cgv" className="hover:text-navy hover:underline">
+            CGV
+          </Link>
           <Link href="/mentions-legales" className="hover:text-navy hover:underline">
             Mentions légales
           </Link>

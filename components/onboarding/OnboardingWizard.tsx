@@ -181,7 +181,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               className="input"
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
-              placeholder="ex: Sud Express 66"
+              placeholder="ex: Transports Martin"
             /></label>
           </div>
           <div>
