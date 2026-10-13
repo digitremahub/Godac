@@ -89,6 +89,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/alerts", label: "Alertes", icon: IconBell, allow: ["chauffeur", "manager", "manager_chauffeur", "direction", "comptable"] },
       { href: "/reports", label: "Rapports de tournée", icon: IconFileText, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
+      { href: "/paie", label: "Paie", icon: IconCoins, allow: ["direction"], moduleKey: "payslips" },
       { href: "/payroll", label: "Salaires", icon: IconCoins, allow: ["direction"], moduleKey: "planning" },
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
       { href: "/fines", label: "Amendes", icon: IconFileText, allow: ["direction"], moduleKey: "fines" },
