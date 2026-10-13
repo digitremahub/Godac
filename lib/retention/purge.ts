@@ -9,6 +9,8 @@ export const RETENTION_DAYS = {
   clockGps: 365,
   /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
   assistantConversations: 90,
+  /** Tournées colis (adresses et noms des destinataires). */
+  parcelRuns: 30,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -39,6 +41,12 @@ export async function purgeExpiredData() {
     .delete({ count: "exact" })
     .lt("updated_at", daysAgo(RETENTION_DAYS.assistantConversations));
   results.assistantConversations = convs.error ? convs.error.message : (convs.count ?? 0);
+
+  const runs = await admin
+    .from("delivery_runs")
+    .delete({ count: "exact" })
+    .lt("run_date", daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10));
+  results.parcelRuns = runs.error ? runs.error.message : (runs.count ?? 0);
 
   return results;
 }
