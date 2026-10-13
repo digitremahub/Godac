@@ -32,7 +32,7 @@ export function HistoriqueTournees({
   return (
     <div className="flex flex-col gap-4">
       <HistoriqueFiltres du={filtres.du} au={filtres.au} services={encadrement ? historique.services : null} chauffeurs={historique.chauffeurs} camions={historique.camions} />
-      <p className="-mt-2 text-xs text-navy/55">Les tournées et leurs adresses sont effacées 30 jours après leur date (données personnelles des destinataires).</p>
+      <p className="-mt-2 text-xs text-navy/55">Tournées conservées 12 mois (adresses, initiales et photos pour les contestations) ; noms complets, téléphones et consignes effacés après 30 jours.</p>
 
       {historique.erreur && <Card className="text-orange-ink">{historique.erreur}</Card>}
 

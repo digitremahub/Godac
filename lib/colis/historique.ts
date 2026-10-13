@@ -89,7 +89,21 @@ export function jourParis(iso: string): string {
 export interface EntreePlanning {
   driver_id: string | null;
   vehicle_id: string | null;
+  service_id?: string | null;
   start_at: string;
+}
+
+/**
+ * Service d'une tournée tel qu'il était ce jour-là : celui figé sur la
+ * tournée, sinon celui du planning du chauffeur ce jour-là — jamais son
+ * affectation actuelle.
+ */
+export function serviceDeTournee(run: { driver_id: string; run_date: string; service_id?: string | null }, planning: EntreePlanning[]): string | null {
+  if (run.service_id) return run.service_id;
+  const e = planning
+    .filter((p) => p.driver_id === run.driver_id && p.service_id && jourParis(p.start_at) === run.run_date)
+    .sort((a, b) => a.start_at.localeCompare(b.start_at))[0];
+  return e?.service_id ?? null;
 }
 
 /**
@@ -203,7 +217,7 @@ export interface Historique {
 export async function historiqueTournees(supabase: SupabaseClient, userId: string, toutes: boolean, filtres: FiltresHistorique): Promise<Historique> {
   let q = supabase
     .from("delivery_runs")
-    .select("id, name, run_date, status, driver_id, vehicle_id, started_at, start_lat, start_lng, return_to_start, created_at")
+    .select("id, name, run_date, status, driver_id, vehicle_id, service_id, started_at, start_lat, start_lng, return_to_start, created_at")
     .gte("run_date", filtres.du)
     .lte("run_date", filtres.au)
     .order("run_date", { ascending: false })
@@ -227,6 +241,7 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
     status: LigneHistorique["statut"];
     driver_id: string;
     vehicle_id: string | null;
+    service_id: string | null;
     started_at: string | null;
     start_lat: number | null;
     start_lng: number | null;
@@ -234,16 +249,14 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
   }[];
 
   const driverIds = [...new Set(listeRuns.map((r) => r.driver_id))];
-  const sansCamion = listeRuns.filter((r) => !r.vehicle_id);
-  const [{ data: noms }, { data: liens }, { data: planning }] = await Promise.all([
+  const sansCamion = listeRuns.filter((r) => !r.vehicle_id || !r.service_id);
+  const [{ data: noms }, { data: planning }] = await Promise.all([
     driverIds.length ? supabase.from("users").select("id, full_name").in("id", driverIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-    driverIds.length ? supabase.from("user_services").select("user_id, service_id").in("user_id", driverIds) : Promise.resolve({ data: [] as { user_id: string; service_id: string }[] }),
     sansCamion.length
       ? supabase
           .from("planning_entries")
-          .select("driver_id, vehicle_id, start_at")
+          .select("driver_id, vehicle_id, service_id, start_at")
           .in("driver_id", [...new Set(sansCamion.map((r) => r.driver_id))])
-          .not("vehicle_id", "is", null)
           .gte("start_at", `${decalerJour(filtres.du, -1)}T00:00:00Z`)
           .lt("start_at", `${decalerJour(filtres.au, 2)}T00:00:00Z`)
           .limit(10000)
@@ -253,13 +266,11 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
   const nomChauffeur = new Map(((noms ?? []) as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name]));
   const nomService = new Map(((services ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
   const immat = new Map(((vehicules ?? []) as { id: string; registration: string }[]).map((v) => [v.id, v.registration]));
-  const servicesDe = new Map<string, string[]>();
-  for (const l of (liens ?? []) as { user_id: string; service_id: string }[]) servicesDe.set(l.user_id, [...(servicesDe.get(l.user_id) ?? []), l.service_id]);
 
   const legeres = listeRuns.map((r) => ({
     ...r,
     camion: camionDeTournee(r, (planning ?? []) as EntreePlanning[]),
-    services: servicesDe.get(r.driver_id) ?? [],
+    services: [serviceDeTournee(r, (planning ?? []) as EntreePlanning[])].filter((x): x is string => Boolean(x)),
   }));
   const { items, page, pages, total } = paginer(filtrerLignes(legeres, filtres), filtres.page);
 
@@ -303,7 +314,14 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
     pages,
     total,
     services: ((services ?? []) as { id: string; name: string }[]).map((s) => ({ id: s.id, label: s.name })),
-    chauffeurs: chauffeurs ? (chauffeurs as { id: string; full_name: string }[]).map((u) => ({ id: u.id, label: u.full_name })) : null,
+    // Chauffeurs actuels + ceux qui ont roulé sur la période (même partis ou changés de rôle depuis).
+    chauffeurs: chauffeurs
+      ? [
+          ...new Map(
+            [...(chauffeurs as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name] as const), ...nomChauffeur.entries()].map(([id, label]) => [id, { id, label }]),
+          ).values(),
+        ].sort((a, b) => a.label.localeCompare(b.label, "fr"))
+      : null,
     camions: ((vehicules ?? []) as { id: string; registration: string }[]).map((v) => ({ id: v.id, label: v.registration })),
     erreur: error?.message ?? null,
   };

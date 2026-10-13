@@ -170,7 +170,11 @@ export default function ConfidentialitePage() {
           <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée (aucun historique).</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
-          <li>Tournées colis (adresses, noms et téléphones des destinataires, photos de livraison)* : 30 jours après la tournée.</li>
+          <li>
+            Tournées colis* : téléphones, consignes et noms complets des destinataires effacés 30 jours après la tournée (le nom est
+            réduit aux initiales) ; adresses, initiales et photos de livraison conservées 12 mois pour traiter les contestations, puis
+            supprimées.
+          </li>
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>
           <li>Factures : 10 ans (obligation comptable).</li>
