@@ -18,7 +18,7 @@ export default async function OrganizationSettingsPage() {
       supabase
         .from("organizations")
         .select(
-          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number",
+          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number, country",
         )
         .eq("id", appUser.organization_id)
         .single(),
@@ -53,6 +53,7 @@ export default async function OrganizationSettingsPage() {
         apeCode={organization?.ape_code ?? null}
         conventionCollective={organization?.convention_collective ?? null}
         urssafNumber={organization?.urssaf_number ?? null}
+        country={organization?.country ?? "FR"}
       />
       <ServicesPanel services={services ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />

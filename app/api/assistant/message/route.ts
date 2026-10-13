@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
   const [{ data: userServices }, { data: organization }, enabledModuleKeys] = await Promise.all([
     supabase.from("user_services").select("services(name)").eq("user_id", appUser.id),
-    supabase.from("organizations").select("name, emergency_phone").eq("id", appUser.organization_id).single(),
+    supabase.from("organizations").select("name, emergency_phone, country").eq("id", appUser.organization_id).single(),
     getEnabledModuleKeys(supabase, appUser.organization_id),
   ]);
   const serviceNames = (userServices ?? []).map((s: any) => s.services?.name).filter(Boolean);
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   const sources = [...getHelpSourcesForRole(appUser.role), ...visibleNotes, ...faqSourcesForRole((faqRows ?? []) as FaqRow[], appUser.role)];
 
   const result = await askAssistant({
-    context: { role: appUser.role, serviceNames, enabledModuleKeys, emergencyPhone: organization?.emergency_phone ?? null },
+    context: { role: appUser.role, serviceNames, enabledModuleKeys, emergencyPhone: organization?.emergency_phone ?? null, country: organization?.country ?? null },
     sources,
     history,
     message: parsed.data.message,

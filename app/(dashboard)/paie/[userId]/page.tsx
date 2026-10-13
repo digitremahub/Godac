@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
+import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { currentMonth } from "@/lib/planning/dates";
@@ -15,6 +16,8 @@ export default async function PaieSalariePage({ params, searchParams }: { params
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "payslips"))) {
     return <EmptyState title="Module Fiches de paie non activé" />;
   }
+  const pays = await paysOrganisation(supabase, appUser.organization_id);
+  if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;
   const { userId } = await params;
   const sp = await searchParams;
   const mois = moisValide(sp.mois) ? sp.mois : currentMonth();

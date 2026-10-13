@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress, reverseGeocode } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { cleAdresse, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 
@@ -13,6 +14,9 @@ const pointSchema = z.object({
   nom: z.string().trim().max(120).nullable(),
   telephone: z.string().trim().max(40).nullable().optional(),
 });
+// Géocodage d'une longue liste hors de France (une adresse par seconde).
+export const maxDuration = 300;
+
 const bodySchema = z.object({ run_id: z.string().uuid(), points: z.array(pointSchema).min(1).max(200) });
 
 /** Exécute `fn` sur chaque élément, au plus `n` à la fois (géocodage sans saturer l'API). */
@@ -44,14 +48,18 @@ export async function POST(req: Request) {
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
-  const complets = await parLots(parsed.data.points, 6, async (p) => {
+  // Hors de France, OpenStreetMap (Nominatim) demande une requête à la fois.
+  const pays = await codePays(appUser.organization_id);
+  const complets = await parLots(parsed.data.points, pays === "FR" ? 6 : 1, async (p) => {
+    // Nominatim : une requête par seconde au plus (conditions d'utilisation d'OpenStreetMap).
+    if (pays !== "FR") await new Promise((r) => setTimeout(r, 1000));
     let { adresse, lat, lng } = p;
     if ((lat === null || lng === null) && adresse) {
-      const geo = await geocodeAddress(adresse);
+      const geo = await geocodeAddress(adresse, pays);
       lat = geo?.lat ?? null;
       lng = geo?.lng ?? null;
     }
-    if (!adresse && lat !== null && lng !== null) adresse = (await reverseGeocode(lat, lng)) ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (!adresse && lat !== null && lng !== null) adresse = (await reverseGeocode(lat, lng, pays)) ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     return adresse && adresse.length >= 3 ? { adresse, lat, lng, nom: p.nom, telephone: normaliserTelephone(p.telephone) } : null;
   });
 

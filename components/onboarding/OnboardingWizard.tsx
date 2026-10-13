@@ -11,6 +11,7 @@ import {
   type DriverCsvRow,
 } from "@/lib/utils/csv";
 import { ModuleSelector } from "@/components/onboarding/ModuleSelector";
+import { PAYS, moduleDisponible, type CodePays } from "@/lib/pays/pays";
 import { PlanPicker } from "@/components/onboarding/PlanPicker";
 import { priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 
@@ -33,6 +34,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
   const router = useRouter();
   const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "org");
   const [organizationName, setOrganizationName] = useState("");
+  const [pays, setPays] = useState<CodePays>("FR");
   const [planId, setPlanId] = useState<PlanId>(catalog.plans[0]?.id ?? "starter");
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
@@ -51,7 +53,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
       const res = await fetch("/api/onboarding/create-organization", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: organizationName }),
+        body: JSON.stringify({ name: organizationName, country: pays }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
@@ -182,6 +184,19 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               placeholder="ex: Sud Express 66"
             /></label>
           </div>
+          <div>
+            <label className="block"><span className="label">Pays de l&apos;entreprise</span>
+            <select className="input" value={pays} onChange={(e) => setPays(e.target.value as CodePays)}>
+              {PAYS.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.drapeau} {p.nom}
+                </option>
+              ))}
+            </select></label>
+            <p className="mt-1 text-sm text-navy/65">
+              GODAC applique les règles de ce pays : protection des données, temps de conduite, paie. Modifiable ensuite dans Organisation.
+            </p>
+          </div>
           <button className="btn-primary" disabled={busy || !organizationName} onClick={submitOrganization}>
             {busy ? "Création…" : "Créer mon organisation"}
           </button>
@@ -200,7 +215,7 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
               les paramètres de votre organisation.
             </p>
             <ModuleSelector
-              modules={catalog.modules}
+              modules={catalog.modules.filter((m) => moduleDisponible(pays, m.key))}
               prices={catalog.prices}
               planId={planId}
               selected={selectedModuleKeys}

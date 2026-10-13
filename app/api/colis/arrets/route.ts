@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { cleAdresse, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ stop: data, grouped: true });
   }
 
-  const geo = await geocodeAddress(parsed.data.adresse);
+  const geo = await geocodeAddress(parsed.data.adresse, await codePays(appUser.organization_id));
   const position = (stops ?? []).reduce((m, s) => Math.max(m, s.position), -1) + 1;
   const { data, error } = await supabase
     .from("delivery_stops")

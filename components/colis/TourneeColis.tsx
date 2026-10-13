@@ -23,13 +23,14 @@ interface Draft {
   code: string | null;
 }
 
-function AdresseInput({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+/** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
+function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   function change(v: string) {
     onChange(v);
     clearTimeout(timer.current);
-    if (v.trim().length < 4) return setSuggestions([]);
+    if (!france || v.trim().length < 4) return setSuggestions([]);
     timer.current = setTimeout(async () => {
       try {
         const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(v)}&limit=5&autocomplete=1`);
@@ -58,7 +59,7 @@ function AdresseInput({ value, onChange, autoFocus }: { value: string; onChange:
   );
 }
 
-export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }) {
+export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquette: boolean; pays?: string }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
@@ -540,7 +541,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
             </button>
           </div>
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
-          <AdresseInput value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
+          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
             className="input"
@@ -629,7 +630,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                 )}
                 {edition?.id === s.id && (
                   <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
-                    <AdresseInput value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
+                    <AdresseInput france={pays === "FR"} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
                     <input
                       className="input"
                       value={edition.destinataire}

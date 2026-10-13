@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -34,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { depot_address, ...fields } = parsed.data;
   const updateFields: Record<string, unknown> = { ...fields };
   if (depot_address !== undefined) {
-    const geocoded = depot_address ? await geocodeAddress(depot_address) : null;
+    const geocoded = depot_address ? await geocodeAddress(depot_address, await codePays(appUser.organization_id)) : null;
     updateFields.depot_address = depot_address;
     updateFields.depot_lat = geocoded?.lat ?? null;
     updateFields.depot_lng = geocoded?.lng ?? null;

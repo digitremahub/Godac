@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Turns a free-text French address into coordinates, via the
+ * Turns a free-text address into coordinates — French addresses via the
  * government's own geocoding API (api-adresse.data.gouv.fr) — free,
  * no API key, no account to configure, consistent with how this app
  * only ever adds a paid/keyed integration when there's no equivalent
@@ -15,9 +15,31 @@ export interface GeocodeResult {
   lng: number;
 }
 
-export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+/**
+ * Hors de France, la Base Adresse Nationale ne connaît pas l'adresse (et
+ * pourrait la confondre avec une rue française du même nom) : on passe
+ * par OpenStreetMap (Nominatim), limité au pays de l'entreprise.
+ */
+const NOMINATIM = "https://nominatim.openstreetmap.org";
+const NOMINATIM_HEADERS = { "User-Agent": "GODAC (https://godac.app; contact@godac.fr)", "Accept-Language": "fr" };
+
+async function geocodeNominatim(address: string, country: string): Promise<GeocodeResult | null> {
+  try {
+    const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&countrycodes=${country.toLowerCase()}&q=${encodeURIComponent(address)}`, {
+      headers: NOMINATIM_HEADERS,
+    });
+    if (!res.ok) return null;
+    const [hit] = (await res.json()) as { lat?: string; lon?: string }[];
+    return hit?.lat && hit.lon ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function geocodeAddress(address: string, country = "FR"): Promise<GeocodeResult | null> {
   const trimmed = address.trim();
   if (!trimmed) return null;
+  if (country !== "FR") return geocodeNominatim(trimmed, country);
 
   let response: Response;
   try {
@@ -38,7 +60,15 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 }
 
 /** Adresse la plus proche d'un point (arrêts importés avec seulement des coordonnées). */
-export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+export async function reverseGeocode(lat: number, lng: number, country = "FR"): Promise<string | null> {
+  if (country !== "FR") {
+    try {
+      const res = await fetch(`${NOMINATIM}/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, { headers: NOMINATIM_HEADERS });
+      return res.ok ? (((await res.json()) as { display_name?: string }).display_name ?? null) : null;
+    } catch {
+      return null;
+    }
+  }
   let response: Response;
   try {
     response = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${lng}&lat=${lat}&limit=1`);

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { PAYS, type CodePays } from "@/lib/pays/pays";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -24,6 +26,7 @@ const bodySchema = z.object({
   ape_code: z.string().trim().min(1).nullable().optional(),
   convention_collective: z.string().trim().min(1).nullable().optional(),
   urssaf_number: z.string().trim().min(1).nullable().optional(),
+  country: z.enum(PAYS.map((p) => p.code) as [CodePays, ...CodePays[]]).optional(),
 });
 
 /** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
@@ -49,6 +52,7 @@ export async function PATCH(req: Request) {
     ape_code,
     convention_collective,
     urssaf_number,
+    country,
   } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
@@ -63,7 +67,7 @@ export async function PATCH(req: Request) {
   if (consumption_anomaly_threshold_percent !== undefined)
     profileFields.consumption_anomaly_threshold_percent = consumption_anomaly_threshold_percent;
   if (depot_address !== undefined) {
-    const geocoded = depot_address ? await geocodeAddress(depot_address) : null;
+    const geocoded = depot_address ? await geocodeAddress(depot_address, country ?? (await codePays(appUser.organization_id))) : null;
     profileFields.depot_address = depot_address;
     profileFields.depot_lat = geocoded?.lat ?? null;
     profileFields.depot_lng = geocoded?.lng ?? null;
@@ -74,6 +78,7 @@ export async function PATCH(req: Request) {
   if (ape_code !== undefined) profileFields.ape_code = ape_code;
   if (convention_collective !== undefined) profileFields.convention_collective = convention_collective;
   if (urssaf_number !== undefined) profileFields.urssaf_number = urssaf_number;
+  if (country !== undefined) profileFields.country = country;
 
   if (Object.keys(profileFields).length > 0) {
     const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
