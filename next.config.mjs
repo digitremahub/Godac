@@ -47,9 +47,11 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // Camera stays available to this site itself (QR scan,
-          // counter-photo capture) — every other origin is denied.
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+          // Camera and geolocation stay available to this site itself
+          // (QR scan, photos ; pointage géolocalisé, pointage assisté,
+          // position sur la carte de tournée) — every other origin is
+          // denied. geolocation=() used to block the GPS badge entirely.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self)" },
         ],
       },
     ];
