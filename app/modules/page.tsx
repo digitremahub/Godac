@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFullCatalog, priceFor } from "@/lib/organization/catalog";
 import { PricingSimulator } from "@/components/modules/PricingSimulator";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
+import { getPaliers } from "@/lib/organization/paliers-serveur";
+import { libellePalier } from "@/lib/organization/paliers";
 
 export const metadata = {
   title: "Modules & tarifs — GODAC",
@@ -22,7 +24,7 @@ export const metadata = {
  */
 export default async function ModulesPage() {
   const supabase = await createServerSupabaseClient();
-  const { plans: allPlans, modules, prices } = await getFullCatalog(supabase);
+  const [{ plans: allPlans, modules, prices }, paliers] = await Promise.all([getFullCatalog(supabase), getPaliers(supabase)]);
   const plans = allPlans.filter((p) => p.is_public);
   const cheapestPlanId = plans[0]?.id;
 
@@ -59,6 +61,24 @@ export default async function ModulesPage() {
               <div key={m.key} className="card flex flex-col gap-3">
                 <h3 className="text-lg">{m.name}</h3>
                 <p className="flex-1 text-sm text-navy/70">{m.description}</p>
+                {paliers.some((p) => p.module_key === m.key) && (
+                  <div className="rounded-lg bg-navy/[0.04] p-3 text-xs">
+                    <p className="mb-1 font-semibold text-navy/80">Par palier d&apos;utilisateurs (chauffeurs actifs)</p>
+                    <ul className="flex flex-col gap-0.5 tabular-nums text-navy/70">
+                      {paliers
+                        .filter((p) => p.module_key === m.key)
+                        .sort((a, b) => a.min_users - b.min_users)
+                        .map((p) => (
+                          <li key={p.min_users} className="flex justify-between gap-2">
+                            <span>{libellePalier(p)}</span>
+                            <span className="font-semibold text-navy">
+                              {Number(p.monthly_price)} €{Number(p.extra_per_user) > 0 && ` + ${Number(p.extra_per_user).toLocaleString("fr-FR")} €/util.`}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
                 {alwaysIncluded ? (
                   <p className="text-sm text-teal-ink">Inclus dans tous les plans</p>
                 ) : (

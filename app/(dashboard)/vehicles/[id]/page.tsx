@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { libellePhoto } from "@/lib/tours/changement-vehicule";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -95,6 +96,33 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
     ]);
   const kmActuel = await getVehicleLatestKmReading(supabase, id);
+
+  // Photos d'état prises à chaque changement de véhicule (10 derniers passages de main).
+  const { data: photosEtat } = await supabase
+    .from("vehicle_change_photos")
+    .select("planning_entry_id, stage, kind, photo_path, created_at, users!vehicle_change_photos_driver_id_fkey(full_name), planning_entries(tour_number)")
+    .eq("vehicle_id", id)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const passages = Object.values(
+    ((photosEtat ?? []) as any[]).reduce<Record<string, { cle: string; date: string; chauffeur: string; tournee: string | null; stage: string; photos: { kind: string; path: string }[] }>>(
+      (acc, p) => {
+        const cle = `${p.planning_entry_id}-${p.stage}`;
+        acc[cle] ??= { cle, date: p.created_at, chauffeur: p.users?.full_name ?? "—", tournee: p.planning_entries?.tour_number ?? null, stage: p.stage, photos: [] };
+        acc[cle].photos.push({ kind: p.kind, path: p.photo_path });
+        return acc;
+      },
+      {},
+    ),
+  ).slice(0, 10);
+  const passagesAvecUrls = await Promise.all(
+    passages.map(async (pa) => ({
+      ...pa,
+      photos: await Promise.all(
+        pa.photos.map(async (ph) => ({ ...ph, url: (await supabase.storage.from("tour-photos").createSignedUrl(ph.path, 600)).data?.signedUrl ?? null })),
+      ),
+    })),
+  );
 
   if (!vehicle) notFound();
   const v = vehicle as any;
@@ -316,6 +344,39 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <div className="w-full">
             <OdometerHistory readings={odometerReadings} />
           </div>
+          <Card className="w-full">
+            <p className="text-sm text-navy/65">Photos d&apos;état aux changements de véhicule</p>
+            {passagesAvecUrls.length === 0 ? (
+              <p className="mt-2 text-xs text-navy/60">
+                Aucune pour l&apos;instant. À chaque changement de véhicule (hors dépannage), le chauffeur qui le récupère photographie
+                l&apos;habitacle, le tableau de bord et le tour du véhicule.
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-col gap-3">
+                {passagesAvecUrls.map((pa) => (
+                  <div key={pa.cle}>
+                    <p className="text-xs text-navy/70">
+                      <span className="font-semibold text-navy">{pa.chauffeur}</span> ·{" "}
+                      {new Date(pa.date).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" })} ·{" "}
+                      {pa.stage === "depart" ? "pris au départ" : "pris en cours de tournée"}
+                      {pa.tournee ? ` · tournée n°${pa.tournee}` : ""}
+                    </p>
+                    <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-6">
+                      {pa.photos.map((ph) =>
+                        ph.url ? (
+                          <a key={ph.path} href={ph.url} target="_blank" rel="noreferrer" className="group relative block aspect-square overflow-hidden rounded-md bg-navy/5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={ph.url} alt={libellePhoto(ph.kind)} className="h-full w-full object-cover" />
+                            <span className="absolute inset-x-0 bottom-0 bg-navy/70 px-1 text-[10px] text-white">{libellePhoto(ph.kind)}</span>
+                          </a>
+                        ) : null,
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
           <QrCodeBadge
             type="vehicle"
             id={v.id}

@@ -3,8 +3,9 @@
 L'application des stores est une coque native (Capacitor) autour de
 l'application chauffeur GODAC (`https://godac.app/livreur`) :
 
-- **gratuite pour les chauffeurs**, sans limite de nombre — c'est
-  l'entreprise qui paie le module « Tournée colis » ;
+- **gratuite pour le chauffeur** — c'est l'entreprise qui paie le
+  module « Tournée colis », facturé par palier d'utilisateurs (table
+  `module_user_tiers`, migration 116) ;
 - toute mise à jour du site est aussitôt dans l'application, sans
   repasser par la validation d'Apple ou de Google ;
 - en plus du site : scanner de codes natif Google (QR, Datamatrix,

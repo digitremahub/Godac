@@ -4,6 +4,8 @@ import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
 import { blockInDemo } from "@/lib/demo/guard";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
 
 /**
  * Builds the subscription price from the org's chosen plan
@@ -41,6 +43,9 @@ export async function POST() {
     return NextResponse.json({ error: "Plan introuvable" }, { status: 500 });
   }
 
+  // Prix des modules au palier d'utilisateurs (app Livreur) à jour avant la commande.
+  await synchroniserPaliers(createAdminSupabaseClient(), organization.id);
+
   const { data: addonRows } = await supabase
     .from("organization_modules")
     .select("module_key, effective_monthly_price, effective_setup_price")
@@ -69,7 +74,11 @@ export async function POST() {
         currency: "eur",
         unit_amount: Math.round(Number(addon.effective_monthly_price) * 100),
         recurring: { interval: "month" as const },
-        product_data: { name: `GODAC — ${moduleByKey.get(addon.module_key)?.name ?? addon.module_key}` },
+        product_data: {
+          name: `GODAC — ${moduleByKey.get(addon.module_key)?.name ?? addon.module_key}`,
+          // Retrouvé par lib/organization/paliers-serveur.ts pour ajuster le palier d'utilisateurs.
+          metadata: { godac_module: addon.module_key },
+        },
       },
       quantity: 1,
     })),

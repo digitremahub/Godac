@@ -67,7 +67,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Démarrer et terminer une tournée",
         texte:
-          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
+          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre de stops de ramasse (inscrit à la main sur la feuille) : ils sont déduits des stops du scan, les colis REMIS comptent comme stops livrés. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
         lien: { href: "/tours/start", label: "Démarrer une tournée" },
         module: "planning",
       },

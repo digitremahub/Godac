@@ -139,7 +139,7 @@ export function BonDeCommande({
         <p>
           Abonnement d’une durée initiale de 12 mois à compter de l’ouverture de l’accès, puis renouvelable de mois en mois,
           résiliable avec un préavis d’un mois. Facturation mensuelle terme à échoir, payable à réception par prélèvement SEPA
-          ou carte bancaire. Mise en service facturée à la commande, ou échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour les chauffeurs.
+          ou carte bancaire. Mise en service facturée à la commande, ou échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour le chauffeur, facturée à l’entreprise par palier d’utilisateurs.
           Données hébergées en France.
         </p>
         <p>

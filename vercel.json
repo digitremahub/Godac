@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/retention",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/paliers",
+      "schedule": "45 3 * * *"
     }
   ]
 }

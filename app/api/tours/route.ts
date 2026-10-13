@@ -7,6 +7,8 @@ import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
 import { getVehicleLastKnownKm } from "@/lib/vehicles/odometer-reference";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
+import { libellePhoto, photoChangementSchema, photosManquantes } from "@/lib/tours/changement-vehicule";
+import { enregistrerPhotosChangement } from "@/lib/tours/photos-changement-serveur";
 import { arretsLivraison } from "@/lib/ocr/arrets";
 
 const reportFieldsSchema = z.object({
@@ -48,6 +50,9 @@ const bodySchema = z
     // planned entry's original vehicle — checked server-side below,
     // never just trusted from a client-side "vehicleChanged" flag.
     change_reason: z.string().min(1).optional(),
+    // Changement (photos d'état obligatoires) ou dépannage (aucune photo exigée).
+    change_type: z.enum(["changement", "depannage"]).optional(),
+    change_photos: z.array(photoChangementSchema).max(12).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.vehicle_ok && !data.problem_description) {
@@ -216,24 +221,46 @@ export async function POST(req: Request) {
       { status: 422 },
     );
   }
+  // Hors dépannage : photos d'état du véhicule récupéré obligatoires.
+  if (vehicleChanged) {
+    const manquantes = photosManquantes(parsed.data.change_type, parsed.data.change_photos);
+    if (manquantes.length) {
+      return NextResponse.json(
+        { error: `Changement de véhicule : photos obligatoires manquantes (${manquantes.map(libellePhoto).join(", ")}).` },
+        { status: 422 },
+      );
+    }
+    if ((parsed.data.change_photos ?? []).some((p) => !p.path.startsWith(`${appUser.organization_id}/`))) {
+      return NextResponse.json({ error: "Chemin de photo invalide." }, { status: 403 });
+    }
+  }
 
+  const champsDepart = vehicleChanged ? { ...startFields, vehicle_change_type: parsed.data.change_type ?? "changement" } : startFields;
   const { data, error } = plannedMatch
-    ? await supabase.from("planning_entries").update(startFields).eq("id", plannedMatch.id).select("id").single()
+    ? await supabase.from("planning_entries").update(champsDepart).eq("id", plannedMatch.id).select("id").single()
     : await supabase
         .from("planning_entries")
-        .insert({ organization_id: appUser.organization_id, tour_number: tourNumber, driver_id: driverId, ...startFields })
+        .insert({ organization_id: appUser.organization_id, tour_number: tourNumber, driver_id: driverId, ...champsDepart })
         .select("id")
         .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (vehicleChanged && plannedMatch?.vehicle_id && parsed.data.change_reason) {
+    await enregistrerPhotosChangement(supabase, {
+      organizationId: appUser.organization_id,
+      planningEntryId: data.id,
+      vehicleId: vehicle.id,
+      driverId,
+      stage: "depart",
+      photos: parsed.data.change_photos ?? [],
+    });
     await reportVehicleSwap(supabase, {
       organizationId: appUser.organization_id,
       plannedEntryId: data.id,
       plannedVehicleId: plannedMatch.vehicle_id,
       actualVehicleId: vehicle.id,
-      reason: parsed.data.change_reason,
+      reason: parsed.data.change_type === "depannage" ? `dépannage — ${parsed.data.change_reason}` : parsed.data.change_reason,
     });
   }
 

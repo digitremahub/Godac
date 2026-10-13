@@ -80,8 +80,10 @@ export default function CgvPage() {
           <Link href="/modules" className={lien}>page Modules & tarifs</Link> à la date de la commande.
         </p>
         <p>
-          L’application mobile GODAC Livreur est mise gratuitement à la disposition des chauffeurs du Client lorsque le
-          module « Tournée colis » est souscrit, sans limite de nombre de chauffeurs.
+          L’application mobile GODAC Livreur est mise à la disposition des chauffeurs du Client lorsque le module « Tournée
+          colis » est souscrit ; elle est gratuite pour le chauffeur et facturée au Client par palier d’utilisateurs (chauffeurs
+          actifs), selon la grille publiée sur la page Modules & tarifs. Le palier est recalculé chaque mois et s’applique à
+          l’échéance suivante, sans prorata.
         </p>
         <p>
           La Solution évolue : l’Éditeur peut ajouter, améliorer ou remplacer des fonctionnalités, sans réduire de manière
