@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { normaliserTelephone } from "@/lib/colis/telephone";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const patchSchema = z.object({
@@ -10,6 +11,7 @@ const patchSchema = z.object({
   adresse: z.string().trim().min(5).max(300).optional(),
   notes: z.string().trim().max(500).nullable().optional(),
   destinataire: z.string().trim().max(120).nullable().optional(),
+  telephone: z.string().trim().max(40).nullable().optional(),
   parcel_count: z.number().int().min(1).max(500).optional(),
   /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
   deplacer: z.enum(["haut", "bas"]).optional(),
@@ -23,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes, destinataire, parcel_count, deplacer } = parsed.data;
+  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer } = parsed.data;
 
   if (deplacer) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, position").eq("id", id).maybeSingle();
@@ -42,6 +44,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const update: Record<string, unknown> = {};
   if (destinataire !== undefined) update.recipient = destinataire || null;
   if (parcel_count !== undefined) update.parcel_count = parcel_count;
+  if (telephone !== undefined) {
+    const tel = normaliserTelephone(telephone);
+    if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
+    update.phone = tel;
+  }
   if (status) {
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();

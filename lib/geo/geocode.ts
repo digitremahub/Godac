@@ -36,3 +36,16 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   const [lng, lat] = coordinates;
   return { lat, lng };
 }
+
+/** Adresse la plus proche d'un point (arrêts importés avec seulement des coordonnées). */
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  let response: Response;
+  try {
+    response = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${lng}&lat=${lat}&limit=1`);
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const data = (await response.json()) as { features?: { properties?: { label?: string } }[] };
+  return data.features?.[0]?.properties?.label ?? null;
+}

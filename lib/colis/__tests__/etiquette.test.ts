@@ -19,3 +19,15 @@ describe("analyserCode", () => {
     expect(r).toEqual({ code: "ABC123456", adresse: "1 chemin du Moulin, 69510 Soucieu-en-Jarrest", destinataire: "SARL Dupont" });
   });
 });
+
+describe("analyserCode — téléphone", () => {
+  it("lit le téléphone sans le prendre pour un numéro de colis", () => {
+    const r = analyserCode("MARTIN Julie\n12 rue des Lilas\n69230 Saint-Genis-Laval\nTél : 06 12 34 56 78\n09876543210987");
+    expect(r.telephone).toBe("06 12 34 56 78");
+    expect(r.code).toBe("09876543210987");
+    expect(r.adresse).toBe("12 rue des Lilas, 69230 Saint-Genis-Laval");
+  });
+  it("JSON avec téléphone", () => {
+    expect(analyserCode('{"address":"3 avenue Foch, 69006 Lyon","phone":"+33612345678"}').telephone).toBe("06 12 34 56 78");
+  });
+});

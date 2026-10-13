@@ -1,59 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
-import { IconCamera, IconCheck, IconMapPin, IconNavigation, IconQrCode, IconX } from "@/components/layout/icons";
+import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { lienSms, lienTel } from "@/lib/colis/telephone";
+import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { ImportTournee } from "@/components/colis/ImportTournee";
+import { ExportTournee } from "@/components/colis/ExportTournee";
 
-interface Run {
-  id: string;
-  name: string | null;
-  run_date: string;
-  status: "loading" | "in_progress" | "done";
-  start_label: string | null;
-  start_lat: number | null;
-  start_lng: number | null;
-  return_to_start: boolean;
-  optimized_at: string | null;
-}
-interface Stop {
-  id: string;
-  position: number;
-  parcel_code: string | null;
-  parcel_count: number;
-  address: string;
-  lat: number | null;
-  lng: number | null;
-  recipient: string | null;
-  notes: string | null;
-  status: "pending" | "delivered" | "failed";
-}
-interface RunResume {
-  id: string;
-  name: string | null;
-  run_date: string;
-  status: Run["status"];
-  nbArrets: number;
-  nbColis: number;
-  nbRestants: number;
-}
 interface Draft {
   adresse: string;
   destinataire: string;
+  telephone: string;
   code: string | null;
 }
-
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: init?.body ? { "Content-Type": "application/json" } : undefined });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur réseau");
-  return json as T;
-}
-
-const waze = (s: Stop) => (s.lat !== null ? `https://waze.com/ul?ll=${s.lat},${s.lng}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent(s.address)}&navigate=yes`);
-const gmaps = (s: Stop) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.lat !== null ? `${s.lat},${s.lng}` : s.address)}&travelmode=driving`;
 
 /** Photo d'étiquette réduite à 1600 px en JPEG avant envoi (lecture plus rapide, moins de données). */
 async function imageEnBase64(file: File): Promise<string> {
@@ -108,10 +73,11 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
   const [stops, setStops] = useState<Stop[]>([]);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; colis: number } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const chargerTournee = useCallback(async (id: string) => {
     try {
@@ -217,7 +183,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     try {
       const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string }>("/api/colis/arrets", {
         method: "POST",
-        body: JSON.stringify({ run_id: run?.id, code: d.code, adresse: d.adresse, destinataire: d.destinataire || null }),
+        body: JSON.stringify({ run_id: run?.id, code: d.code, adresse: d.adresse, destinataire: d.destinataire || null, telephone: d.telephone.trim() || null }),
       });
       setToast(
         r.duplicate
@@ -241,10 +207,10 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     const lu = analyserCode(text);
     if (lu.adresse) {
       // Adresse dans le code : ajout direct, sans quitter le scanner.
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", code: lu.code });
+      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code });
     } else {
       setScanner(false);
-      setDraft({ adresse: "", destinataire: "", code: lu.code });
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code });
       setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
     }
   }
@@ -253,11 +219,16 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     setBusy("photo");
     try {
       const image = await imageEnBase64(file);
-      const lu = await api<{ adresse: string | null; destinataire: string | null; code: string | null }>("/api/colis/etiquette", {
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null }>("/api/colis/etiquette", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
       });
-      setDraft((d) => ({ adresse: lu.adresse ?? d?.adresse ?? "", destinataire: lu.destinataire ?? d?.destinataire ?? "", code: d?.code ?? lu.code }));
+      setDraft((d) => ({
+        adresse: lu.adresse ?? d?.adresse ?? "",
+        destinataire: lu.destinataire ?? d?.destinataire ?? "",
+        telephone: lu.telephone ?? d?.telephone ?? "",
+        code: d?.code ?? lu.code,
+      }));
       if (!lu.adresse) setToast({ ok: false, text: "Adresse illisible : saisissez-la." });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -316,6 +287,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         body: JSON.stringify({
           ...(avant && edition.adresse.trim() !== avant.address ? { adresse: edition.adresse.trim() } : {}),
           destinataire: edition.destinataire.trim() || null,
+          telephone: edition.telephone.trim() || null,
           parcel_count: Math.max(1, edition.colis),
         }),
       });
@@ -448,6 +420,16 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
             {prochain.recipient && <p className="text-sm text-navy/70">{prochain.recipient}</p>}
             {prochain.notes && <p className="mt-1 text-sm text-navy/70">{prochain.notes}</p>}
           </div>
+          {prochain.phone && (
+            <div className="grid grid-cols-2 gap-2">
+              <a href={lienTel(prochain.phone)} className="btn-secondary justify-center border-teal/70 !py-3 text-teal-ink">
+                <IconPhone className="h-4 w-4" /> Appeler
+              </a>
+              <a href={lienSms(prochain.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !py-3">
+                <IconMessage className="h-4 w-4" /> Prévenir (SMS)
+              </a>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <a href={waze(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
               <IconNavigation className="h-4 w-4" /> Waze
@@ -462,9 +444,14 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
               <IconX className="h-5 w-5" /> Échec / absent
             </button>
           </div>
-          <button type="button" className="btn-ghost w-fit !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(true)}>
-            Réoptimiser depuis ma position
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/livreur" className="btn-secondary !py-1.5 text-sm">
+              Mode chauffeur plein écran
+            </Link>
+            <button type="button" className="btn-ghost w-fit !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(true)}>
+              Réoptimiser depuis ma position
+            </button>
+          </div>
         </Card>
       ) : enLivraison ? (
         <Card className="text-center">
@@ -495,7 +482,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                 <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Lecture…" : "Photo d'étiquette"}
               </button>
             )}
-            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", code: null })}>
+            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
               + Saisir une adresse
             </button>
           </div>
@@ -504,12 +491,19 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           ) : (
             <p className="text-xs text-navy/60">Pas d&apos;adresse de dépôt : l&apos;ordre partira du premier arrêt. Renseignez le dépôt dans Organisation → Services.</p>
           )}
+          <ImportTournee
+            runId={run.id}
+            onImporte={async (texte, ok) => {
+              setToast({ ok, text: texte });
+              await recharger(run.id);
+            }}
+          />
         </Card>
       )}
 
       {enLivraison && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", code: null })}>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
             + Ajouter une adresse
           </button>
           <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setScanner(true)}>
@@ -529,6 +523,15 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
           <AdresseInput value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
+          <input
+            className="input"
+            type="tel"
+            inputMode="tel"
+            value={draft.telephone}
+            onChange={(e) => setDraft({ ...draft, telephone: e.target.value })}
+            placeholder="Téléphone du client (facultatif)"
+            aria-label="Téléphone du client"
+          />
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
               Ajouter à la tournée
@@ -566,9 +569,14 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold leading-snug">{s.address}</p>
                     <p className="text-xs text-navy/60">
-                      {[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
+                      {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
                     </p>
                   </div>
+                  {s.phone && s.status === "pending" && (
+                    <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                      <IconPhone className="h-4 w-4" />
+                    </a>
+                  )}
                   {s.status !== "pending" && (
                     <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
                       Annuler
@@ -586,7 +594,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                     <button
                       type="button"
                       className="btn-ghost !px-2 !py-1"
-                      onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", colis: s.parcel_count })}
+                      onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count })}
                     >
                       Modifier
                     </button>
@@ -604,6 +612,15 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                       onChange={(e) => setEdition({ ...edition, destinataire: e.target.value })}
                       placeholder="Destinataire (facultatif)"
                       aria-label="Destinataire"
+                    />
+                    <input
+                      className="input"
+                      type="tel"
+                      inputMode="tel"
+                      value={edition.telephone}
+                      onChange={(e) => setEdition({ ...edition, telephone: e.target.value })}
+                      placeholder="Téléphone du client (facultatif)"
+                      aria-label="Téléphone du client"
                     />
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-navy/65">Colis à cette adresse</span>
@@ -631,6 +648,8 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         </Card>
       )}
 
+      {pending.length > 0 && <ExportTournee run={run} stops={pending} />}
+
       {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
           <button
@@ -640,6 +659,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
             onClick={async () => {
               if (!run.optimized_at) await optimiser(false);
               await phase("in_progress");
+              router.push("/livreur");
             }}
           >
             Démarrer la livraison ({pending.length} arrêt{pending.length > 1 ? "s" : ""})

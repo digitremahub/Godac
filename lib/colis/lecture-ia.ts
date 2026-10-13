@@ -1,20 +1,22 @@
 import "server-only";
+import { normaliserTelephone } from "@/lib/colis/telephone";
 
 /**
  * Lit l'adresse du destinataire sur la photo d'une étiquette de colis
  * (Claude vision), comme la lecture d'étiquette des applications de
  * tournée. La photo n'est ni stockée ni journalisée : elle est envoyée,
- * lue, puis oubliée — seuls l'adresse et le numéro de colis reviennent.
+ * lue, puis oubliée — seuls l'adresse, le téléphone et le numéro de colis reviennent.
  */
 export interface EtiquetteLue {
   adresse: string | null;
   destinataire: string | null;
   code: string | null;
+  telephone: string | null;
 }
 
 export type LectureResult = { ok: true; etiquette: EtiquetteLue } | { ok: false; reason: string };
 
-const PROMPT = `Tu lis la photo d'une étiquette de colis (DPD, Colissimo, Chronopost, GLS, UPS, DHL…). Extrais UNIQUEMENT l'adresse de LIVRAISON du destinataire (pas l'expéditeur, pas le dépôt) : numéro et rue, complément utile (bâtiment, lieu-dit), code postal et ville, sur une seule ligne. Donne aussi le nom du destinataire (personne ou société) et le numéro de colis / de suivi s'ils sont lisibles. Ne devine jamais : null si illisible.`;
+const PROMPT = `Tu lis la photo d'une étiquette de colis (DPD, Colissimo, Chronopost, GLS, UPS, DHL…). Extrais UNIQUEMENT l'adresse de LIVRAISON du destinataire (pas l'expéditeur, pas le dépôt) : numéro et rue, complément utile (bâtiment, lieu-dit), code postal et ville, sur une seule ligne. Donne aussi le nom du destinataire (personne ou société), son numéro de téléphone (pas celui de l'expéditeur ni du transporteur) et le numéro de colis / de suivi s'ils sont lisibles. Ne devine jamais : null si illisible.`;
 
 export async function lireEtiquette(imageBase64: string, mediaType: string): Promise<LectureResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -25,8 +27,9 @@ export async function lireEtiquette(imageBase64: string, mediaType: string): Pro
       adresse: { anyOf: [{ type: "string" }, { type: "null" }] },
       destinataire: { anyOf: [{ type: "string" }, { type: "null" }] },
       code: { anyOf: [{ type: "string" }, { type: "null" }] },
+      telephone: { anyOf: [{ type: "string" }, { type: "null" }] },
     },
-    required: ["adresse", "destinataire", "code"],
+    required: ["adresse", "destinataire", "code", "telephone"],
   };
   let response: Response;
   try {
@@ -58,5 +61,5 @@ export async function lireEtiquette(imageBase64: string, mediaType: string): Pro
   const input = data.content?.find((c) => c.type === "tool_use")?.input;
   if (!input) return { ok: false, reason: "réponse IA inattendue" };
   const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 300) : null);
-  return { ok: true, etiquette: { adresse: clean(input.adresse), destinataire: clean(input.destinataire), code: clean(input.code) } };
+  return { ok: true, etiquette: { adresse: clean(input.adresse), destinataire: clean(input.destinataire), code: clean(input.code), telephone: normaliserTelephone(clean(input.telephone)) } };
 }
