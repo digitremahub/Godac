@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { BoutonImprimer, ThemeClairPourImpression } from "@/components/marketing/BoutonImprimer";
-import { calculerDevis, euros, REMISE_FONDATEUR, TVA } from "@/lib/commercial/devis";
+import { calculerDevis, euros, OFFRE_FONDATEUR, TVA } from "@/lib/commercial/devis";
 import { EDITEUR, VERSION_CONTRATS, designationEditeur } from "@/lib/legal/editeur";
 import type { ModuleCatalogEntry, ModulePlanPrice, Plan } from "@/lib/organization/catalog-types";
 
@@ -33,8 +33,7 @@ export function BonDeCommande({
   fondateur: boolean;
 }) {
   const plan = plans.find((x) => x.id === planId) ?? plans.find((x) => x.is_public) ?? plans[0]!;
-  const fondateur = fondateurDemande && Boolean(REMISE_FONDATEUR[plan.id]);
-  const d = calculerDevis(plan, modules, prices, choisis, fondateur);
+  const d = calculerDevis(plan, modules, prices, choisis, fondateurDemande);
   const aujourdhui = new Date();
   const numero = `BC-${aujourdhui.toISOString().slice(0, 10).replace(/-/g, "")}-${plan.id.toUpperCase().slice(0, 3)}`;
   const date = aujourdhui.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
@@ -103,7 +102,7 @@ export function BonDeCommande({
             ))}
             {d.remiseFondateur > 0 && (
               <tr>
-                <td className={cel}>Offre Fondateur (10 premiers clients) — remise sur la mise en service</td>
+                <td className={cel}>{OFFRE_FONDATEUR}</td>
                 <td className={`${cel} text-right`}>—</td>
                 <td className={`${cel} text-right tabular-nums`}>− {euros(d.remiseFondateur)}</td>
               </tr>
@@ -127,6 +126,12 @@ export function BonDeCommande({
             </tr>
           </tfoot>
         </table>
+        {d.echeances > 1 && (
+          <p className="mt-2 text-xs text-navy/70">
+            Mise en service de la formule {plan.name} payable en {d.echeances} mensualités de{" "}
+            {euros(Math.round((Number(plan.setup_price) / d.echeances) * 100) / 100)} HT, ajoutées aux {d.echeances} premières factures, sans frais.
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-1 text-xs leading-relaxed text-navy/75">
@@ -134,7 +139,7 @@ export function BonDeCommande({
         <p>
           Abonnement d’une durée initiale de 12 mois à compter de l’ouverture de l’accès, puis renouvelable de mois en mois,
           résiliable avec un préavis d’un mois. Facturation mensuelle terme à échoir, payable à réception par prélèvement SEPA
-          ou carte bancaire. Mise en service facturée à la commande. Application GODAC Livreur gratuite pour les chauffeurs.
+          ou carte bancaire. Mise en service facturée à la commande, ou échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour les chauffeurs.
           Données hébergées en France.
         </p>
         <p>

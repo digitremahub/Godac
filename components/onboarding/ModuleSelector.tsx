@@ -79,7 +79,7 @@ export function ModuleSelector({
                   </div>
                   <p className="text-sm text-navy/70">{module.description}</p>
                   {price && price.setup_price > 0 && (
-                    <p className="text-xs text-navy/60">+ {price.setup_price} € de mise en service, une seule fois</p>
+                    <p className="text-xs text-navy/60">+ {price.setup_price} € de mise en service</p>
                   )}
                 </button>
               );

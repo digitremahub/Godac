@@ -13,7 +13,7 @@ import {
 import { ModuleSelector } from "@/components/onboarding/ModuleSelector";
 import { PAYS, moduleDisponible, type CodePays } from "@/lib/pays/pays";
 import { PlanPicker } from "@/components/onboarding/PlanPicker";
-import { priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
+import { libelleMiseEnService, priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 
 type Step = "org" | "modules" | "import" | "tanks" | "subscribe" | "done";
 
@@ -397,8 +397,8 @@ function SubscriptionSummary({
       </div>
       {plan && plan.setup_price > 0 && (
         <div className="flex justify-between text-navy/65">
-          <span>Mise en service (unique)</span>
-          <span>{plan.setup_price} €</span>
+          <span>Mise en service</span>
+          <span>{libelleMiseEnService(plan)}</span>
         </div>
       )}
       {addons.map((a) => (

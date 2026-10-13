@@ -1,6 +1,6 @@
 "use client";
 
-import type { Plan, PlanId } from "@/lib/organization/catalog-types";
+import { libelleMiseEnService, type Plan, type PlanId } from "@/lib/organization/catalog-types";
 
 export function PlanPicker({
   plans,
@@ -33,7 +33,7 @@ export function PlanPicker({
               <span className="text-sm font-normal text-navy/60">/mois</span>
             </p>
             {plan.setup_price > 0 && (
-              <p className="text-xs text-navy/60">* + {plan.setup_price} € de mise en service, une seule fois</p>
+              <p className="text-xs text-navy/60">* + {libelleMiseEnService(plan)} de mise en service</p>
             )}
           </button>
         );

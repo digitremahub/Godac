@@ -73,16 +73,32 @@ export async function POST() {
       },
       quantity: 1,
     })),
+    // Mise en service de la formule : à la commande, ou échelonnée en N
+    // mensualités (ligne mensuelle retirée par le webhook après la N-ième
+    // facture payée — app/api/webhooks/stripe, événement invoice.paid).
     ...(plan.setup_price > 0
       ? [
-          {
-            price_data: {
-              currency: "eur",
-              unit_amount: Math.round(plan.setup_price * 100),
-              product_data: { name: `GODAC — Mise en service (${plan.name})` },
-            },
-            quantity: 1,
-          },
+          plan.setup_installments > 1
+            ? {
+                price_data: {
+                  currency: "eur",
+                  unit_amount: Math.round((plan.setup_price / plan.setup_installments) * 100),
+                  recurring: { interval: "month" as const },
+                  product_data: {
+                    name: `GODAC — Mise en service (${plan.name}), payable en ${plan.setup_installments} fois`,
+                    metadata: { godac_setup_installments: String(plan.setup_installments) },
+                  },
+                },
+                quantity: 1,
+              }
+            : {
+                price_data: {
+                  currency: "eur",
+                  unit_amount: Math.round(plan.setup_price * 100),
+                  product_data: { name: `GODAC — Mise en service (${plan.name})` },
+                },
+                quantity: 1,
+              },
         ]
       : []),
     ...addons
