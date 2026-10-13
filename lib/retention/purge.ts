@@ -9,8 +9,10 @@ export const RETENTION_DAYS = {
   clockGps: 365,
   /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
   assistantConversations: 90,
-  /** Tournées colis (adresses, noms, téléphones des destinataires, photos de livraison). */
-  parcelRuns: 30,
+  /** Tournées colis : adresses, initiales des destinataires et photos de livraison, gardées pour les contestations. */
+  parcelRuns: 365,
+  /** Au-delà : nom complet réduit aux initiales, téléphone et consignes effacés. */
+  parcelRecipients: 30,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -42,6 +44,24 @@ export async function purgeExpiredData() {
     .lt("updated_at", daysAgo(RETENTION_DAYS.assistantConversations));
   results.assistantConversations = convs.error ? convs.error.message : (convs.count ?? 0);
 
+  // Destinataires des tournées de plus de 30 jours : initiales seulement,
+  // téléphone et consignes effacés (adresses et photos gardées 12 mois pour les contestations).
+  const limiteDestinataires = daysAgo(RETENTION_DAYS.parcelRecipients).slice(0, 10);
+  const { data: aAnonymiser } = await admin
+    .from("delivery_stops")
+    .select("id, recipient, phone, notes, delivery_runs!inner(run_date)")
+    .lt("delivery_runs.run_date", limiteDestinataires)
+    .or("phone.not.is.null,notes.not.is.null,recipient.not.is.null")
+    .limit(5000);
+  let anonymises = 0;
+  for (const st of (aAnonymiser ?? []) as { id: string; recipient: string | null; phone: string | null; notes: string | null }[]) {
+    const initiales = initialesDestinataire(st.recipient);
+    if (st.phone === null && st.notes === null && st.recipient === initiales) continue;
+    const { error } = await admin.from("delivery_stops").update({ recipient: initiales, phone: null, notes: null }).eq("id", st.id);
+    if (!error) anonymises++;
+  }
+  results.parcelRecipients = anonymises;
+
   // Photos de livraison des tournées purgées : effacées du stockage d'abord.
   const limite = daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10);
   const { data: photos } = await admin
@@ -60,4 +80,21 @@ export async function purgeExpiredData() {
   results.parcelRuns = runs.error ? runs.error.message : (runs.count ?? 0);
 
   return results;
+}
+
+/** « Jean-Marc Dupont » → « J.-M. D. » ; déjà réduit ou vide : inchangé. */
+export function initialesDestinataire(nom: string | null): string | null {
+  if (!nom || !nom.trim()) return null;
+  if (/^([A-ZÀ-Þ]\.(-[A-ZÀ-Þ]\.)?\s?)+$/.test(nom.trim())) return nom.trim();
+  return nom
+    .trim()
+    .split(/\s+/)
+    .map((mot) =>
+      mot
+        .split("-")
+        .filter(Boolean)
+        .map((p) => `${p[0]!.toLocaleUpperCase("fr-FR")}.`)
+        .join("-"),
+    )
+    .join(" ");
 }

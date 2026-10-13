@@ -53,27 +53,34 @@ export async function listerTournees(supabase: SupabaseClient, appUser: AppUser)
 }
 
 /**
- * Camion du chauffeur ce jour-là d'après le planning (première entrée du
- * jour avec un véhicule) — sert à l'historique des tournées colis.
+ * Camion et service du chauffeur ce jour-là d'après le planning (première
+ * entrée du jour) — figés sur la tournée pour l'historique, qui filtre sur
+ * ce qu'ils étaient ce jour-là et non sur l'affectation actuelle.
  */
-export async function camionDuJour(supabase: SupabaseClient, driverId: string, date: string): Promise<string | null> {
+export async function planningDuJour(supabase: SupabaseClient, driverId: string, date: string): Promise<{ vehicleId: string | null; serviceId: string | null }> {
   const veille = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString();
   const lendemain = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString();
   const { data } = await supabase
     .from("planning_entries")
-    .select("vehicle_id, start_at")
+    .select("vehicle_id, service_id, start_at")
     .eq("driver_id", driverId)
-    .not("vehicle_id", "is", null)
     .gte("start_at", veille)
     .lt("start_at", lendemain)
     .order("start_at");
   const jour = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
-  return ((data ?? []) as { vehicle_id: string; start_at: string }[]).find((e) => jour.format(new Date(e.start_at)) === date)?.vehicle_id ?? null;
+  const duJour = ((data ?? []) as { vehicle_id: string | null; service_id: string | null; start_at: string }[]).filter((e) => jour.format(new Date(e.start_at)) === date);
+  return { vehicleId: duJour.find((e) => e.vehicle_id)?.vehicle_id ?? null, serviceId: duJour.find((e) => e.service_id)?.service_id ?? null };
 }
 
 export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, name: string | null) {
   const date = aujourdhuiParis();
-  const [start, vehicule] = await Promise.all([depotDuChauffeur(supabase, appUser), camionDuJour(supabase, appUser.id, date).catch(() => null)]);
+  const [start, jour, { data: liens }] = await Promise.all([
+    depotDuChauffeur(supabase, appUser),
+    planningDuJour(supabase, appUser.id, date).catch(() => ({ vehicleId: null, serviceId: null })),
+    supabase.from("user_services").select("service_id").eq("user_id", appUser.id).limit(1),
+  ]);
+  const vehicule = jour.vehicleId;
+  const service = jour.serviceId ?? ((liens ?? []) as { service_id: string }[])[0]?.service_id ?? null;
   const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("driver_id", appUser.id).eq("run_date", date);
   const { data, error } = await supabase
     .from("delivery_runs")
@@ -86,6 +93,7 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
       start_lat: start?.lat ?? null,
       start_lng: start?.lng ?? null,
       ...(vehicule ? { vehicle_id: vehicule } : {}),
+      ...(service ? { service_id: service } : {}),
     })
     .select(RUN_FIELDS)
     .single();
