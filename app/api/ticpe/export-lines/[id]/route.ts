@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -117,5 +118,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update({ total_liters: totalLiters, ...(exportRow.pdf_file_path ? {} : { pdf_file_path: pdfFilePath }) })
     .eq("id", line.export_id);
 
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "ticpe_correction",
+    targetTable: "ticpe_export_lines",
+    targetId: id,
+    details: parsed.data,
+  });
   return NextResponse.json({ ok: true });
 }

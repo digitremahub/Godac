@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
+import { motDePassePin } from "@/lib/auth/pin-securise";
 
 const bodySchema = z.object({
   pin: z.string(),
@@ -42,7 +43,7 @@ export async function PATCH(req: Request) {
   }
 
   const admin = createAdminSupabaseClient();
-  const { error: passwordError } = await admin.auth.admin.updateUserById(appUser.id, { password: parsed.data.pin });
+  const { error: passwordError } = await admin.auth.admin.updateUserById(appUser.id, { password: motDePassePin(appUser.id, parsed.data.pin) });
   if (passwordError) {
     return NextResponse.json({ error: passwordError.message }, { status: 500 });
   }

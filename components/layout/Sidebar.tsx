@@ -26,6 +26,7 @@ import {
   IconChatBubble,
   IconChartBar,
   IconMapPin,
+  IconShieldCheck,
 } from "@/components/layout/icons";
 
 interface NavItem {
@@ -111,6 +112,7 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/organizations", label: "Organisation", icon: IconBuilding, allow: ["direction"] },
       { href: "/admin/billing", label: "Abonnement", icon: IconCreditCard, allow: ["direction"] },
       { href: "/admin/users", label: "Utilisateurs", icon: IconUsers, allow: ["direction"] },
+      { href: "/admin/journal", label: "Journal d'audit", icon: IconShieldCheck, allow: ["direction"] },
     ],
   },
   {

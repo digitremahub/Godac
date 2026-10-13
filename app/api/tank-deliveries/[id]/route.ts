@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -22,5 +23,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: message }, { status: 409 });
   }
   if (!data?.length) return NextResponse.json({ error: "Livraison introuvable." }, { status: 404 });
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "livraison_cuve_annulee",
+    targetTable: "tank_deliveries",
+    targetId: id,
+  });
   return NextResponse.json({ ok: true });
 }

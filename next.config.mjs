@@ -1,4 +1,21 @@
 /** @type {import('next').NextConfig} */
+const SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co";
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.supabase.co https://tiles.openfreemap.org https://*.openfreemap.org",
+  "font-src 'self' data:",
+  `connect-src 'self' ${SUPABASE} wss://*.supabase.co https://*.supabase.co https://tiles.openfreemap.org https://*.openfreemap.org`,
+  "worker-src 'self' blob:",
+  "frame-src https://js.stripe.com https://checkout.stripe.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https://checkout.stripe.com",
+  "object-src 'none'",
+  "report-uri /api/csp-report",
+].join("; ");
+
 const nextConfig = {
   reactStrictMode: true,
   // lib/assistant/help-content.ts reads content/help/*.md via a
@@ -52,6 +69,11 @@ const nextConfig = {
           // position sur la carte de tournée) — every other origin is
           // denied. geolocation=() used to block the GPS badge entirely.
           { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self)" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+          // Politique de contenu en mode « rapport seul » : rien n'est bloqué,
+          // les écarts sont remontés à /api/csp-report pour l'ajuster avant
+          // de la rendre bloquante (audit sécurité).
+          { key: "Content-Security-Policy-Report-Only", value: CSP },
         ],
       },
     ];

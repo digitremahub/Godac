@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
+import { motDePassePin } from "@/lib/auth/pin-securise";
 
 const bodySchema = z.object({
   pin: z.string(),
@@ -51,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const { error: passwordError } = await admin.auth.admin.updateUserById(id, { password: parsed.data.pin });
+  const { error: passwordError } = await admin.auth.admin.updateUserById(id, { password: motDePassePin(id, parsed.data.pin) });
   if (passwordError) {
     return NextResponse.json({ error: passwordError.message }, { status: 500 });
   }
@@ -61,5 +62,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ email: user.email });
+  return NextResponse.json({ ok: true });
 }

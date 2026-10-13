@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -102,5 +103,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (dejaEnregistre) {
+    await journaliser({
+      organizationId: appUser.organization_id,
+      userId: appUser.id,
+      action: "plein_modification",
+      targetTable: "fuel_entries",
+      targetId: id,
+      details: fields,
+    });
+  }
   return NextResponse.json({ fuelEntry: data });
 }

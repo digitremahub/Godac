@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
@@ -192,5 +193,13 @@ export async function POST(req: Request) {
 
   const { data: signedUrl } = await supabase.storage.from("ticpe-exports").createSignedUrl(filePath, 300);
 
+  await journaliser({
+    organizationId: organization.id,
+    userId: appUser.id,
+    action: "ticpe_export",
+    targetTable: "ticpe_exports",
+    targetId: exportRow.id,
+    details: { period_start, period_end, vehicules: rows.length, litres: totalLiters },
+  });
   return NextResponse.json({ exportId: exportRow.id, downloadUrl: signedUrl?.signedUrl });
 }

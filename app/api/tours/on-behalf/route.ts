@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { verifierPin } from "@/lib/auth/pin-securise";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
 import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { issueOnBehalfToken } from "@/lib/tours/on-behalf";
@@ -63,15 +63,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const probe = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { error: pinError } = await probe.auth.signInWithPassword({ email: colleague.email, password: pin });
-  if (pinError) {
-    return NextResponse.json({ error: "Code PIN incorrect." }, { status: 401 });
+  // Même contrôle que la connexion par badge : compteur d'essais et verrou.
+  const verif = await verifierPin(
+    { id: colleague.id, email: colleague.email, organization_id: colleague.organization_id, full_name: colleague.full_name },
+    pin,
+  );
+  if (!verif.ok) {
+    return NextResponse.json({ error: verif.error }, { status: verif.status });
   }
-  // Revoke only this throwaway session — never the colleague's others.
-  await probe.auth.signOut({ scope: "local" });
 
   const { data: openTour } = await admin
     .from("planning_entries")

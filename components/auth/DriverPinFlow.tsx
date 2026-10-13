@@ -25,14 +25,12 @@ import { postLoginPath } from "@/lib/auth/post-login";
 export function DriverPinFlow({
   id,
   fullName,
-  email,
   needsSetup,
   pendingApproval,
   hasPasskey = false,
 }: {
   id: string;
   fullName: string;
-  email: string;
   needsSetup: boolean;
   pendingApproval: boolean;
   /** Skips straight to a "Déverrouiller" button above the PIN form — see app/api/auth/passkey. */
@@ -63,9 +61,15 @@ export function DriverPinFlow({
     }
   }
 
+  // Connexion côté serveur : compteur d'essais et verrou (app/api/auth/driver-pin/[id]/login).
   async function signIn(withPin: string) {
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: withPin });
-    if (signInError) throw new Error("Code PIN incorrect.");
+    const res = await fetch(`/api/auth/driver-pin/${id}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: withPin }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Code PIN incorrect.");
     window.location.href = postLoginPath();
   }
 

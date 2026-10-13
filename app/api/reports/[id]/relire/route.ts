@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -77,6 +78,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const { error: majErreur } = await supabase.from("planning_entries").update(update).eq("id", id);
   if (majErreur) return NextResponse.json({ error: majErreur.message }, { status: 500 });
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "rapport_relecture",
+    targetTable: "planning_entries",
+    targetId: id,
+    details: { relus: Object.keys(lectures), echecs },
+  });
   return NextResponse.json({ ok: true, relus: Object.keys(lectures), echecs });
 }
 
