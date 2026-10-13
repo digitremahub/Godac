@@ -25,7 +25,8 @@ export function palierPour(paliers: PalierUtilisateurs[], moduleKey: string, uti
 export function prixPalier(paliers: PalierUtilisateurs[], moduleKey: string, utilisateurs: number): number | null {
   const p = palierPour(paliers, moduleKey, utilisateurs);
   if (!p) return null;
-  const supplement = p.max_users === null ? Math.max(0, utilisateurs - (p.min_users - 1)) * Number(p.extra_per_user) : 0;
+  // Palier ouvert : supplément par utilisateur au-delà du seuil (100 → 129 €, 101 → 130 €).
+  const supplement = p.max_users === null ? Math.max(0, utilisateurs - p.min_users) * Number(p.extra_per_user) : 0;
   return Math.round((Number(p.monthly_price) + supplement) * 100) / 100;
 }
 
