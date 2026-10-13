@@ -45,7 +45,8 @@ export async function POST(req: Request) {
 
   const { data: organization, error: orgError } = await admin
     .from("organizations")
-    .insert({ name: parsed.data.name, country: parsed.data.country })
+    // Pointage assisté (badge géolocalisé au dépôt) activé d'office ; désactivable dans Organisation.
+    .insert({ name: parsed.data.name, country: parsed.data.country, auto_clock_enabled: true })
     .select("id")
     .single();
   if (orgError) {

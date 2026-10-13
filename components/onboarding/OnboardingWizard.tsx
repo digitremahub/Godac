@@ -196,6 +196,10 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
             <p className="mt-1 text-sm text-navy/65">
               GODAC applique les règles de ce pays : protection des données, temps de conduite, paie. Modifiable ensuite dans Organisation.
             </p>
+            <p className="mt-2 text-sm text-navy/65">
+              Le pointage assisté par géolocalisation (badge d&apos;entrée automatique au dépôt) est activé d&apos;office :
+              pensez à en informer vos salariés. Vous pouvez le désactiver à tout moment dans Organisation.
+            </p>
           </div>
           <button className="btn-primary" disabled={busy || !organizationName} onClick={submitOrganization}>
             {busy ? "Création…" : "Créer mon organisation"}
