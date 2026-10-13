@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
+import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
 import { FRAIS_CONVENTIONNELS, parametresLegauxAu } from "@/lib/paie/parametres";
 
@@ -9,6 +10,8 @@ export default async function ReglagesPaiePage() {
   const appUser = await requireAppUser();
   if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="La paie est réservée à la direction." />;
   const supabase = await createServerSupabaseClient();
+  const pays = await paysOrganisation(supabase, appUser.organization_id);
+  if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;
   const { data: r } = await supabase.from("payroll_settings").select("*").eq("organization_id", appUser.organization_id).maybeSingle();
   const legal = parametresLegauxAu(new Date().toISOString().slice(0, 10));
 

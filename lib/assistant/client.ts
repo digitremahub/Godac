@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { paysDe } from "@/lib/pays/pays";
 import { ASSISTANT_SYSTEM_PROMPT, SUMMARY_SYSTEM_PROMPT } from "@/lib/assistant/system-prompt";
 import type { HelpSource } from "@/lib/assistant/help-content";
 
@@ -18,6 +19,14 @@ export interface AssistantContext {
   serviceNames: string[];
   enabledModuleKeys: string[];
   emergencyPhone: string | null;
+  /** Pays de l'entreprise : les réponses suivent son droit (données, temps de conduite, paie). */
+  country?: string | null;
+}
+
+/** Rappel du pays pour que l'assistant n'applique pas le droit français partout. */
+function paysContexte(code: string | null | undefined): string {
+  const p = paysDe(code);
+  return `Entreprise établie en ${p.nom} : pour les questions de droit, réponds selon ce pays (données personnelles : ${p.donnees.loi}, autorité ${p.donnees.autorite} ; temps de conduite : ${p.tempsConduite} ; paie : ${p.paie.organismes}) et renvoie vers l'employeur en cas de doute.`;
 }
 
 export interface AssistantHistoryMessage {
@@ -50,7 +59,7 @@ export async function askAssistant({
   }
 
   const sourcesText = sources.map((s) => `### ${s.title}\n${s.content}`).join("\n\n");
-  const contextText = `Rôle de la personne : ${context.role}. Service(s) : ${context.serviceNames.join(", ") || "aucun"}. Modules activés : ${context.enabledModuleKeys.join(", ") || "aucun"}.${context.emergencyPhone ? ` Numéro du responsable en cas d'urgence : ${context.emergencyPhone}.` : " Aucun numéro d'urgence configuré pour cette organisation."}`;
+  const contextText = `Rôle de la personne : ${context.role}. Service(s) : ${context.serviceNames.join(", ") || "aucun"}. Modules activés : ${context.enabledModuleKeys.join(", ") || "aucun"}. ${paysContexte(context.country)}${context.emergencyPhone ? ` Numéro du responsable en cas d'urgence : ${context.emergencyPhone}.` : " Aucun numéro d'urgence configuré pour cette organisation."}`;
 
   const toolSchema = {
     type: "object" as const,

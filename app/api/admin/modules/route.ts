@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { moduleDisponible } from "@/lib/pays/pays";
 import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
 
 const bodySchema = z.object({
@@ -33,7 +34,7 @@ export async function PATCH(req: Request) {
 
   const { data: organization } = await supabase
     .from("organizations")
-    .select("plan")
+    .select("plan, country")
     .eq("id", appUser.organization_id)
     .single();
   if (!organization) {
@@ -47,7 +48,8 @@ export async function PATCH(req: Request) {
   const rows = sellable.map((m) => {
     const price = priceFor(prices, m.key, planId);
     const included = price?.included ?? false;
-    const enabled = included || selected.has(m.key);
+    // Jamais activé (ni facturé) un module sans objet dans le pays de l'entreprise.
+    const enabled = (included || selected.has(m.key)) && moduleDisponible(organization.country, m.key);
     return {
       organization_id: appUser.organization_id,
       module_key: m.key,

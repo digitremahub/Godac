@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 
@@ -56,7 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (notes !== undefined) update.notes = notes;
   if (adresse) {
-    const geo = await geocodeAddress(adresse);
+    const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
   }
   const { data, error } = await supabase.from("delivery_stops").update(update).eq("id", id).select(STOP_FIELDS).maybeSingle();

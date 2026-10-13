@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { PAYS, type CodePays } from "@/lib/pays/pays";
 import { getFullCatalog, priceFor } from "@/lib/organization/catalog";
 
-const bodySchema = z.object({ name: z.string().min(1) });
+const bodySchema = z.object({
+  name: z.string().min(1),
+  country: z.enum(PAYS.map((p) => p.code) as [CodePays, ...CodePays[]]).default("FR"),
+});
 
 /**
  * Onboarding step 1 for an organic sign-up (as opposed to an invited
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
 
   const { data: organization, error: orgError } = await admin
     .from("organizations")
-    .insert({ name: parsed.data.name })
+    .insert({ name: parsed.data.name, country: parsed.data.country })
     .select("id")
     .single();
   if (orgError) {

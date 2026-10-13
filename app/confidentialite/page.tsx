@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
+import { PAYS } from "@/lib/pays/pays";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -164,6 +165,27 @@ export default function ConfidentialitePage() {
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>
           <li>Factures : 10 ans (obligation comptable).</li>
+        </ul>
+      </Section>
+
+      <Section title="Entreprises établies hors de France">
+        <p>
+          Chaque entreprise indique son pays dans GODAC. Les données restent hébergées en France ; le droit du pays de
+          l&apos;entreprise s&apos;applique en plus du RGPD, et l&apos;autorité compétente pour ses salariés est la suivante :
+        </p>
+        <ul className={list}>
+          {PAYS.filter((p) => p.code !== "FR").map((p) => (
+            <li key={p.code}>
+              <strong>
+                {p.drapeau} {p.nom}
+              </strong>{" "}
+              : {p.donnees.loi} —{" "}
+              <a href={p.donnees.site} className="text-teal-ink hover:underline" target="_blank" rel="noreferrer">
+                {p.donnees.autorite}
+              </a>
+              {p.donnees.transfert && <span className="block text-navy/70">{p.donnees.transfert}</span>}
+            </li>
+          ))}
         </ul>
       </Section>
 

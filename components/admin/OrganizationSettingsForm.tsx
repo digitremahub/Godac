@@ -6,6 +6,8 @@ import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { textSafeVariant } from "@/lib/theme/contrast";
 import { IconMapPin, IconNavigation } from "@/components/layout/icons";
+import { PAYS, paysDe, type CodePays } from "@/lib/pays/pays";
+import { ReglesPays } from "@/components/admin/ReglesPays";
 
 const DEFAULT_ACCENT = "#1BE4C1";
 
@@ -26,6 +28,7 @@ export function OrganizationSettingsForm({
   apeCode,
   conventionCollective,
   urssafNumber,
+  country,
 }: {
   organizationId: string;
   name: string;
@@ -43,6 +46,7 @@ export function OrganizationSettingsForm({
   apeCode: string | null;
   conventionCollective: string | null;
   urssafNumber: string | null;
+  country: string;
 }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
@@ -60,6 +64,8 @@ export function OrganizationSettingsForm({
   const [apeCodeValue, setApeCodeValue] = useState(apeCode ?? "");
   const [conventionCollectiveValue, setConventionCollectiveValue] = useState(conventionCollective ?? "");
   const [urssafNumberValue, setUrssafNumberValue] = useState(urssafNumber ?? "");
+  const [paysValue, setPaysValue] = useState<CodePays>(paysDe(country).code);
+  const pays = paysDe(paysValue);
   const [busy, setBusy] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +119,7 @@ export function OrganizationSettingsForm({
           ape_code: apeCodeValue.trim() || null,
           convention_collective: conventionCollectiveValue.trim() || null,
           urssaf_number: urssafNumberValue.trim() || null,
+          country: paysValue,
         }),
       });
       const json = await res.json();
@@ -134,6 +141,20 @@ export function OrganizationSettingsForm({
       <div>
         <label className="block"><span className="label">Nom de l&apos;organisation</span>
         <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} /></label>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="block">
+          <span className="label">Pays de l&apos;entreprise</span>
+          <select className="input" value={paysValue} onChange={(e) => setPaysValue(e.target.value as CodePays)}>
+            {PAYS.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.drapeau} {p.nom}
+              </option>
+            ))}
+          </select>
+        </label>
+        <ReglesPays pays={pays} />
       </div>
 
       <div>
@@ -297,10 +318,12 @@ export function OrganizationSettingsForm({
         </div>
 
         <div>
-          <label className="block"><span className="label">SIRET</span>
-          <input className="input" placeholder="ex: 804 467 967 00027" value={siretValue} onChange={(e) => setSiretValue(e.target.value)} /></label>
+          <label className="block"><span className="label">{pays.identifiants.entreprise}</span>
+          <input className="input" placeholder={`ex: ${pays.identifiants.exempleEntreprise}`} value={siretValue} onChange={(e) => setSiretValue(e.target.value)} /></label>
         </div>
 
+        {pays.code === "FR" && (
+          <>
         <div>
           <label className="block"><span className="label">Code APE/NAF</span>
           <input className="input" placeholder="ex: 4941A" value={apeCodeValue} onChange={(e) => setApeCodeValue(e.target.value)} /></label>
@@ -315,9 +338,11 @@ export function OrganizationSettingsForm({
             onChange={(e) => setConventionCollectiveValue(e.target.value)}
           /></label>
         </div>
+          </>
+        )}
 
         <div>
-          <label className="block"><span className="label">Numéro de cotisant URSSAF</span>
+          <label className="block"><span className="label">{pays.identifiants.cotisant}</span>
           <input className="input" value={urssafNumberValue} onChange={(e) => setUrssafNumberValue(e.target.value)} /></label>
         </div>
 
