@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { moduleActif, tourneeDuJour } from "@/lib/colis/serveur";
+import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
 
 const bodySchema = z.object({
+  run_id: z.string().uuid(),
   /** Position actuelle du chauffeur : réoptimiser en cours de route à partir d'ici. */
   depuis: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).nullable().optional(),
 });
@@ -20,8 +21,8 @@ export async function POST(req: Request) {
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const run = await tourneeDuJour(supabase, appUser);
-  if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 500 });
+  const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
+  if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
   const { data: stops } = await supabase.from("delivery_stops").select("id, lat, lng, status, position").eq("run_id", run.id).order("position");
   const faits = (stops ?? []).filter((s) => s.status !== "pending");
