@@ -98,6 +98,22 @@ export interface Prime {
   soumise: boolean;
 }
 
+/**
+ * Retenue opérée sur le net à payer (après impôt) : acompte déjà versé,
+ * saisie sur salaire (greffe), avis à tiers détenteur / saisie
+ * administrative (impôts, Trésor), pension alimentaire (paiement direct),
+ * remboursement d'un prêt de l'employeur, autre.
+ */
+export type TypeRetenue = "acompte" | "saisie" | "atd" | "pension" | "pret" | "autre";
+
+export interface Retenue {
+  type: TypeRetenue;
+  libelle: string;
+  montant: number;
+  /** Référence du dossier (n° d'acte, d'avis, créancier) — reprise sur le bulletin. */
+  reference?: string;
+}
+
 export interface VariablesMois {
   /** Heures réellement travaillées (tournées / badges) ; null = heures du contrat. */
   heuresTravaillees: number | null;
@@ -111,6 +127,10 @@ export interface VariablesMois {
   nbGrandDeplacement: number;
   /** Cumul d'heures sup déjà exonérées d'IR cette année (pour le plafond). */
   cumulHeuresSupExonereesAnnee: number;
+  /** Acomptes, saisies, ATD… déduits du net à payer (absent des bulletins antérieurs). */
+  retenues?: Retenue[];
+  /** Personnes à charge, pour la part saisissable du salaire. */
+  personnesACharge?: number;
 }
 
 export type Section = "brut" | "sante" | "retraite" | "famille" | "chomage" | "autres" | "csg" | "exonerations" | "net";
@@ -140,6 +160,12 @@ export interface Bulletin {
   tauxPas: number;
   montantPas: number;
   fraisNonSoumis: number;
+  /** Net à payer avant acomptes et saisies. */
+  netAvantRetenues: number;
+  totalRetenues: number;
+  /** Part saisissable du salaire ce mois (barème légal), pour saisies et ATD. */
+  partSaisissable: number;
+  /** Net effectivement versé, après acomptes et saisies. */
   netAPayer: number;
   coutEmployeur: number;
   heuresSupExonerees: number;

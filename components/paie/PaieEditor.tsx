@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
-import { calculerBulletin, HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
+import { calculerBulletin, HEURES_EQUIVALENCE, LIBELLE_RETENUE } from "@/lib/paie/calcul";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import type { ParametresEntreprise, ParametresLegaux, Prime, ProfilSalarie, RegimeTransport, Section, VariablesMois } from "@/lib/paie/types";
+import type { ParametresEntreprise, ParametresLegaux, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
 
 const eur = (n: number | null) => (n === null ? "" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const REGIMES: { key: RegimeTransport; label: string }[] = [
@@ -88,6 +88,8 @@ export function PaieEditor({
   const [repasUnique, setRepasUnique] = useState<Num>(prefill.nbRepasUnique);
   const [casse, setCasse] = useState<Num>(prefill.nbCasseCroute);
   const [decoucher, setDecoucher] = useState<Num>(prefill.nbGrandDeplacement);
+  const [retenues, setRetenues] = useState<Retenue[]>(prefill.retenues ?? []);
+  const [personnesACharge, setPersonnesACharge] = useState<Num>(prefill.personnesACharge ?? 0);
 
   const [busy, setBusy] = useState<"profil" | "bulletin" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -102,6 +104,8 @@ export function PaieEditor({
     nbRepasUnique: n(repasUnique),
     nbCasseCroute: n(casse),
     nbGrandDeplacement: n(decoucher),
+    retenues: retenues.filter((r) => r.montant > 0),
+    personnesACharge: n(personnesACharge),
     cumulHeuresSupExonereesAnnee: prefill.cumulHeuresSupExonereesAnnee,
   };
   const bulletin = useMemo(
@@ -247,6 +251,49 @@ export function PaieEditor({
           <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setPrimes([...primes, { libelle: "", montant: 0, soumise: true }])}>
             + Prime ou retenue
           </button>
+          <p className="label !mb-0">Acomptes et saisies (après le net)</p>
+          <p className="-mt-1 text-xs text-navy/55">
+            Acompte déjà versé, saisie sur salaire, ATD / saisie administrative, pension alimentaire, remboursement de prêt. Les retenues
+            récurrentes sont reprises le mois suivant.
+          </p>
+          {retenues.map((r, i) => {
+            const maj = (champ: Partial<Retenue>) => setRetenues(retenues.map((x, j) => (j === i ? { ...x, ...champ } : x)));
+            return (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <select className="input w-auto !py-1.5" value={r.type} onChange={(e) => maj({ type: e.target.value as TypeRetenue })} aria-label="Type de retenue">
+                  {(Object.keys(LIBELLE_RETENUE) as TypeRetenue[]).map((t) => (
+                    <option key={t} value={t}>
+                      {LIBELLE_RETENUE[t]}
+                    </option>
+                  ))}
+                </select>
+                <input className="input min-w-0 flex-1 !py-1.5" placeholder="Précision (créancier…)" value={r.libelle} onChange={(e) => maj({ libelle: e.target.value })} aria-label="Précision" />
+                <input className="input w-32 !py-1.5" placeholder="Réf. dossier" value={r.reference ?? ""} onChange={(e) => maj({ reference: e.target.value })} aria-label="Référence" />
+                <input
+                  className="input w-28 !py-1.5 tabular-nums"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={r.montant || ""}
+                  onChange={(e) => maj({ montant: Math.max(0, Number(e.target.value)) })}
+                  aria-label="Montant"
+                />
+                <button type="button" className="btn-ghost !px-2 !py-1 text-xs text-orange-ink" onClick={() => setRetenues(retenues.filter((_, j) => j !== i))}>
+                  Retirer
+                </button>
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setRetenues([...retenues, { type: "acompte", libelle: "", montant: 0 }])}>
+              + Acompte ou saisie
+            </button>
+            {retenues.some((r) => r.type === "saisie" || r.type === "atd") && (
+              <div className="w-48">
+                <Field label="Personnes à charge" value={personnesACharge} onChange={setPersonnesACharge} step="1" />
+              </div>
+            )}
+          </div>
         </Card>
       </div>
 
@@ -269,6 +316,7 @@ export function PaieEditor({
               {[
                 ["Brut", bulletin.brut],
                 ["Net avant impôt", bulletin.netAvantImpot],
+                ...(bulletin.totalRetenues > 0 ? [["Acomptes et saisies", -bulletin.totalRetenues] as [string, number]] : []),
                 ["Net à payer", bulletin.netAPayer],
                 ["Coût employeur", bulletin.coutEmployeur],
               ].map(([l, v]) => (

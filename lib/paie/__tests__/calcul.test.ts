@@ -108,3 +108,20 @@ describe("RGDU transport routier", () => {
     expect(gr.reductionGenerale).toBeGreaterThan(sed.reductionGenerale);
   });
 });
+
+describe("acomptes et saisies", () => {
+  it("déduits après le net, avec contrôle de la part saisissable", () => {
+    const base = calculerBulletin({ legal, entreprise, salarie: sedentaireSmic, variables: vars() });
+    const b = calculerBulletin({
+      legal,
+      entreprise,
+      salarie: sedentaireSmic,
+      variables: { ...vars(), retenues: [{ type: "acompte", libelle: "", montant: 200 }, { type: "atd", libelle: "DGFiP", montant: 900, reference: "A-123" }] },
+    });
+    expect(b.netAvantRetenues).toBe(base.netAPayer);
+    expect(b.totalRetenues).toBe(1100);
+    expect(b.netAPayer).toBeCloseTo(base.netAPayer - 1100, 2);
+    expect(b.lignes.some((l) => l.libelle.startsWith("Saisie administrative (ATD) — DGFiP — réf. A-123"))).toBe(true);
+    expect(b.avertissements.some((a) => a.includes("part saisissable"))).toBe(true);
+  });
+});

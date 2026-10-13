@@ -35,4 +35,16 @@ export const variablesSchema = z.object({
   nbRepasUnique: z.coerce.number().int().min(0).max(62),
   nbCasseCroute: z.coerce.number().int().min(0).max(62),
   nbGrandDeplacement: z.coerce.number().int().min(0).max(31),
+  retenues: z
+    .array(
+      z.object({
+        type: z.enum(["acompte", "saisie", "atd", "pension", "pret", "autre"]),
+        libelle: z.string().trim().max(80),
+        montant: z.coerce.number().min(0).max(100000),
+        reference: z.string().trim().max(60).optional(),
+      }),
+    )
+    .max(20)
+    .default([]),
+  personnesACharge: z.coerce.number().int().min(0).max(20).default(0),
 });
