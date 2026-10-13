@@ -1,0 +1,288 @@
+import type { UserRole } from "@/lib/types/domain";
+
+/**
+ * Guides d'utilisation par rôle : une seule source pour la page /guide de
+ * l'application (réservée aux entreprises clientes) et pour les pages
+ * Notion. Une étape liée à un module n'est affichée que si l'entreprise a
+ * activé ce module.
+ */
+export interface EtapeGuide {
+  titre: string;
+  texte: string;
+  lien?: { href: string; label: string };
+  module?: string;
+}
+
+export interface SectionGuide {
+  titre: string;
+  etapes: EtapeGuide[];
+}
+
+export interface GuideRole {
+  role: UserRole;
+  titre: string;
+  intro: string;
+  sections: SectionGuide[];
+}
+
+const DEMARRER_CHAUFFEUR: SectionGuide = {
+  titre: "Bien démarrer",
+  etapes: [
+    {
+      titre: "Se connecter",
+      texte:
+        "Scannez votre badge QR (remis par votre responsable) puis tapez votre code PIN. Vous pouvez aussi vous connecter avec le lien reçu par e-mail. Ne communiquez jamais votre code.",
+    },
+    {
+      titre: "Installer GODAC sur le téléphone",
+      texte:
+        "Sur Android (Chrome) : menu ⋮ → « Installer l'application ». Sur iPhone (Safari) : bouton Partager → « Sur l'écran d'accueil ». GODAC s'ouvre ensuite comme une application, en plein écran.",
+    },
+    {
+      titre: "Autoriser la localisation et les notifications",
+      texte:
+        "Acceptez la localisation quand GODAC la demande : elle sert uniquement au moment du pointage (et sur la carte de la tournée colis), jamais en continu. Les notifications vous préviennent d'un changement de planning, d'un message ou d'une alerte.",
+    },
+  ],
+};
+
+const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
+  {
+    titre: "Ma journée",
+    etapes: [
+      {
+        titre: "Pointer l'arrivée et le départ",
+        texte:
+          "En arrivant au dépôt, ouvrez GODAC : si le pointage assisté est actif, votre entrée est pointée toute seule (vous pouvez l'annuler). Sinon, touchez « Badger l'entrée ». En fin de journée, GODAC vous propose de badger la sortie.",
+        lien: { href: "/time-clock", label: "Pointeuse" },
+        module: "time_clock",
+      },
+      {
+        titre: "Voir mon planning",
+        texte:
+          "« Mon planning » affiche vos tournées jour par jour. Les deux coches vertes indiquent votre présence : celle du haut pour le matin, celle du bas pour le soir.",
+        lien: { href: "/planning/mine", label: "Mon planning" },
+        module: "planning",
+      },
+      {
+        titre: "Démarrer et terminer une tournée",
+        texte:
+          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
+        lien: { href: "/tours/start", label: "Démarrer une tournée" },
+        module: "planning",
+      },
+      {
+        titre: "Les villages de ma tournée",
+        texte: "« Tournées & villages » donne la liste des villages de chaque tournée et le contact de votre chef d'équipe.",
+        lien: { href: "/tours/routes", label: "Tournées & villages" },
+        module: "planning",
+      },
+    ],
+  },
+  {
+    titre: "Carburant et véhicule",
+    etapes: [
+      {
+        titre: "Déclarer un plein",
+        texte:
+          "Page Carburant → nouveau ravitaillement : prenez le ticket en photo, GODAC lit les litres et le montant (à vérifier avant d'enregistrer), puis indiquez le kilométrage.",
+        lien: { href: "/fuel", label: "Carburant" },
+      },
+      {
+        titre: "Mon véhicule et ses papiers",
+        texte: "« Mon véhicule » regroupe la carte grise, l'assurance et les contrôles du camion que vous conduisez.",
+        lien: { href: "/my-vehicle", label: "Mon véhicule" },
+      },
+      {
+        titre: "Signaler un problème sur le véhicule",
+        texte: "« Demandes d'entretien » : décrivez le problème, ajoutez une photo et choisissez l'urgence. Votre responsable est prévenu.",
+        lien: { href: "/maintenance", label: "Demandes d'entretien" },
+        module: "maintenance_requests",
+      },
+    ],
+  },
+  {
+    titre: "Tournée colis et application GODAC Livreur",
+    etapes: [
+      {
+        titre: "Charger les colis",
+        texte:
+          "« Tournée colis » → scannez chaque colis (QR, Datamatrix ou code-barres), ou photographiez l'étiquette. Les adresses et le téléphone du client s'ajoutent tout seuls. Vous pouvez aussi importer un itinéraire Google Maps.",
+        lien: { href: "/colis", label: "Tournée colis" },
+        module: "route_optimizer",
+      },
+      {
+        titre: "Démarrer la livraison",
+        texte:
+          "« Démarrer la livraison » calcule le meilleur ordre et ouvre l'application chauffeur : l'arrêt en cours en grand, avec Appeler, SMS « j'arrive », Waze ou Google Maps. L'onglet « Carte » montre tous les arrêts et votre position.",
+        lien: { href: "/livreur", label: "Application chauffeur" },
+        module: "route_optimizer",
+      },
+      {
+        titre: "Valider une livraison",
+        texte:
+          "Touchez « Livré » et indiquez où vous avez déposé le colis. La photo est obligatoire pour une boîte aux lettres ou un jardin, conseillée sinon : elle vous protège en cas de réclamation.",
+        module: "route_optimizer",
+      },
+    ],
+  },
+  {
+    titre: "Équipe et documents",
+    etapes: [
+      { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
+      { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/intranet", label: "Intranet" }, module: "intranet" },
+      { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : messages, photos et documents restent dans l'entreprise.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
+      { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/payslips", label: "Fiches de paie" }, module: "payslips" },
+      { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/contestations", label: "Contestations" }, module: "customer_disputes" },
+    ],
+  },
+];
+
+const AIDE: SectionGuide = {
+  titre: "Besoin d'aide ?",
+  etapes: [
+    { titre: "Questions fréquentes", texte: "Les réponses aux questions les plus posées.", lien: { href: "/faq", label: "Questions fréquentes" } },
+    { titre: "Assistant", texte: "La bulle d'aide en bas de l'écran répond à vos questions sur GODAC et transmet à un responsable si besoin.", module: "assistant" },
+    { titre: "Mon compte", texte: "Nom, téléphone, mode sombre et taille du texte se règlent dans « Mon compte ».", lien: { href: "/account", label: "Mon compte" } },
+  ],
+};
+
+const ENCADREMENT: SectionGuide[] = [
+  {
+    titre: "Planning et équipes",
+    etapes: [
+      {
+        titre: "Construire le planning",
+        texte:
+          "« Planning » affiche la semaine à l'horizontale : affectez chaque chauffeur à une tournée et un véhicule, dupliquez une case, suivez les présences (coche du haut = matin, du bas = soir). Les chauffeurs sont prévenus des changements.",
+        lien: { href: "/planning", label: "Planning" },
+        module: "planning",
+      },
+      { titre: "Tournées, villages et chefs d'équipe", texte: "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service.", lien: { href: "/tours/routes", label: "Tournées & villages" }, module: "planning" },
+      { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
+      { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
+      { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/qr-codes", label: "Badges QR" } },
+    ],
+  },
+  {
+    titre: "Carburant, flotte et entretien",
+    etapes: [
+      { titre: "Contrôler les pleins", texte: "La page Carburant liste tous les pleins ; les surconsommations sont signalées dans les alertes.", lien: { href: "/fuel", label: "Carburant" } },
+      { titre: "Vérifier les lectures automatiques", texte: "« Revue OCR » regroupe les tickets et compteurs lus par l'IA à vérifier.", lien: { href: "/ocr-review", label: "Revue OCR" }, module: "ocr" },
+      { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/tanks", label: "Cuves" } },
+      { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
+      { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/maintenance", label: "Demandes d'entretien" }, module: "maintenance_requests" },
+    ],
+  },
+  {
+    titre: "Suivi et relation client",
+    etapes: [
+      { titre: "Rapports de tournée", texte: "Kilométrages, horaires et rapports de chaque tournée terminée.", lien: { href: "/reports", label: "Rapports de tournée" }, module: "planning" },
+      {
+        titre: "Contestations clients",
+        texte:
+          "Déposez la réclamation (photo ou PDF) : GODAC la lit et propose le chauffeur concerné. Vous validez avant toute notification ; la photo de livraison s'affiche quand la livraison est retrouvée.",
+        lien: { href: "/contestations", label: "Contestations" },
+        module: "customer_disputes",
+      },
+      { titre: "Alertes", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Alertes ».", lien: { href: "/alerts", label: "Alertes" } },
+      { titre: "Demandes d'assistance", texte: "Les questions transmises par l'assistant à un humain arrivent ici.", lien: { href: "/support", label: "Demandes d'assistance" }, module: "assistant" },
+    ],
+  },
+];
+
+export const GUIDES: GuideRole[] = [
+  {
+    role: "chauffeur",
+    titre: "Guide du chauffeur",
+    intro: "GODAC regroupe sur votre téléphone votre planning, vos tournées, vos pleins, vos papiers et vos échanges avec l'équipe. Voici l'essentiel pour bien l'utiliser.",
+    sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, AIDE],
+  },
+  {
+    role: "manager",
+    titre: "Guide du manager",
+    intro: "Vous organisez l'activité de votre service : planning, chauffeurs, carburant, véhicules et réclamations. Ce guide reprend vos tâches courantes.",
+    sections: [...ENCADREMENT, AIDE],
+  },
+  {
+    role: "manager_chauffeur",
+    titre: "Guide du manager-chauffeur",
+    intro: "Vous roulez et vous encadrez : vous avez à la fois les écrans du chauffeur (pointage, tournées, pleins, colis) et ceux du manager (planning, validations, flotte).",
+    sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...ENCADREMENT, AIDE],
+  },
+  {
+    role: "comptable",
+    titre: "Guide du comptable",
+    intro: "Vous retrouvez dans GODAC les données utiles à la comptabilité : carburant, cuves, flotte, fiches de paie et export TICPE.",
+    sections: [
+      {
+        titre: "Vos écrans",
+        etapes: [
+          { titre: "Carburant", texte: "Tous les pleins avec litres, montants et véhicules ; filtres par période et export.", lien: { href: "/fuel", label: "Carburant" } },
+          { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/tanks", label: "Cuves" } },
+          { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
+          { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
+          { titre: "Fiches de paie", texte: "Consultez et distribuez les bulletins des salariés.", lien: { href: "/payslips", label: "Fiches de paie" }, module: "payslips" },
+          { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/alerts", label: "Alertes" } },
+        ],
+      },
+      AIDE,
+    ],
+  },
+  {
+    role: "direction",
+    titre: "Guide de la direction",
+    intro: "Vous pilotez l'entreprise dans GODAC : réglages, utilisateurs, abonnement, paie et indicateurs, en plus de tous les écrans de l'encadrement.",
+    sections: [
+      {
+        titre: "Mettre en place GODAC",
+        etapes: [
+          {
+            titre: "Régler l'organisation",
+            texte:
+              "Organisation : pays de l'entreprise (règles légales appliquées), logo et couleur, adresse du dépôt, identité légale, services et leurs dépôts, cuves, pointage assisté par géolocalisation (actif par défaut, à annoncer aux salariés).",
+            lien: { href: "/admin/organizations", label: "Organisation" },
+          },
+          {
+            titre: "Inviter les utilisateurs et choisir leur rôle",
+            texte:
+              "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, manager-chauffeur, comptable, direction). Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
+            lien: { href: "/admin/users", label: "Utilisateurs" },
+          },
+          { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/billing", label: "Abonnement" } },
+          { titre: "Lien d'inscription des chauffeurs", texte: "Partagez le lien d'inscription (page Organisation) : les chauffeurs s'inscrivent et vous les validez.", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
+        ],
+      },
+      {
+        titre: "Paie et RH",
+        etapes: [
+          { titre: "Bulletins de paie", texte: "Paie : les heures des tournées, congés et frais sont préremplis ; vérifiez puis générez les bulletins (France). Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/paie", label: "Paie" }, module: "payslips" },
+          { titre: "Salaires et heures", texte: "Synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/payroll", label: "Salaires" }, module: "planning" },
+          { titre: "Planning des congés", texte: "Vue d'ensemble des absences de l'équipe.", lien: { href: "/leaves/planning", label: "Planning congés" }, module: "leave_management" },
+          { titre: "Amendes", texte: "Enregistrez les avis de contravention et désignez le conducteur dans les délais.", lien: { href: "/fines", label: "Amendes" }, module: "fines" },
+        ],
+      },
+      ...ENCADREMENT,
+      {
+        titre: "Pilotage",
+        etapes: [{ titre: "Reporting BI", texte: "Indicateurs consolidés : coûts carburant, consommation, activité.", lien: { href: "/reporting", label: "Reporting BI" }, module: "bi_reporting" }],
+      },
+      AIDE,
+    ],
+  },
+];
+
+export function guideDe(role: string | null | undefined): GuideRole {
+  return GUIDES.find((g) => g.role === role) ?? GUIDES[0]!;
+}
+
+/** Guide filtré : sans les étapes des modules que l'entreprise n'a pas. */
+export function guideFiltre(guide: GuideRole, modulesActifs: string[]): GuideRole {
+  const actifs = new Set(modulesActifs);
+  return {
+    ...guide,
+    sections: guide.sections
+      .map((s) => ({ ...s, etapes: s.etapes.filter((e) => !e.module || actifs.has(e.module)) }))
+      .filter((s) => s.etapes.length > 0),
+  };
+}
