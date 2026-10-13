@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { PlanPicker } from "@/components/onboarding/PlanPicker";
 import { ModuleSelector } from "@/components/onboarding/ModuleSelector";
-import { priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
+import { libelleMiseEnService, priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 import { Card } from "@/components/ui";
 
 /**
@@ -58,7 +58,10 @@ export function PricingSimulator({
             <span className="text-base font-normal text-navy/60">/mois</span>
           </p>
           {setupTotal > 0 && (
-            <p className="text-xs text-navy/60">* + {setupTotal.toFixed(2)} € de mise en service, une seule fois</p>
+            <p className="text-xs text-navy/60">
+              * + {plan && setupTotal === Number(plan.setup_price) ? libelleMiseEnService(plan) : `${setupTotal.toFixed(2)} €`} de mise en service
+              {plan && plan.setup_installments > 1 && setupTotal !== Number(plan.setup_price) ? ` (formule payable en ${plan.setup_installments} fois)` : ""}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">

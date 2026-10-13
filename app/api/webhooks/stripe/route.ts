@@ -71,6 +71,26 @@ export async function POST(req: Request) {
       break;
     }
 
+    case "invoice.paid": {
+      // Mise en service échelonnée : la ligne s'arrête après N factures payées.
+      const invoice = event.data.object as Stripe.Invoice;
+      const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      if (!subscriptionId) break;
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price.product"] });
+      const echeance = subscription.items.data.find((item) => {
+        const product = item.price.product;
+        return typeof product === "object" && !("deleted" in product && product.deleted) && "metadata" in product && product.metadata?.godac_setup_installments;
+      });
+      if (!echeance) break;
+      const product = echeance.price.product as Stripe.Product;
+      const total = Number(product.metadata.godac_setup_installments);
+      const payees = await stripe.invoices.list({ subscription: subscriptionId, status: "paid", limit: 100 });
+      if (payees.data.length >= total) {
+        await stripe.subscriptionItems.del(echeance.id, { proration_behavior: "none" });
+      }
+      break;
+    }
+
     default:
       break;
   }

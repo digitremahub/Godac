@@ -1,11 +1,11 @@
-import { priceFor, type ModuleCatalogEntry, type ModulePlanPrice, type Plan, type PlanId } from "@/lib/organization/catalog-types";
+import { priceFor, type ModuleCatalogEntry, type ModulePlanPrice, type Plan } from "@/lib/organization/catalog-types";
 
 /**
  * Chiffrage d'un bon de commande à partir du catalogue (mêmes tables que
  * le simulateur et la facturation), avec l'offre Fondateur réservée aux
- * dix premiers clients (remise sur la mise en service).
+ * dix premiers clients : mise en service offerte.
  */
-export const REMISE_FONDATEUR: Partial<Record<PlanId, number>> = { pro: 3000, business: 4000 };
+export const OFFRE_FONDATEUR = "Offre Fondateur (10 premiers clients) — mise en service offerte";
 export const TVA = 0.2;
 
 export interface LigneDevis {
@@ -23,6 +23,8 @@ export interface Devis {
   miseEnServiceHT: number;
   remiseFondateur: number;
   miseEnServiceNetHT: number;
+  /** Mise en service de la formule payable en N mensualités (modules : à la commande). */
+  echeances: number;
 }
 
 export function calculerDevis(
@@ -54,8 +56,9 @@ export function calculerDevis(
   }
   const mensuelHT = arrondi(lignes.reduce((t, l) => t + l.mensuel, 0));
   const miseEnServiceHT = arrondi(lignes.reduce((t, l) => t + l.miseEnService, 0));
-  const remiseFondateur = fondateur ? Math.min(REMISE_FONDATEUR[plan.id] ?? 0, miseEnServiceHT) : 0;
-  return { plan, lignes, mensuelHT, miseEnServiceHT, remiseFondateur, miseEnServiceNetHT: arrondi(miseEnServiceHT - remiseFondateur) };
+  const remiseFondateur = fondateur ? miseEnServiceHT : 0;
+  const miseEnServiceNetHT = arrondi(miseEnServiceHT - remiseFondateur);
+  return { plan, lignes, mensuelHT, miseEnServiceHT, remiseFondateur, miseEnServiceNetHT, echeances: miseEnServiceNetHT > 0 ? Math.max(1, plan.setup_installments ?? 1) : 1 };
 }
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
