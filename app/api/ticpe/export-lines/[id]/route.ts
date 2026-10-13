@@ -3,13 +3,14 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { generateTicpePdf } from "@/lib/ticpe/generate-pdf";
+import { buildTicpeWorkbook } from "@/lib/utils/excel";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("confirm") }),
   z.object({
     action: z.literal("correct"),
-    corrected_total_liters: z.coerce.number().min(0),
-    corrected_total_amount: z.coerce.number().min(0),
+    corrected_total_liters: z.coerce.number().positive("Indiquez un litrage supérieur à 0."),
+    corrected_total_amount: z.coerce.number().positive("Indiquez un montant supérieur à 0."),
   }),
 ]);
 
@@ -57,11 +58,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const [{ data: exportRow }, { data: organization }, { data: allLines }] = await Promise.all([
-    supabase.from("ticpe_exports").select("organization_id, period_start, period_end, pdf_file_path").eq("id", line.export_id).single(),
+    supabase.from("ticpe_exports").select("organization_id, period_start, period_end, file_path, pdf_file_path").eq("id", line.export_id).single(),
     supabase.from("organizations").select("name").eq("id", appUser.organization_id).single(),
     supabase
       .from("ticpe_export_lines")
-      .select("registration, vehicle_type, entry_count, computed_total_liters, computed_total_amount, corrected_total_liters, corrected_total_amount")
+      .select("registration, vehicle_type, entry_count, computed_total_liters, computed_total_amount, corrected_total_liters, corrected_total_amount, vehicles(ptac_kg)")
       .eq("export_id", line.export_id)
       .order("registration"),
   ]);
@@ -69,8 +70,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const pdfBuffer = await generateTicpePdf({
     organizationName: organization?.name ?? "Organisation",
-    periodStartLabel: DAY_LABEL.format(new Date(exportRow.period_start)),
-    periodEndLabel: DAY_LABEL.format(new Date(exportRow.period_end)),
+    periodStartLabel: DAY_LABEL.format(new Date(`${exportRow.period_start}T12:00:00Z`)),
+    periodEndLabel: DAY_LABEL.format(new Date(`${exportRow.period_end}T12:00:00Z`)),
     lines: (allLines ?? []).map((l) => ({
       registration: l.registration,
       vehicleType: l.vehicle_type,
@@ -87,9 +88,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .upload(pdfFilePath, pdfBuffer, { contentType: "application/pdf", upsert: true });
   if (uploadError) return NextResponse.json({ error: `Échec de la régénération du PDF: ${uploadError.message}` }, { status: 500 });
 
-  if (!exportRow.pdf_file_path) {
-    await supabase.from("ticpe_exports").update({ pdf_file_path: pdfFilePath }).eq("id", line.export_id);
+  // L'Excel et le total de l'export suivent les corrections, comme le PDF.
+  const lignes = (allLines ?? []).map((l: any) => ({
+    registration: l.registration as string,
+    vehicleType: l.vehicle_type as "PL" | "SPL",
+    ptacKg: l.vehicles?.ptac_kg !== null && l.vehicles?.ptac_kg !== undefined ? Number(l.vehicles.ptac_kg) : null,
+    entryCount: l.entry_count as number,
+    totalLiters: Number(l.corrected_total_liters ?? l.computed_total_liters),
+    totalAmount: Number(l.corrected_total_amount ?? l.computed_total_amount),
+  }));
+  const workbook = await buildTicpeWorkbook({
+    organizationName: organization?.name ?? "Organisation",
+    periodStart: exportRow.period_start,
+    periodEnd: exportRow.period_end,
+    rows: lignes,
+  });
+  if (exportRow.file_path) {
+    const { error: xlsxError } = await supabase.storage.from("ticpe-exports").upload(exportRow.file_path, workbook, {
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      upsert: true,
+    });
+    if (xlsxError) return NextResponse.json({ error: `Échec de la régénération de l'Excel: ${xlsxError.message}` }, { status: 500 });
   }
+
+  const totalLiters = Math.round(lignes.reduce((n, l) => n + l.totalLiters, 0) * 100) / 100;
+  await supabase
+    .from("ticpe_exports")
+    .update({ total_liters: totalLiters, ...(exportRow.pdf_file_path ? {} : { pdf_file_path: pdfFilePath }) })
+    .eq("id", line.export_id);
 
   return NextResponse.json({ ok: true });
 }

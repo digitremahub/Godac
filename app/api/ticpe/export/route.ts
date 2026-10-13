@@ -3,20 +3,26 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { filterTicpeEligibleVehicles, isTicpeSafeToInclude } from "@/lib/business/ticpe";
+import { bornesPeriode, eligibiliteTicpe } from "@/lib/ticpe/export";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
 import { generateTicpePdf } from "@/lib/ticpe/generate-pdf";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
-const bodySchema = z.object({
-  period_start: z.string().date(),
-  period_end: z.string().date(),
-});
+const bodySchema = z
+  .object({
+    period_start: z.string().date(),
+    period_end: z.string().date(),
+  })
+  .refine((b) => b.period_start <= b.period_end, { message: "La fin de période précède le début.", path: ["period_end"] });
+
+const PAGE = 1000;
 
 /**
- * Module 7: generates the TICPE export, strictly scoped to PL/SPL
- * (see lib/business/ticpe.ts — VL never appears here, by construction
- * rather than by a filter someone could forget to apply). Only
+ * Module 7: generates the TICPE export — gazole uniquement (jamais
+ * d'AdBlue), pleins validés, véhicules PL/SPL de PTAC ≥ 7,5 t (ou PTAC non
+ * renseigné, signalé dans l'Excel), motorisation non essence/électrique
+ * (lib/ticpe/export.ts). Période en jours entiers, heure de Paris. Only
  * comptable/direction can reach this route in practice (RLS on
  * `ticpe_exports` would reject the insert otherwise), but we also
  * check the role up front so the error is immediate and clear.
@@ -48,32 +54,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Organisation introuvable" }, { status: 409 });
   }
 
-  const { data: entries, error } = await supabase
-    .from("fuel_entries")
-    .select("liters, unit_price, total_amount, vehicles!inner(id, registration, type, spec_sources)")
-    .in("status", ["manual", "validated"]) // only trusted, validated data feeds a fiscal export
-    .gte("occurred_at", `${period_start}T00:00:00Z`)
-    .lte("occurred_at", `${period_end}T23:59:59Z`);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Période en jours entiers, heure de Paris : [début 00:00, lendemain de la fin 00:00[.
+  const { depuis, avant } = bornesPeriode(period_start, period_end);
+  const entries: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("fuel_entries")
+      .select("id, liters, total_amount, vehicles!inner(id, registration, type, spec_sources, ptac_kg, fuel_type)")
+      .eq("organization_id", organization.id)
+      .in("status", ["manual", "validated"]) // only trusted, validated data feeds a fiscal export
+      .eq("product", "gazole") // jamais d'AdBlue dans une déclaration de gazole
+      .gte("occurred_at", depuis)
+      .lt("occurred_at", avant)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    entries.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
   }
-
-  const eligibleEntries = filterTicpeEligibleVehicles(
-    (entries ?? []).map((e: any) => ({ ...e, type: e.vehicles.type })),
-  ).filter((e: any) => isTicpeSafeToInclude(e.type, e.vehicles.spec_sources));
 
   const byVehicle = new Map<
     string,
-    { vehicleId: string; registration: string; vehicleType: "PL" | "SPL"; entryCount: number; totalLiters: number; totalAmount: number }
+    { vehicleId: string; registration: string; vehicleType: "PL" | "SPL"; ptacKg: number | null; entryCount: number; totalLiters: number; totalAmount: number }
   >();
 
-  for (const entry of eligibleEntries as any[]) {
-    const key = entry.vehicles.id;
+  for (const entry of entries) {
+    const v = entry.vehicles;
+    if (!eligibiliteTicpe(v).inclus) continue;
+    const key = v.id;
     const existing = byVehicle.get(key) ?? {
-      vehicleId: entry.vehicles.id,
-      registration: entry.vehicles.registration,
-      vehicleType: entry.vehicles.type,
+      vehicleId: v.id,
+      registration: v.registration,
+      vehicleType: v.type,
+      ptacKg: v.ptac_kg !== null && v.ptac_kg !== undefined ? Number(v.ptac_kg) : null,
       entryCount: 0,
       totalLiters: 0,
       totalAmount: 0,
@@ -84,7 +99,9 @@ export async function POST(req: Request) {
     byVehicle.set(key, existing);
   }
 
-  const rows = Array.from(byVehicle.values()).sort((a, b) => a.registration.localeCompare(b.registration));
+  const rows = Array.from(byVehicle.values())
+    .map((r) => ({ ...r, totalLiters: Math.round(r.totalLiters * 100) / 100, totalAmount: Math.round(r.totalAmount * 100) / 100 }))
+    .sort((a, b) => a.registration.localeCompare(b.registration, "fr"));
 
   const workbookBuffer = await buildTicpeWorkbook({
     organizationName: organization.name,
@@ -96,8 +113,8 @@ export async function POST(req: Request) {
   const DAY_LABEL = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
   const pdfBuffer = await generateTicpePdf({
     organizationName: organization.name,
-    periodStartLabel: DAY_LABEL.format(new Date(period_start)),
-    periodEndLabel: DAY_LABEL.format(new Date(period_end)),
+    periodStartLabel: DAY_LABEL.format(new Date(`${period_start}T12:00:00Z`)),
+    periodEndLabel: DAY_LABEL.format(new Date(`${period_end}T12:00:00Z`)),
     lines: rows.map((r) => ({
       registration: r.registration,
       vehicleType: r.vehicleType,
@@ -125,7 +142,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Échec de l'upload PDF: ${pdfUploadError.message}` }, { status: 500 });
   }
 
-  const totalLiters = rows.reduce((sum, r) => sum + r.totalLiters, 0);
+  const totalLiters = Math.round(rows.reduce((sum, r) => sum + r.totalLiters, 0) * 100) / 100;
 
   const { data: exportRow, error: insertError } = await supabase
     .from("ticpe_exports")
@@ -143,8 +160,16 @@ export async function POST(req: Request) {
     .single();
 
   if (insertError) {
+    await createAdminSupabaseClient().storage.from("ticpe-exports").remove([filePath, pdfFilePath]);
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+
+  // Export tout-ou-rien : si les lignes ne s'enregistrent pas, l'export et ses fichiers sont retirés.
+  const annuler = async () => {
+    const admin = createAdminSupabaseClient();
+    await admin.from("ticpe_exports").delete().eq("id", exportRow.id);
+    await admin.storage.from("ticpe-exports").remove([filePath, pdfFilePath]);
+  };
 
   if (rows.length > 0) {
     const { error: linesError } = await supabase.from("ticpe_export_lines").insert(
@@ -159,7 +184,10 @@ export async function POST(req: Request) {
         computed_total_amount: r.totalAmount,
       })),
     );
-    if (linesError) return NextResponse.json({ error: linesError.message }, { status: 500 });
+    if (linesError) {
+      await annuler();
+      return NextResponse.json({ error: `Export annulé : ${linesError.message}` }, { status: 500 });
+    }
   }
 
   const { data: signedUrl } = await supabase.storage.from("ticpe-exports").createSignedUrl(filePath, 300);

@@ -65,7 +65,7 @@ export async function ChauffeurDashboard({
       : Promise.resolve({ data: null }),
     supabase
       .from("fuel_entries")
-      .select("id, occurred_at, liters, unit_price, status, vehicles(registration)")
+      .select("id, occurred_at, liters, unit_price, status, product, vehicles(registration)")
       .eq("driver_id", appUser.id)
       .order("occurred_at", { ascending: false })
       .limit(5),
@@ -241,6 +241,7 @@ export async function ChauffeurDashboard({
                 <li key={e.id} className="flex items-center justify-between rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
                   <span>
                     {e.vehicles?.registration ?? "—"} · {e.liters ? `${e.liters} L` : "—"}
+                    {e.product === "adblue" && " AdBlue"}
                   </span>
                   <span className="text-xs text-navy/60">{new Date(e.occurred_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</span>
                 </li>

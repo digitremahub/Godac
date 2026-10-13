@@ -1,20 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * The tank's current weighted-average cost per litre (PMP), fed by
- * both deliveries (supabase/migrations/20260101000020_tank_deliveries.sql)
- * and prior fill-ups (the compute_fuel_entry_derived trigger) — see
- * fuel_price_history, the running trail both write to. A driver
- * filling from the company's own cuve has no way to know this price;
- * the server fills it in instead of asking (see app/api/fuel-entries).
+ * PMP (prix moyen pondéré) courant d'une cuve, porté par tanks.pmp et
+ * recalculé à chaque livraison par le trigger before_tank_delivery
+ * (migration 121) : (stock⁺ × PMP + litres livrés × prix) / (stock⁺ +
+ * litres livrés). Un plein à la cuve ne le modifie pas : il est valorisé
+ * à ce prix. Le chauffeur n'a jamais à connaître ce prix.
  */
 export async function getCurrentTankPmp(supabase: SupabaseClient, tankId: string): Promise<number | null> {
-  const { data } = await supabase
-    .from("fuel_price_history")
-    .select("pmp_after")
-    .eq("tank_id", tankId)
-    .order("recorded_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.pmp_after !== undefined && data?.pmp_after !== null ? Number(data.pmp_after) : null;
+  const { data } = await supabase.from("tanks").select("pmp").eq("id", tankId).maybeSingle();
+  return data?.pmp !== undefined && data?.pmp !== null ? Number(data.pmp) : null;
 }

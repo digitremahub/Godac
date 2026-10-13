@@ -49,3 +49,30 @@ export function checkTourDistanceGap(startKm: number, endKm: number): TourDistan
   const gapKm = endKm - startKm;
   return { gapKm, isLargeGap: gapKm > LARGE_TOUR_GAP_KM };
 }
+
+/** Distance maximale plausible par jour pour un poids lourd (marge comprise). */
+export const KM_MAX_PAR_JOUR = 1500;
+
+/**
+ * Rejette un kilométrage manifestement erroné vers le haut (faute de
+ * frappe : 1 254 300 au lieu de 125 430), qui bloquerait ensuite toutes
+ * les saisies suivantes du véhicule : au plus 1 500 km par jour écoulé
+ * depuis la dernière lecture, avec un minimum de 2 000 km.
+ */
+export function checkOdometerJump(
+  newKm: number,
+  referenceKm: number | null,
+  referenceAt: string | null,
+  now: Date = new Date(),
+): OdometerRegressionCheck {
+  if (referenceKm === null) return { ok: true, message: null };
+  const jours = referenceAt ? Math.max(0, (now.getTime() - Date.parse(referenceAt)) / 86_400_000) : 0;
+  const plafond = referenceKm + Math.max(2000, Math.ceil(jours) * KM_MAX_PAR_JOUR);
+  if (newKm > plafond) {
+    return {
+      ok: false,
+      message: `Le kilométrage saisi (${newKm} km) paraît trop élevé : dernière lecture ${referenceKm} km. Vérifiez la saisie.`,
+    };
+  }
+  return { ok: true, message: null };
+}

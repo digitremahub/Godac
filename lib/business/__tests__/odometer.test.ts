@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkOdometerNotRegressing, checkTourDistanceGap } from "../odometer";
+import { checkOdometerJump, checkOdometerNotRegressing, checkTourDistanceGap } from "../odometer";
 
 describe("checkOdometerNotRegressing", () => {
   it("passes when there is no prior reading yet", () => {
@@ -35,5 +35,21 @@ describe("checkTourDistanceGap", () => {
 
   it("does not flag exactly 1500 km", () => {
     expect(checkTourDistanceGap(1000, 2500).isLargeGap).toBe(false);
+  });
+});
+
+describe("checkOdometerJump", () => {
+  const now = new Date("2026-10-13T12:00:00Z");
+  it("accepte une progression plausible", () => {
+    expect(checkOdometerJump(126_400, 125_430, "2026-10-12T12:00:00Z", now).ok).toBe(true);
+  });
+  it("refuse une faute de frappe (un chiffre en trop)", () => {
+    expect(checkOdometerJump(1_254_300, 125_430, "2026-10-12T12:00:00Z", now).ok).toBe(false);
+  });
+  it("tient compte du temps écoulé", () => {
+    expect(checkOdometerJump(140_000, 125_430, "2026-09-30T12:00:00Z", now).ok).toBe(true);
+  });
+  it("sans référence : accepté", () => {
+    expect(checkOdometerJump(125_430, null, null, now).ok).toBe(true);
   });
 });

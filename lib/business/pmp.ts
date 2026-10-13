@@ -1,30 +1,23 @@
-import type { PriorTankHistory } from "@/lib/types/domain";
-
 /**
- * PMP = Prix Moyen Pondéré (weighted average price), recomputed on
- * every fill-up for a given tank. This is a pure mirror of the
- * `compute_fuel_entry_derived` Postgres trigger
- * (supabase/migrations/20260101000010_business_functions.sql) —
- * kept here so the UI can preview the resulting PMP before a
- * manager confirms an entry, and so the formula is unit-tested
- * independently of the database.
+ * PMP = Prix Moyen Pondéré d'une cuve, recalculé à chaque LIVRAISON :
+ * miroir pur du trigger before_tank_delivery (migration 121), testé ici
+ * indépendamment de la base. Un plein (sortie de cuve) ne change pas le
+ * PMP : il est valorisé à ce prix. Stock négatif (livraisons manquantes)
+ * compté comme 0, pour que le prix de la livraison s'impose.
  *
- * The database trigger remains the source of truth: this function
- * must never be relied on to persist the PMP, only to preview it.
+ * La base reste la source de vérité : cette fonction ne sert qu'à
+ * prévisualiser et à tester la formule.
  */
-export function computeWeightedAveragePrice(
-  history: PriorTankHistory,
-  newEntry: { liters: number; unitPrice: number },
+export function computeDeliveryPmp(
+  tank: { stockLiters: number; pmp: number | null },
+  delivery: { liters: number; unitPrice: number },
 ): number {
-  if (newEntry.liters <= 0) {
+  if (delivery.liters <= 0) {
     throw new Error("liters must be positive to compute a PMP");
   }
-
-  const cumulativeLiters = history.cumulativeLiters + newEntry.liters;
-  const cumulativeAmount =
-    history.cumulativeAmount + newEntry.liters * newEntry.unitPrice;
-
-  return roundTo(cumulativeAmount / cumulativeLiters, 4);
+  const stock = Math.max(tank.stockLiters, 0);
+  if (tank.pmp === null || stock === 0) return roundTo(delivery.unitPrice, 4);
+  return roundTo((stock * tank.pmp + delivery.liters * delivery.unitPrice) / (stock + delivery.liters), 4);
 }
 
 export function isPriceAnomalous(

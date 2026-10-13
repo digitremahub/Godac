@@ -13,6 +13,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
   const [unitPrice, setUnitPrice] = useState("");
   const [supplier, setSupplier] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [deliveredOn, setDeliveredOn] = useState(aujourdhui());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +27,8 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         body: JSON.stringify({
           tank_id: tankId,
           liters: Number(liters),
-          unit_price: unitPrice ? Number(unitPrice) : undefined,
+          unit_price: Number(unitPrice),
+          delivered_at: deliveredOn && deliveredOn !== aujourdhui() ? new Date(`${deliveredOn}T12:00`).toISOString() : undefined,
           supplier: supplier || undefined,
         }),
       });
@@ -52,6 +54,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
       setUnitPrice("");
       setSupplier("");
       setInvoiceFile(null);
+      setDeliveredOn(aujourdhui());
       setOpen(false);
       router.refresh();
     } catch (e) {
@@ -76,9 +79,19 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
       <input
         className="input !py-1 text-sm"
         type="number"
-        aria-label="Prix/L (optionnel)" placeholder="Prix/L (optionnel)"
+        step="0.0001"
+        min="0"
+        aria-label="Prix au litre TTC (facture)" placeholder="Prix au litre TTC (facture)"
         value={unitPrice}
         onChange={(e) => setUnitPrice(e.target.value)}
+      />
+      <input
+        className="input !py-1 text-sm"
+        type="date"
+        aria-label="Date de livraison"
+        max={aujourdhui()}
+        value={deliveredOn}
+        onChange={(e) => setDeliveredOn(e.target.value)}
       />
       <input
         className="input !py-1 text-sm"
@@ -96,7 +109,7 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
         />
       </label>
       <div className="flex gap-2">
-        <button className="btn-primary flex-1 !py-1.5 text-sm" disabled={busy || !liters} onClick={submit}>
+        <button className="btn-primary flex-1 !py-1.5 text-sm" disabled={busy || !(Number(liters) > 0) || !(Number(unitPrice) > 0)} onClick={submit}>
           {busy ? "Envoi…" : "Enregistrer"}
         </button>
         <button className="btn-secondary !py-1.5 text-sm" disabled={busy} onClick={() => setOpen(false)}>
@@ -105,4 +118,10 @@ export function TankDeliveryForm({ tankId }: { tankId: string }) {
       </div>
     </div>
   );
+}
+
+/** Date du jour (heure locale), au format AAAA-MM-JJ. */
+function aujourdhui() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

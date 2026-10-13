@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { processFuelEntryOcr } from "@/lib/ocr/pipeline";
+import type { TicketExtras } from "@/lib/ocr/ticket-check";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
 const bodySchema = z.object({
@@ -12,8 +13,10 @@ const bodySchema = z.object({
 
 /**
  * Step 4 of the OCR flow: called once the ticket photo has finished
- * uploading to Storage. Records the photo path, then runs the Mindee
- * extraction (lib/ocr/pipeline.ts).
+ * uploading to Storage. Records the photo path, then runs the Claude
+ * vision extraction (lib/ocr/pipeline.ts). Returns the ticket's total
+ * and fuel type for the driver's check step (`ticket`, null if the
+ * extraction failed).
  *
  * Runs inline in a Next.js Route Handler for the MVP. If extraction
  * volume outgrows Vercel's execution limits, move the
@@ -39,9 +42,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  let ticket: TicketExtras | null = null;
   if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
-    await processFuelEntryOcr(parsed.data.fuelEntryId);
+    ticket = await processFuelEntryOcr(parsed.data.fuelEntryId);
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ticket });
 }

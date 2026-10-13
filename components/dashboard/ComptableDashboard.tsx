@@ -4,13 +4,18 @@ import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import type { AppUser } from "@/lib/auth/session";
+import { summarizeFuelRows, TRUSTED_FUEL_STATUSES, type FuelTotalsRow } from "@/lib/fuel/totals";
+import { addDays } from "@/lib/planning/dates";
+import { fetchAllRows } from "@/lib/utils/fetch-all";
+import { parisDay, parisMonthStartDay, parisMonthStartIso } from "@/lib/utils/paris-time";
 
+/** Trimestre civil en cours, jours calendaires de Paris (pas ceux du fuseau du serveur). */
 function currentQuarterRange(): { start: string; end: string } {
-  const now = new Date();
-  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-  const start = new Date(now.getFullYear(), quarterStartMonth, 1);
-  const end = new Date(now.getFullYear(), quarterStartMonth + 3, 0);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  const month = Number(parisDay().slice(5, 7));
+  const offset = -((month - 1) % 3);
+  const start = parisMonthStartDay(new Date(), offset);
+  const end = addDays(parisMonthStartDay(new Date(), offset + 3), -1);
+  return { start, end };
 }
 
 /**
@@ -25,8 +30,8 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
   const ticpeEnabled = enabledModules.includes("ticpe_export");
   const leaveEnabled = enabledModules.includes("leave_management");
 
-  const now = new Date();
-  const monthStartISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  // 1er du mois à minuit, heure de Paris.
+  const monthStartISO = parisMonthStartIso();
   const { start: quarterStart, end: quarterEnd } = currentQuarterRange();
 
   const [
@@ -50,7 +55,16 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
     leaveEnabled
       ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending")
       : Promise.resolve({ count: null }),
-    supabase.from("fuel_entries").select("liters, total_amount").gte("occurred_at", monthStartISO).limit(5000),
+    // Pleins de confiance du mois, toutes les lignes (plus de .limit() silencieux).
+    fetchAllRows<FuelTotalsRow>((a, b) =>
+      supabase
+        .from("fuel_entries")
+        .select("liters, total_amount, status, product")
+        .in("status", [...TRUSTED_FUEL_STATUSES])
+        .gte("occurred_at", monthStartISO)
+        .order("id")
+        .range(a, b),
+    ),
     supabase.from("tank_deliveries").select("id", { count: "exact", head: true }).is("invoice_path", null),
     supabase
       .from("tank_deliveries")
@@ -76,9 +90,8 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
     vehicles: { registration: string } | null;
     users: { full_name: string } | null;
   }[];
-  const fuelRows = (fuelRes.data ?? []) as { liters: number | null; total_amount: number | null }[];
-  const totalLiters = fuelRows.reduce((sum, r) => sum + Number(r.liters ?? 0), 0);
-  const totalCost = fuelRows.reduce((sum, r) => sum + Number(r.total_amount ?? 0), 0);
+  const fuelTotals = summarizeFuelRows(fuelRes.rows);
+  const fuelSuffix = fuelRes.truncated ? " (tronqué)" : "";
   const missingInvoiceDeliveries = (missingInvoiceDeliveriesRes.data ?? []) as any[];
   const openAlerts = (openAlertsRes.data ?? []) as any[];
   const ticpeUpToDate = ticpeEnabled ? Boolean(ticpeExportRes.data) : null;
@@ -111,8 +124,12 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
             <StatTile label="Congés en attente" value={String(pendingLeaveRes.count ?? 0)} accent="gold" />
           </Link>
         )}
-        <StatTile label="Carburant ce mois" value={`${Math.round(totalCost).toLocaleString("fr-FR")} €`} />
-        <StatTile label="Litres ce mois" value={`${Math.round(totalLiters).toLocaleString("fr-FR")} L`} accent="gold" />
+        <StatTile label={`Carburant ce mois${fuelSuffix}`} value={`${Math.round(fuelTotals.cost).toLocaleString("fr-FR")} €`} />
+        <StatTile
+          label={`Gazole ce mois${fuelSuffix}${fuelTotals.adblueLiters > 0 ? ` · AdBlue ${Math.round(fuelTotals.adblueLiters).toLocaleString("fr-FR")} L` : ""}`}
+          value={`${Math.round(fuelTotals.gazoleLiters).toLocaleString("fr-FR")} L`}
+          accent="gold"
+        />
         <Link href="/tanks?tab=approvisionnements" className="block">
           <StatTile
             label="Factures d'approvisionnement manquantes"

@@ -4,7 +4,10 @@ import { PageHeader, StatTile, Card } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
 import { BarChartCard, type BarDatum } from "@/components/reporting/BarChartCard";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
-import { addDays, todayISO } from "@/lib/planning/dates";
+import { addDays } from "@/lib/planning/dates";
+import { TRUSTED_FUEL_STATUSES } from "@/lib/fuel/totals";
+import { fetchAllRows } from "@/lib/utils/fetch-all";
+import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/paris-time";
 import type { AppUser } from "@/lib/auth/session";
 
 /**
@@ -21,10 +24,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const payslipsEnabled = enabledModules.includes("payslips");
 
-  const now = new Date();
-  const monthStartISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const monthStartDate = monthStartISO.slice(0, 10);
-  const from30d = addDays(todayISO(), -30);
+  // Bornes en heure de Paris (pas minuit UTC ni l'heure du serveur).
+  const monthStartDate = parisMonthStartDay();
+  const since30d = parisMidnightIso(addDays(parisDay(), -30));
 
   const [
     activeVehiclesRes,
@@ -63,17 +65,30 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     payslipsEnabled
       ? supabase.from("payslips").select("user_id").gte("period_start", monthStartDate)
       : Promise.resolve({ data: null }),
+    // Pleins de confiance uniquement, toutes les lignes (pas de .limit()
+    // qui tronquait les totaux en silence).
     biEnabled
-      ? supabase.from("fuel_entries").select("liters, total_amount, vehicles(registration)").gte("occurred_at", `${from30d}T00:00:00`).limit(2000)
-      : Promise.resolve({ data: null }),
+      ? fetchAllRows((a, b) =>
+          supabase
+            .from("fuel_entries")
+            .select("liters, total_amount, status, product, vehicles(registration)")
+            .in("status", [...TRUSTED_FUEL_STATUSES])
+            .gte("occurred_at", since30d)
+            .order("id")
+            .range(a, b),
+        )
+      : Promise.resolve(null),
     biEnabled
-      ? supabase
-          .from("planning_entries")
-          .select("status, services(name)")
-          .in("status", ["in_progress", "done"])
-          .gte("start_at", `${from30d}T00:00:00`)
-          .limit(2000)
-      : Promise.resolve({ data: null }),
+      ? fetchAllRows((a, b) =>
+          supabase
+            .from("planning_entries")
+            .select("status, services(name)")
+            .in("status", ["in_progress", "done"])
+            .gte("start_at", since30d)
+            .order("id")
+            .range(a, b),
+        )
+      : Promise.resolve(null),
   ]);
 
   const openAlerts = (openAlertsRes.data ?? []) as any[];
@@ -98,7 +113,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   let toursByService: BarDatum[] = [];
   if (biEnabled) {
     const costByVehicle = new Map<string, number>();
-    for (const r of (fuelRowsRes.data ?? []) as any[]) {
+    for (const r of (fuelRowsRes?.rows ?? []) as any[]) {
       const name = r.vehicles?.registration ?? "—";
       costByVehicle.set(name, (costByVehicle.get(name) ?? 0) + Number(r.total_amount ?? 0));
     }
@@ -107,7 +122,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       .slice(0, 8);
 
     const toursByServiceMap = new Map<string, number>();
-    for (const r of (tourRowsRes.data ?? []) as any[]) {
+    for (const r of (tourRowsRes?.rows ?? []) as any[]) {
       const name = r.services?.name ?? "—";
       toursByServiceMap.set(name, (toursByServiceMap.get(name) ?? 0) + 1);
     }
@@ -158,6 +173,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
             <BarChartCard title="Coût carburant par véhicule (top 8)" data={fuelCostByVehicle} valueSuffix=" €" />
             <BarChartCard title="Tournées par service" data={toursByService} />
           </div>
+          {(fuelRowsRes?.truncated || tourRowsRes?.truncated) && (
+            <p className="mt-2 text-xs text-orange-ink">Résultats tronqués : trop de lignes sur la période, les totaux sont incomplets.</p>
+          )}
         </div>
       )}
 

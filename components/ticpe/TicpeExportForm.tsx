@@ -7,13 +7,19 @@ import { Card } from "@/components/ui";
 export function TicpeExportForm() {
   const router = useRouter();
   const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+  // Dates locales (heure de Paris) : toISOString() donnerait la veille entre minuit et 2 h.
+  const jour = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const firstOfMonth = jour(new Date(today.getFullYear(), today.getMonth(), 1));
   const [start, setStart] = useState(firstOfMonth);
-  const [end, setEnd] = useState(today.toISOString().slice(0, 10));
+  const [end, setEnd] = useState(jour(today));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function generate() {
+    if (start > end) {
+      setError("La fin de période précède le début.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

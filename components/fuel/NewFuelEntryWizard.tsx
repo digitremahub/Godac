@@ -7,6 +7,8 @@ import { QrScanner } from "@/components/fuel/QrScanner";
 import { CameraCapture, type OcrCaptureResult } from "@/components/fuel/CameraCapture";
 import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { FuelEntryForm, type FuelEntryFormValues } from "@/components/fuel/FuelEntryForm";
+import { fuelEntryPayload, parseDecimal } from "@/lib/fuel/entry-payload";
+import { datetimeLocalToIso, isoToDatetimeLocal, toDatetimeLocalValue } from "@/lib/utils/datetime-local";
 import { IconCamera, IconCheck, IconDroplet } from "@/components/layout/icons";
 
 interface VehicleOption {
@@ -28,10 +30,23 @@ interface EmployeeOption {
  * Follows the physical order of a real fill-up instead of one
  * all-fields-at-once screen: chauffeur, puis véhicule, puis la photo
  * du compteur kilométrique (toujours, qu'il s'agisse d'un ticket
- * station ou d'un plein cuve), puis la branche ticket (OCR) ou cuve
- * (totaliseur avant/après), puis validation.
+ * station ou d'un plein cuve), puis la branche achat en station
+ * (ticket photographié/OCR ou saisi à la main : litres, prix, produit,
+ * sans cuve ni totaliseur) ou cuve (choix de la cuve, totaliseur
+ * avant/après), puis validation.
  */
-type Phase = "driver" | "vehicle" | "odometer" | "capture-choice" | "ocr" | "tank-before" | "tank-after" | "validate" | "submitted";
+type Phase =
+  | "driver"
+  | "vehicle"
+  | "odometer"
+  | "capture-choice"
+  | "ocr"
+  | "station"
+  | "tank"
+  | "tank-before"
+  | "tank-after"
+  | "validate"
+  | "submitted";
 
 const FUEL_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "fuel-tickets";
 
@@ -86,14 +101,13 @@ export function NewFuelEntryWizard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [occurredAt, setOccurredAt] = useState(new Date().toISOString().slice(0, 16));
+  const [occurredAt, setOccurredAt] = useState(() => toDatetimeLocalValue());
   const [vehicleKm, setVehicleKm] = useState("");
   const [vehicleKmPhotoPath, setVehicleKmPhotoPath] = useState("");
   const [totalizerBefore, setTotalizerBefore] = useState("");
   const [totalizerBeforePhotoPath, setTotalizerBeforePhotoPath] = useState("");
   const [totalizerAfter, setTotalizerAfter] = useState("");
   const [totalizerAfterPhotoPath, setTotalizerAfterPhotoPath] = useState("");
-  const [stationName, setStationName] = useState("");
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
   const tank = tanks.find((t) => t.id === tankId);
@@ -190,6 +204,88 @@ export function NewFuelEntryWizard({
           )}
         </Card>
 
+        <button className="btn-primary" disabled={!vehicleId} onClick={() => setPhase("odometer")}>
+          Continuer
+        </button>
+      </div>
+    );
+  }
+
+  if (phase === "odometer") {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-3">
+          <p className="text-sm text-navy/70">
+            {vehicle?.registration}
+            {tank && ` · ${tank.name}`}
+          </p>
+          <div>
+            <label className="block"><span className="label">Kilométrage du véhicule *</span>
+            <input type="number" step="1" className="input" value={vehicleKm} onChange={(e) => setVehicleKm(e.target.value)} /></label>
+            {ocrEnabled && (
+              <div className="mt-1.5">
+                <CounterPhotoCapture
+                  label="Photo compteur kilométrique"
+                  initUrl="/api/ocr/odometer/init"
+                  processUrl="/api/ocr/odometer/process"
+                  bucket="tour-photos"
+                  onCaptured={({ photoPath, reading }) => {
+                    setVehicleKmPhotoPath(photoPath);
+                    if (reading !== null) setVehicleKm(String(reading));
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <button className="btn-primary" disabled={!vehicleKm} onClick={() => setPhase("capture-choice")}>
+          Continuer
+        </button>
+      </div>
+    );
+  }
+
+  if (phase === "capture-choice") {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <p className="text-sm text-navy/70">
+            {vehicle?.registration} · {vehicleKm} km
+          </p>
+        </Card>
+        {/* Cuve scannée (QR) : le plein cuve passe en premier. */}
+        <div className={`flex gap-4 ${initialTankId ? "flex-col-reverse" : "flex-col"}`}>
+          <div className="flex flex-col gap-2">
+            <p className="label">Achat en station</p>
+            {ocrEnabled && (
+              <button className="btn-primary" onClick={() => setPhase("ocr")}>
+                <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photographier le ticket (OCR)
+              </button>
+            )}
+            <button className={ocrEnabled ? "btn-secondary" : "btn-primary"} onClick={() => setPhase("station")}>
+              Saisir le ticket à la main
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="label">Cuve de l&apos;entreprise</p>
+            <button className="btn-secondary" onClick={() => setPhase(tankId ? "tank-before" : "tank")}>
+              <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein cuve (totaliseur)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "ocr" && !ocrResult) {
+    // Ticket de station : aucune cuve rattachée.
+    return <CameraCapture vehicleId={vehicleId} driverId={driverId} onResult={setOcrResult} />;
+  }
+
+  if (phase === "tank") {
+    return (
+      <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
           <p className="label">Cuve / pompe</p>
           {scanTarget === "tank" ? (
@@ -218,67 +314,11 @@ export function NewFuelEntryWizard({
           )}
         </Card>
 
-        <button className="btn-primary" disabled={!vehicleId || !tankId} onClick={() => setPhase("odometer")}>
+        <button className="btn-primary" disabled={!tankId} onClick={() => setPhase("tank-before")}>
           Continuer
         </button>
       </div>
     );
-  }
-
-  if (phase === "odometer") {
-    return (
-      <div className="flex flex-col gap-4">
-        <Card className="flex flex-col gap-3">
-          <p className="text-sm text-navy/70">
-            {vehicle?.registration} · {tank?.name}
-          </p>
-          <div>
-            <label className="block"><span className="label">Kilométrage du véhicule *</span>
-            <input type="number" step="1" className="input" value={vehicleKm} onChange={(e) => setVehicleKm(e.target.value)} /></label>
-            {ocrEnabled && (
-              <div className="mt-1.5">
-                <CounterPhotoCapture
-                  label="Photo compteur kilométrique"
-                  initUrl="/api/ocr/odometer/init"
-                  processUrl="/api/ocr/odometer/process"
-                  bucket="tour-photos"
-                  onCaptured={({ photoPath, reading }) => {
-                    setVehicleKmPhotoPath(photoPath);
-                    if (reading !== null) setVehicleKm(String(reading));
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <button className="btn-primary" disabled={!vehicleKm} onClick={() => setPhase(ocrEnabled ? "capture-choice" : "tank-before")}>
-          Continuer
-        </button>
-      </div>
-    );
-  }
-
-  if (phase === "capture-choice") {
-    return (
-      <div className="flex flex-col gap-4">
-        <Card>
-          <p className="text-sm text-navy/70">
-            {vehicle?.registration} · {tank?.name} · {vehicleKm} km
-          </p>
-        </Card>
-        <button className="btn-primary" onClick={() => setPhase("ocr")}>
-          <IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photographier le ticket (OCR)
-        </button>
-        <button className="btn-secondary" onClick={() => setPhase("tank-before")}>
-          <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein cuve (totaliseur)
-        </button>
-      </div>
-    );
-  }
-
-  if (phase === "ocr" && !ocrResult) {
-    return <CameraCapture vehicleId={vehicleId} tankId={tankId} driverId={driverId} onResult={setOcrResult} />;
   }
 
   if (phase === "tank-before") {
@@ -358,18 +398,17 @@ export function NewFuelEntryWizard({
           vehicle_id: vehicleId,
           tank_id: tankId,
           driver_id: driverId,
-          occurred_at: new Date(occurredAt).toISOString(),
-          totalizer_before: totalizerBefore ? Number(totalizerBefore) : null,
-          totalizer_after: Number(totalizerAfter),
+          occurred_at: datetimeLocalToIso(occurredAt),
+          totalizer_before: parseDecimal(totalizerBefore),
+          totalizer_after: parseDecimal(totalizerAfter) ?? undefined,
           totalizer_before_photo_path: totalizerBeforePhotoPath || undefined,
           totalizer_after_photo_path: totalizerAfterPhotoPath || undefined,
           vehicle_km: vehicleKm ? Number(vehicleKm) : undefined,
           vehicle_km_photo_path: vehicleKmPhotoPath || undefined,
-          station_name: stationName || undefined,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Données refusées — vérifiez les champs.");
       handleSubmitted(json.fuelEntry);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -386,24 +425,41 @@ export function NewFuelEntryWizard({
       const res = await fetch(`/api/fuel-entries/${ocrResult.fuelEntryId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        // Ticket de station : ni cuve ni totaliseur (tank_id: null).
         body: JSON.stringify({
+          ...fuelEntryPayload(values, { station: true, method: "PATCH" }),
           vehicle_id: vehicleId,
-          tank_id: tankId,
-          occurred_at: new Date(values.occurred_at).toISOString(),
-          totalizer_before: values.totalizer_before ? Number(values.totalizer_before) : null,
-          totalizer_after: Number(values.totalizer_after),
-          totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
-          totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
-          vehicle_km: values.vehicle_km ? Number(values.vehicle_km) : undefined,
           vehicle_km_photo_path: vehicleKmPhotoPath || undefined,
-          liters: Number(values.liters),
-          unit_price: Number(values.unit_price),
-          station_name: values.station_name || undefined,
           ...(markManual ? { markManual: true } : { validate: true }),
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Données refusées — vérifiez les champs.");
+      handleSubmitted(json.fuelEntry);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Achat en station saisi à la main (ticket en main, sans photo / OCR désactivé). */
+  async function submitStation(values: FuelEntryFormValues) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/fuel-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(onBehalf ? { "x-godac-on-behalf": onBehalf.token } : {}) },
+        body: JSON.stringify({
+          ...fuelEntryPayload(values, { station: true, method: "POST" }),
+          vehicle_id: vehicleId,
+          driver_id: driverId,
+          vehicle_km_photo_path: vehicleKmPhotoPath || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Données refusées — vérifiez les champs.");
       handleSubmitted(json.fuelEntry);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -424,33 +480,56 @@ export function NewFuelEntryWizard({
   if (phase === "ocr" && ocrResult) {
     if (ocrResult.status === "ocr_failed") {
       return (
+        <div className="flex flex-col gap-2">
+          {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+          <FuelEntryForm
+            ocrNotice={`Extraction OCR impossible (${ocrResult.ocrError ?? "raison inconnue"}). Complétez manuellement — la photo reste attachée pour l'audit.`}
+            initialValues={{ vehicle_km: vehicleKm }}
+            submitLabel="Enregistrer"
+            busy={busy}
+            station
+            onSubmit={(values) => submitOcrConfirmation(values, true)}
+          />
+        </div>
+      );
+    }
+    const extracted = ocrResult.extractedFields;
+    return (
+      <div className="flex flex-col gap-2">
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
         <FuelEntryForm
-          ocrNotice={`Extraction OCR impossible (${ocrResult.ocrError ?? "raison inconnue"}). Complétez manuellement — la photo reste attachée pour l'audit.`}
+          ocrNotice="Ticket analysé — vérifiez les champs avant validation."
+          initialValues={{
+            // ISO (UTC) stocké → heure locale de l'input.
+            occurred_at: isoToDatetimeLocal(extracted?.occurred_at) || undefined,
+            liters: extracted?.liters?.toString(),
+            unit_price: extracted?.unit_price?.toString(),
+            station_name: extracted?.station_name,
+            vehicle_km: vehicleKm,
+          }}
+          ticket={extracted ? { total_amount: extracted.total_amount ?? null, fuel_type: extracted.fuel_type ?? null } : null}
+          submitLabel="Valider et enregistrer"
+          busy={busy}
+          station
+          onSubmit={(values) => submitOcrConfirmation(values)}
+        />
+      </div>
+    );
+  }
+
+  if (phase === "station") {
+    return (
+      <div className="flex flex-col gap-2">
+        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+        <FuelEntryForm
+          ocrNotice="Achat en station : reportez les litres, le prix au litre et le produit indiqués sur le ticket."
           initialValues={{ vehicle_km: vehicleKm }}
           submitLabel="Enregistrer"
           busy={busy}
-          totalizerOcrEnabled={ocrEnabled}
-          showPriceFields
-          onSubmit={(values) => submitOcrConfirmation(values, true)}
+          station
+          onSubmit={submitStation}
         />
-      );
-    }
-    return (
-      <FuelEntryForm
-        ocrNotice="Ticket analysé — vérifiez les champs avant validation."
-        initialValues={{
-          occurred_at: ocrResult.extractedFields?.occurred_at?.slice(0, 16),
-          liters: ocrResult.extractedFields?.liters?.toString(),
-          unit_price: ocrResult.extractedFields?.unit_price?.toString(),
-          station_name: ocrResult.extractedFields?.station_name,
-          vehicle_km: vehicleKm,
-        }}
-        submitLabel="Valider et enregistrer"
-        busy={busy}
-        totalizerOcrEnabled={ocrEnabled}
-        showPriceFields
-        onSubmit={(values) => submitOcrConfirmation(values)}
-      />
+      </div>
     );
   }
 
@@ -474,11 +553,6 @@ export function NewFuelEntryWizard({
         <div>
           <label className="block"><span className="label">Date et heure</span>
           <input type="datetime-local" className="input" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} /></label>
-        </div>
-
-        <div>
-          <label className="block"><span className="label">Station (optionnel)</span>
-          <input className="input" value={stationName} onChange={(e) => setStationName(e.target.value)} /></label>
         </div>
 
         {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}

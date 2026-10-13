@@ -4,18 +4,20 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const patchSchema = z.object({
-  totalizer_before: z.coerce.number().nullable().optional(),
-  totalizer_after: z.coerce.number().optional(),
+  totalizer_before: z.coerce.number().nonnegative().nullable().optional(),
+  totalizer_after: z.coerce.number().positive().nullable().optional(),
   totalizer_before_photo_path: z.string().optional(),
   totalizer_after_photo_path: z.string().optional(),
   vehicle_km: z.coerce.number().nonnegative().optional(),
   vehicle_km_photo_path: z.string().optional(),
-  liters: z.coerce.number().positive().optional(),
-  unit_price: z.coerce.number().nonnegative().optional(),
+  liters: z.coerce.number().positive().max(5000).optional(),
+  unit_price: z.coerce.number().positive().max(10).optional(),
+  product: z.enum(["gazole", "adblue"]).optional(),
   occurred_at: z.string().datetime().optional(),
   station_name: z.string().nullable().optional(),
   vehicle_id: z.string().uuid().optional(),
-  tank_id: z.string().uuid().optional(),
+  // null : achat en station (aucune cuve).
+  tank_id: z.string().uuid().nullable().optional(),
   /** Set by the OCR review UI (Module 3) once a manager confirms the extracted/corrected fields. */
   validate: z.boolean().optional(),
   /** Set when an ocr_failed row is completed by hand — the degraded-mode fallback never silently drops the ticket photo already attached. */
@@ -44,9 +46,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 /**
  * Edits a fuel entry, and/or promotes it to `validated`. RLS is the
- * real gate on who can touch which row (see
- * supabase/migrations/20260101000009_rls_policies.sql); this route
- * just shapes the payload and stamps validated_by/validated_at.
+ * real gate on who can touch which row (migration 122 : le chauffeur
+ * complète et valide son ticket en attente, la modification d'un plein
+ * enregistré revient au manager / à la direction) ; the triggers of
+ * migration 121 report any change of litres or tank onto the tank stock.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,6 +61,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { validate, markManual, ...fields } = parsed.data;
   const supabase = await createServerSupabaseClient();
+
+  const { data: current } = await supabase.from("fuel_entries").select("status, tank_id").eq("id", id).maybeSingle();
+  if (!current) return NextResponse.json({ error: "Plein introuvable." }, { status: 404 });
+  const dejaEnregistre = current.status === "manual" || current.status === "validated";
+  // Revalider un plein déjà enregistré ne doit rien rejouer (stock, alertes).
+  if (dejaEnregistre && (validate || markManual)) {
+    return NextResponse.json({ error: "Ce plein est déjà enregistré." }, { status: 409 });
+  }
+  if (fields.occurred_at && new Date(fields.occurred_at).getTime() > Date.now() + 10 * 60_000) {
+    return NextResponse.json({ error: "La date du plein est dans le futur." }, { status: 422 });
+  }
+  const tankFinal = fields.tank_id !== undefined ? fields.tank_id : current.tank_id;
+  if (tankFinal === null) {
+    // Achat en station : ni totaliseur, ni produit déduit d'une cuve.
+    fields.totalizer_before = null;
+    fields.totalizer_after = null;
+  } else if (fields.product !== undefined) {
+    // Plein cuve : le produit est celui de la cuve (fixé par la base).
+    delete fields.product;
+  }
 
   const update: Record<string, unknown> = { ...fields };
   if (validate) {

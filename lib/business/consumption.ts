@@ -1,10 +1,10 @@
 /**
- * Fuel consumption (L/100km) per vehicle over a period. Diesel liters
- * come from fuel_entries; km traveled comes from whichever odometer
- * readings exist for the vehicle in that window (tours, maintenance
- * requests) — there is no odometer field on fuel_entries itself (see
- * 20260101000003_fuel_tables.sql's comment: totalizer_before/after is
- * the TANK's index, not the vehicle's). Pure and side-effect-free —
+ * Fuel consumption (L/100km) per vehicle over a period. Km traveled
+ * comes from the odometer readings in that window (tour start/end,
+ * interventions, and the vehicle_km typed at each trusted fill-up —
+ * totalizer_before/after is the TANK's index, never the vehicle's);
+ * gazole liters from trusted fill-ups (see computeWindowConsumption
+ * for which ones count). Pure and side-effect-free —
  * the readings/liters lookup lives in lib/vehicles/consumption.ts,
  * same split as lib/business/odometer.ts vs. odometer-reference.ts.
  */
@@ -34,6 +34,45 @@ export function computeKmTraveled(readings: OdometerPoint[]): number | null {
 export function computeConsumptionLPer100Km(litersConsumed: number, kmTraveled: number | null): number | null {
   if (kmTraveled === null || kmTraveled <= 0 || litersConsumed <= 0) return null;
   return Math.round((litersConsumed / kmTraveled) * 100 * 10) / 10;
+}
+
+export interface FillUpPoint {
+  at: string;
+  liters: number;
+}
+
+export interface WindowConsumption {
+  km: number;
+  liters: number;
+  lPer100Km: number | null;
+}
+
+/**
+ * Consumption between the first and last odometer reading of a
+ * window. Only the fill-ups strictly after the first reading and up to
+ * (inclusive) the last one count: the fuel bought at or before the
+ * first reading was burnt before it, so summing every litre of the
+ * window against a shorter distance overstated L/100km. Pass only
+ * trusted gazole fill-ups (status manual/validated, product gazole —
+ * AdBlue isn't fuel). null with fewer than two readings or km ≤ 0.
+ */
+export function computeWindowConsumption(readings: OdometerPoint[], fillUps: FillUpPoint[]): WindowConsumption | null {
+  if (readings.length < 2) return null;
+  const sorted = [...readings].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  const km = last.km - first.km;
+  if (!(km > 0)) return null;
+  const from = Date.parse(first.at);
+  const to = Date.parse(last.at);
+  const liters = fillUps
+    .filter((f) => {
+      const t = Date.parse(f.at);
+      return t > from && t <= to;
+    })
+    .reduce((sum, f) => sum + Number(f.liters ?? 0), 0);
+  const rounded = Math.round(liters * 100) / 100;
+  return { km, liters: rounded, lPer100Km: computeConsumptionLPer100Km(rounded, km) };
 }
 
 export interface ConsumptionAnomalyCheck {

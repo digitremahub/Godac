@@ -8,7 +8,7 @@ export default async function OcrReviewPage() {
   const { data: entries } = await supabase
     .from("fuel_entries")
     .select(
-      "id, occurred_at, liters, unit_price, station_name, totalizer_before, totalizer_after, vehicle_km, status, ocr_error, ocr_confidence, ticket_photo_path, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name)",
+      "id, occurred_at, liters, unit_price, station_name, totalizer_before, totalizer_after, vehicle_km, status, ocr_error, ocr_confidence, ocr_raw, ticket_photo_path, tank_id, product, vehicles(registration), tanks(name), users!fuel_entries_driver_id_fkey(full_name)",
     )
     .in("status", ["awaiting_validation", "ocr_failed"])
     .order("created_at", { ascending: true });

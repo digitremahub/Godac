@@ -11,6 +11,9 @@ export interface OcrCaptureResult {
     liters?: number;
     unit_price?: number;
     station_name?: string;
+    /** Lus sur le ticket mais sans colonne propre (gardés dans ocr_raw) — pour le contrôle à la validation. */
+    total_amount?: number;
+    fuel_type?: string;
   } | null;
   status: "awaiting_validation" | "ocr_failed";
   ocrError?: string;
@@ -30,7 +33,8 @@ export function CameraCapture({
   onResult,
 }: {
   vehicleId: string;
-  tankId: string;
+  /** Absent pour un ticket de station (aucune cuve). */
+  tankId?: string;
   driverId?: string;
   onResult: (result: OcrCaptureResult) => void;
 }) {
@@ -48,7 +52,7 @@ export function CameraCapture({
       const initRes = await fetch("/api/ocr/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicle_id: vehicleId, tank_id: tankId, driver_id: driverId }),
+        body: JSON.stringify({ vehicle_id: vehicleId, tank_id: tankId || undefined, driver_id: driverId }),
       });
       const initJson = await initRes.json();
       if (!initRes.ok) throw new Error(initJson.error ?? "Erreur d'initialisation");
@@ -85,6 +89,8 @@ export function CameraCapture({
               liters: detail.fuelEntry.liters ?? undefined,
               unit_price: detail.fuelEntry.unit_price ?? undefined,
               station_name: detail.fuelEntry.station_name ?? undefined,
+              total_amount: processJson.ticket?.total_amount ?? undefined,
+              fuel_type: processJson.ticket?.fuel_type ?? undefined,
             }
           : null,
       });

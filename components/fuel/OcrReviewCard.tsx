@@ -4,12 +4,20 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { FuelEntryForm, type FuelEntryFormValues } from "@/components/fuel/FuelEntryForm";
+import { fuelEntryPayload } from "@/lib/fuel/entry-payload";
+import { ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
+import { isoToDatetimeLocal } from "@/lib/utils/datetime-local";
 
 export function OcrReviewCard({ entry }: { entry: any }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Un ticket photographié vient d'une station ; une ligne déjà
+  // rattachée à une cuve peut l'être à tort (ancien parcours OCR qui
+  // imposait une cuve) — le relecteur peut la détacher.
+  const [station, setStation] = useState(!entry.tank_id);
+  const ticket = ticketExtrasFromOcrRaw(entry.ocr_raw);
 
   async function submit(values: FuelEntryFormValues, markManual: boolean) {
     setBusy(true);
@@ -19,20 +27,12 @@ export function OcrReviewCard({ entry }: { entry: any }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          occurred_at: new Date(values.occurred_at).toISOString(),
-          totalizer_before: values.totalizer_before ? Number(values.totalizer_before) : null,
-          totalizer_after: Number(values.totalizer_after),
-          totalizer_before_photo_path: values.totalizer_before_photo_path || undefined,
-          totalizer_after_photo_path: values.totalizer_after_photo_path || undefined,
-          vehicle_km: values.vehicle_km ? Number(values.vehicle_km) : undefined,
-          liters: Number(values.liters),
-          unit_price: Number(values.unit_price),
-          station_name: values.station_name || undefined,
+          ...fuelEntryPayload(values, { station, method: "PATCH" }),
           ...(markManual ? { markManual: true } : { validate: true }),
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Données refusées — vérifiez les champs.");
       setDone(true);
       router.refresh();
     } catch (e) {
@@ -71,6 +71,13 @@ export function OcrReviewCard({ entry }: { entry: any }) {
                 .join(" · ") || "n/a"}
             </div>
           )}
+          {(ticket.total_amount !== null || ticket.fuel_type) && (
+            <p className="mt-2 text-xs text-navy/60">
+              Lu sur le ticket : {ticket.fuel_type ?? "carburant non lu"}
+              {ticket.total_amount !== null && ` · total ${ticket.total_amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}`}
+            </p>
+          )}
+          {entry.tank_id && <p className="mt-2 text-xs text-navy/60">Cuve : {entry.tanks?.name ?? "—"}</p>}
           {entry.ocr_error && <p className="mt-2 text-xs text-orange-ink">{entry.ocr_error}</p>}
         </div>
 
@@ -78,18 +85,22 @@ export function OcrReviewCard({ entry }: { entry: any }) {
           {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
           <FuelEntryForm
             initialValues={{
-              occurred_at: entry.occurred_at?.slice(0, 16),
+              occurred_at: isoToDatetimeLocal(entry.occurred_at),
               liters: entry.liters?.toString(),
               unit_price: entry.unit_price?.toString(),
               totalizer_before: entry.totalizer_before?.toString(),
               totalizer_after: entry.totalizer_after?.toString(),
               vehicle_km: entry.vehicle_km?.toString(),
               station_name: entry.station_name ?? "",
+              product: entry.product === "adblue" ? "adblue" : "gazole",
             }}
             submitLabel="Valider"
             busy={busy}
             totalizerOcrEnabled
             showPriceFields
+            station={station}
+            onStationChange={entry.tank_id ? setStation : undefined}
+            ticket={ticket}
             onSubmit={(v) => submit(v, entry.status === "ocr_failed")}
           />
         </div>

@@ -30,6 +30,8 @@ export function FuelHistoryFilters({
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
+    // Nouveau filtre : on repart de la première page.
+    params.delete("page");
     router.push(`/fuel?${params.toString()}`);
   }
 
@@ -61,7 +63,15 @@ export function FuelHistoryFilters({
           ))}
         </select>
       )}
-      {(searchParams.get("vehicle") || searchParams.get("driver")) && (
+      <label className="flex items-center gap-1.5 text-sm text-navy/70">
+        Du
+        <input type="date" aria-label="Depuis le" className="input !w-auto" value={searchParams.get("from") ?? ""} onChange={(e) => setParam("from", e.target.value)} />
+      </label>
+      <label className="flex items-center gap-1.5 text-sm text-navy/70">
+        au
+        <input type="date" aria-label="Jusqu'au" className="input !w-auto" value={searchParams.get("to") ?? ""} onChange={(e) => setParam("to", e.target.value)} />
+      </label>
+      {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page")) && (
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/fuel")}>
           Réinitialiser
         </button>

@@ -42,7 +42,7 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
     supabase
       .from("tanks")
       .select(
-        "id, name, fuel_type, capacity_liters, current_totalizer_index, current_stock_liters, last_reading_at, service_id, services(name)",
+        "id, name, fuel_type, capacity_liters, current_totalizer_index, current_stock_liters, pmp, last_reading_at, service_id, services(name)",
       )
       .order("name"),
     supabase.from("services").select("id, name").order("name"),
@@ -113,6 +113,15 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
               </div>
 
               <div className="flex justify-between text-sm text-navy/65">
+                <span>Prix moyen pondéré</span>
+                <span className="font-semibold tabular-nums text-navy">
+                  {tank.pmp !== null && tank.pmp !== undefined
+                    ? `${Number(tank.pmp).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 4 })} €/L TTC`
+                    : "à définir par une livraison"}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-sm text-navy/65">
                 <span>
                   {tank.last_reading_at
                     ? `Dernier plein: ${new Date(tank.last_reading_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`
@@ -162,10 +171,16 @@ async function DeliveriesTab({
 }) {
   const { data: deliveries } = await supabase
     .from("tank_deliveries")
-    .select("id, liters, unit_price, supplier, delivered_at, invoice_path, tanks(name)")
+    .select("id, tank_id, liters, unit_price, supplier, delivered_at, created_at, invoice_path, pmp_after, tanks(name)")
     .order("delivered_at", { ascending: false });
 
   const rows = (deliveries ?? []) as any[];
+  // Dernière livraison saisie de chaque cuve : la seule annulable.
+  const derniere = new Map<string, any>();
+  for (const d of rows) {
+    const cur = derniere.get(d.tank_id);
+    if (!cur || d.created_at > cur.created_at || (d.created_at === cur.created_at && d.id > cur.id)) derniere.set(d.tank_id, d);
+  }
   const withUrls = await Promise.all(
     rows.map(async (d) => {
       const invoiceUrl = d.invoice_path
@@ -179,6 +194,8 @@ async function DeliveriesTab({
         supplier: d.supplier,
         deliveredAt: d.delivered_at,
         invoiceUrl,
+        pmpAfter: d.pmp_after !== null && d.pmp_after !== undefined ? Number(d.pmp_after) : null,
+        cancellable: derniere.get(d.tank_id)?.id === d.id,
       };
     }),
   );
