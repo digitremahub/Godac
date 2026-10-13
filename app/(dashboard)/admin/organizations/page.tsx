@@ -2,6 +2,10 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { estPoleBureau } from "@/lib/organization/poles";
+import { TRANCHES_EFFECTIF } from "@/lib/organization/recherche-entreprises";
+import { paysDe } from "@/lib/pays/pays";
+import { SiretPanel } from "@/components/organization/SiretPanel";
+import { MiseEnPlaceCard } from "@/components/organization/MiseEnPlaceCard";
 import { PageHeader } from "@/components/ui";
 import { OrganizationSettingsForm } from "@/components/admin/OrganizationSettingsForm";
 import { ServicesPanel } from "@/components/admin/ServicesPanel";
@@ -19,7 +23,7 @@ export default async function OrganizationSettingsPage() {
       supabase
         .from("organizations")
         .select(
-          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number, country",
+          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number, country, siren, legal_name, naf_label, idcc, effectif_tranche, company_created_on, siret_checked_at",
         )
         .eq("id", appUser.organization_id)
         .single(),
@@ -48,7 +52,38 @@ export default async function OrganizationSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Organisation" description="Paramètres généraux de votre espace GODAC." />
+      {isDirection && (
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <SiretPanel
+            actuel={{
+              legal_name: organization?.legal_name,
+              siret: organization?.siret,
+              siren: organization?.siren,
+              legal_form: organization?.legal_form,
+              ape_code: organization?.ape_code,
+              naf_label: organization?.naf_label,
+              legal_address: organization?.legal_address,
+              convention_collective: organization?.convention_collective,
+              idcc: organization?.idcc,
+              effectif_tranche: organization?.effectif_tranche,
+              company_created_on: organization?.company_created_on,
+              depot_address: organization?.depot_address,
+              country: organization?.country,
+            }}
+            verifieLe={organization?.siret_checked_at ?? null}
+          />
+          {organization?.siret_checked_at && (
+            <MiseEnPlaceCard
+              idcc={(organization.idcc as string[] | null) ?? []}
+              pays={paysDe(organization.country)}
+              libelleEffectif={organization.effectif_tranche ? (TRANCHES_EFFECTIF[organization.effectif_tranche]?.libelle ?? null) : null}
+            />
+          )}
+        </div>
+      )}
       <OrganizationSettingsForm
+        // Remonté après une lecture SIRET pour reprendre les valeurs écrites.
+        key={organization?.siret_checked_at ?? "manuel"}
         organizationId={appUser.organization_id}
         name={organization?.name ?? ""}
         ocrEnabled={ocrEnabled}

@@ -11,7 +11,10 @@ import {
   type DriverCsvRow,
 } from "@/lib/utils/csv";
 import { ModuleSelector } from "@/components/onboarding/ModuleSelector";
-import { PAYS, moduleDisponible, type CodePays } from "@/lib/pays/pays";
+import { PAYS, moduleDisponible, paysDe, type CodePays } from "@/lib/pays/pays";
+import { ApercuEntreprise, SiretLookup } from "@/components/organization/SiretLookup";
+import { MiseEnPlaceCard } from "@/components/organization/MiseEnPlaceCard";
+import type { InfosEntreprise } from "@/lib/organization/recherche-entreprises";
 import { PlanPicker } from "@/components/onboarding/PlanPicker";
 import { libelleMiseEnService, priceFor, type Plan, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 
@@ -35,6 +38,10 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
   const [step, setStep] = useState<Step>(stripeStatus === "success" ? "done" : "org");
   const [organizationName, setOrganizationName] = useState("");
   const [pays, setPays] = useState<CodePays>("FR");
+  // SIRET : la fiche trouvée pré-remplit l'organisation et met en place
+  // convention, paie et identité légale à la création (create-organization).
+  const [siret, setSiret] = useState("");
+  const [entreprise, setEntreprise] = useState<InfosEntreprise | null>(null);
   const [planId, setPlanId] = useState<PlanId>(catalog.plans[0]?.id ?? "starter");
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
@@ -53,7 +60,12 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
       const res = await fetch("/api/onboarding/create-organization", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: organizationName, country: pays }),
+        body: JSON.stringify({
+          name: organizationName,
+          country: pays,
+          entreprise: entreprise ?? undefined,
+          siret: !entreprise && siret.trim() ? siret.trim() : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
@@ -175,6 +187,23 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
       {step === "org" && (
         <Card className="flex max-w-md flex-col gap-4">
+          {pays === "FR" && (
+            <div className="flex flex-col gap-3">
+              <SiretLookup
+                value={siret}
+                onChange={(v) => {
+                  setSiret(v);
+                  setEntreprise(null);
+                }}
+                onFound={(info) => {
+                  setEntreprise(info);
+                  setOrganizationName((prev) => prev || info.raisonSociale || info.nom);
+                }}
+                label="SIRET de votre entreprise (facultatif)"
+              />
+              {entreprise && <ApercuEntreprise info={entreprise} />}
+            </div>
+          )}
           <div>
             <label className="block"><span className="label">Nom de votre entreprise de transport</span>
             <input
@@ -209,6 +238,15 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
 
       {step === "modules" && (
         <div className="flex flex-col gap-6">
+          {entreprise && (
+            <MiseEnPlaceCard
+              className="max-w-2xl"
+              idcc={entreprise.idcc}
+              pays={paysDe(pays)}
+              libelleEffectif={entreprise.libelleEffectif}
+              effectif={entreprise.effectifEstime}
+            />
+          )}
           <div>
             <p className="mb-2 text-navy/70">Choisissez votre plan.</p>
             <PlanPicker plans={catalog.plans} selected={planId} onChange={setPlanId} />
