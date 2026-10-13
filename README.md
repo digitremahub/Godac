@@ -256,7 +256,7 @@ Ne jamais committer `.env.local`. `.gitignore` l'exclut déjà.
    ```bash
    supabase link --project-ref <ref>
    supabase db push          # applique toutes les migrations
-   supabase db seed          # données de démo (Sud Express 66 fictif)
+   supabase db seed          # données de démo (entreprise fictive)
    ```
 3. Dans le dashboard Supabase → **Authentication → URL Configuration**,
    régler le Site URL et ajouter `<NEXT_PUBLIC_APP_URL>/auth/callback`

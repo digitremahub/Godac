@@ -26,7 +26,7 @@ export default async function GodacStaffPage() {
   }
 
   const supabase = createAdminSupabaseClient();
-  const [{ data: organizations }, { data: ocrRows }, { data: supportRequests }] = await Promise.all([
+  const [{ data: organizations }, { data: ocrRows }, { data: supportRequests }, { data: demandesDemo }] = await Promise.all([
     supabase
       .from("organizations")
       .select("id, name, plan, subscription_status, created_at, vehicles(count), users(count)")
@@ -38,6 +38,11 @@ export default async function GodacStaffPage() {
       .eq("recipient", "support_godac")
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("demo_requests")
+      .select("id, full_name, company, email, phone, vehicles, activity, message, plan_interest, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
   const ocrByOrg = new Map((ocrRows ?? []).map((r) => [r.organization_id as string, r.enabled as boolean]));
 
@@ -85,6 +90,54 @@ export default async function GodacStaffPage() {
           </tbody>
         </table>
       </Card>
+
+      <div className="mt-6">
+        <h2 className="mb-2 text-lg">Demandes de démo (site public)</h2>
+        <Card className="overflow-x-auto">
+          {(demandesDemo ?? []).length === 0 ? (
+            <p className="text-sm text-navy/60">Aucune demande pour l&apos;instant.</p>
+          ) : (
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="text-left text-navy/60">
+                <tr>
+                  <th className="pb-2">Reçue le</th>
+                  <th className="pb-2">Entreprise</th>
+                  <th className="pb-2">Contact</th>
+                  <th className="pb-2">Véhicules</th>
+                  <th className="pb-2">Besoin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(demandesDemo ?? []).map((d: any) => (
+                  <tr key={d.id} className="border-t border-navy/5 align-top">
+                    <td className="py-2">{new Date(d.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" })}</td>
+                    <td className="py-2">
+                      {d.company}
+                      {d.activity && <span className="block text-xs text-navy/55">{d.activity}</span>}
+                    </td>
+                    <td className="py-2">
+                      {d.full_name}
+                      <a href={`mailto:${d.email}`} className="block text-xs text-teal-ink hover:underline">
+                        {d.email}
+                      </a>
+                      {d.phone && (
+                        <a href={`tel:${d.phone}`} className="block text-xs text-teal-ink hover:underline">
+                          {d.phone}
+                        </a>
+                      )}
+                    </td>
+                    <td className="py-2">{d.vehicles ?? "—"}</td>
+                    <td className="py-2 text-xs">
+                      {d.plan_interest && <span className="badge-teal mr-1 capitalize">{d.plan_interest}</span>}
+                      {d.message}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      </div>
 
       <div className="mt-6">
         <h2 className="mb-2 text-lg">Demandes d&apos;assistance transmises au support GODAC</h2>

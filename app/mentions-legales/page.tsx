@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
+import { EDITEUR, designationEditeur } from "@/lib/legal/editeur";
 
 export default function MentionsLegalesPage() {
   return (
     <LegalPageLayout title="Mentions légales">
       <p>
-        <strong>Éditeur.</strong> Le site et l&apos;application GODAC sont édités à titre individuel par François.
+        <strong>Éditeur.</strong>{" "}
+        {EDITEUR.societe
+          ? `Le site et l’application GODAC sont édités par ${designationEditeur()}.`
+          : `Le site et l’application GODAC sont édités à titre individuel par ${EDITEUR.prenom} (société en cours d’immatriculation).`}
         <br />
-        Directeur de la publication : François.
+        Directeur de la publication : {EDITEUR.societe?.representant ?? EDITEUR.prenom}.
         <br />
         Contact : <a href="mailto:contact@godac.fr" className="text-teal-ink hover:underline">contact@godac.fr</a>
       </p>

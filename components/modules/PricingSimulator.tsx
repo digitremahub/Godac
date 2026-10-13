@@ -36,6 +36,7 @@ export function PricingSimulator({
   const addonsSetupTotal = selectedAddons.reduce((sum, x) => sum + Number(x.price?.setup_price ?? 0), 0);
   const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
   const setupTotal = (plan?.setup_price ?? 0) + addonsSetupTotal;
+  const selection = new URLSearchParams({ plan: planId, modules: selectedAddons.map((x) => x.module.key).join(",") }).toString();
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,9 +61,17 @@ export function PricingSimulator({
             <p className="text-xs text-navy/60">* + {setupTotal.toFixed(2)} € de mise en service, une seule fois</p>
           )}
         </div>
-        <Link href="/sign-up" className="btn-primary shrink-0">
-          Créer mon organisation
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link href={`/contact?${selection}`} className="btn-primary">
+            Demander une démo
+          </Link>
+          <Link href={`/bon-de-commande?${selection}`} className="btn-secondary">
+            Bon de commande
+          </Link>
+          <Link href="/sign-up" className="btn-ghost">
+            Créer mon organisation
+          </Link>
+        </div>
       </Card>
     </div>
   );

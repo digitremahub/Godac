@@ -1,38 +1,79 @@
-import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
+import Link from "next/link";
+import { Article, LegalPageLayout, listeLegale } from "@/components/legal/LegalPageLayout";
+import { EDITEUR, designationEditeur } from "@/lib/legal/editeur";
 
+export const metadata = { title: "Conditions générales d'utilisation — GODAC" };
+
+const lien = "text-teal-ink hover:underline";
+
+/** CGU : s'imposent à chaque utilisateur (direction, encadrement, chauffeurs). Le contrat commercial relève des CGV. */
 export default function CguPage() {
   return (
-    <LegalPageLayout title="Conditions générales d'utilisation">
+    <LegalPageLayout title="Conditions d'utilisation" contractuel>
       <p>
-        Les présentes conditions générales d&apos;utilisation (CGU) régissent l&apos;accès et l&apos;utilisation de
-        l&apos;application GODAC, éditée par [À COMPLÉTER : raison sociale], par les entreprises clientes (ci-après
-        « l&apos;Organisation ») et leurs utilisateurs.
+        Les présentes conditions générales d’utilisation (« CGU ») s’appliquent à toute personne qui utilise
+        l’application GODAC ou l’application mobile GODAC Livreur (« l’Utilisateur »), éditées par {designationEditeur()}{" "}
+        (« l’Éditeur »). L’accès est fourni par l’entreprise qui a souscrit l’abonnement (« l’Entreprise »), employeur ou
+        donneur d’ordre de l’Utilisateur ; le contrat entre l’Éditeur et l’Entreprise relève des{" "}
+        <Link href="/cgv" className={lien}>conditions générales de vente</Link>.
       </p>
-      <p>
-        <strong>Objet.</strong> GODAC est un outil de gestion du carburant, de la flotte, des tournées et de
-        l&apos;entretien destiné aux entreprises de transport routier de marchandises. [À COMPLÉTER : description
-        détaillée du service et des modules inclus selon l&apos;offre souscrite].
-      </p>
-      <p>
-        <strong>Compte et accès.</strong> Chaque utilisateur accède à l&apos;application via un compte nominatif
-        rattaché à l&apos;Organisation. [À COMPLÉTER : conditions de création de compte, rôles, responsabilité de
-        l&apos;Organisation sur la gestion de ses utilisateurs].
-      </p>
-      <p>
-        <strong>Abonnement et tarification.</strong> [À COMPLÉTER : conditions tarifaires, durée d&apos;engagement,
-        modalités de résiliation — voir la page /modules pour le détail des modules et de leurs prix].
-      </p>
-      <p>
-        <strong>Responsabilité.</strong> [À COMPLÉTER : limites de responsabilité, disponibilité du service,
-        maintenance].
-      </p>
-      <p>
-        <strong>Droit applicable.</strong> [À COMPLÉTER : droit applicable et juridiction compétente].
-      </p>
-      <p>
-        Le présent document est un modèle à compléter et à faire valider par un professionnel du droit avant toute
-        mise en production.
-      </p>
+
+      <Article n={1} titre="Objet">
+        <p>
+          GODAC est un logiciel de gestion pour les entreprises de transport routier : carburant, flotte, planning et
+          tournées, pointage, congés, messagerie, tournées colis et, selon l’abonnement de l’Entreprise, paie, amendes et
+          contestations clients.
+        </p>
+      </Article>
+
+      <Article n={2} titre="Compte">
+        <ul className={listeLegale}>
+          <li>Le compte est nominatif et créé ou validé par l’Entreprise, qui attribue le rôle de chaque Utilisateur.</li>
+          <li>L’Utilisateur garde ses identifiants (code PIN, lien de connexion, clé d’accès) confidentiels et signale toute utilisation anormale.</li>
+          <li>L’Entreprise peut désactiver un compte à tout moment, notamment au départ du salarié : l’accès est alors coupé immédiatement.</li>
+        </ul>
+      </Article>
+
+      <Article n={3} titre="Bon usage">
+        <ul className={listeLegale}>
+          <li>Saisir des informations exactes (pleins, kilométrages, pointages, livraisons) et ne pas usurper l’identité d’un autre Utilisateur.</li>
+          <li>Ne publier dans la messagerie aucun contenu illicite, injurieux ou contraire à la confidentialité de l’Entreprise.</li>
+          <li>Ne pas utiliser l’application au volant, véhicule en mouvement : les actions se font à l’arrêt.</li>
+          <li>Ne pas tenter d’accéder aux données d’autres Utilisateurs ou d’autres entreprises, ni perturber le service.</li>
+        </ul>
+      </Article>
+
+      <Article n={4} titre="Données personnelles">
+        <p>
+          Les données de l’Utilisateur sont traitées pour le compte de l’Entreprise, responsable de traitement ; l’Éditeur agit
+          comme sous-traitant. Le détail figure dans la{" "}
+          <Link href="/confidentialite" className={lien}>politique de confidentialité</Link>. La position GPS n’est relevée
+          qu’au moment du pointage ou lorsque l’Utilisateur demande à recalculer sa tournée : GODAC ne suit jamais les
+          déplacements en continu.
+        </p>
+      </Article>
+
+      <Article n={5} titre="Disponibilité">
+        <p>
+          L’Éditeur s’efforce de rendre le service accessible en permanence, sous réserve des opérations de maintenance et
+          des aléas des réseaux, dans les conditions de l’<Link href="/sla" className={lien}>engagement de service</Link>{" "}
+          souscrit par l’Entreprise.
+        </p>
+      </Article>
+
+      <Article n={6} titre="Propriété intellectuelle">
+        <p>
+          L’application, la marque GODAC et leurs contenus sont protégés. L’Utilisateur bénéficie d’un droit d’usage limité à
+          son activité pour l’Entreprise, pendant la durée de son accès.
+        </p>
+      </Article>
+
+      <Article n={7} titre="Contact et droit applicable">
+        <p>
+          Pour toute question : <a href={`mailto:${EDITEUR.email}`} className={lien}>{EDITEUR.email}</a>, ou en priorité
+          l’Entreprise. Les présentes CGU sont soumises au droit français.
+        </p>
+      </Article>
     </LegalPageLayout>
   );
 }
