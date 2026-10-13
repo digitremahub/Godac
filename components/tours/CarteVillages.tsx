@@ -142,6 +142,7 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
         const maplibregl = await import("maplibre-gl");
         if (annule || !conteneur.current) return;
         lib.current = maplibregl;
+        let charge = false;
         const m = new maplibregl.Map({
           container: conteneur.current,
           style: STYLE,
@@ -203,7 +204,14 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
           m.on("mouseleave", "villages", () => (m.getCanvas().style.cursor = ""));
           setPrete(true);
         });
-        m.on("error", () => setErreurCarte(true));
+        // Seule une panne avant le premier affichage (style injoignable) mérite le bandeau ; une tuile manquante ensuite, non.
+        m.on("error", () => {
+          if (!charge) setErreurCarte(true);
+        });
+        m.on("load", () => {
+          charge = true;
+          setErreurCarte(false);
+        });
         carte.current = m;
       } catch {
         if (!annule) setErreurCarte(true);
