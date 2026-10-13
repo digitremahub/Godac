@@ -1,0 +1,27 @@
+{
+  "name": "godac-livreur",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Application GODAC Livreur (App Store / Google Play) : coque native autour de l'application chauffeur GODAC.",
+  "scripts": {
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#0A0F1E' --iconBackgroundColorDark '#0A0F1E' --splashBackgroundColor '#0A0F1E' --splashBackgroundColorDark '#0A0F1E'",
+    "android:debug": "cap sync android && cd android && ./gradlew assembleDebug",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "8.0.1",
+    "@capacitor-mlkit/barcode-scanning": "8.2.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
+    "typescript": "^5.6.0"
+  }
+}

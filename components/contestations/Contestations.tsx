@@ -11,6 +11,8 @@ export interface Contestation {
   id: string;
   status: "to_validate" | "assigned" | "answered" | "resolved" | "rejected";
   has_document: boolean;
+  /** Livraison retrouvée dans une tournée colis (lieu de dépôt, photo). */
+  preuve: { stopId: string; photo: boolean; lieu: string | null; livreLe: string | null } | null;
   client_name: string | null;
   reference: string | null;
   parcel_code: string | null;
@@ -27,6 +29,20 @@ export interface Contestation {
   responded_at: string | null;
   resolution_note: string | null;
   created_at: string;
+}
+
+/** Lien vers la photo prise par le chauffeur à la livraison, avec le lieu de dépôt. */
+function PreuveLivraison({ c }: { c: Contestation }) {
+  if (!c.preuve) return null;
+  const quand = c.preuve.livreLe ? new Date(c.preuve.livreLe).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  const texte = ["Livré", c.preuve.lieu?.toLowerCase(), quand && `le ${quand}`].filter(Boolean).join(" ");
+  return c.preuve.photo ? (
+    <a href={`/api/colis/arrets/${c.preuve.stopId}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !py-2 text-sm text-teal-ink">
+      📷 Photo de livraison{c.preuve.lieu || quand ? ` · ${texte}` : ""}
+    </a>
+  ) : c.preuve.lieu ? (
+    <span className="self-center text-xs text-navy/60">{texte} · sans photo</span>
+  ) : null;
 }
 
 const STATUT: Record<Contestation["status"], { label: string; cls: string }> = {
@@ -169,6 +185,7 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
                 <IconFileText className="h-4 w-4" /> Document
               </a>
             )}
+            <PreuveLivraison c={c} />
           </div>
         </>
       ) : (
@@ -201,6 +218,7 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
                     <IconFileText className="h-4 w-4" /> Document
                   </a>
                 )}
+                <PreuveLivraison c={c} />
               </div>
             </div>
           )}

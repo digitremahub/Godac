@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       ...champs,
       suggested_driver_id: suggestion?.driverId ?? null,
       suggestion_reason: suggestion?.raison ?? null,
+      delivery_stop_id: suggestion?.stopId ?? null,
       created_by: appUser.id,
     })
     .select("id")

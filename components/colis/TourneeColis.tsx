@@ -9,7 +9,10 @@ import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
-import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { libelleLieu } from "@/lib/colis/livraison";
+import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
+import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { ExportTournee } from "@/components/colis/ExportTournee";
 
@@ -18,17 +21,6 @@ interface Draft {
   destinataire: string;
   telephone: string;
   code: string | null;
-}
-
-/** Photo d'étiquette réduite à 1600 px en JPEG avant envoi (lecture plus rapide, moins de données). */
-async function imageEnBase64(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85).split(",")[1]!;
 }
 
 function AdresseInput({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
@@ -75,6 +67,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
   const [draft, setDraft] = useState<Draft | null>(null);
   const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [livraison, setLivraison] = useState<Stop | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -203,15 +196,31 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     }
   }
 
-  function onCode(text: string) {
+  /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
+  function onCode(text: string): boolean {
     const lu = analyserCode(text);
     if (lu.adresse) {
       // Adresse dans le code : ajout direct, sans quitter le scanner.
       ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code });
+      return true;
     } else {
       setScanner(false);
       setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code });
       setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
+      return false;
+    }
+  }
+
+  /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
+  async function ouvrirScanner() {
+    if (!scannerNatifDisponible()) return setScanner(true);
+    try {
+      for (;;) {
+        const code = await scannerNatif();
+        if (!code || !onCode(code)) break;
+      }
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
     }
   }
 
@@ -378,6 +387,16 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           {toast.text}
         </p>
       )}
+      {livraison && (
+        <LivraisonSheet
+          stop={livraison}
+          onClose={() => setLivraison(null)}
+          onLivre={(maj) => {
+            setStops((all) => all.map((x) => (x.id === maj.id ? maj : x)));
+            setLivraison(null);
+          }}
+        />
+      )}
       {scanner && <ParcelScanner onCode={onCode} onClose={() => setScanner(false)} />}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
@@ -437,7 +456,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
             <a href={gmaps(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
-            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => statut(prochain, "delivered")}>
+            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => setLivraison(prochain)}>
               <IconCheck className="h-5 w-5" /> Livré
             </button>
             <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => statut(prochain, "failed")}>
@@ -474,7 +493,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         <Card className="flex flex-col gap-3">
           <h2 className="text-lg">Charger les colis</h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <button type="button" className="btn-primary justify-center !py-3" onClick={() => setScanner(true)}>
+            <button type="button" className="btn-primary justify-center !py-3" onClick={ouvrirScanner}>
               <IconQrCode className="h-5 w-5" /> Scanner les colis
             </button>
             {lectureEtiquette && (
@@ -506,7 +525,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
             + Ajouter une adresse
           </button>
-          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setScanner(true)}>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={ouvrirScanner}>
             <IconQrCode className="h-4 w-4" /> Scanner un colis
           </button>
         </div>
@@ -569,12 +588,17 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold leading-snug">{s.address}</p>
                     <p className="text-xs text-navy/60">
-                      {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
+                      {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.status === "delivered" && libelleLieu(s.delivered_place), s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                   {s.phone && s.status === "pending" && (
                     <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                       <IconPhone className="h-4 w-4" />
+                    </a>
+                  )}
+                  {s.proof_photo_path && (
+                    <a href={`/api/colis/arrets/${s.id}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs" aria-label={`Photo de livraison — ${s.address}`}>
+                      📷 Photo
                     </a>
                   )}
                   {s.status !== "pending" && (

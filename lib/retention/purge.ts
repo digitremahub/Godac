@@ -9,7 +9,7 @@ export const RETENTION_DAYS = {
   clockGps: 365,
   /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
   assistantConversations: 90,
-  /** Tournées colis (adresses et noms des destinataires). */
+  /** Tournées colis (adresses, noms, téléphones des destinataires, photos de livraison). */
   parcelRuns: 30,
 } as const;
 
@@ -42,10 +42,21 @@ export async function purgeExpiredData() {
     .lt("updated_at", daysAgo(RETENTION_DAYS.assistantConversations));
   results.assistantConversations = convs.error ? convs.error.message : (convs.count ?? 0);
 
+  // Photos de livraison des tournées purgées : effacées du stockage d'abord.
+  const limite = daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10);
+  const { data: photos } = await admin
+    .from("delivery_stops")
+    .select("proof_photo_path, delivery_runs!inner(run_date)")
+    .lt("delivery_runs.run_date", limite)
+    .not("proof_photo_path", "is", null);
+  const chemins = (photos ?? []).map((p) => p.proof_photo_path as string);
+  for (let i = 0; i < chemins.length; i += 100) await admin.storage.from("delivery-proofs").remove(chemins.slice(i, i + 100));
+  results.deliveryPhotos = chemins.length;
+
   const runs = await admin
     .from("delivery_runs")
     .delete({ count: "exact" })
-    .lt("run_date", daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10));
+    .lt("run_date", limite);
   results.parcelRuns = runs.error ? runs.error.message : (runs.count ?? 0);
 
   return results;
