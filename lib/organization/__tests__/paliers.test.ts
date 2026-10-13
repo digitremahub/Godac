@@ -8,25 +8,28 @@ const p = (min_users: number, max_users: number | null, monthly_price: number, e
   monthly_price,
   extra_per_user,
 });
-const grille = [p(1, 5, 29), p(6, 15, 59), p(16, 30, 99), p(31, null, 99, 1)];
+const grille = [p(1, 20, 29), p(21, 50, 59), p(51, 99, 99), p(100, null, 129, 1)];
 
 describe("paliers d'utilisateurs", () => {
   it("prix selon le nombre de chauffeurs", () => {
     expect(prixPalier(grille, "route_optimizer", 0)).toBe(29);
-    expect(prixPalier(grille, "route_optimizer", 5)).toBe(29);
-    expect(prixPalier(grille, "route_optimizer", 6)).toBe(59);
-    expect(prixPalier(grille, "route_optimizer", 30)).toBe(99);
-    expect(prixPalier(grille, "route_optimizer", 31)).toBe(100);
+    expect(prixPalier(grille, "route_optimizer", 20)).toBe(29);
+    expect(prixPalier(grille, "route_optimizer", 21)).toBe(59);
+    expect(prixPalier(grille, "route_optimizer", 50)).toBe(59);
+    expect(prixPalier(grille, "route_optimizer", 51)).toBe(99);
+    expect(prixPalier(grille, "route_optimizer", 99)).toBe(99);
   });
-  it("bloqué à 99 € puis 1 € par utilisateur au-delà de 30", () => {
-    expect(prixPalier(grille, "route_optimizer", 104)).toBe(99 + 74);
+  it("100 et plus : 129 € + 1 € par chauffeur au-delà de 100", () => {
+    expect(prixPalier(grille, "route_optimizer", 100)).toBe(129);
+    expect(prixPalier(grille, "route_optimizer", 101)).toBe(130);
+    expect(prixPalier(grille, "route_optimizer", 125)).toBe(154);
   });
   it("module sans grille", () => {
     expect(prixPalier(grille, "payslips", 10)).toBeNull();
   });
   it("libellés", () => {
-    expect(libellePalier(grille[0]!)).toBe("jusqu'à 5 utilisateurs");
-    expect(libellePalier(grille[1]!)).toBe("6 à 15 utilisateurs");
-    expect(libellePalier(grille[3]!)).toBe("31 utilisateurs et plus");
+    expect(libellePalier(grille[0]!)).toBe("jusqu'à 20 utilisateurs");
+    expect(libellePalier(grille[1]!)).toBe("21 à 50 utilisateurs");
+    expect(libellePalier(grille[3]!)).toBe("100 utilisateurs et plus");
   });
 });

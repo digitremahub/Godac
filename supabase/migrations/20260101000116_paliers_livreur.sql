@@ -8,7 +8,7 @@ create table module_user_tiers (
   min_users integer not null check (min_users >= 0),
   max_users integer check (max_users is null or max_users >= min_users),
   monthly_price numeric(10, 2) not null check (monthly_price >= 0),
-  -- Palier ouvert (max_users null) : supplément par utilisateur au-delà de min_users - 1.
+  -- Palier ouvert (max_users null) : supplément par utilisateur au-delà de min_users.
   extra_per_user numeric(10, 2) not null default 0,
   primary key (module_key, min_users)
 );
