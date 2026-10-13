@@ -24,6 +24,8 @@ const endFieldsSchema = z.object({
 
 const bodySchema = z.union([
   z.object({ stage: z.literal("start"), photo_path: z.string().min(1), fields: startFieldsSchema.partial() }),
+  // Feuille de début de tournée (photo ou PDF), distincte de l'écran du terminal.
+  z.object({ stage: z.literal("start_sheet"), photo_path: z.string().min(1), fields: startFieldsSchema.partial() }),
   z.object({ stage: z.literal("end"), photo_path: z.string().min(1), fields: endFieldsSchema.partial() }),
 ]);
 
@@ -58,19 +60,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: tour, error: fetchError } = await supabase
     .from("planning_entries")
     .select(
-      "start_photo_path, end_photo_path, report_ocr_raw, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_departure_time, report_stops_delivered, report_packages_missing, report_pickups, report_return_time, report_packages_picked_up, report_packages_returned, report_packages_relay",
+      "start_photo_path, start_sheet_path, end_photo_path, report_ocr_raw, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_departure_time, report_stops_delivered, report_packages_missing, report_pickups, report_return_time, report_packages_picked_up, report_packages_returned, report_packages_relay",
     )
     .eq("id", id)
     .single();
   if (fetchError || !tour) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
-  const alreadyHasPhoto = parsed.data.stage === "start" ? Boolean(tour.start_photo_path) : Boolean(tour.end_photo_path);
+  const colonne = parsed.data.stage === "start" ? "start_photo_path" : parsed.data.stage === "start_sheet" ? "start_sheet_path" : "end_photo_path";
+  const alreadyHasPhoto = Boolean((tour as Record<string, unknown>)[colonne]);
   if (alreadyHasPhoto) {
     return NextResponse.json({ error: "Une photo est déjà enregistrée pour cette étape." }, { status: 409 });
   }
 
   let candidates: Record<string, string | number | null | undefined>;
-  if (parsed.data.stage === "start") {
+  if (parsed.data.stage === "start" || parsed.data.stage === "start_sheet") {
     const f = parsed.data.fields;
     candidates = {
       report_bl_number: f.bl_number,
@@ -95,7 +98,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const tourColumns = tour as Record<string, unknown>;
   const update: Record<string, unknown> = {
-    [parsed.data.stage === "start" ? "start_photo_path" : "end_photo_path"]: parsed.data.photo_path,
+    [colonne]: parsed.data.photo_path,
     report_ocr_raw: { ...((tour.report_ocr_raw as object) ?? {}), [parsed.data.stage]: parsed.data.fields },
   };
   for (const [column, value] of Object.entries(candidates)) {

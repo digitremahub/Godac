@@ -15,6 +15,7 @@ import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import { VehicleDocumentsPanel } from "@/components/vehicles/VehicleDocumentsPanel";
 import { listVehicleDocuments } from "@/lib/vehicles/documents";
 import { parisCalendarDate } from "@/lib/planning/dates";
+import { getVehicleLatestKmReading } from "@/lib/vehicles/odometer-reference";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -93,6 +94,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       getVehicleConsumption(supabase, id, 90),
       supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
     ]);
+  const kmActuel = await getVehicleLatestKmReading(supabase, id);
 
   if (!vehicle) notFound();
   const v = vehicle as any;
@@ -235,6 +237,21 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           )}
         </div>
         <div className="flex flex-col items-center gap-4">
+          <Card className="w-full border-teal/40">
+            <p className="text-sm text-navy/65">Kilométrage actuel</p>
+            {kmActuel ? (
+              <>
+                <p className="font-display text-2xl font-bold tabular-nums">{Math.round(kmActuel.km).toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ")} km</p>
+                <p className="text-xs text-navy/60">
+                  Dernier relevé le{" "}
+                  {new Date(kmActuel.at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" })} ·{" "}
+                  {kmActuel.source}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-navy/60">Aucun relevé : il s&apos;affichera au premier départ de tournée ou au premier plein.</p>
+            )}
+          </Card>
           {(v.brand || v.model) && (
             <Card className="w-full">
               <p className="text-sm text-navy/65">Modèle</p>
