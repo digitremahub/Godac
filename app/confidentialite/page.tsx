@@ -54,6 +54,10 @@ export default function ConfidentialitePage() {
             d&apos;identifier le conducteur dans les délais légaux.
           </li>
           <li>
+            <strong>Tournées colis et contestations clients :</strong> adresses de livraison, nom des destinataires,
+            réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
+          </li>
+          <li>
             <strong>Messagerie :</strong> messages et pièces jointes échangés entre collègues dans GODAC.
           </li>
           <li>
@@ -84,7 +88,7 @@ export default function ConfidentialitePage() {
 
       <Section title="Lecture automatique par intelligence artificielle">
         <p>
-          La lecture automatique des photos (ticket de carburant, compteur, amende, rapport de tournée, étiquette de colis) et
+          La lecture automatique des photos (ticket de carburant, compteur, amende, rapport de tournée, étiquette de colis, réclamation client) et
           l&apos;assistant sont des <strong>options désactivées par défaut</strong>, que seule l&apos;entreprise
           cliente peut activer. Lorsqu&apos;elles sont activées, les contenus concernés sont transmis à Anthropic
           (modèles Claude) pour être analysés, puis le résultat vous est proposé pour vérification. Selon ses

@@ -11,6 +11,7 @@ const RESOLVE_URL: Record<string, string> = {
   vehicle_interventions: "/maintenance",
   tank_deliveries: "/tanks?tab=approvisionnements",
   fines: "/fines",
+  customer_disputes: "/contestations",
   planning_entries: "/tours/history",
   support_requests: "/support",
   meeting_requests: "/intranet",
