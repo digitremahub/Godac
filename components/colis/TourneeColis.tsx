@@ -9,6 +9,8 @@ import { networkErrorMessage } from "@/lib/utils/network-error";
 
 interface Run {
   id: string;
+  name: string | null;
+  run_date: string;
   status: "loading" | "in_progress" | "done";
   start_label: string | null;
   start_lat: number | null;
@@ -27,6 +29,15 @@ interface Stop {
   recipient: string | null;
   notes: string | null;
   status: "pending" | "delivered" | "failed";
+}
+interface RunResume {
+  id: string;
+  name: string | null;
+  run_date: string;
+  status: Run["status"];
+  nbArrets: number;
+  nbColis: number;
+  nbRestants: number;
 }
 interface Draft {
   adresse: string;
@@ -91,6 +102,8 @@ function AdresseInput({ value, onChange, autoFocus }: { value: string; onChange:
 }
 
 export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }) {
+  const [runs, setRuns] = useState<RunResume[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [scanner, setScanner] = useState(false);
@@ -99,18 +112,99 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const recharger = useCallback(async () => {
+  const chargerTournee = useCallback(async (id: string) => {
     try {
-      const data = await api<{ run: Run; stops: Stop[] }>("/api/colis/tournee");
+      const data = await api<{ run: Run; stops: Stop[] }>(`/api/colis/tournees/${id}`);
       setRun(data.run);
       setStops(data.stops);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     }
   }, []);
+
+  const recharger = useCallback(
+    async (prefere?: string | null) => {
+      try {
+        const { tournees } = await api<{ tournees: RunResume[] }>("/api/colis/tournees");
+        setRuns(tournees);
+        let memo: string | null = null;
+        try {
+          memo = localStorage.getItem("godac-tournee-colis");
+        } catch {
+          /* stockage indisponible */
+        }
+        const choix =
+          [prefere, activeId, memo].find((id) => id && tournees.some((t) => t.id === id)) ??
+          tournees.find((t) => t.status !== "done")?.id ??
+          tournees[tournees.length - 1]?.id ??
+          null;
+        setActiveId(choix);
+        if (choix) await chargerTournee(choix);
+        else setRun(null);
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+      }
+    },
+    [activeId, chargerTournee],
+  );
+
+  function choisir(id: string) {
+    setActiveId(id);
+    try {
+      localStorage.setItem("godac-tournee-colis", id);
+    } catch {
+      /* stockage indisponible */
+    }
+    chargerTournee(id);
+  }
+
+  async function nouvelleTournee() {
+    setBusy("nouvelle");
+    try {
+      const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
+      try {
+        localStorage.setItem("godac-tournee-colis", cree.id);
+      } catch {
+        /* stockage indisponible */
+      }
+      await recharger(cree.id);
+      setToast({ ok: true, text: `${cree.name ?? "Tournée"} créée : scannez vos colis.` });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function supprimerTournee() {
+    if (!run) return;
+    if (!confirm(`Supprimer « ${run.name ?? "cette tournée"} » et ses ${stops.length} arrêt(s) ? C'est définitif.`)) return;
+    setBusy("suppr");
+    try {
+      await api(`/api/colis/tournees/${run.id}`, { method: "DELETE" });
+      setRun(null);
+      setStops([]);
+      await recharger(null);
+      setToast({ ok: true, text: "Tournée supprimée." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function renommer() {
+    if (!run) return;
+    const nom = prompt("Nom de la tournée", run.name ?? "")?.trim();
+    if (!nom || nom === run.name) return;
+    await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ name: nom.slice(0, 60) }) }).catch((e) => setToast({ ok: false, text: networkErrorMessage(e) }));
+    await recharger(run.id);
+  }
+
   useEffect(() => {
     recharger();
-  }, [recharger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -122,7 +216,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     try {
       const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string }>("/api/colis/arrets", {
         method: "POST",
-        body: JSON.stringify({ code: d.code, adresse: d.adresse, destinataire: d.destinataire || null }),
+        body: JSON.stringify({ run_id: run?.id, code: d.code, adresse: d.adresse, destinataire: d.destinataire || null }),
       });
       setToast(
         r.duplicate
@@ -134,7 +228,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
               : { ok: true, text: "Colis ajouté." },
       );
       setDraft(null);
-      await recharger();
+      await recharger(run?.id);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -184,10 +278,10 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           }),
         );
       }
-      const r = await api<{ kmAvant: number; kmApres: number; sansGps: number }>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ depuis }) });
+      const r = await api<{ kmAvant: number; kmApres: number; sansGps: number }>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run?.id, depuis }) });
       const gain = r.kmAvant - r.kmApres;
+      await recharger(run?.id);
       setToast({ ok: true, text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}.` });
-      await recharger();
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -201,22 +295,70 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
-      await recharger();
+      await recharger(run?.id);
     }
   }
 
   async function supprimer(s: Stop) {
     if (!confirm(`Retirer « ${s.address} » de la tournée ?`)) return;
     setStops((all) => all.filter((x) => x.id !== s.id));
-    await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger());
+    await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger(run?.id));
   }
 
   async function phase(status: Run["status"]) {
-    await api("/api/colis/tournee", { method: "PATCH", body: JSON.stringify({ status }) });
-    await recharger();
+    if (!run) return;
+    await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+    await recharger(run.id);
   }
 
-  if (!run) return <p className="text-sm text-navy/60">Chargement de la tournée…</p>;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+  const selecteur = runs && (
+    <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Mes tournées colis">
+      {runs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={t.id === activeId}
+          onClick={() => choisir(t.id)}
+          className={`rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
+            t.id === activeId ? "border-teal bg-teal/10 font-semibold" : "border-navy/10 bg-surface hover:border-navy/25"
+          }`}
+        >
+          <span className="block leading-tight">
+            {t.name ?? "Tournée"}
+            {t.run_date !== today && <span className="ml-1 text-xs font-normal text-navy/55">({new Date(`${t.run_date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})</span>}
+          </span>
+          <span className="block text-xs font-normal text-navy/60">
+            {t.status === "done" ? "Clôturée" : t.status === "in_progress" ? `En livraison · ${t.nbRestants} restant(s)` : `${t.nbColis} colis`}
+          </span>
+        </button>
+      ))}
+      <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy !== null} onClick={nouvelleTournee}>
+        + Nouvelle tournée
+      </button>
+    </div>
+  );
+
+  if (!runs) return <p className="text-sm text-navy/60">Chargement des tournées…</p>;
+  if (!run) {
+    return (
+      <div className="flex flex-col gap-4">
+        {toast && (
+          <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
+            {toast.text}
+          </p>
+        )}
+        <Card className="flex flex-col items-start gap-3">
+          <h2 className="text-lg">Aucune tournée colis en cours</h2>
+          <p className="text-sm text-navy/65">Créez une tournée, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
+          <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
+            Créer une tournée
+          </button>
+        </Card>
+      </div>
+    );
+  }
 
   const pending = stops.filter((s) => s.status === "pending");
   const colis = stops.reduce((n, s) => n + s.parcel_count, 0);
@@ -234,6 +376,21 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
       {scanner && <ParcelScanner onCode={onCode} onClose={() => setScanner(false)} />}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
+      {selecteur}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg">
+          {run.name ?? "Tournée"}
+          {run.status === "done" && <span className="ml-2 rounded-full bg-navy/[0.06] px-2 py-0.5 text-xs font-semibold text-navy/65">Clôturée</span>}
+        </h2>
+        <div className="flex gap-1">
+          <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm" onClick={renommer}>
+            Renommer
+          </button>
+          <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
+            Supprimer la tournée
+          </button>
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-2">
         {[
           ["Arrêts", stops.length],
@@ -282,6 +439,15 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
           <p className="mt-1 text-sm text-navy/65">{livres} arrêt(s) livré(s) sur {stops.length}.</p>
           <button type="button" className="btn-primary mt-3" onClick={() => phase("done")}>
             Clôturer la tournée
+          </button>
+        </Card>
+      ) : run.status === "done" ? (
+        <Card className="flex flex-col items-start gap-3">
+          <p className="text-sm text-navy/70">
+            Tournée clôturée : {livres} arrêt(s) livré(s) sur {stops.length}.
+          </p>
+          <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
+            + Nouvelle tournée
           </button>
         </Card>
       ) : (
@@ -374,7 +540,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         </Card>
       )}
 
-      {!enLivraison && pending.length > 0 && (
+      {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
           <button
             type="button"

@@ -3,9 +3,10 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
-import { cleAdresse, moduleActif, tourneeDuJour, STOP_FIELDS } from "@/lib/colis/serveur";
+import { cleAdresse, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const bodySchema = z.object({
+  run_id: z.string().uuid(),
   code: z.string().trim().max(120).nullable().optional(),
   adresse: z.string().trim().min(5).max(300),
   destinataire: z.string().trim().max(120).nullable().optional(),
@@ -22,8 +23,8 @@ export async function POST(req: Request) {
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Adresse manquante ou trop courte." }, { status: 400 });
-  const run = await tourneeDuJour(supabase, appUser);
-  if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 500 });
+  const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
+  if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
   const { data: stops } = await supabase.from("delivery_stops").select("id, parcel_code, parcel_count, address, status, position").eq("run_id", run.id);
   const code = parsed.data.code || null;
