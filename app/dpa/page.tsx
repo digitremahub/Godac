@@ -16,7 +16,7 @@ const TRAITEMENTS: [string, string, string][] = [
   ["Messagerie, intranet, alertes", "Salariés", "Messages, pièces jointes, convocations, notifications"],
   ["Amendes", "Conducteurs", "Avis de contravention, véhicule, conducteur désigné"],
   ["Paie (si souscrit)", "Salariés", "Rémunération, heures, absences, frais, numéro de sécurité sociale, coordonnées bancaires éventuelles, taux de prélèvement à la source"],
-  ["Tournée colis (si souscrit)", "Destinataires des colis du Client", "Nom, adresse, téléphone, photo du colis déposé"],
+  ["Tournée colis (si souscrit)", "Destinataires des colis du Client, chauffeurs", "Nom, adresse, téléphone, photo du colis déposé ; dernière position du chauffeur pendant la tournée en cours (sans historique, effacée à la clôture)"],
   ["Contestations clients (si souscrit)", "Clients du Client, chauffeurs", "Réclamation, référence, adresse, réponse du chauffeur"],
   ["Assistant (si souscrit)", "Utilisateurs", "Questions posées et réponses"],
 ];

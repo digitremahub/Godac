@@ -48,8 +48,9 @@ export default function CguPage() {
           Les données de l’Utilisateur sont traitées pour le compte de l’Entreprise, responsable de traitement ; l’Éditeur agit
           comme sous-traitant. Le détail figure dans la{" "}
           <Link href="/confidentialite" className={lien}>politique de confidentialité</Link>. La position GPS n’est relevée
-          qu’au moment du pointage ou lorsque l’Utilisateur demande à recalculer sa tournée : GODAC ne suit jamais les
-          déplacements en continu.
+          qu’au moment du pointage et, pour les chauffeurs, pendant une tournée colis en cours (suivi de la livraison par
+          l’Entreprise, dernière position seulement, effacée à la clôture, masquable pendant une pause). En dehors de ces
+          moments, GODAC ne suit jamais les déplacements.
         </p>
       </Article>
 

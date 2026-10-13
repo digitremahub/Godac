@@ -10,6 +10,7 @@ import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
 import { libelleLieu } from "@/lib/colis/livraison";
+import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
@@ -272,7 +273,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status } : x)));
+    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
     } catch (e) {
@@ -380,6 +381,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const prochain = pending[0];
   const livres = stops.filter((s) => s.status === "delivered").length;
   const enLivraison = run.status === "in_progress";
+  const avancement = estimerAvancement(
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null })),
+    {
+      depot: run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
+      retourDepot: run.return_to_start,
+    },
+  );
 
   return (
     <div className="flex flex-col gap-4 pb-24">
@@ -428,6 +436,20 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           </Card>
         ))}
       </div>
+
+      {enLivraison && avancement.adressesRestantes > 0 && (
+        <p className="rounded-xl bg-marine px-4 py-2.5 text-sm text-white">
+          Reste <strong>{avancement.adressesRestantes}</strong> adresse{avancement.adressesRestantes > 1 ? "s" : ""} et{" "}
+          <strong>{avancement.colisRestants}</strong> colis
+          {avancement.finEstimee && (
+            <>
+              {" "}
+              · fin estimée vers <strong className="text-teal">{heureFin(avancement.finEstimee)}</strong>
+              <span className="text-white/60">{avancement.methode === "rythme" ? " (au rythme actuel)" : " (estimation)"}</span>
+            </>
+          )}
+        </p>
+      )}
 
       {enLivraison && prochain ? (
         <Card className="flex flex-col gap-3 border-2 border-teal/50">
