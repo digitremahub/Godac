@@ -94,7 +94,7 @@ export default function CgvPage() {
           Les frais de mise en service rémunèrent le paramétrage de l’espace du Client (organisation, services, dépôts,
           véhicules, utilisateurs), l’import des données fournies par le Client et la prise en main de l’équipe. Ils sont
           facturés une seule fois, à la commande, ou en plusieurs mensualités sans frais lorsque la Formule ou le bon de
-          commande le prévoit (formule Starter : trois mensualités). Ils restent acquis à l’Éditeur ; en cas de résiliation
+          commande le prévoit (formule Starter : douze mensualités). Ils restent acquis à l’Éditeur ; en cas de résiliation
           anticipée, les mensualités restantes deviennent exigibles.
         </p>
         <p>
