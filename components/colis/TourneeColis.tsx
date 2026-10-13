@@ -108,6 +108,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
   const [stops, setStops] = useState<Stop[]>([]);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; colis: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -225,7 +226,7 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
             ? { ok: true, text: "Ajouté à un arrêt existant (même adresse)." }
             : r.geocoded === false
               ? { ok: false, text: "Ajouté, mais adresse introuvable sur la carte : vérifiez-la." }
-              : { ok: true, text: "Colis ajouté." },
+              : { ok: true, text: run?.status === "in_progress" ? "Adresse ajoutée en fin de tournée : réoptimisez pour l'insérer au bon endroit." : "Colis ajouté." },
       );
       setDraft(null);
       await recharger(run?.id);
@@ -303,6 +304,38 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
     if (!confirm(`Retirer « ${s.address} » de la tournée ?`)) return;
     setStops((all) => all.filter((x) => x.id !== s.id));
     await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger(run?.id));
+  }
+
+  async function enregistrerEdition() {
+    if (!edition) return;
+    const avant = stops.find((x) => x.id === edition.id);
+    setBusy("edition");
+    try {
+      await api(`/api/colis/arrets/${edition.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...(avant && edition.adresse.trim() !== avant.address ? { adresse: edition.adresse.trim() } : {}),
+          destinataire: edition.destinataire.trim() || null,
+          parcel_count: Math.max(1, edition.colis),
+        }),
+      });
+      setEdition(null);
+      await recharger(run?.id);
+      setToast({ ok: true, text: avant && edition.adresse.trim() !== avant.address ? "Adresse modifiée : pensez à réoptimiser l'ordre." : "Arrêt mis à jour." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deplacer(st: Stop, sens: "haut" | "bas") {
+    try {
+      await api(`/api/colis/arrets/${st.id}`, { method: "PATCH", body: JSON.stringify({ deplacer: sens }) });
+      await recharger(run?.id);
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
   }
 
   async function phase(status: Run["status"]) {
@@ -474,6 +507,17 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         </Card>
       )}
 
+      {enLivraison && (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", code: null })}>
+            + Ajouter une adresse
+          </button>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setScanner(true)}>
+            <IconQrCode className="h-4 w-4" /> Scanner un colis
+          </button>
+        </div>
+      )}
+
       {draft && (
         <Card className="flex flex-col gap-3 border-2 border-teal/40">
           <div className="flex items-center justify-between">
@@ -502,37 +546,84 @@ export function TourneeColis({ lectureEtiquette }: { lectureEtiquette: boolean }
         <Card className="!p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 sm:px-5">
             <h2 className="text-lg">{run.optimized_at ? "Ordre de passage" : "Colis chargés"}</h2>
-            {!enLivraison && pending.length > 1 && (
-              <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(false)}>
+            {run.status !== "done" && pending.length > 1 && (
+              <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(enLivraison)}>
                 {busy === "optim" ? "Calcul…" : run.optimized_at ? "Réoptimiser" : "Optimiser l'ordre"}
               </button>
             )}
           </div>
           <ol className="mt-2 divide-y divide-navy/[0.07]">
             {stops.map((s, i) => (
-              <li key={s.id} className={`flex items-start gap-3 px-4 py-2.5 sm:px-5 ${s.status !== "pending" ? "opacity-55" : ""}`}>
-                <span
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
-                    s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-marine text-teal"
-                  }`}
-                >
-                  {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold leading-snug">{s.address}</p>
-                  <p className="text-xs text-navy/60">
-                    {[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
-                  </p>
+              <li key={s.id} className={`px-4 py-2.5 sm:px-5 ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+                      s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-marine text-teal"
+                    }`}
+                  >
+                    {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold leading-snug">{s.address}</p>
+                    <p className="text-xs text-navy/60">
+                      {[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  {s.status !== "pending" && (
+                    <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
+                      Annuler
+                    </button>
+                  )}
                 </div>
-                {s.status === "pending" && !enLivraison && (
-                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs text-orange-ink" onClick={() => supprimer(s)} aria-label={`Retirer ${s.address}`}>
-                    Retirer
-                  </button>
+                {s.status === "pending" && run.status !== "done" && edition?.id !== s.id && (
+                  <div className="mt-1.5 flex flex-wrap gap-1 pl-9 text-xs">
+                    <button type="button" className="btn-ghost !px-2 !py-1" aria-label={`Monter ${s.address}`} onClick={() => deplacer(s, "haut")}>
+                      ↑
+                    </button>
+                    <button type="button" className="btn-ghost !px-2 !py-1" aria-label={`Descendre ${s.address}`} onClick={() => deplacer(s, "bas")}>
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost !px-2 !py-1"
+                      onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", colis: s.parcel_count })}
+                    >
+                      Modifier
+                    </button>
+                    <button type="button" className="btn-ghost !px-2 !py-1 text-orange-ink" onClick={() => supprimer(s)} aria-label={`Retirer ${s.address}`}>
+                      Retirer
+                    </button>
+                  </div>
                 )}
-                {s.status !== "pending" && (
-                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
-                    Annuler
-                  </button>
+                {edition?.id === s.id && (
+                  <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
+                    <AdresseInput value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
+                    <input
+                      className="input"
+                      value={edition.destinataire}
+                      onChange={(e) => setEdition({ ...edition, destinataire: e.target.value })}
+                      placeholder="Destinataire (facultatif)"
+                      aria-label="Destinataire"
+                    />
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-navy/65">Colis à cette adresse</span>
+                      <button type="button" className="btn-secondary !px-3 !py-1" onClick={() => setEdition({ ...edition, colis: Math.max(1, edition.colis - 1) })} aria-label="Un colis de moins">
+                        −
+                      </button>
+                      <span className="w-6 text-center font-semibold tabular-nums">{edition.colis}</span>
+                      <button type="button" className="btn-secondary !px-3 !py-1" onClick={() => setEdition({ ...edition, colis: edition.colis + 1 })} aria-label="Un colis de plus">
+                        +
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="btn-primary !py-2 text-sm" disabled={busy !== null || edition.adresse.trim().length < 5} onClick={enregistrerEdition}>
+                        Enregistrer
+                      </button>
+                      <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setEdition(null)}>
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
                 )}
               </li>
             ))}
