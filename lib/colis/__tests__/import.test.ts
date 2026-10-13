@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lireFichier, lireLienGoogleMaps, lireListe } from "@/lib/colis/import";
+import { extraireLien, idListeGoogle, lireFichier, lireLienGoogleMaps, lireListe, lireListeGoogle } from "@/lib/colis/import";
 
 describe("lireLienGoogleMaps", () => {
   it("itinéraire /dir/ avec adresses et coordonnées", () => {
@@ -61,5 +61,25 @@ describe("téléphones importés", () => {
   it("numéro en fin de ligne d'une liste", () => {
     const [p] = lireListe("12 rue des Lilas, 69230 Saint-Genis-Laval - 06 12 34 56 78");
     expect(p).toEqual({ adresse: "12 rue des Lilas, 69230 Saint-Genis-Laval", lat: null, lng: null, nom: null, telephone: "06 12 34 56 78" });
+  });
+});
+
+describe("listes Google Maps partagées", () => {
+  it("extrait le lien d'un texte partagé", () => {
+    expect(extraireLien("Regarde ma liste « Tournée 12 » sur Google Maps : https://maps.app.goo.gl/AbCdEf123.")).toBe("https://maps.app.goo.gl/AbCdEf123");
+    expect(extraireLien("aucun lien")).toBeNull();
+  });
+  it("identifiant de liste", () => {
+    expect(idListeGoogle("https://www.google.com/maps/placelists/list/2Abc_dEfGhIjK123?g_ep=x")).toBe("2Abc_dEfGhIjK123");
+    expect(idListeGoogle("https://www.google.com/maps/@45.7,4.8,12z/data=!4m3!11m2!2sXyZ987_abcDEF!3e3")).toBe("XyZ987_abcDEF");
+    expect(idListeGoogle("https://www.google.com/maps/dir/A/B")).toBeNull();
+  });
+  it("lit les lieux de l'aperçu de liste", () => {
+    const lieu = (nom: string, adresse: string, lat: number, lng: number) => [null, [null, null, "", null, adresse, [null, null, lat, lng], ["0x47f4:0x1"]], nom, ""];
+    const reponse = `)]}'\n${JSON.stringify([[null, "id", null, null, "Ma liste", null, null, null, [lieu("Boulangerie", "12 Rue des Lilas, 69230 Saint-Genis-Laval", 45.69, 4.79), lieu("Client B", "3 Avenue Foch, 69006 Lyon", 45.77, 4.84)]]])}`;
+    const pts = lireListeGoogle(reponse);
+    expect(pts).toHaveLength(2);
+    expect(pts[0]).toMatchObject({ lat: 45.69, lng: 4.79, adresse: "12 Rue des Lilas, 69230 Saint-Genis-Laval" });
+    expect(lireListeGoogle("pas du json")).toEqual([]);
   });
 });

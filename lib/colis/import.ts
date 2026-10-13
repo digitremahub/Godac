@@ -63,6 +63,62 @@ export function lireLienGoogleMaps(url: string): PointImporte[] {
   return q ? [point(q)].filter((x): x is PointImporte => x !== null) : [];
 }
 
+/** Premier lien https d'un texte partagé (« Regarde ma liste … https://maps.app.goo.gl/… »). */
+export function extraireLien(texte: string): string | null {
+  const m = texte.match(/https?:\/\/[^\s<>"']+/i);
+  return m ? m[0].replace(/[).,;!?»]+$/, "") : null;
+}
+
+/**
+ * Identifiant d'une liste Google Maps enregistrée (« Partager la liste ») :
+ * …/maps/placelists/list/<id> ou …/data=…!2s<id>!3e3.
+ */
+export function idListeGoogle(url: string): string | null {
+  const direct = url.match(/placelists\/list\/([\w-]{8,})/);
+  if (direct) return direct[1]!;
+  const data = url.match(/!2s([\w-]{10,})!3e3/);
+  return data ? data[1]! : null;
+}
+
+/**
+ * Réponse de l'aperçu de liste Google Maps (JSON préfixé « )]}' ») →
+ * points. Le format n'est pas documenté : on cherche, de façon tolérante,
+ * chaque lieu sous la forme [ …, [null, null, lat, lng], …, adresse ] et
+ * son nom.
+ */
+export function lireListeGoogle(reponse: string): PointImporte[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(reponse.replace(/^\)\]\}'\s*/, ""));
+  } catch {
+    return [];
+  }
+  const estCoord = (v: unknown): v is [null, null, number, number] =>
+    Array.isArray(v) && v.length >= 4 && v[0] === null && v[1] === null && typeof v[2] === "number" && typeof v[3] === "number" &&
+    Math.abs(v[2]) <= 90 && Math.abs(v[3]) <= 180;
+  const points: PointImporte[] = [];
+  const vus = new Set<string>();
+  // Un lieu : un tableau dont un élément est un tableau « détails » portant les coordonnées.
+  const visiter = (v: unknown, parent: unknown[] | null) => {
+    if (!Array.isArray(v)) return;
+    const coord = v.find(estCoord);
+    if (coord) {
+      const textes = v.filter((x): x is string => typeof x === "string" && x.trim().length > 0 && !/^0x[0-9a-f]+:0x/i.test(x));
+      const adresse = textes.find((t) => /\d/.test(t) && /[a-zà-ÿ]{3,}/i.test(t) && t.length > 6) ?? null;
+      const nomParent = parent?.find((x): x is string => typeof x === "string" && x.trim().length > 0) ?? null;
+      const cle = `${coord[2].toFixed(6)},${coord[3].toFixed(6)}`;
+      if (!vus.has(cle)) {
+        vus.add(cle);
+        points.push({ adresse, lat: coord[2], lng: coord[3], nom: nomParent && nomParent !== adresse ? nomParent : null });
+      }
+      return;
+    }
+    for (const x of v) visiter(x, v);
+  };
+  visiter(data, null);
+  return points;
+}
+
 /** Une adresse (ou « lat, lng ») par ligne. */
 export function lireListe(texte: string): PointImporte[] {
   return texte

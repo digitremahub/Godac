@@ -120,9 +120,9 @@ export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: 
         <>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-semibold">Lien Google Maps</span>
-            <span className="text-xs text-navy/60">Dans Google Maps : itinéraire avec vos arrêts → Partager → Copier le lien.</span>
+            <span className="text-xs text-navy/60">Dans Google Maps : une liste enregistrée (« Partager la liste ») ou un itinéraire → Partager → Copier. Vous pouvez coller tout le texte partagé.</span>
             <div className="flex gap-2">
-              <input className="input flex-1" value={lien} onChange={(e) => setLien(e.target.value)} placeholder="https://maps.app.goo.gl/…" inputMode="url" />
+              <input className="input flex-1" value={lien} onChange={(e) => setLien(e.target.value)} placeholder="https://maps.app.goo.gl/…" />
               <button type="button" className="btn-secondary" disabled={busy !== null || lien.trim().length < 12} onClick={depuisLien}>
                 {busy === "lien" ? "Lecture…" : "Lire"}
               </button>
