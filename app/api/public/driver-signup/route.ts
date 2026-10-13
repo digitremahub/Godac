@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
+import { dateNaissanceValide } from "@/lib/users/date-naissance";
 import { createPinDriver } from "@/lib/auth/driver-pin";
 
 const bodySchema = z.object({
@@ -8,6 +10,8 @@ const bodySchema = z.object({
   full_name: z.string().min(1),
   company_name: z.string().min(1),
   phone: z.string().optional(),
+  // Code de secours « initiales + mois/année de naissance » (ex : FT1188).
+  birth_date: z.string().refine((v) => dateNaissanceValide(v), "Date de naissance invalide."),
   service_id: z.string().uuid().optional(),
 });
 
@@ -63,6 +67,8 @@ export async function POST(req: Request) {
       serviceId: parsed.data.service_id,
       pendingApproval: true,
     });
+    await admin.from("employee_files").insert({ organization_id: organization.id, user_id: id, birth_date: parsed.data.birth_date });
+    await assignDriverCodeFromBirthDate(admin, organization.id, id, parsed.data.full_name, parsed.data.birth_date);
     return NextResponse.json({ id });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
