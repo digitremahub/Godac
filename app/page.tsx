@@ -8,20 +8,57 @@ import {
   IconArrowRight,
   IconCalendar,
   IconChartBar,
+  IconAlertTriangle,
   IconCheck,
   IconClock,
+  IconCoins,
+  IconCylinder,
+  IconMapPin,
   IconDroplet,
   IconFileText,
   IconPlay,
   IconQrCode,
-  IconShieldCheck,
   IconTruck,
 } from "@/components/layout/icons";
 
 const TRUST_STATS = [
-  { icon: IconClock, label: "Plus de temps pour l'essentiel" },
-  { icon: IconShieldCheck, label: "Moins d'imprévus" },
-  { icon: IconChartBar, label: "Une meilleure rentabilité" },
+  { icon: IconDroplet, label: "Chaque litre tracé" },
+  { icon: IconAlertTriangle, label: "Anomalies signalées" },
+  { icon: IconCoins, label: "TICPE récupérée" },
+];
+
+/** Le cœur de l'offre : contrôler et réduire le poste carburant. */
+const LEVIERS_CARBURANT = [
+  {
+    title: "Chaque plein rattaché",
+    description: "Véhicule, chauffeur, kilométrage, litres et ticket (photo lue automatiquement) : plus aucun plein sans justificatif.",
+    icon: IconDroplet,
+  },
+  {
+    title: "Anomalies détectées",
+    description: "Écart de totaliseur sur la cuve, consommation d'un véhicule qui dépasse le seuil que vous fixez : alerte immédiate au bon responsable.",
+    icon: IconAlertTriangle,
+  },
+  {
+    title: "Cuves et prix maîtrisés",
+    description: "Niveau des cuves, prix moyen pondéré recalculé à chaque livraison, carte des prix stations pour faire le plein au bon endroit.",
+    icon: IconCylinder,
+  },
+  {
+    title: "Consommation par véhicule",
+    description: "L/100 km sur 30 et 90 jours, comparés à la référence constructeur : vous savez quel camion ou quel chauffeur consomme trop.",
+    icon: IconChartBar,
+  },
+  {
+    title: "TICPE remboursée",
+    description: "Export PL/SPL prêt pour le comptable chaque trimestre : le remboursement partiel de taxe n'est plus oublié.",
+    icon: IconCoins,
+  },
+  {
+    title: "Kilomètres justifiés",
+    description: "Départs et retours de tournée avec photo du compteur : les litres sont confrontés aux kilomètres réellement parcourus.",
+    icon: IconMapPin,
+  },
 ];
 
 const HOME_SLIDES = [
@@ -35,11 +72,6 @@ const HOME_SLIDES = [
 const REPLACES = ["Les tableurs Excel", "Les groupes WhatsApp", "Les tickets papier", "Les relances par téléphone"];
 
 const FEATURES = [
-  {
-    title: "Carburant & PMP",
-    description: "Saisie manuelle ou OCR du ticket, prix moyen pondéré recalculé tout seul, écart de totaliseur détecté.",
-    icon: IconDroplet,
-  },
   {
     title: "Flotte & entretien",
     description: "Fiches véhicules, interventions par niveau d'urgence, demandes du chauffeur directement au gestionnaire.",
@@ -61,8 +93,8 @@ const FEATURES = [
     icon: IconCalendar,
   },
   {
-    title: "Conformité TICPE",
-    description: "Export Excel filtré PL/SPL pour le comptable, jamais les véhicules légers. Prêt à déposer.",
+    title: "Tournée colis & app Livreur",
+    description: "Scan des colis, ordre de passage optimisé, photo de livraison et suivi des tournées en direct.",
     icon: IconFileText,
   },
 ];
@@ -96,14 +128,15 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-28 lg:pt-16">
             <div className="flex flex-col gap-7">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
-                Le système d&apos;exploitation de la PME transport
+                Carburant cher&nbsp;? Contrôlez-le.
               </p>
               <h1 className="text-[34px] leading-[1.1] tracking-tight sm:text-5xl lg:text-[52px]">
-                Moins d&apos;imprévus, <span className="text-teal">plus de routes</span> à parcourir.
+                Votre carburant, <span className="text-teal">enfin sous contrôle</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                Carburant, flotte, entretiens, plannings, paie et documents&nbsp;: un seul outil pour tenir votre
-                entreprise de transport, du dépôt jusqu&apos;à la comptabilité.
+                GODAC trace chaque litre, détecte les pleins anormaux et les dérives de consommation, et récupère votre
+                TICPE. Flotte, planning, tournées et paie s&apos;ajoutent dans le même outil&nbsp;: un seul abonnement au lieu
+                d&apos;en payer plusieurs.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
@@ -165,6 +198,34 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </div>
       </section>
 
+      {/* ── Carburant : le cœur de l'offre ── */}
+      <section id="carburant" className="scroll-mt-6 bg-paper py-20 lg:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-6">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <p className="kicker !text-teal-ink">Carburant</p>
+            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Savoir où part chaque litre, et arrêter les fuites.</h2>
+            <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+              Le gazole est l&apos;un des plus gros postes d&apos;une entreprise de transport. GODAC le contrôle au plein près,
+              sans ressaisie&nbsp;: le chauffeur photographie son ticket, GODAC fait le reste.
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {LEVIERS_CARBURANT.map((l) => (
+              <li key={l.title} className="card flex flex-col gap-3">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal text-marine">
+                  <l.icon className="h-5 w-5" />
+                </span>
+                <h3 className="text-lg">{l.title}</h3>
+                <p className="text-pretty text-sm leading-relaxed text-navy/65">{l.description}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-8 text-center text-sm text-navy/60">
+            Inclus dès le plan Essentiel, avec la lecture automatique des tickets.
+          </p>
+        </div>
+      </section>
+
       {/* ── Demo ── */}
       <section id="demo" className="scroll-mt-6 bg-surface">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
@@ -220,8 +281,12 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-xl">
-              <p className="kicker !text-teal-ink">Modules</p>
-              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Un seul réflexe. Toute la boîte.</h2>
+              <p className="kicker !text-teal-ink">Tout-en-un</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Et le reste, sans un outil de plus.</h2>
+              <p className="mt-3 text-pretty text-navy/65">
+                Activez les modules dont vous avez besoin, quand vous en avez besoin&nbsp;: ils remplacent les logiciels de
+                flotte, de planning, de tournée et de paie que vous payez à part.
+              </p>
             </div>
             <Link href="/modules" className="btn-secondary w-fit">
               Modules & tarifs
@@ -261,8 +326,8 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-marine px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
           <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-teal/20 blur-3xl" />
           <div className="relative">
-            <h2 className="text-[28px] leading-tight sm:text-4xl">Votre entreprise, organisée.</h2>
-            <p className="mt-3 text-white/70">Carburant, flotte, équipes et comptabilité&nbsp;: tout au même endroit.</p>
+            <h2 className="text-[28px] leading-tight sm:text-4xl">Reprenez la main sur le carburant.</h2>
+            <p className="mt-3 text-white/70">Puis ajoutez flotte, planning, tournées et paie dans le même outil.</p>
           </div>
           <Link href={primaryCta.href} className="btn-primary relative shrink-0 !px-7 !py-3.5 text-base">
             {primaryCta.label}

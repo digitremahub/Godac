@@ -36,11 +36,12 @@ export default async function ModulesPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
         <SiteHeader />
         <div className="relative mx-auto max-w-3xl px-5 pb-20 pt-10 text-center sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">4 plans selon votre flotte · modules à la carte</p>
-          <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Choisissez votre plan, ajoutez ce dont vous avez besoin</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Carburant inclus dans tous les plans · modules à la carte</p>
+          <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Contrôlez le carburant, ajoutez le reste quand vous voulez</h1>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg font-light text-white/75">
-            Chaque plan est dimensionné pour votre nombre de véhicules et inclut tout le socle
-            opérationnel et RH&nbsp;; les modules avancés restent activables à la carte.
+            Chaque plan est dimensionné pour votre nombre de véhicules et inclut le contrôle du carburant (pleins, tickets lus
+            automatiquement, cuves, anomalies). Flotte, planning, tournées, paie&nbsp;: les autres modules s&apos;activent à la carte,
+            dans le même outil.
           </p>
         </div>
       </div>
