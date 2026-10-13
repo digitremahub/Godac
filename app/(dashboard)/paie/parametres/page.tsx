@@ -1,0 +1,51 @@
+import Link from "next/link";
+import { requireAppUser } from "@/lib/auth/session";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { PageHeader, EmptyState } from "@/components/ui";
+import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
+import { FRAIS_CONVENTIONNELS, parametresLegauxAu } from "@/lib/paie/parametres";
+
+export default async function ReglagesPaiePage() {
+  const appUser = await requireAppUser();
+  if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="La paie est réservée à la direction." />;
+  const supabase = await createServerSupabaseClient();
+  const { data: r } = await supabase.from("payroll_settings").select("*").eq("organization_id", appUser.organization_id).maybeSingle();
+  const legal = parametresLegauxAu(new Date().toISOString().slice(0, 10));
+
+  const initial: Reglages = {
+    headcount: r?.headcount ?? 1,
+    accident_rate: Number(r?.accident_rate ?? 0),
+    mobility_rate: Number(r?.mobility_rate ?? 0),
+    prevoyance_salarial_rate: Number(r?.prevoyance_salarial_rate ?? 0),
+    prevoyance_patronal_rate: Number(r?.prevoyance_patronal_rate ?? 0),
+    mutuelle_salarial_amount: Number(r?.mutuelle_salarial_amount ?? 0),
+    mutuelle_patronal_amount: Number(r?.mutuelle_patronal_amount ?? 0),
+    meal_allowance: r?.meal_allowance ?? null,
+    single_meal_allowance: r?.single_meal_allowance ?? null,
+    snack_allowance: r?.snack_allowance ?? null,
+    overnight_allowance: r?.overnight_allowance ?? null,
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title="Réglages de paie"
+        description={`Ce qui est propre à votre entreprise. Les taux légaux (SMIC ${legal.smicHoraire.toFixed(2).replace(".", ",")} €, plafond de la Sécurité sociale ${legal.pmss.toLocaleString("fr-FR")} €, cotisations) sont tenus à jour par GODAC.`}
+        actions={
+          <Link href="/paie" className="btn-secondary !py-2 text-sm">
+            ← Paie
+          </Link>
+        }
+      />
+      <ReglagesPaieForm
+        initial={initial}
+        defauts={{
+          meal_allowance: FRAIS_CONVENTIONNELS.repas,
+          single_meal_allowance: FRAIS_CONVENTIONNELS.repasUnique,
+          snack_allowance: FRAIS_CONVENTIONNELS.cassecroute,
+          overnight_allowance: FRAIS_CONVENTIONNELS.grandDeplacement,
+        }}
+      />
+    </div>
+  );
+}
