@@ -1,4 +1,5 @@
 import { haversineKm } from "@/lib/colis/itineraire";
+import { minutesParis } from "@/lib/colis/heure-paris";
 
 /**
  * Avancement d'une tournée colis et heure de fin estimée — affichés au
@@ -10,6 +11,13 @@ import { haversineKm } from "@/lib/colis/itineraire";
  * - « estimation » avant : trajet restant (durée de l'itinéraire si connue,
  *   sinon distance × 1,3 à 35 km/h) + 3 min de remise par arrêt.
  * Le retour au dépôt est ajouté s'il est prévu.
+ *
+ * Horaires d'ouverture (lib/colis/horaires.ts) : quand un arrêt restant a
+ * des créneaux (`fenetres`, minutes depuis minuit à Paris), on estime
+ * l'heure d'arrivée de chaque arrêt (même rythme ou même trajet que
+ * ci-dessus) et on ajoute l'attente jusqu'à l'ouverture si on arrive en
+ * avance. Approximation simple : ni l'ordre ni la durée d'itinéraire
+ * routier ne sont recalculés.
  */
 export interface ArretEstimation {
   status: "pending" | "delivered" | "failed";
@@ -17,6 +25,8 @@ export interface ArretEstimation {
   lat: number | null;
   lng: number | null;
   done_at: string | null;
+  /** Créneaux d'ouverture du jour (null : pas de contrainte, [] : fermé). */
+  fenetres?: [number, number][] | null;
 }
 
 export interface Avancement {
@@ -33,7 +43,8 @@ export const MINUTES_PAR_ARRET = 3;
 export const VITESSE_KMH = 35;
 const FACTEUR_ROUTE = 1.3;
 
-function minutesTrajet(km: number) {
+/** Durée de trajet estimée (min) pour une distance à vol d'oiseau. */
+export function minutesTrajet(km: number) {
   return ((km * FACTEUR_ROUTE) / VITESSE_KMH) * 60;
 }
 
@@ -71,9 +82,10 @@ export function estimerAvancement(
 
   let minutes: number;
   let methode: Avancement["methode"];
+  let cycle: number | null = null;
   if (horodates.length >= 3) {
-    const cycle = (horodates[horodates.length - 1]! - horodates[0]!) / 60000 / (horodates.length - 1);
-    minutes = restants.length * Math.min(30, Math.max(1, cycle)) + retour;
+    cycle = Math.min(30, Math.max(1, (horodates[horodates.length - 1]! - horodates[0]!) / 60000 / (horodates.length - 1)));
+    minutes = restants.length * cycle + retour;
     methode = "rythme";
   } else {
     let trajet = options.minutesItineraire ?? null;
@@ -89,7 +101,30 @@ export function estimerAvancement(
     minutes = trajet + restants.length * MINUTES_PAR_ARRET;
     methode = "estimation";
   }
+  minutes += attentesOuverture(restants, cycle, options.position ?? null, minutesParis(maintenant));
   return { ...base, finEstimee: new Date(maintenant.getTime() + minutes * 60000).toISOString(), methode };
+}
+
+/**
+ * Attente cumulée (min) aux adresses à horaires où l'on arriverait avant
+ * l'ouverture : arrêts parcourus dans l'ordre depuis maintenant, chacun
+ * coûtant le rythme constaté, ou trajet + remise.
+ */
+function attentesOuverture(restants: ArretEstimation[], cycle: number | null, position: { lat: number; lng: number } | null, maintenant: number): number {
+  if (!restants.some((a) => a.fenetres?.length)) return 0;
+  let t = maintenant;
+  let attente = 0;
+  let prec = position;
+  for (const a of restants) {
+    const point = a.lat !== null && a.lng !== null ? { lat: a.lat, lng: a.lng } : null;
+    const arrivee = t + (cycle ?? (prec && point ? minutesTrajet(haversineKm(prec, point)) : 0));
+    if (point) prec = point;
+    const ouverture = a.fenetres?.find(([, c]) => arrivee < c)?.[0];
+    const w = ouverture !== undefined && ouverture > arrivee ? ouverture - arrivee : 0;
+    attente += w;
+    t = arrivee + w + (cycle === null ? MINUTES_PAR_ARRET : 0);
+  }
+  return attente;
 }
 
 /** « 16 h 40 » (heure de Paris). */
