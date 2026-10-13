@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 
 const bodySchema = z.object({
   report_bl_number: z.string().nullable().optional(),
@@ -64,7 +65,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  const { error } = await supabase.from("planning_entries").update(parsed.data).eq("id", id);
+  // Ramasses corrigées sans toucher aux arrêts : recalcule les arrêts de
+  // livraison depuis le total du scan (stops du scan − ramasses).
+  const update: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.report_pickups !== undefined) {
+    const { data: actuel } = await supabase
+      .from("planning_entries")
+      .select("report_pickups, report_stops_total, report_ocr_raw")
+      .eq("id", id)
+      .single();
+    const arretsInchanges = parsed.data.report_stops_total === undefined || parsed.data.report_stops_total === actuel?.report_stops_total;
+    if (actuel && arretsInchanges && parsed.data.report_pickups !== actuel.report_pickups) {
+      const lectures = (actuel.report_ocr_raw as { start?: LectureArrets; start_sheet?: LectureArrets; end?: LectureArrets } | null) ?? {};
+      const brut = lectures.end?.stops_scan ?? lectures.start?.stops_scan ?? lectures.start_sheet?.stops_scan ?? null;
+      if (brut != null) update.report_stops_total = arretsLivraison({ stops_scan: brut }, { pickups: parsed.data.report_pickups });
+    }
+  }
+
+  const { error } = await supabase.from("planning_entries").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

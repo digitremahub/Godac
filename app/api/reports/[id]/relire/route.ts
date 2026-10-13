@@ -23,7 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
   const { data: tour, error } = await supabase
     .from("planning_entries")
-    .select("id, start_photo_path, start_sheet_path, end_photo_path, report_ocr_raw")
+    .select("id, start_photo_path, start_sheet_path, end_photo_path, report_ocr_raw, report_pickups")
     .eq("id", id)
     .eq("organization_id", appUser.organization_id)
     .single();
@@ -52,7 +52,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   // Départ : écran du terminal, complété par la feuille de début.
   const depart = lectures.start || lectures.start_sheet ? fusion(lectures.start, lectures.start_sheet) : null;
-  const retour = lectures.end ?? null;
+  // Ramasses inscrites à la main : si la relecture ne les trouve pas, on
+  // garde le chiffre déjà enregistré (saisi par le chauffeur ou corrigé).
+  const ramasses = lectures.end?.pickups ?? depart?.pickups ?? tour.report_pickups ?? null;
+  const retour = lectures.end ? { ...lectures.end, pickups: ramasses } : ramasses !== null ? ({ pickups: ramasses } as Partial<TourReportFields>) : null;
   const update: Record<string, unknown> = {
     report_ocr_raw: { ...((tour.report_ocr_raw as object) ?? {}), ...lectures, relu_le: new Date().toISOString() },
   };
@@ -66,7 +69,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   poser("report_departure_time", depart?.departure_time ?? retour?.departure_time);
   poser("report_stops_delivered", retour?.stops_delivered);
   poser("report_packages_missing", retour?.packages_missing ?? depart?.packages_missing);
-  poser("report_pickups", retour?.pickups ?? depart?.pickups);
+  poser("report_pickups", ramasses);
   poser("report_return_time", retour?.return_time);
   poser("report_packages_picked_up", retour?.packages_picked_up);
   poser("report_packages_returned", retour?.packages_returned);

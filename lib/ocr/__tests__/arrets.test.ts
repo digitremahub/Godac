@@ -2,17 +2,20 @@ import { describe, expect, it } from "vitest";
 import { arretsLivraison } from "@/lib/ocr/arrets";
 
 describe("arrêts de livraison", () => {
-  it("prend le compte-rendu de retour s'il porte les stops", () => {
-    expect(arretsLivraison({ stops_total: 61, pickups: null }, { stops_total: 55, pickups: 6 })).toBe(55);
+  it("stops du scan moins les ramasses lues sur la feuille", () => {
+    expect(arretsLivraison({ stops_scan: 61, pickups: 4 }, null)).toBe(57);
   });
-  it("déduit les ramasses connues au retour du total lu au départ", () => {
-    expect(arretsLivraison({ stops_total: 61, pickups: null }, { pickups: 6 })).toBe(55);
+  it("la saisie du chauffeur au retour fait foi", () => {
+    expect(arretsLivraison({ stops_scan: 61, pickups: 4 }, { pickups: 6 })).toBe(55);
   });
-  it("ne déduit pas deux fois si le départ portait déjà les ramasses", () => {
-    expect(arretsLivraison({ stops_total: 55, pickups: 6 }, { pickups: 6 })).toBe(55);
+  it("le total du compte-rendu de retour prime sur celui du départ", () => {
+    expect(arretsLivraison({ stops_scan: 61 }, { stops_scan: 60, pickups: 5 })).toBe(55);
   });
-  it("sans retour : total du départ", () => {
-    expect(arretsLivraison({ stops_total: 61 }, null)).toBe(61);
+  it("sans ramasse connue : total du scan", () => {
+    expect(arretsLivraison({ stops_scan: 61 }, null)).toBe(61);
     expect(arretsLivraison(null, null)).toBeNull();
+  });
+  it("anciennes lectures (total brut dans stops_total)", () => {
+    expect(arretsLivraison({ stops_total: 61, pickups: null }, { pickups: 6 })).toBe(55);
   });
 });

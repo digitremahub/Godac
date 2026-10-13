@@ -100,7 +100,7 @@ describe("lecture du scan", () => {
     const { stops_total: _t, ...brut } = validFields({ pickups: 4 });
     const lu = normaliserLecture({ ...brut, stops_scan: 61 }) as Record<string, unknown>;
     expect(lu.stops_total).toBe(57);
-    expect(lu).not.toHaveProperty("stops_scan");
+    expect(lu.stops_scan).toBe(61);
     expect(tourReportSchema.safeParse(lu).success).toBe(true);
   });
 

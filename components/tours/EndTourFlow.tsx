@@ -56,6 +56,9 @@ export function EndTourFlow({
   const [returnType, setReturnType] = useState<"depot" | "domicile">("depot");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
+  // Stops de ramasse : inscrits à la main sur la feuille ou saisis ici,
+  // déduits des stops du scan pour obtenir les arrêts de livraison.
+  const [ramasses, setRamasses] = useState("");
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
   const [problemPhotoFile, setProblemPhotoFile] = useState<File | null>(null);
@@ -148,7 +151,10 @@ export function EndTourFlow({
           end_km: Number(endKm),
           end_km_photo_path: endKmPhotoPath || undefined,
           sheet_photo_path: sheetPhotoPath || undefined,
-          report_fields: reportFields ?? undefined,
+          report_fields:
+            reportFields || ramasses.trim() !== ""
+              ? { ...(reportFields ?? {}), ...(ramasses.trim() !== "" ? { pickups: Number(ramasses) } : {}) }
+              : undefined,
           notes: notes || undefined,
           return_type: returnType,
           vehicle_ok: vehicleOk,
@@ -335,6 +341,7 @@ export function EndTourFlow({
         onCaptured={({ photoPath, fields }) => {
           setSheetPhotoPath(photoPath);
           setReportFields(fields);
+          if (fields?.pickups != null && ramasses.trim() === "") setRamasses(String(fields.pickups));
         }}
       />
       {reportFields && (
@@ -353,6 +360,23 @@ export function EndTourFlow({
             .join(" · ") || "aucune donnée exploitable sur cette photo"}
         </p>
       )}
+
+      <label className="block">
+        <span className="label">Stops de ramasse</span>
+        <input
+          className="input"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          placeholder="0 si aucune ramasse"
+          value={ramasses}
+          onChange={(e) => setRamasses(e.target.value.replace(/[^0-9]/g, ""))}
+        />
+        <span className="mt-1 block text-xs text-navy/55">
+          Nombre de stops où vous avez fait une ramasse (inscrit à la main sur la feuille). Ils sont déduits des stops du scan : seuls
+          les arrêts de livraison sont comptés.
+        </span>
+      </label>
 
       <label className="flex min-h-[44px] items-center gap-2 text-sm">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />

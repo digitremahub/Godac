@@ -7,6 +7,7 @@ import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 const startFieldsSchema = z.object({
   bl_number: z.string().nullable(),
   stops_total: z.number().int().nonnegative().nullable(),
+  stops_scan: z.number().int().nonnegative().nullable().optional(),
   pickups: z.number().int().nonnegative().nullable(),
   packages_count: z.number().int().nonnegative().nullable(),
   priority_count: z.number().int().nonnegative().nullable(),
@@ -16,6 +17,7 @@ const startFieldsSchema = z.object({
 const endFieldsSchema = z.object({
   bl_number: z.string().nullable(),
   stops_total: z.number().int().nonnegative().nullable(),
+  stops_scan: z.number().int().nonnegative().nullable().optional(),
   stops_delivered: z.number().int().nonnegative().nullable(),
   packages_missing: z.number().int().nonnegative().nullable(),
   pickups: z.number().int().nonnegative().nullable(),

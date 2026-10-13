@@ -19,6 +19,8 @@ export const tourReportSchema = z.object({
   tour_number: fieldSchema(z.string()),
   bl_number: fieldSchema(z.string()),
   stops_total: fieldSchema(z.number().int().nonnegative()),
+  // Total imprimé sur le scan, ramasses comprises (absent des anciennes lectures).
+  stops_scan: fieldSchema(z.number().int().nonnegative()).optional(),
   packages_count: fieldSchema(z.number().int().nonnegative()),
   priority_count: fieldSchema(z.number().int().nonnegative()),
   stops_delivered: fieldSchema(z.number().int().nonnegative()),
@@ -42,15 +44,16 @@ export type TourReportFields = z.infer<typeof tourReportSchema>;
  * Le document imprime un total de stops qui inclut les ramasses ; GODAC
  * compte les arrêts de LIVRAISON : stops_total = stops du scan − stops de
  * ramasse. Fait ici (et non par l'IA) pour que le calcul soit fiable.
- * Accepte aussi une réponse déjà au format final (stops_total).
+ * stops_scan est conservé pour recalculer si le chauffeur corrige les
+ * ramasses (lib/ocr/arrets.ts). Accepte une réponse déjà au format final.
  */
 export function normaliserLecture(input: unknown): unknown {
   if (!input || typeof input !== "object") return input;
-  const { stops_scan, ...reste } = input as Record<string, unknown>;
-  if (stops_scan === undefined) return input;
-  const ramasses = typeof reste.pickups === "number" ? reste.pickups : 0;
-  const stops_total = typeof stops_scan === "number" ? Math.max(0, stops_scan - ramasses) : null;
-  return { ...reste, stops_total };
+  const lu = input as Record<string, unknown>;
+  if (lu.stops_scan === undefined) return input;
+  const stops_scan = typeof lu.stops_scan === "number" ? lu.stops_scan : null;
+  const ramasses = typeof lu.pickups === "number" ? lu.pickups : 0;
+  return { ...lu, stops_scan, stops_total: stops_scan === null ? null : Math.max(0, stops_scan - ramasses) };
 }
 
 export type TourReportOcrResult =
@@ -61,7 +64,7 @@ const SYSTEM_PROMPT = `Tu lis une photo ou un scan d'un rapport de tournée de l
 
 Règles de lecture (importantes) :
 - stops_scan : le nombre de stops / arrêts TOTAL tel qu'il est imprimé sur le document (« Stops », « Nb stops », « Arrêts »). Ce total INCLUT les stops de ramasse : recopie-le tel quel, la déduction des ramasses est faite ensuite par le logiciel.
-- pickups : le nombre de STOPS de ramasse (« Stop(s) ramasse », « Ramasse », « Enlèvement »), pas le nombre de colis ramassés.
+- pickups : le nombre de STOPS de ramasse (« Stop(s) ramasse », « Ramasse », « Enlèvement »), pas le nombre de colis ramassés. Il est souvent INSCRIT À LA MAIN par le chauffeur sur la feuille (stylo, à côté de « Ramasse » ou en marge) : lis l'écriture manuscrite si elle est lisible, sinon null (le chauffeur le saisira).
 - stops_delivered : le nombre de colis REMIS (ligne « Remis », « Colis remis », « Remis destinataire »). Chez le transporteur, chaque colis remis correspond à un stop livré : c'est CE chiffre qu'il faut renvoyer comme stops livrés. N'utilise pas une autre ligne « Livré » si une ligne « Remis » existe.
 - packages_count : le nombre total de colis chargés / en charge (« Colis », « Nb colis »).
 - priority_count : colis prioritaires (« Prio », « Predict », « Express »).
