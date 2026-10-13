@@ -4,6 +4,8 @@ import ExcelJS from "exceljs";
 export interface TicpeExportRow {
   registration: string;
   vehicleType: "PL" | "SPL";
+  /** PTAC en kg ; null = non renseigné (à vérifier avant dépôt). */
+  ptacKg?: number | null;
   entryCount: number;
   totalLiters: number;
   totalAmount: number;
@@ -33,15 +35,17 @@ export async function buildTicpeWorkbook({
   const sheet = workbook.addWorksheet("TICPE");
   sheet.addRow([`Export TICPE — ${organizationName}`]);
   sheet.addRow([`Période: ${periodStart} au ${periodEnd}`]);
-  sheet.addRow([`Périmètre: véhicules PL et SPL uniquement (VL exclus par règle métier)`]);
+  sheet.addRow([`Périmètre : gazole uniquement (AdBlue exclu), pleins validés, véhicules PL/SPL de PTAC ≥ 7,5 t (VL exclus)`]);
+  sheet.addRow([`Période en jours entiers, heure de Paris. Montant = coût d'achat enregistré (TTC), pas le montant du remboursement.`]);
   sheet.addRow([]);
 
   const header = sheet.addRow([
     "Immatriculation",
     "Type",
+    "PTAC (kg)",
     "Nb ravitaillements",
     "Litres totaux",
-    "Montant total (€)",
+    "Coût d'achat TTC (€)",
   ]);
   header.font = { bold: true };
 
@@ -49,6 +53,7 @@ export async function buildTicpeWorkbook({
     sheet.addRow([
       row.registration,
       row.vehicleType,
+      row.ptacKg ?? "non renseigné — à vérifier",
       row.entryCount,
       Number(row.totalLiters.toFixed(2)),
       Number(row.totalAmount.toFixed(2)),
@@ -57,6 +62,7 @@ export async function buildTicpeWorkbook({
 
   const totalsRow = sheet.addRow([
     "TOTAL",
+    "",
     "",
     rows.reduce((sum, r) => sum + r.entryCount, 0),
     Number(rows.reduce((sum, r) => sum + r.totalLiters, 0).toFixed(2)),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeConsumptionLPer100Km, computeKmTraveled, detectConsumptionAnomaly } from "../consumption";
+import { computeConsumptionLPer100Km, computeKmTraveled, computeWindowConsumption, detectConsumptionAnomaly } from "../consumption";
 
 describe("computeKmTraveled", () => {
   it("returns null with fewer than two readings", () => {
@@ -67,5 +67,48 @@ describe("detectConsumptionAnomaly", () => {
 
   it("never flags without a baseline to compare against", () => {
     expect(detectConsumptionAnomaly(50, null, 5).anomaly).toBe(false);
+  });
+});
+
+describe("computeWindowConsumption", () => {
+  const readings = [
+    { at: "2026-03-01T08:00:00Z", km: 10000 },
+    { at: "2026-03-10T08:00:00Z", km: 11000 },
+    { at: "2026-03-20T08:00:00Z", km: 12000 },
+  ];
+
+  it("ne compte que les pleins après le premier relevé et jusqu'au dernier inclus", () => {
+    const result = computeWindowConsumption(readings, [
+      { at: "2026-03-01T08:00:00Z", liters: 400 }, // au premier relevé : carburant consommé avant
+      { at: "2026-03-05T08:00:00Z", liters: 300 },
+      { at: "2026-03-20T08:00:00Z", liters: 300 }, // au dernier relevé : compté
+      { at: "2026-03-25T08:00:00Z", liters: 500 }, // après le dernier relevé
+    ]);
+    expect(result).toEqual({ km: 2000, liters: 600, lPer100Km: 30 });
+  });
+
+  it("trie les relevés par date", () => {
+    const result = computeWindowConsumption([...readings].reverse(), [{ at: "2026-03-15T08:00:00Z", liters: 500 }]);
+    expect(result).toEqual({ km: 2000, liters: 500, lPer100Km: 25 });
+  });
+
+  it("null avec moins de deux relevés", () => {
+    expect(computeWindowConsumption([readings[0]!], [{ at: "2026-03-05T08:00:00Z", liters: 100 }])).toBeNull();
+  });
+
+  it("null si la distance est nulle ou négative", () => {
+    expect(
+      computeWindowConsumption(
+        [
+          { at: "2026-03-01T08:00:00Z", km: 10000 },
+          { at: "2026-03-02T08:00:00Z", km: 10000 },
+        ],
+        [],
+      ),
+    ).toBeNull();
+  });
+
+  it("aucun plein entre les relevés : km connus, consommation inconnue", () => {
+    expect(computeWindowConsumption(readings, [])).toEqual({ km: 2000, liters: 0, lPer100Km: null });
   });
 });

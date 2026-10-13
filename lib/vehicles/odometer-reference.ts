@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Pleins « de confiance » : saisis à la main ou ticket OCR validé. */
+const TRUSTED_STATUSES = ["manual", "validated"];
+
 /**
  * The highest odometer reading on record for a vehicle, across every
  * source that can produce one (tours, maintenance-request readings,
- * fuel fill-ups, and the baseline set when the vehicle entered GODAC).
+ * trusted fuel fill-ups, and the baseline set when the vehicle entered
+ * GODAC). A ticket still awaiting OCR validation is left out: its
+ * kilométrage hasn't been checked by anyone yet.
  * Not a pure function — this is the data-access half that
  * lib/business/odometer.ts's checkOdometerNotRegressing() is
  * deliberately kept out of, same split as lib/organization/modules.ts
@@ -14,7 +19,7 @@ export async function getVehicleLastKnownKm(supabase: SupabaseClient, vehicleId:
     supabase.from("vehicles").select("initial_km").eq("id", vehicleId).single(),
     supabase.from("planning_entries").select("start_km, end_km").eq("vehicle_id", vehicleId),
     supabase.from("vehicle_interventions").select("odometer_km").eq("vehicle_id", vehicleId),
-    supabase.from("fuel_entries").select("vehicle_km").eq("vehicle_id", vehicleId),
+    supabase.from("fuel_entries").select("vehicle_km").eq("vehicle_id", vehicleId).in("status", TRUSTED_STATUSES),
   ]);
 
   const readings: number[] = [];
@@ -49,7 +54,12 @@ export async function getVehicleLatestKmReading(supabase: SupabaseClient, vehicl
     supabase.from("vehicles").select("initial_km, created_at").eq("id", vehicleId).single(),
     supabase.from("planning_entries").select("tour_number, start_at, start_km, end_at, end_km").eq("vehicle_id", vehicleId).or("start_km.not.is.null,end_km.not.is.null"),
     supabase.from("vehicle_interventions").select("type, created_at, odometer_km").eq("vehicle_id", vehicleId).not("odometer_km", "is", null),
-    supabase.from("fuel_entries").select("occurred_at, vehicle_km").eq("vehicle_id", vehicleId).not("vehicle_km", "is", null),
+    supabase
+      .from("fuel_entries")
+      .select("occurred_at, vehicle_km")
+      .eq("vehicle_id", vehicleId)
+      .in("status", TRUSTED_STATUSES)
+      .not("vehicle_km", "is", null),
   ]);
 
   const releves: DernierReleveKm[] = [];

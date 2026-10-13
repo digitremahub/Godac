@@ -106,7 +106,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       showFuelHistory
         ? supabase
             .from("fuel_entries")
-            .select("id, occurred_at, liters, total_amount, status, gap_flagged, vehicles(registration)")
+            .select("id, occurred_at, liters, total_amount, status, gap_flagged, product, station_name, tank_id, tanks(name), vehicles(registration)")
             .eq("driver_id", id)
             .order("occurred_at", { ascending: false })
             .limit(15)

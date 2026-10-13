@@ -14,6 +14,10 @@ export interface TankDeliveryRow {
   supplier: string | null;
   deliveredAt: string;
   invoiceUrl: string | null;
+  /** PMP de la cuve après cette livraison (null pour les livraisons antérieures au suivi). */
+  pmpAfter: number | null;
+  /** Dernière livraison de sa cuve : seule annulable. */
+  cancellable: boolean;
 }
 
 /**
@@ -27,6 +31,22 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
   const supabase = createBrowserSupabaseClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function cancel(d: TankDeliveryRow) {
+    if (!window.confirm(`Annuler la livraison de ${d.liters.toLocaleString("fr-FR")} L sur ${d.tankName} ? Le stock et le PMP de la cuve seront remis comme avant.`)) return;
+    setBusyId(d.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tank-deliveries/${d.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function attachInvoice(deliveryId: string, file: File) {
     setBusyId(deliveryId);
@@ -67,9 +87,11 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
             <th className="pb-2">Date</th>
             <th className="pb-2">Cuve</th>
             <th className="pb-2">Litres</th>
-            <th className="pb-2">Prix/L</th>
+            <th className="pb-2">Prix/L TTC</th>
+            <th className="pb-2" title="Prix moyen pondéré de la cuve après cette livraison">PMP après</th>
             <th className="pb-2">Fournisseur</th>
             <th className="pb-2">Facture</th>
+            {canManage && <th className="pb-2" />}
           </tr>
         </thead>
         <tbody>
@@ -78,7 +100,8 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
               <td className="py-2">{new Date(d.deliveredAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</td>
               <td className="py-2">{d.tankName}</td>
               <td className="py-2">{d.liters.toLocaleString("fr-FR")} L</td>
-              <td className="py-2">{d.unitPrice ? `${d.unitPrice} €` : "—"}</td>
+              <td className="py-2">{d.unitPrice ? `${Number(d.unitPrice).toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €` : "—"}</td>
+              <td className="py-2">{d.pmpAfter !== null ? `${d.pmpAfter.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €` : "—"}</td>
               <td className="py-2">{d.supplier ?? "—"}</td>
               <td className="py-2">
                 {d.invoiceUrl ? (
@@ -100,6 +123,15 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
                   <span className="text-navy/60">—</span>
                 )}
               </td>
+              {canManage && (
+                <td className="py-2">
+                  {d.cancellable && (
+                    <button className="text-xs text-orange-ink underline disabled:opacity-50" disabled={busyId === d.id} onClick={() => cancel(d)}>
+                      Annuler
+                    </button>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

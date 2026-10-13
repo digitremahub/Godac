@@ -6,7 +6,8 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
-  tank_id: z.string().uuid(),
+  // Absent pour un ticket de station : le plein n'est rattaché à aucune cuve.
+  tank_id: z.string().uuid().optional(),
   occurred_at: z.string().datetime().optional(),
   // Set when scanning a driver badge on a shared device (a tablet
   // mounted at the pump rather than the chauffeur's own phone). RLS
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     .insert({
       organization_id: appUser.organization_id,
       vehicle_id: parsed.data.vehicle_id,
-      tank_id: parsed.data.tank_id,
+      tank_id: parsed.data.tank_id ?? null,
       driver_id: parsed.data.driver_id ?? appUser.id,
       created_by: appUser.id,
       occurred_at: parsed.data.occurred_at ?? new Date().toISOString(),

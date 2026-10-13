@@ -6,6 +6,10 @@ import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { FuelHistoryFilters } from "@/components/fuel/FuelHistoryFilters";
 import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
+import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
+
+const PAGE_SIZE = 50;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * "Carburant" (historique) et "Nouveau ravitaillement" (l'assistant de
@@ -20,7 +24,7 @@ import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 export default async function FuelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string }>;
+  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const appUser = await requireAppUser();
@@ -56,7 +60,7 @@ export default async function FuelPage({
       <div className="mx-auto max-w-lg">
         <PageHeader
           title="Nouveau ravitaillement"
-          description="Scannez véhicule + cuve, ou sélectionnez-les manuellement."
+          description="Plein à la cuve de l'entreprise ou achat en station (ticket)."
           actions={
             <Link href="/fuel" className="btn-secondary">
               ← Historique
@@ -81,19 +85,28 @@ export default async function FuelPage({
     );
   }
 
+  // Historique paginé (50 par page) et filtrable par période — les
+  // jours du filtre sont des jours de Paris.
+  const page = Math.max(1, Math.floor(Number(params.page)) || 1);
+  const from = params.from && DAY_RE.test(params.from) ? params.from : null;
+  const to = params.to && DAY_RE.test(params.to) ? params.to : null;
   let query = supabase
     .from("fuel_entries")
     .select(
-      "id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, station_name, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
+      "id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
+      { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
   if (params.driver) query = query.eq("driver_id", params.driver);
   if (params.status) query = query.eq("status", params.status);
+  if (from) query = query.gte("occurred_at", parisMidnightIso(from));
+  if (to) query = query.lt("occurred_at", parisMidnightIso(nextDay(to)));
 
-  const [{ data: entries, error }, { data: vehicles }, { data: drivers }] = await Promise.all([
+  const [{ data: entries, error, count }, { data: vehicles }, { data: drivers }] = await Promise.all([
     query,
     supabase.from("vehicles").select("id, registration").order("registration"),
     canSeeOtherDrivers ? supabase.from("users").select("id, full_name").eq("active", true).order("full_name") : Promise.resolve({ data: null }),
@@ -121,6 +134,42 @@ export default async function FuelPage({
       {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
 
       <FuelHistoryTable entries={(entries ?? []) as any} />
+
+      <FuelHistoryPager params={params} page={page} total={count ?? 0} />
     </div>
+  );
+}
+
+/** Pagination de l'historique : liens précédent / suivant qui gardent les filtres. */
+function FuelHistoryPager({ params, page, total }: { params: Record<string, string | undefined>; page: number; total: number }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (pages <= 1) return null;
+  const href = (p: number) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v && k !== "page" && k !== "new") q.set(k, v);
+    if (p > 1) q.set("page", String(p));
+    const qs = q.toString();
+    return qs ? `/fuel?${qs}` : "/fuel";
+  };
+  return (
+    <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm">
+      {page > 1 ? (
+        <Link href={href(page - 1)} className="btn-secondary !px-3 !py-1.5">
+          ← Plus récents
+        </Link>
+      ) : (
+        <span />
+      )}
+      <span className="text-navy/60">
+        Page {Math.min(page, pages)} / {pages} · {total} ravitaillement{total > 1 ? "s" : ""}
+      </span>
+      {page < pages ? (
+        <Link href={href(page + 1)} className="btn-secondary !px-3 !py-1.5">
+          Plus anciens →
+        </Link>
+      ) : (
+        <span />
+      )}
+    </nav>
   );
 }

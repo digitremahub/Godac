@@ -1,32 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { computeWeightedAveragePrice, isPriceAnomalous } from "../pmp";
+import { computeDeliveryPmp, isPriceAnomalous } from "../pmp";
 
-describe("computeWeightedAveragePrice", () => {
-  it("returns the entry's own price when the tank has no history", () => {
-    const pmp = computeWeightedAveragePrice(
-      { cumulativeLiters: 0, cumulativeAmount: 0, lastTrustedEntry: null },
-      { liters: 400, unitPrice: 1.5 },
-    );
-    expect(pmp).toBe(1.5);
+describe("computeDeliveryPmp", () => {
+  it("première livraison : prix de la livraison", () => {
+    expect(computeDeliveryPmp({ stockLiters: 0, pmp: null }, { liters: 5000, unitPrice: 1.4 })).toBe(1.4);
   });
 
-  it("weights the new fill-up against prior cumulative volume", () => {
-    // 1000 L @ 1.40 previously, now 400 L @ 1.60
-    // (1000*1.40 + 400*1.60) / 1400 = (1400 + 640) / 1400 = 1.4571..
-    const pmp = computeWeightedAveragePrice(
-      { cumulativeLiters: 1000, cumulativeAmount: 1400, lastTrustedEntry: null },
-      { liters: 400, unitPrice: 1.6 },
-    );
-    expect(pmp).toBe(1.4571);
+  it("pondère le stock restant et la livraison", () => {
+    // 1000 L restants à 1,40 + 4000 L livrés à 1,60 → (1400 + 6400) / 5000 = 1,56
+    expect(computeDeliveryPmp({ stockLiters: 1000, pmp: 1.4 }, { liters: 4000, unitPrice: 1.6 })).toBe(1.56);
   });
 
-  it("rejects a non-positive liters value", () => {
-    expect(() =>
-      computeWeightedAveragePrice(
-        { cumulativeLiters: 0, cumulativeAmount: 0, lastTrustedEntry: null },
-        { liters: 0, unitPrice: 1.5 },
-      ),
-    ).toThrow();
+  it("cuve vide ou stock négatif : prix de la livraison", () => {
+    expect(computeDeliveryPmp({ stockLiters: 0, pmp: 1.4 }, { liters: 3000, unitPrice: 1.65 })).toBe(1.65);
+    expect(computeDeliveryPmp({ stockLiters: -200, pmp: 1.4 }, { liters: 3000, unitPrice: 1.65 })).toBe(1.65);
+  });
+
+  it("refuse des litres nuls", () => {
+    expect(() => computeDeliveryPmp({ stockLiters: 0, pmp: null }, { liters: 0, unitPrice: 1.5 })).toThrow();
   });
 });
 

@@ -71,7 +71,7 @@ function TicpeDocument({ data }: { data: TicpePdfData }) {
             <Text style={[styles.headerCell, { flex: 1 }]}>Type</Text>
             <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Pleins</Text>
             <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Litres</Text>
-            <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Montant</Text>
+            <Text style={[styles.headerCell, { flex: 1, textAlign: "right" }]}>Coût d&apos;achat TTC</Text>
           </View>
           {data.lines.map((l, i) => (
             <View key={i} style={styles.row}>

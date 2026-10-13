@@ -7,8 +7,19 @@ export interface FuelHistoryRow {
   total_amount: number | null;
   status: string;
   gap_flagged?: boolean | null;
+  product?: string | null;
+  station_name?: string | null;
+  tank_id?: string | null;
+  tanks?: { name: string } | null;
   vehicles?: { registration: string } | null;
   users?: { full_name: string } | null;
+}
+
+/** « Cuve X » pour un plein à la cuve, « Station Y » pour un achat en station. */
+function sourceLabel(e: FuelHistoryRow): string {
+  if (e.tanks?.name) return `Cuve ${e.tanks.name}`;
+  if (e.tank_id) return "Cuve";
+  return e.station_name ? `Station ${e.station_name}` : "Station";
 }
 
 function StatusBadge({ status, gapFlagged }: { status: string; gapFlagged?: boolean | null }) {
@@ -49,12 +60,14 @@ export function FuelHistoryTable({
 
   return (
     <Card className="overflow-x-auto">
-      <table className="w-full min-w-[520px] text-sm">
+      <table className="w-full min-w-[680px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Date</th>
             {showVehicle && <th className="pb-2">Véhicule</th>}
             {showDriver && <th className="pb-2">Chauffeur</th>}
+            <th className="pb-2">Produit</th>
+            <th className="pb-2">Origine</th>
             <th className="pb-2">Litres</th>
             <th className="pb-2">Montant</th>
             <th className="pb-2">Statut</th>
@@ -66,6 +79,8 @@ export function FuelHistoryTable({
               <td className="py-2">{new Date(e.occurred_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
               {showVehicle && <td className="py-2">{e.vehicles?.registration ?? "—"}</td>}
               {showDriver && <td className="py-2">{e.users?.full_name ?? "—"}</td>}
+              <td className="py-2">{e.product === "adblue" ? "AdBlue" : "Gazole"}</td>
+              <td className="py-2">{sourceLabel(e)}</td>
               <td className="py-2">{e.liters ?? "—"} L</td>
               <td className="py-2">{e.total_amount ?? "—"} €</td>
               <td className="py-2">

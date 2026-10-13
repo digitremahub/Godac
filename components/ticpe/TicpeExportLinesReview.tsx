@@ -90,7 +90,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
             <th className="pb-2">Véhicule</th>
             <th className="pb-2">Pleins</th>
             <th className="pb-2">Litres</th>
-            <th className="pb-2">Montant</th>
+            <th className="pb-2">Coût d&apos;achat TTC</th>
             <th className="pb-2">Statut</th>
             <th className="pb-2"></th>
           </tr>
@@ -115,7 +115,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                 </td>
                 <td className="py-2">
                   {isEditing ? (
-                    <input aria-label="Montant (€)" className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
+                    <input aria-label="Coût d'achat TTC (€)" className="input !w-24 !py-1" type="number" value={amountValue} onChange={(e) => setAmountValue(e.target.value)} />
                   ) : (
                     `${amount.toLocaleString("fr-FR")} €`
                   )}
@@ -126,7 +126,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                 <td className="py-2">
                   {isEditing ? (
                     <div className="flex gap-2">
-                      <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => saveCorrection(l.id)}>
+                      <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === l.id || !(Number(litersValue) > 0) || !(Number(amountValue) > 0)} onClick={() => saveCorrection(l.id)}>
                         Enregistrer
                       </button>
                       <button className="text-xs text-navy/60" disabled={busyId === l.id} onClick={() => setEditingId(null)}>

@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { extractFuelReceipt } from "@/lib/ocr/fuel-receipt";
+import { classifyTicketFuel, type TicketExtras } from "@/lib/ocr/ticket-check";
+import { parisLocalToIso } from "@/lib/utils/paris-time";
 
 /**
  * Runs the OCR extraction for one fuel_entries row and writes the
@@ -14,29 +16,33 @@ import { extractFuelReceipt } from "@/lib/ocr/fuel-receipt";
  * (success) or pending_ocr -> ocr_failed (any failure) — validated
  * is only ever reached by a human via the review UI, never by this
  * pipeline directly.
+ *
+ * Returns what the ticket says beyond the row's own columns (total
+ * payé, type de carburant) so the review step can check it — also kept
+ * in ocr_raw.fields for the manager review queue. null on failure.
  */
-export async function processFuelEntryOcr(fuelEntryId: string): Promise<void> {
+export async function processFuelEntryOcr(fuelEntryId: string): Promise<TicketExtras | null> {
   const supabase = createAdminSupabaseClient();
 
   const { data: entry, error: fetchError } = await supabase
     .from("fuel_entries")
-    .select("id, organization_id, ticket_photo_path, status")
+    .select("id, organization_id, ticket_photo_path, status, tank_id")
     .eq("id", fuelEntryId)
     .single();
 
   if (fetchError || !entry) {
     console.error("processFuelEntryOcr: entry not found", fuelEntryId, fetchError);
-    return;
+    return null;
   }
 
   if (entry.status !== "pending_ocr") {
     // Already processed (webhook retry, double-submit) — no-op.
-    return;
+    return null;
   }
 
   if (!entry.ticket_photo_path) {
     await markFailed(fuelEntryId, "Aucune photo de ticket associée à cet enregistrement.");
-    return;
+    return null;
   }
 
   const { data: fileBlob, error: downloadError } = await supabase.storage
@@ -45,7 +51,7 @@ export async function processFuelEntryOcr(fuelEntryId: string): Promise<void> {
 
   if (downloadError || !fileBlob) {
     await markFailed(fuelEntryId, `Téléchargement de la photo impossible: ${downloadError?.message}`);
-    return;
+    return null;
   }
 
   const imageBytes = Buffer.from(await fileBlob.arrayBuffer());
@@ -53,20 +59,26 @@ export async function processFuelEntryOcr(fuelEntryId: string): Promise<void> {
 
   if (!result.ok) {
     await markFailed(fuelEntryId, result.reason);
-    return;
+    return null;
   }
 
   const { fields, raw } = result;
+  // Achat en station : le produit vient du ticket (AdBlue n'est pas du
+  // gazole). À la cuve, la base impose celui de la cuve.
+  const product = !entry.tank_id && classifyTicketFuel(fields.fuel_type) === "adblue" ? "adblue" : undefined;
 
   const { error: updateError } = await supabase
     .from("fuel_entries")
     .update({
       status: "awaiting_validation",
-      occurred_at: combineDateTime(fields.date, fields.time) ?? undefined,
+      // Heure murale imprimée sur le ticket, donc heure de Paris — pas
+      // l'UTC du serveur.
+      occurred_at: fields.date ? (parisLocalToIso(fields.date, fields.time) ?? undefined) : undefined,
       liters: fields.liters ?? undefined,
       unit_price: fields.unit_price ?? undefined,
       station_name: fields.station_name ?? undefined,
-      ocr_raw: raw as any,
+      product,
+      ocr_raw: { ...(raw as object), fields } as any,
       ocr_error: null,
     })
     .eq("id", fuelEntryId);
@@ -74,7 +86,10 @@ export async function processFuelEntryOcr(fuelEntryId: string): Promise<void> {
   if (updateError) {
     console.error("processFuelEntryOcr: failed to persist extraction", updateError);
     await markFailed(fuelEntryId, `Échec d'enregistrement de l'extraction: ${updateError.message}`);
+    return null;
   }
+
+  return { total_amount: fields.total_amount, fuel_type: fields.fuel_type };
 }
 
 async function markFailed(fuelEntryId: string, reason: string) {
@@ -107,11 +122,4 @@ async function markFailed(fuelEntryId: string, reason: string) {
       service_id: vehicle?.service_id ?? null,
     });
   }
-}
-
-function combineDateTime(date: string | null, time: string | null): string | null {
-  if (!date) return null;
-  const iso = time ? `${date}T${time}` : `${date}T00:00:00`;
-  const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }

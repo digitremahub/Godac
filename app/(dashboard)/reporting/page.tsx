@@ -3,7 +3,10 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, StatTile, EmptyState } from "@/components/ui";
 import { BarChartCard, type BarDatum } from "@/components/reporting/BarChartCard";
-import { addDays, todayISO } from "@/lib/planning/dates";
+import { addDays } from "@/lib/planning/dates";
+import { summarizeFuelRows, TRUSTED_FUEL_STATUSES } from "@/lib/fuel/totals";
+import { fetchAllRows } from "@/lib/utils/fetch-all";
+import { parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
 
 /**
  * Module Reporting BI — a consolidated read-only view over data
@@ -31,21 +34,36 @@ export default async function ReportingPage() {
     );
   }
 
-  const from = addDays(todayISO(), -30);
+  // Minuit de Paris il y a 30 jours (pas minuit UTC).
+  const since = parisMidnightIso(addDays(parisDay(), -30));
 
-  const [{ data: fuelRows }, { data: tourRows }] = await Promise.all([
-    supabase.from("fuel_entries").select("liters, total_amount, vehicles(registration)").gte("occurred_at", `${from}T00:00:00`).limit(2000),
-    supabase
-      .from("planning_entries")
-      .select("status, services(name)")
-      .in("status", ["in_progress", "done"])
-      .gte("start_at", `${from}T00:00:00`)
-      .limit(2000),
+  // Toutes les lignes, page par page : un .limit() tronquait les totaux
+  // en silence. Seuls les pleins de confiance (manuels / tickets validés).
+  const [fuelRes, tourRes] = await Promise.all([
+    fetchAllRows((a, b) =>
+      supabase
+        .from("fuel_entries")
+        .select("liters, total_amount, status, product, vehicles(registration)")
+        .in("status", [...TRUSTED_FUEL_STATUSES])
+        .gte("occurred_at", since)
+        .order("id")
+        .range(a, b),
+    ),
+    fetchAllRows((a, b) =>
+      supabase
+        .from("planning_entries")
+        .select("status, services(name)")
+        .in("status", ["in_progress", "done"])
+        .gte("start_at", since)
+        .order("id")
+        .range(a, b),
+    ),
   ]);
+  const fuelRows = fuelRes.rows;
+  const tourRows = tourRes.rows;
 
-  const totalLiters = (fuelRows ?? []).reduce((sum, r) => sum + Number(r.liters ?? 0), 0);
-  const totalFuelCost = (fuelRows ?? []).reduce((sum, r) => sum + Number(r.total_amount ?? 0), 0);
-  const toursCount = (tourRows ?? []).length;
+  const fuelTotals = summarizeFuelRows(fuelRows);
+  const toursCount = tourRows.length;
 
   const costByVehicle = new Map<string, number>();
   for (const r of fuelRows ?? []) {
@@ -67,9 +85,21 @@ export default async function ReportingPage() {
     <div>
       <PageHeader title="Reporting BI" description="Consolidé carburant et tournées sur les 30 derniers jours." />
 
+      {(fuelRes.truncated || tourRes.truncated || fuelRes.error || tourRes.error) && (
+        <p role="alert" className="mb-4 text-sm text-orange-ink">
+          {fuelRes.error || tourRes.error
+            ? `Données incomplètes : ${fuelRes.error ?? tourRes.error}`
+            : "Résultats tronqués : trop de lignes sur la période, les totaux sont incomplets."}
+        </p>
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile label="Carburant (30 j)" value={`${Math.round(totalFuelCost).toLocaleString("fr-FR")} €`} />
-        <StatTile label="Litres (30 j)" value={`${Math.round(totalLiters).toLocaleString("fr-FR")} L`} accent="gold" />
+        <StatTile label="Carburant (30 j)" value={`${Math.round(fuelTotals.cost).toLocaleString("fr-FR")} €`} />
+        <StatTile
+          label={fuelTotals.adblueLiters > 0 ? `Gazole (30 j) · AdBlue ${Math.round(fuelTotals.adblueLiters).toLocaleString("fr-FR")} L` : "Gazole (30 j)"}
+          value={`${Math.round(fuelTotals.gazoleLiters).toLocaleString("fr-FR")} L`}
+          accent="gold"
+        />
         <StatTile label="Tournées (30 j)" value={toursCount.toString()} accent="orange" />
       </div>
 
