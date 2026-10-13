@@ -54,7 +54,7 @@ export default function ConfidentialitePage() {
             d&apos;identifier le conducteur dans les délais légaux.
           </li>
           <li>
-            <strong>Tournées colis et contestations clients :</strong> adresses de livraison, nom et téléphone des destinataires (pour que le chauffeur puisse les appeler),
+            <strong>Tournées colis et contestations clients :</strong> adresses de livraison, nom et téléphone des destinataires (pour que le chauffeur puisse les appeler), photo du colis déposé (preuve de livraison),
             réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
           </li>
           <li>
@@ -160,7 +160,7 @@ export default function ConfidentialitePage() {
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
-          <li>Tournées colis (adresses, noms et téléphones des destinataires)* : 30 jours après la tournée.</li>
+          <li>Tournées colis (adresses, noms et téléphones des destinataires, photos de livraison)* : 30 jours après la tournée.</li>
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>
           <li>Factures : 10 ans (obligation comptable).</li>

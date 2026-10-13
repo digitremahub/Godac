@@ -52,6 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (status) {
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
+    if (status !== "delivered") update.delivered_place = null;
   }
   if (notes !== undefined) update.notes = notes;
   if (adresse) {

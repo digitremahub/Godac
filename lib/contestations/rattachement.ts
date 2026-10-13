@@ -5,6 +5,8 @@ export interface Suggestion {
   driverId: string;
   driverName: string;
   raison: string;
+  /** Arrêt de tournée colis retrouvé : donne accès à la photo de livraison. */
+  stopId?: string;
 }
 
 const norm = (s: string) =>
@@ -33,18 +35,25 @@ export async function suggererChauffeur(
     const code = c.parcel_code.replace(/\s/g, "");
     const { data } = await supabase
       .from("delivery_stops")
-      .select("parcel_code, delivery_runs!inner(driver_id, run_date)")
+      .select("id, parcel_code, delivery_runs!inner(driver_id, run_date)")
       .eq("organization_id", organizationId)
       .ilike("parcel_code", `%${code}%`)
       .limit(1);
     const run = (data?.[0] as any)?.delivery_runs;
-    if (run?.driver_id) return { driverId: run.driver_id, driverName: await nom(run.driver_id), raison: `Colis ${code} scanné dans sa tournée du ${new Date(run.run_date).toLocaleDateString("fr-FR")}` };
+    if (run?.driver_id) {
+      return {
+        driverId: run.driver_id,
+        driverName: await nom(run.driver_id),
+        raison: `Colis ${code} scanné dans sa tournée du ${new Date(run.run_date).toLocaleDateString("fr-FR")}`,
+        stopId: (data?.[0] as any).id,
+      };
+    }
   }
 
   if (c.delivery_address && c.delivery_date) {
     const { data } = await supabase
       .from("delivery_stops")
-      .select("address, delivery_runs!inner(driver_id, run_date)")
+      .select("id, address, delivery_runs!inner(driver_id, run_date)")
       .eq("organization_id", organizationId)
       .eq("delivery_runs.run_date", c.delivery_date);
     const cible = norm(c.delivery_address);
@@ -53,7 +62,7 @@ export async function suggererChauffeur(
       return a === cible || a.includes(cible) || cible.includes(a);
     }) as any;
     if (hit?.delivery_runs?.driver_id) {
-      return { driverId: hit.delivery_runs.driver_id, driverName: await nom(hit.delivery_runs.driver_id), raison: "Adresse livrée par ce chauffeur à cette date" };
+      return { driverId: hit.delivery_runs.driver_id, driverName: await nom(hit.delivery_runs.driver_id), raison: "Adresse livrée par ce chauffeur à cette date", stopId: hit.id };
     }
   }
 

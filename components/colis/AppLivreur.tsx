@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 
 const MEMO = "godac-tournee-colis";
@@ -23,6 +25,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
+  const [livraison, setLivraison] = useState<Stop | null>(null);
 
   const charger = useCallback(async (prefere?: string | null) => {
     try {
@@ -68,6 +71,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   useEffect(() => {
     if (run?.status !== "in_progress") return;
     let lock: { release: () => Promise<void> } | null = null;
+    let relacherNatif: (() => void) | null = null;
+    garderEcranAllume().then((f) => (relacherNatif = f));
     const nav = navigator as unknown as { wakeLock?: { request: (t: "screen") => Promise<{ release: () => Promise<void> }> } };
     const demander = () => nav.wakeLock?.request("screen").then((l) => (lock = l)).catch(() => undefined);
     demander();
@@ -76,6 +81,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
     return () => {
       document.removeEventListener("visibilitychange", visible);
       lock?.release().catch(() => undefined);
+      relacherNatif?.();
     };
   }, [run?.status]);
 
@@ -206,6 +212,17 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         </p>
       )}
 
+      {livraison && (
+        <LivraisonSheet
+          stop={livraison}
+          onClose={() => setLivraison(null)}
+          onLivre={(maj) => {
+            setStops((all) => all.map((x) => (x.id === maj.id ? maj : x)));
+            setLivraison(null);
+          }}
+        />
+      )}
+
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
@@ -267,7 +284,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </a>
             </div>
             <div className="grid grid-cols-[2fr_1fr] gap-2">
-              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => statut(prochain, "delivered")}>
+              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => setLivraison(prochain)}>
                 <IconCheck className="h-6 w-6" /> Livré
               </button>
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => statut(prochain, "failed")}>
@@ -337,6 +354,11 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
                     <p className="min-w-0 flex-1 truncate text-sm">{s.address}</p>
+                    {s.proof_photo_path && (
+                      <a href={`/api/colis/arrets/${s.id}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs" aria-label={`Photo de livraison — ${s.address}`}>
+                        📷
+                      </a>
+                    )}
                     {s.phone && (
                       <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Rappeler ${s.recipient ?? s.address}`}>
                         <IconPhone className="h-4 w-4" />

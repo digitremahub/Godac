@@ -74,7 +74,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (body.action === "resuggerer") {
     const s = await suggererChauffeur(supabase, appUser.organization_id, c);
-    await supabase.from("customer_disputes").update({ suggested_driver_id: s?.driverId ?? null, suggestion_reason: s?.raison ?? null, updated_at: now }).eq("id", id);
+    await supabase.from("customer_disputes").update({ suggested_driver_id: s?.driverId ?? null, suggestion_reason: s?.raison ?? null, delivery_stop_id: s?.stopId ?? null, updated_at: now }).eq("id", id);
     return NextResponse.json({ suggestion: s });
   }
 
