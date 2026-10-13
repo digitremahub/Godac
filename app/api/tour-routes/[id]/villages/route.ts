@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { normalizeVillageName } from "@/lib/tours/carte-villages";
 
 const bodySchema = z.object({
   villages: z
@@ -29,6 +30,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { data: route } = await supabase.from("tour_routes").select("id").eq("id", id).maybeSingle();
   if (!route) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
+  // Les coordonnées déjà trouvées pour la carte suivent le village tant que
+  // son nom et son code postal ne changent pas (la liste est réécrite en
+  // entier à chaque enregistrement). Sans la migration des coordonnées,
+  // la lecture échoue et l'on enregistre simplement sans elles.
+  const geoKey = (name: string, cp: string | null | undefined) => `${normalizeVillageName(name)}|${cp?.trim() ?? ""}`;
+  const { data: previous } = await supabase.from("tour_route_villages").select("name, postal_code, lat, lng, insee_code, geocode_status, geocoded_at").eq("route_id", id);
+  const known = new Map(
+    ((previous ?? []) as any[])
+      .filter((v) => v.geocoded_at)
+      .map((v) => [geoKey(v.name, v.postal_code), { lat: v.lat, lng: v.lng, insee_code: v.insee_code, geocode_status: v.geocode_status, geocoded_at: v.geocoded_at }] as const),
+  );
+
   const { error: deleteError } = await supabase.from("tour_route_villages").delete().eq("route_id", id);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
   if (parsed.data.villages.length > 0) {
@@ -40,6 +53,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         name: v.name,
         postal_code: v.postal_code || null,
         notes: v.notes || null,
+        ...(known.get(geoKey(v.name, v.postal_code)) ?? {}),
       })),
     );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
