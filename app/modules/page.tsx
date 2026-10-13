@@ -72,7 +72,7 @@ export default async function ModulesPage() {
                           <li key={p.min_users} className="flex justify-between gap-2">
                             <span>{libellePalier(p)}</span>
                             <span className="font-semibold text-navy">
-                              {Number(p.monthly_price)} €{Number(p.extra_per_user) > 0 && ` + ${Number(p.extra_per_user).toLocaleString("fr-FR")} €/util.`}
+                              {Number(p.monthly_price)} €{Number(p.extra_per_user) > 0 && ` + ${Number(p.extra_per_user).toLocaleString("fr-FR")} € par utilisateur au-delà de ${p.min_users - 1}`}
                             </span>
                           </li>
                         ))}
