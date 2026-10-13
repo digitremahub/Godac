@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
-import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
+import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
@@ -16,6 +16,8 @@ const patchSchema = z.object({
   parcel_count: z.number().int().min(1).max(500).optional(),
   /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
   deplacer: z.enum(["haut", "bas"]).optional(),
+  /** Range l'arrêt dans une autre liste de la même tournée (en fin de liste). */
+  list_id: z.string().uuid().optional(),
 });
 
 /** Livré / échec / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
@@ -26,12 +28,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer } = parsed.data;
+  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer, list_id } = parsed.data;
+
+  if (list_id) {
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
+    if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+    if (stop.list_id === list_id) return NextResponse.json({ ok: true });
+    if (!(await listeDeLaTournee(supabase, stop.run_id, list_id))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
+    const { data: dernier } = await supabase.from("delivery_stops").select("position").eq("run_id", stop.run_id).order("position", { ascending: false }).limit(1).maybeSingle();
+    const { error } = await supabase
+      .from("delivery_stops")
+      .update({ list_id, position: (dernier?.position ?? 0) + 1 })
+      .eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
 
   if (deplacer) {
-    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, position").eq("id", id).maybeSingle();
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).maybeSingle();
     if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
-    const { data: voisins } = await supabase.from("delivery_stops").select("id, position").eq("run_id", stop.run_id).eq("status", "pending").order("position");
+    // Voisin encore à livrer dans la même liste.
+    let q = supabase.from("delivery_stops").select("id, position").eq("run_id", stop.run_id).eq("status", "pending");
+    q = stop.list_id ? q.eq("list_id", stop.list_id) : q.is("list_id", null);
+    const { data: voisins } = await q.order("position");
     const liste = voisins ?? [];
     const i = liste.findIndex((v) => v.id === id);
     const j = deplacer === "haut" ? i - 1 : i + 1;

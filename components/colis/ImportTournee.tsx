@@ -13,8 +13,31 @@ const MAX = 200;
  * partagé, fichier (liste Google enregistrée en CSV, Google My Maps en
  * KML, Takeout en GeoJSON, GPX, Circuit / Excel en CSV) ou liste collée.
  */
-export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: (message: string, ok: boolean) => Promise<void> | void }) {
+const NOUVELLE = "__nouvelle";
+
+/** Nom de liste tiré de la source : nom du fichier sans extension, sinon le libellé. */
+function nomDepuisSource(source: string): string {
+  return source.replace(/\.[a-z0-9]{2,7}$/i, "").replace(/[_]+/g, " ").trim().slice(0, 60) || "Liste importée";
+}
+
+/**
+ * `cibles` : listes de la tournée où importer (id null = liste implicite) ;
+ * l'import peut aussi créer une nouvelle liste, nommée d'après la source.
+ */
+export function ImportTournee({
+  runId,
+  onImporte,
+  cibles = [],
+  cibleParDefaut = null,
+}: {
+  runId: string;
+  onImporte: (message: string, ok: boolean, listId?: string | null) => Promise<void> | void;
+  cibles?: { id: string | null; nom: string }[];
+  cibleParDefaut?: string | null;
+}) {
   const [ouvert, setOuvert] = useState(false);
+  const [cible, setCible] = useState<string>(cibleParDefaut ?? "");
+  const [nomListe, setNomListe] = useState("");
   const [lien, setLien] = useState("");
   const [texte, setTexte] = useState("");
   const [apercu, setApercu] = useState<{ source: string; points: PointImporte[] } | null>(null);
@@ -26,6 +49,8 @@ export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: 
     setErreur(null);
     if (!points.length) return setErreur("Aucune adresse reconnue.");
     setApercu({ source, points: points.slice(0, MAX) });
+    setNomListe(nomDepuisSource(source));
+    setCible(cibleParDefaut ?? "");
   }
 
   async function depuisLien() {
@@ -51,9 +76,13 @@ export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: 
     if (!apercu) return;
     setBusy("import");
     try {
-      const r = await api<{ ajoutes: number; regroupes: number; ignores: number; sansGps: number }>("/api/colis/arrets/bulk", {
+      const r = await api<{ ajoutes: number; regroupes: number; ignores: number; sansGps: number; list_id?: string | null }>("/api/colis/arrets/bulk", {
         method: "POST",
-        body: JSON.stringify({ run_id: runId, points: apercu.points.map((p) => ({ ...p, telephone: p.telephone ?? null })) }),
+        body: JSON.stringify({
+          run_id: runId,
+          points: apercu.points.map((p) => ({ ...p, telephone: p.telephone ?? null })),
+          ...(cible === NOUVELLE ? { nouvelle_liste: nomListe.trim() || nomDepuisSource(apercu.source) } : { list_id: cible || null }),
+        }),
       });
       setApercu(null);
       setLien("");
@@ -69,6 +98,7 @@ export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: 
           .filter(Boolean)
           .join(" · ") + ". Lancez « Optimiser l'ordre ».",
         !r.sansGps && !r.ignores,
+        r.list_id ?? null,
       );
     } catch (e) {
       setErreur(networkErrorMessage(e));
@@ -107,6 +137,22 @@ export function ImportTournee({ runId, onImporte }: { runId: string; onImporte: 
               </li>
             ))}
           </ol>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5">
+              <span className="text-navy/65">Importer dans</span>
+              <select className="input !w-auto !py-1.5" value={cible} onChange={(e) => setCible(e.target.value)} aria-label="Liste où importer">
+                {cibles.map((c) => (
+                  <option key={c.id ?? ""} value={c.id ?? ""}>
+                    {c.nom}
+                  </option>
+                ))}
+                <option value={NOUVELLE}>+ Nouvelle liste</option>
+              </select>
+            </label>
+            {cible === NOUVELLE && (
+              <input className="input !w-auto min-w-0 flex-1 !py-1.5" value={nomListe} maxLength={60} onChange={(e) => setNomListe(e.target.value)} aria-label="Nom de la nouvelle liste" placeholder="Nom de la liste" />
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null} onClick={importer}>
               {busy === "import" ? "Import et géolocalisation…" : `Ajouter ${apercu.points.length} adresse(s) à la tournée`}

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { IconCopy, IconDownload, IconExternal } from "@/components/layout/icons";
 import { liensGoogleMaps, versCsv, versGpx, type ArretExport } from "@/lib/colis/export";
-import type { Run, Stop } from "@/components/colis/commun";
+import type { Liste, Run, Stop } from "@/components/colis/commun";
+import { LISTE_PRINCIPALE } from "@/lib/colis/listes";
 
 function telecharger(nom: string, contenu: string, type: string) {
   const url = URL.createObjectURL(new Blob([contenu], { type }));
@@ -22,7 +23,8 @@ function telecharger(nom: string, contenu: string, type: string) {
  * autre application : Google Maps (navigation multi-arrêts), Circuit /
  * Excel (CSV), GPS (GPX), ou simple liste copiée.
  */
-export function ExportTournee({ run, stops }: { run: Run; stops: Stop[] }) {
+export function ExportTournee({ run, stops, listes = [] }: { run: Run; stops: Stop[]; listes?: Liste[] }) {
+  const nomListe = new Map(listes.map((l) => [l.id, l.name]));
   const [ouvert, setOuvert] = useState(false);
   const [copie, setCopie] = useState(false);
   const arrets: ArretExport[] = stops.map((s) => ({
@@ -33,6 +35,7 @@ export function ExportTournee({ run, stops }: { run: Run; stops: Stop[] }) {
     telephone: s.phone,
     colis: s.parcel_count,
     notes: s.notes,
+    liste: (s.list_id && nomListe.get(s.list_id)) || LISTE_PRINCIPALE,
   }));
   const depot = run.start_lat !== null && run.start_lng !== null ? { adresse: run.start_label ?? "Dépôt", lat: run.start_lat, lng: run.start_lng } : null;
   const fichier = (run.name ?? "tournee").normalize("NFD").replace(/[^\w-]+/g, "-").toLowerCase() + `-${run.run_date}`;
