@@ -123,3 +123,42 @@ export const FRAIS_CONVENTIONNELS = {
   /** Grand déplacement : 1 repas + découcher. */
   grandDeplacement: 52.31,
 };
+
+/**
+ * Barème annuel de la part saisissable des rémunérations (art. R3252-2
+ * du code du travail), revalorisé chaque année par décret : fraction
+ * saisissable par tranche de rémunération annuelle nette, et majoration
+ * des seuils par personne à charge. Valeurs 2025 — à vérifier et mettre
+ * à jour à chaque revalorisation.
+ */
+export const BAREME_SAISIE = {
+  effetAu: "2025-01-01",
+  tranches: [
+    { jusqua: 4370, fraction: 1 / 20 },
+    { jusqua: 8520, fraction: 1 / 10 },
+    { jusqua: 12690, fraction: 1 / 5 },
+    { jusqua: 16820, fraction: 1 / 4 },
+    { jusqua: 20940, fraction: 1 / 3 },
+    { jusqua: 25200, fraction: 2 / 3 },
+    { jusqua: null as number | null, fraction: 1 },
+  ],
+  majorationParPersonneACharge: 1720,
+};
+
+/** Part saisissable mensuelle d'un net mensuel (barème annuel ramené au mois). */
+export function partSaisissableMensuelle(netMensuel: number, personnesACharge = 0): number {
+  if (netMensuel <= 0) return 0;
+  const majoration = BAREME_SAISIE.majorationParPersonneACharge * Math.max(0, personnesACharge);
+  let reste = netMensuel * 12;
+  let precedent = 0;
+  let part = 0;
+  for (const t of BAREME_SAISIE.tranches) {
+    const plafond = t.jusqua === null ? Infinity : t.jusqua + majoration;
+    const tranche = Math.min(reste, plafond - precedent);
+    if (tranche <= 0) break;
+    part += tranche * t.fraction;
+    reste -= tranche;
+    precedent = plafond;
+  }
+  return Math.round((part / 12) * 100) / 100;
+}

@@ -1,4 +1,15 @@
-import type { Bulletin, LigneBulletin, ParametresEntreprise, ParametresLegaux, ProfilSalarie, Section, VariablesMois } from "@/lib/paie/types";
+import type { Bulletin, LigneBulletin, ParametresEntreprise, ParametresLegaux, ProfilSalarie, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
+import { partSaisissableMensuelle } from "@/lib/paie/parametres";
+
+/** Libellé sur le bulletin de chaque type de retenue après le net. */
+export const LIBELLE_RETENUE: Record<TypeRetenue, string> = {
+  acompte: "Acompte versé",
+  saisie: "Saisie sur salaire",
+  atd: "Saisie administrative (ATD)",
+  pension: "Pension alimentaire (paiement direct)",
+  pret: "Remboursement de prêt",
+  autre: "Retenue",
+};
 
 /**
  * Calcul d'un bulletin de paie mensuel — fonction pure, sans accès base
@@ -247,8 +258,35 @@ export function calculerBulletin({
 
   add("net", "Impôt sur le revenu prélevé à la source", { base: netImposable, tauxSalarial: tauxPas, montantSalarial: montantPas });
 
-  const netAPayer = r2(netAvantImpot - montantPas + fraisNonSoumis);
+  const netAvantRetenues = r2(netAvantImpot - montantPas + fraisNonSoumis);
   const coutEmployeur = r2(brut + totalPat + fraisNonSoumis);
+
+  // ── Acomptes, saisies, ATD… (après le net) ──────────────────────
+  // Part saisissable : barème légal sur le net après cotisations et impôt,
+  // hors remboursements de frais (art. L3252-2 et R3252-2 du code du travail).
+  const baseSaisissable = r2(netAvantImpot - montantPas);
+  const partSaisissable = partSaisissableMensuelle(baseSaisissable, variables.personnesACharge ?? 0);
+  const retenues = (variables.retenues ?? []).filter((r) => r.montant > 0);
+  for (const r of retenues) {
+    const libelle = [LIBELLE_RETENUE[r.type], r.libelle.trim(), r.reference?.trim() ? `réf. ${r.reference.trim()}` : ""].filter(Boolean).join(" — ");
+    add("net", libelle, { base: null, tauxSalarial: null, montantSalarial: r2(r.montant) });
+  }
+  const somme = (types: Retenue["type"][]) => r2(retenues.filter((r) => types.includes(r.type)).reduce((t, r) => t + r.montant, 0));
+  const totalRetenues = somme(["acompte", "saisie", "atd", "pension", "pret", "autre"]);
+  const saisies = somme(["saisie", "atd"]);
+  if (saisies > partSaisissable + 0.01) {
+    avertissements.push(
+      `Saisies et ATD (${saisies.toFixed(2)} €) au-delà de la part saisissable du salaire (${partSaisissable.toFixed(2)} € ce mois, barème légal${variables.personnesACharge ? ` avec ${variables.personnesACharge} personne(s) à charge` : ", sans personne à charge déclarée"}). Seule la pension alimentaire peut dépasser cette part.`,
+    );
+  }
+  const pret = somme(["pret"]);
+  if (pret > pct(baseSaisissable, 10) + 0.01) {
+    avertissements.push("Remboursement de prêt supérieur au dixième du salaire : la retenue pour avance de l'employeur est limitée à 10 % (art. L3251-3).");
+  }
+  const netAPayer = r2(netAvantRetenues - totalRetenues);
+  if (netAPayer < 0) {
+    avertissements.push("Les retenues dépassent le net à payer : le net versé ne peut pas être négatif.");
+  }
 
   if (variables.heuresTravaillees !== null && variables.heuresTravaillees > SEUIL_HS_50 + 20) {
     avertissements.push("Plus de 206 h dans le mois : vérifiez les durées maximales de travail.");
@@ -267,6 +305,9 @@ export function calculerBulletin({
     tauxPas,
     montantPas,
     fraisNonSoumis,
+    netAvantRetenues,
+    totalRetenues,
+    partSaisissable,
     netAPayer,
     coutEmployeur,
     heuresSupExonerees,

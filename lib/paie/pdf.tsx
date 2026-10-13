@@ -173,6 +173,7 @@ function BulletinDoc({ d }: { d: BulletinPdfData }) {
             <View style={s.infoLine}><Text>Net imposable</Text><Text>{eur(b.netImposable)} €</Text></View>
             <View style={s.infoLine}><Text>Impôt sur le revenu (taux {num(b.tauxPas)} %)</Text><Text>− {eur(b.montantPas)} €</Text></View>
             {b.fraisNonSoumis > 0 && <View style={s.infoLine}><Text>Frais et indemnités non soumis</Text><Text>+ {eur(b.fraisNonSoumis)} €</Text></View>}
+            {(b.totalRetenues ?? 0) > 0 && <View style={s.infoLine}><Text>Acomptes et saisies (détail ci-dessus)</Text><Text>− {eur(b.totalRetenues)} €</Text></View>}
             {b.heuresSupExonerees > 0 && <View style={s.infoLine}><Text>Heures supplémentaires exonérées d'impôt</Text><Text>{eur(b.heuresSupExonerees)} €</Text></View>}
             <View style={s.infoLine}><Text>Total versé par l'employeur</Text><Text>{eur(b.coutEmployeur)} €</Text></View>
             <View style={[s.infoLine, { marginTop: 4 }]}><Text>Cumul brut de l'année</Text><Text>{eur(d.cumuls.brut)} €</Text></View>

@@ -63,7 +63,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   const avant = new Date(Date.parse(`${debut}T00:00:00Z`) - 86_400_000).toISOString();
   const apres = new Date(Date.parse(`${finExclue}T00:00:00Z`) + 86_400_000).toISOString();
 
-  const [entreprise, { data: profil }, { data: contrat }, { data: tours }, { data: conges }, { data: anterieurs }, { data: existant }] = await Promise.all([
+  const [entreprise, { data: profil }, { data: contrat }, { data: tours }, { data: conges }, { data: anterieurs }, { data: existant }, { data: precedent }] = await Promise.all([
     parametresEntreprise(supabase, organizationId),
     supabase.from("payroll_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("user_contracts").select("monthly_gross_salary, contractual_monthly_hours").eq("user_id", userId).maybeSingle(),
@@ -89,6 +89,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .gte("period_start", `${mois.slice(0, 4)}-01-01`)
       .lt("period_start", debut),
     supabase.from("payslips").select("id, variables").eq("user_id", userId).eq("period_start", debut).eq("period_end", fin).maybeSingle(),
+    // Dernier bulletin antérieur : on y reprend les retenues récurrentes (saisies, ATD, pension, prêt).
+    supabase.from("payslips").select("variables").eq("user_id", userId).lt("period_start", debut).order("period_start", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const regime = (profil?.regime ?? "courte_distance") as RegimeTransport;
@@ -142,6 +144,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       nbRepasUnique: 0,
       nbCasseCroute: 0,
       nbGrandDeplacement: 0,
+      retenues: ((precedent?.variables as VariablesMois | null)?.retenues ?? []).filter((r) => r.type !== "acompte"),
+      personnesACharge: (precedent?.variables as VariablesMois | null)?.personnesACharge ?? 0,
       cumulHeuresSupExonereesAnnee: cumuls.heuresSupExonerees,
       joursTravailles,
     },
