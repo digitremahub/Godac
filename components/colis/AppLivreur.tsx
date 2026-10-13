@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
@@ -9,6 +10,14 @@ import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import type { Itineraire } from "@/lib/colis/itineraire";
+
+// La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
+const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
+  ssr: false,
+  loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la carte…</p>,
+});
+const MEMO_VUE = "godac-livreur-vue";
 
 const MEMO = "godac-tournee-colis";
 
@@ -26,6 +35,26 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  const [vue, setVue] = useState<"liste" | "carte">("liste");
+  const [selection, setSelection] = useState<string | null>(null);
+  const [itineraire, setItineraire] = useState<Itineraire | null>(null);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(MEMO_VUE) === "carte") setVue("carte");
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
+  function changerVue(v: "liste" | "carte") {
+    setVue(v);
+    try {
+      localStorage.setItem(MEMO_VUE, v);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+  const choisirArret = useCallback((id: string) => setSelection(id), []);
 
   const charger = useCallback(async (prefere?: string | null) => {
     try {
@@ -163,9 +192,11 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const suivants = pending.slice(1);
   const actives = (runs ?? []).filter((t) => t.status !== "done");
   const progression = stops.length ? Math.round((termines.length / stops.length) * 100) : 0;
+  const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
+  const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-paper">
+    <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
           <Link href="/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
@@ -202,6 +233,22 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-valuenow={progression} aria-valuemin={0} aria-valuemax={100} aria-label="Avancement">
               <div className="h-full rounded-full bg-teal transition-all" style={{ width: `${progression}%` }} />
             </div>
+            {run.status !== "loading" && stops.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
+                {(["liste", "carte"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="tab"
+                    aria-selected={vue === v}
+                    onClick={() => changerVue(v)}
+                    className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
+                  >
+                    {v === "liste" ? "Arrêts" : "Carte"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -223,7 +270,60 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         />
       )}
 
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      {enCarte && run && (
+        <section className="relative min-h-0 flex-1" aria-label="Carte de la tournée">
+          <CarteTournee run={run} stops={stops} selection={arretCarte?.id ?? null} onSelection={choisirArret} onItineraire={setItineraire} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {itineraire && itineraire.distanceKm > 0 && (
+              <p className="pointer-events-auto mx-auto mb-2 w-fit rounded-full bg-marine px-3 py-1 text-xs font-semibold text-white shadow-pop">
+                Reste ≈ {itineraire.distanceKm} km
+                {itineraire.dureeMin !== null && ` · ${itineraire.dureeMin >= 60 ? `${Math.floor(itineraire.dureeMin / 60)} h ${String(itineraire.dureeMin % 60).padStart(2, "0")}` : `${itineraire.dureeMin} min`} de route`}
+                {itineraire.approx && " (estimation)"}
+              </p>
+            )}
+            {arretCarte ? (
+              <div className="pointer-events-auto mx-auto flex max-w-xl flex-col gap-3 rounded-2xl bg-surface p-4 shadow-pop">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
+                    Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
+                    {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
+                    {arretCarte.status === "delivered" ? " · livré" : arretCarte.status === "failed" ? " · absent" : arretCarte.id === prochain?.id ? " · prochain" : ""}
+                  </p>
+                  <p className="font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
+                  {arretCarte.recipient && <p className="text-sm text-navy/70">{arretCarte.recipient}</p>}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <a href={waze(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm" target="_blank" rel="noreferrer">
+                    <IconNavigation className="h-4 w-4" /> Y aller
+                  </a>
+                  {arretCarte.phone ? (
+                    <a href={lienTel(arretCarte.phone)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
+                      <IconPhone className="h-4 w-4" /> Appeler
+                    </a>
+                  ) : (
+                    <button type="button" className="btn-secondary justify-center !px-2 !py-2.5 text-sm" onClick={() => ajouterTelephone(arretCarte)}>
+                      <IconPhone className="h-4 w-4" /> N°
+                    </button>
+                  )}
+                  {arretCarte.status === "pending" ? (
+                    <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => setLivraison(arretCarte)}>
+                      <IconCheck className="h-4 w-4" /> Livré
+                    </button>
+                  ) : (
+                    <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="pointer-events-auto mx-auto w-fit rounded-xl bg-surface px-4 py-3 text-sm font-semibold shadow-pop">Tournée terminée 🎉</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
         ) : !run ? (
