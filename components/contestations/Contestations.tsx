@@ -307,7 +307,9 @@ function NouvelleContestation({ organizationId, lectureAuto }: { organizationId:
           json.lecture === "ok"
             ? `Document lu. ${json.suggestion ? `Chauffeur suggéré : ${json.suggestion.driverName}.` : "Aucun chauffeur trouvé automatiquement."} Vérifiez puis validez.`
             : json.lecture === "echec"
-              ? "Document illisible : complétez les champs à la main."
+              ? json.lectureErreur
+                ? `${json.lectureErreur} Complétez les champs à la main.`
+                : "Document illisible : complétez les champs à la main."
               : "Contestation créée : complétez les champs.",
       });
       router.refresh();

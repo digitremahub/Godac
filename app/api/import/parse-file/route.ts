@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { parseTableFile, dumpRawTableText } from "@/lib/import/parse-table";
 import { extractRowsWithAI } from "@/lib/import/ai-extract";
@@ -57,6 +59,11 @@ export async function POST(req: Request) {
   if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
     try {
       const rawText = await dumpRawTableText(file);
+      const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "import_ai");
+      if (!quota.ok) {
+        if (deterministicRows.length === 0) return NextResponse.json({ error: quota.raison }, { status: 429 });
+        return NextResponse.json({ rows: deterministicRows, warning: quota.raison });
+      }
       const aiResult = await extractRowsWithAI(rawText, kind);
       if (aiResult.ok && aiResult.rows.length > 0) {
         return NextResponse.json({ rows: aiResult.rows, source: "ai" });

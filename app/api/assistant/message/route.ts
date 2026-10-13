@@ -9,6 +9,7 @@ import { isWithinMessageRateLimit, MAX_MESSAGE_LENGTH, MAX_HISTORY_MESSAGES } fr
 import { createSupportRequest } from "@/lib/assistant/create-support-request";
 import { anonymizeQuestion, faqSourcesForRole, type FaqRow } from "@/lib/assistant/faq";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 
 const bodySchema = z.object({ message: z.string().min(1).max(MAX_MESSAGE_LENGTH) });
 
@@ -87,6 +88,11 @@ export async function POST(req: Request) {
   const { data: faqRows } = await supabase.from("assistant_faq").select("question, answer, roles").eq("status", "published");
 
   const sources = [...getHelpSourcesForRole(appUser.role), ...visibleNotes, ...faqSourcesForRole((faqRows ?? []) as FaqRow[], appUser.role)];
+
+  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "assistant");
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.raison }, { status: 429 });
+  }
 
   const result = await askAssistant({
     context: { role: appUser.role, serviceNames, enabledModuleKeys, emergencyPhone: organization?.emergency_phone ?? null, country: organization?.country ?? null },

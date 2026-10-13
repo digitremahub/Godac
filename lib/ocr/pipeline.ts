@@ -3,6 +3,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { extractFuelReceipt } from "@/lib/ocr/fuel-receipt";
 import { classifyTicketFuel, type TicketExtras } from "@/lib/ocr/ticket-check";
 import { parisLocalToIso } from "@/lib/utils/paris-time";
+import { consommer } from "@/lib/usage/consommer";
 
 /**
  * Runs the OCR extraction for one fuel_entries row and writes the
@@ -21,7 +22,7 @@ import { parisLocalToIso } from "@/lib/utils/paris-time";
  * payé, type de carburant) so the review step can check it — also kept
  * in ocr_raw.fields for the manager review queue. null on failure.
  */
-export async function processFuelEntryOcr(fuelEntryId: string): Promise<TicketExtras | null> {
+export async function processFuelEntryOcr(fuelEntryId: string, userId: string | null = null): Promise<TicketExtras | null> {
   const supabase = createAdminSupabaseClient();
 
   const { data: entry, error: fetchError } = await supabase
@@ -51,6 +52,13 @@ export async function processFuelEntryOcr(fuelEntryId: string): Promise<TicketEx
 
   if (downloadError || !fileBlob) {
     await markFailed(fuelEntryId, `Téléchargement de la photo impossible: ${downloadError?.message}`);
+    return null;
+  }
+
+  // Quota de l'entreprise (lib/usage) : au-delà, bascule en saisie manuelle.
+  const quota = await consommer(supabase, entry.organization_id, userId, "ocr_ticket");
+  if (!quota.ok) {
+    await markFailed(fuelEntryId, quota.raison);
     return null;
   }
 

@@ -4,6 +4,8 @@ import { sendTransactionalEmail } from "@/lib/email/resend";
 import { classifySupportCategory, determineSupportRecipient } from "@/lib/assistant/routing";
 import { summarizeConversation, type AssistantHistoryMessage } from "@/lib/assistant/client";
 import type { AppUser } from "@/lib/auth/session";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 
 export interface SupportRequestOutcome {
   recipientLabel: "votre responsable" | "le support GODAC";
@@ -41,8 +43,11 @@ export async function createSupportRequest({
     supabase.from("organizations").select("name, emergency_phone").eq("id", appUser.organization_id).single(),
   ]);
 
-  const summaryResult = await summarizeConversation(history);
-  const conversationSummary = summaryResult.ok ? summaryResult.summary || null : null;
+  // Résumé IA compté comme un message d'assistant ; quota atteint : la
+  // demande part quand même, sans résumé.
+  const quota = history.length ? await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "assistant") : { ok: false as const };
+  const summaryResult = quota.ok ? await summarizeConversation(history) : null;
+  const conversationSummary = summaryResult?.ok ? summaryResult.summary || null : null;
 
   const { data: created, error } = await supabase
     .from("support_requests")
