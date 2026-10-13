@@ -9,6 +9,10 @@ const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
   notes: z.string().trim().max(500).nullable().optional(),
+  destinataire: z.string().trim().max(120).nullable().optional(),
+  parcel_count: z.number().int().min(1).max(500).optional(),
+  /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
+  deplacer: z.enum(["haut", "bas"]).optional(),
 });
 
 /** Livré / échec / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
@@ -19,8 +23,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes } = parsed.data;
+  const { adresse, status, notes, destinataire, parcel_count, deplacer } = parsed.data;
+
+  if (deplacer) {
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, position").eq("id", id).maybeSingle();
+    if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+    const { data: voisins } = await supabase.from("delivery_stops").select("id, position").eq("run_id", stop.run_id).eq("status", "pending").order("position");
+    const liste = voisins ?? [];
+    const i = liste.findIndex((v) => v.id === id);
+    const j = deplacer === "haut" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= liste.length) return NextResponse.json({ ok: true });
+    const autre = liste[j]!;
+    await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id);
+    await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id);
+    return NextResponse.json({ ok: true });
+  }
+
   const update: Record<string, unknown> = {};
+  if (destinataire !== undefined) update.recipient = destinataire || null;
+  if (parcel_count !== undefined) update.parcel_count = parcel_count;
   if (status) {
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
