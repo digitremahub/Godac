@@ -10,7 +10,7 @@ export default async function AdminUsersPage() {
       .from("users")
       .select("id, full_name, email, phone, role, role_title, active, auth_method, pin_set_at")
       .order("full_name"),
-    supabase.from("services").select("id, name").order("name"),
+    supabase.from("services").select("id, name, pole").order("name"),
     supabase.from("user_services").select("user_id, service_id"),
   ]);
 

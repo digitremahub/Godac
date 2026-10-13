@@ -1,6 +1,7 @@
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
+import { estPoleBureau } from "@/lib/organization/poles";
 import { PageHeader } from "@/components/ui";
 import { OrganizationSettingsForm } from "@/components/admin/OrganizationSettingsForm";
 import { ServicesPanel } from "@/components/admin/ServicesPanel";
@@ -13,7 +14,7 @@ export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
-  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }] =
+  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }] =
     await Promise.all([
       supabase
         .from("organizations")
@@ -25,13 +26,24 @@ export default async function OrganizationSettingsPage() {
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       isModuleEnabled(supabase, appUser.organization_id, "assistant"),
       isDirection ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
-      supabase.from("services").select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email").order("name"),
+      supabase.from("services").select("id, name, code, pole, depot_address, team_leader_name, team_leader_phone, team_leader_email").order("name"),
       supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
       supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
       isDirection
         ? supabase.from("payslip_contribution_lines").select("id, label, salarial_rate, patronal_rate").order("created_at")
         : Promise.resolve({ data: null }),
+      // Qui est dans quel pôle bureau — affiché sous chaque pôle.
+      supabase.from("user_services").select("service_id, users(full_name, active)"),
     ]);
+
+  const membersByService = new Map<string, string[]>();
+  for (const m of (memberships ?? []) as any[]) {
+    if (!m.users?.full_name || m.users.active === false) continue;
+    membersByService.set(m.service_id, [...(membersByService.get(m.service_id) ?? []), m.users.full_name]);
+  }
+  const servicesWithMembers = (services ?? []).map((s) => ({ ...s, members: membersByService.get(s.id) ?? [] }));
+  // Les cuves sont du matériel transport : seuls les services d'exploitation leur sont proposés.
+  const transportServices = (services ?? []).filter((s) => !estPoleBureau(s.pole));
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,8 +67,8 @@ export default async function OrganizationSettingsPage() {
         urssafNumber={organization?.urssaf_number ?? null}
         country={organization?.country ?? "FR"}
       />
-      <ServicesPanel services={services ?? []} />
-      <TanksPanel tanks={tanks ?? []} services={services ?? []} />
+      <ServicesPanel services={servicesWithMembers} />
+      <TanksPanel tanks={tanks ?? []} services={transportServices} />
       {payslipsEnabled && (
         <PayslipContributionLinesPanel
           lines={(contributionLines ?? []).map((l) => ({ ...l, salarial_rate: Number(l.salarial_rate), patronal_rate: Number(l.patronal_rate) }))}

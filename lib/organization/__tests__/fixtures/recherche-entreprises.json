@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "siren": "812345676",
+      "nom_complet": "TRANSPORTS EXEMPLE (TREX)",
+      "nom_raison_sociale": "TRANSPORTS EXEMPLE",
+      "sigle": "TREX",
+      "nombre_etablissements": 2,
+      "nombre_etablissements_ouverts": 2,
+      "siege": {
+        "activite_principale": "49.41B",
+        "adresse": "12 RUE DES ROUTIERS 69007 LYON",
+        "code_postal": "69007",
+        "commune": "69387",
+        "libelle_commune": "LYON",
+        "latitude": "45.7421",
+        "longitude": "4.8406",
+        "est_siege": true,
+        "etat_administratif": "A",
+        "liste_idcc": ["0016"],
+        "siret": "81234567600017",
+        "tranche_effectif_salarie": "11"
+      },
+      "activite_principale": "49.41B",
+      "categorie_entreprise": "PME",
+      "date_creation": "2015-06-01",
+      "etat_administratif": "A",
+      "nature_juridique": "5710",
+      "section_activite_principale": "H",
+      "tranche_effectif_salarie": "12",
+      "annee_tranche_effectif_salarie": "2023",
+      "dirigeants": [{ "nom": "EXEMPLE", "prenoms": "JEAN", "qualite": "Président de SAS", "type_dirigeant": "personne physique" }],
+      "matching_etablissements": [
+        {
+          "activite_principale": "49.41B",
+          "adresse": "3 AVENUE DU FRET 38070 SAINT-QUENTIN-FALLAVIER",
+          "code_postal": "38070",
+          "commune": "38449",
+          "est_siege": false,
+          "etat_administratif": "A",
+          "latitude": "45.6431",
+          "libelle_commune": "SAINT-QUENTIN-FALLAVIER",
+          "liste_idcc": ["16"],
+          "longitude": "5.1102",
+          "siret": "81234567600025"
+        }
+      ],
+      "complements": {
+        "collectivite_territoriale": null,
+        "convention_collective_renseignee": true,
+        "liste_idcc": ["0016", "1486"],
+        "est_entrepreneur_individuel": false,
+        "est_ess": false
+      }
+    }
+  ],
+  "total_results": 1,
+  "page": 1,
+  "per_page": 1,
+  "total_pages": 1
+}
