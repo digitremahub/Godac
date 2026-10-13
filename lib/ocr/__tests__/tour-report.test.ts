@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { extractTourReportFromImage, tourReportSchema } from "../tour-report";
+import { extractTourReportFromImage, normaliserLecture, tourReportSchema } from "../tour-report";
 
 const ORIGINAL_ENV = process.env.ANTHROPIC_API_KEY;
 
@@ -92,5 +92,34 @@ describe("extractTourReportFromImage", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("rate limited", { status: 429 })));
     const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("lecture du scan", () => {
+  it("déduit les stops de ramasse du total imprimé", () => {
+    const { stops_total: _t, ...brut } = validFields({ pickups: 4 });
+    const lu = normaliserLecture({ ...brut, stops_scan: 61 }) as Record<string, unknown>;
+    expect(lu.stops_total).toBe(57);
+    expect(lu).not.toHaveProperty("stops_scan");
+    expect(tourReportSchema.safeParse(lu).success).toBe(true);
+  });
+
+  it("garde le total quand aucune ramasse n'est lisible", () => {
+    const { stops_total: _t, ...brut } = validFields();
+    expect((normaliserLecture({ ...brut, stops_scan: 61 }) as Record<string, unknown>).stops_total).toBe(61);
+  });
+
+  it("les colis REMIS de l'IA arrivent dans stops_delivered après extraction", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    const { stops_total: _t, ...brut } = validFields({ pickups: 3, stops_delivered: 52 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ content: [{ type: "tool_use", name: "tour_report", input: { ...brut, stops_scan: 58 } }] }), { status: 200 }),
+      ),
+    );
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "scan.pdf");
+    expect(result.ok && result.fields.stops_total).toBe(55);
+    expect(result.ok && result.fields.stops_delivered).toBe(52);
   });
 });

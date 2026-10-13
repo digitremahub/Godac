@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 
 const startFieldsSchema = z.object({
   bl_number: z.string().nullable(),
   stops_total: z.number().int().nonnegative().nullable(),
+  pickups: z.number().int().nonnegative().nullable(),
   packages_count: z.number().int().nonnegative().nullable(),
   priority_count: z.number().int().nonnegative().nullable(),
   departure_time: z.string().nullable(),
@@ -13,6 +15,7 @@ const startFieldsSchema = z.object({
 
 const endFieldsSchema = z.object({
   bl_number: z.string().nullable(),
+  stops_total: z.number().int().nonnegative().nullable(),
   stops_delivered: z.number().int().nonnegative().nullable(),
   packages_missing: z.number().int().nonnegative().nullable(),
   pickups: z.number().int().nonnegative().nullable(),
@@ -77,7 +80,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const f = parsed.data.fields;
     candidates = {
       report_bl_number: f.bl_number,
-      report_stops_total: f.stops_total,
+      report_pickups: f.pickups,
       report_packages_count: f.packages_count,
       report_priority_count: f.priority_count,
       report_departure_time: f.departure_time,
@@ -106,6 +109,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       update[column] = value;
     }
   }
+  // Arrêts de livraison = stops du scan − ramasses, recalculés avec tout
+  // ce qui est connu (départ + retour), voir lib/ocr/arrets.ts.
+  const lectures = update.report_ocr_raw as { start?: LectureArrets; start_sheet?: LectureArrets; end?: LectureArrets };
+  const depart = lectures.start?.stops_total != null ? lectures.start : lectures.start_sheet;
+  const arrets = arretsLivraison(depart, lectures.end);
+  if (arrets !== null) update.report_stops_total = arrets;
 
   const { error } = await supabase.from("planning_entries").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

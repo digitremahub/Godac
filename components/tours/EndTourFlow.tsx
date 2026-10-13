@@ -342,7 +342,7 @@ export function EndTourFlow({
           Lu automatiquement :{" "}
           {[
             reportFields.return_time && `retour ${reportFields.return_time}`,
-            reportFields.stops_delivered !== null && `${reportFields.stops_delivered} arrêts livrés`,
+            reportFields.stops_delivered !== null && `${reportFields.stops_delivered} arrêts livrés (colis remis)`,
             reportFields.packages_missing !== null && `${reportFields.packages_missing} colis manquants`,
             reportFields.pickups !== null && `${reportFields.pickups} stops de ramasse`,
             reportFields.packages_picked_up !== null && `${reportFields.packages_picked_up} colis ramassés`,

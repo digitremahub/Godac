@@ -5,9 +5,11 @@ import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
+import { arretsLivraison } from "@/lib/ocr/arrets";
 
 const reportFieldsSchema = z.object({
   bl_number: z.string().nullable(),
+  stops_total: z.number().int().nonnegative().nullable(),
   stops_delivered: z.number().int().nonnegative().nullable(),
   packages_missing: z.number().int().nonnegative().nullable(),
   pickups: z.number().int().nonnegative().nullable(),
@@ -115,6 +117,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const reportFields = parsed.data.report_fields;
+  const lectureDepart = ((tour.report_ocr_raw as { start?: { stops_total?: number | null; pickups?: number | null } } | null) ?? {}).start;
+  const arretsDeLivraison = reportFields ? arretsLivraison(lectureDepart, reportFields) : null;
 
   const { error } = await supabase
     .from("planning_entries")
@@ -132,6 +136,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(reportFields
         ? {
             report_bl_number: reportFields.bl_number ?? undefined,
+            // Stops du scan − ramasses (voir lib/ocr/arrets.ts).
+            ...(arretsDeLivraison !== null ? { report_stops_total: arretsDeLivraison } : {}),
             report_stops_delivered: reportFields.stops_delivered ?? null,
             report_packages_missing: reportFields.packages_missing ?? null,
             report_pickups: reportFields.pickups ?? null,

@@ -12,6 +12,7 @@ const reportFieldsSchema = z.object({
   tour_number: z.string().nullable(),
   bl_number: z.string().nullable(),
   stops_total: z.number().int().nonnegative().nullable(),
+  pickups: z.number().int().nonnegative().nullable(),
   packages_count: z.number().int().nonnegative().nullable(),
   priority_count: z.number().int().nonnegative().nullable(),
   departure_time: z.string().nullable(),
@@ -161,6 +162,7 @@ export async function POST(req: Request) {
       ? {
           report_bl_number: reportFields.bl_number ?? null,
           report_stops_total: reportFields.stops_total ?? null,
+          ...(reportFields.pickups != null ? { report_pickups: reportFields.pickups } : {}),
           report_packages_count: reportFields.packages_count ?? null,
           report_priority_count: reportFields.priority_count ?? null,
           report_departure_time: reportFields.departure_time ?? null,
