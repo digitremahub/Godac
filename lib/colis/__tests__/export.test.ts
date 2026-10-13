@@ -26,6 +26,15 @@ describe("CSV / GPX", () => {
     const r = lireFichier("t.csv", versCsv(arrets.slice(0, 3)).replace(/^﻿/, ""));
     expect(r.map((p) => p.lat)).toEqual([45.7, 45.701, 45.702]);
   });
+  it("colonne « Liste » remplie, sans gêner la réimportation", () => {
+    const csv = versCsv(arrets.slice(0, 2).map((a, i) => ({ ...a, liste: i ? "Liste 2" : "Amazon, matin" })));
+    const [entete, l1, l2] = csv.replace(/^﻿/, "").split("\r\n");
+    expect(entete!.split(",").at(-1)).toBe("Liste");
+    expect(l1!.endsWith(`,"Amazon, matin"`)).toBe(true);
+    expect(l2!.endsWith(",Liste 2")).toBe(true);
+    const r = lireFichier("t.csv", csv.replace(/^﻿/, ""));
+    expect(r.map((p) => p.adresse)).toEqual([arrets[0]!.adresse, arrets[1]!.adresse]);
+  });
   it("GPX valide avec les arrêts dans l'ordre", () => {
     const g = versGpx("Tournée & co", arrets.slice(0, 2));
     expect(g).toContain("<name>Tournée &amp; co</name>");

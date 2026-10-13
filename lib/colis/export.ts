@@ -11,6 +11,8 @@ export interface ArretExport {
   colis?: number;
   notes?: string | null;
   telephone?: string | null;
+  /** Liste de la tournée (colonne « Liste » du CSV). */
+  liste?: string | null;
 }
 
 /** Google Maps accepte 9 étapes intermédiaires par lien (plus départ et arrivée). */
@@ -58,11 +60,11 @@ const csvCell = (v: string | number | null | undefined) => {
   return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-/** CSV avec en-têtes reconnus par Circuit, Google My Maps et Excel. */
+/** CSV avec en-têtes reconnus par Circuit, Google My Maps et Excel (+ colonne « Liste » de GODAC). */
 export function versCsv(arrets: ArretExport[]): string {
-  const lignes = [["Stop", "Address", "Name", "Phone", "Packages", "Latitude", "Longitude", "Notes"].join(",")];
+  const lignes = [["Stop", "Address", "Name", "Phone", "Packages", "Latitude", "Longitude", "Notes", "Liste"].join(",")];
   arrets.forEach((a, i) => {
-    lignes.push([i + 1, a.adresse, a.destinataire ?? "", a.telephone ?? "", a.colis ?? 1, a.lat ?? "", a.lng ?? "", a.notes ?? ""].map(csvCell).join(","));
+    lignes.push([i + 1, a.adresse, a.destinataire ?? "", a.telephone ?? "", a.colis ?? 1, a.lat ?? "", a.lng ?? "", a.notes ?? "", a.liste ?? ""].map(csvCell).join(","));
   });
   return "﻿" + lignes.join("\r\n") + "\r\n";
 }

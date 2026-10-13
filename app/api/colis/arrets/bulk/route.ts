@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress, reverseGeocode } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
-import { cleAdresse, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { cleAdresse, listeDeLaTournee, materialiserListePrincipale, moduleActif, tourneeParId, LIST_FIELDS } from "@/lib/colis/serveur";
 
 const pointSchema = z.object({
   adresse: z.string().trim().max(300).nullable(),
@@ -17,7 +17,14 @@ const pointSchema = z.object({
 // Géocodage d'une longue liste hors de France (une adresse par seconde).
 export const maxDuration = 300;
 
-const bodySchema = z.object({ run_id: z.string().uuid(), points: z.array(pointSchema).min(1).max(200) });
+const bodySchema = z.object({
+  run_id: z.string().uuid(),
+  points: z.array(pointSchema).min(1).max(200),
+  /** Liste existante de la tournée où importer… */
+  list_id: z.string().uuid().nullable().optional(),
+  /** …ou nom d'une nouvelle liste à créer pour cet import (ex. le nom du fichier). */
+  nouvelle_liste: z.string().trim().min(1).max(60).nullable().optional(),
+});
 
 /** Exécute `fn` sur chaque élément, au plus `n` à la fois (géocodage sans saturer l'API). */
 async function parLots<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Promise<R[]> {
@@ -47,6 +54,8 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Liste invalide (200 adresses au plus)." }, { status: 400 });
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
+  let listId = parsed.data.list_id ?? null;
+  if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
 
   // Hors de France, OpenStreetMap (Nominatim) demande une requête à la fois.
   const pays = await codePays(appUser.organization_id);
@@ -63,8 +72,26 @@ export async function POST(req: Request) {
     return adresse && adresse.length >= 3 ? { adresse, lat, lng, nom: p.nom, telephone: normaliserTelephone(p.telephone) } : null;
   });
 
-  const { data: existants } = await supabase.from("delivery_stops").select("id, address, parcel_count, phone, status, position").eq("run_id", run.id);
-  const parCle = new Map((existants ?? []).filter((s) => s.status === "pending").map((s) => [cleAdresse(s.address), s]));
+  // Import dans une nouvelle liste : la liste implicite devient d'abord une
+  // vraie liste (en tête), la nouvelle se place après les autres.
+  if (!listId && parsed.data.nouvelle_liste) {
+    try {
+      const listes = await materialiserListePrincipale(supabase, appUser.organization_id, run.id);
+      const { data: cree, error } = await supabase
+        .from("delivery_lists")
+        .insert({ organization_id: appUser.organization_id, run_id: run.id, name: parsed.data.nouvelle_liste, position: listes.reduce((m, l) => Math.max(m, l.position), -1) + 1 })
+        .select(LIST_FIELDS)
+        .single();
+      if (error) throw new Error(error.message);
+      listId = cree.id as string;
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Création de la liste impossible." }, { status: 500 });
+    }
+  }
+
+  const { data: existants } = await supabase.from("delivery_stops").select("id, list_id, address, parcel_count, phone, status, position").eq("run_id", run.id);
+  // Regroupement par adresse seulement dans la liste visée.
+  const parCle = new Map((existants ?? []).filter((s) => s.status === "pending" && (s.list_id ?? null) === listId).map((s) => [cleAdresse(s.address), s]));
   let position = (existants ?? []).reduce((m, s) => Math.max(m, s.position), -1) + 1;
   const nouveaux = new Map<string, Record<string, unknown>>();
   let regroupes = 0;
@@ -91,6 +118,7 @@ export async function POST(req: Request) {
       nouveaux.set(cle, {
         organization_id: appUser.organization_id,
         run_id: run.id,
+        ...(listId ? { list_id: listId } : {}),
         position: position++,
         address: p.adresse,
         recipient: p.nom,
@@ -107,5 +135,5 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
   const sansGps = [...nouveaux.values()].filter((s) => s.lat === null).length;
-  return NextResponse.json({ ajoutes: nouveaux.size, regroupes, ignores, sansGps });
+  return NextResponse.json({ ajoutes: nouveaux.size, regroupes, ignores, sansGps, list_id: listId });
 }

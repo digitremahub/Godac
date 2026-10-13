@@ -1,4 +1,5 @@
 /** Types et petits utilitaires partagés par la tournée colis et l'application chauffeur. */
+export type { Liste } from "@/lib/colis/listes";
 export interface Run {
   id: string;
   name: string | null;
@@ -25,6 +26,8 @@ export interface Stop {
   done_at?: string | null;
   delivered_place: string | null;
   proof_photo_path: string | null;
+  /** Liste de la tournée (null : liste implicite « Liste principale »). */
+  list_id?: string | null;
 }
 export interface RunResume {
   id: string;

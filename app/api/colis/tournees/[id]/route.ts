@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { ordonnerParListe } from "@/lib/colis/listes";
 
 async function contexte(id: string) {
   const appUser = await requireAppUser();
@@ -13,12 +14,15 @@ async function contexte(id: string) {
   return { supabase, run };
 }
 
-/** Une tournée et ses arrêts dans l'ordre. */
+/** Une tournée, ses listes et ses arrêts dans l'ordre de livraison (liste après liste). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await contexte((await params).id);
   if ("erreur" in ctx) return ctx.erreur;
-  const { data: stops } = await ctx.supabase.from("delivery_stops").select(STOP_FIELDS).eq("run_id", ctx.run.id).order("position").order("created_at");
-  return NextResponse.json({ run: ctx.run, stops: stops ?? [] });
+  const [{ data: stops }, lists] = await Promise.all([
+    ctx.supabase.from("delivery_stops").select(STOP_FIELDS).eq("run_id", ctx.run.id).order("position").order("created_at"),
+    listesDeTournee(ctx.supabase, ctx.run.id),
+  ]);
+  return NextResponse.json({ run: ctx.run, lists, stops: ordonnerParListe((stops ?? []) as { id: string; list_id: string | null; position: number }[], lists) });
 }
 
 const patchSchema = z.object({

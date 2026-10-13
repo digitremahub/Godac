@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -9,7 +9,8 @@ import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
-import { api, gmaps, waze, SMS_ARRIVEE, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 
@@ -35,6 +36,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
+  const [lists, setLists] = useState<Liste[]>([]);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
@@ -126,9 +128,10 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         setStops([]);
         return;
       }
-      const data = await api<{ run: Run; stops: Stop[] }>(`/api/colis/tournees/${choix}`);
+      const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${choix}`);
       setRun(data.run);
       setStops(data.stops);
+      setLists(data.lists ?? []);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       setRuns((r) => r ?? []);
@@ -239,6 +242,15 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const termines = stops.filter((s) => s.status !== "pending");
   const prochain = pending[0];
   const suivants = pending.slice(1);
+  // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
+  const groupes = grouperParListe(stops, lists);
+  const multi = groupes.length > 1 || groupes[0]?.liste != null;
+  const groupeDe = (s: Stop) => groupes.find((g) => g.arrets.includes(s)) ?? groupes[0]!;
+  const separateur = (s: Stop) => {
+    const g = groupeDe(s);
+    const r = compteurs(g.arrets).restants;
+    return `${nomGroupe(g)} · ${r} restant${r > 1 ? "s" : ""}`;
+  };
   const actives = (runs ?? []).filter((t) => t.status !== "done");
   const progression = stops.length ? Math.round((termines.length / stops.length) * 100) : 0;
   const avancement = estimerAvancement(
@@ -424,6 +436,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
           </section>
         ) : prochain ? (
           <section className="flex flex-col gap-4 rounded-2xl border-2 border-teal/60 bg-surface p-5 shadow-card" aria-label="Arrêt en cours">
+            {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
               Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
               {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis`}
@@ -490,26 +503,35 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </button>
             </div>
             <ol className="flex flex-col gap-2">
-              {suivants.map((s) => (
-                <li key={s.id} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5 shadow-card">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold leading-snug">{s.address}</p>
-                    <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
-                  </div>
-                  {s.phone ? (
-                    <a href={lienTel(s.phone)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
-                      <IconPhone className="h-5 w-5" />
-                    </a>
-                  ) : (
-                    <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.05] text-navy/40" onClick={() => ajouterTelephone(s)} aria-label={`Ajouter le numéro de ${s.recipient ?? s.address}`}>
-                      <IconPhone className="h-5 w-5" />
-                    </button>
+              {suivants.map((s, k) => (
+                <Fragment key={s.id}>
+                  {multi && groupeDe(s) !== groupeDe(k ? suivants[k - 1]! : prochain!) && (
+                    <li className="mt-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-navy/60" aria-label={`Liste ${separateur(s)}`}>
+                      <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
+                      {separateur(s)}
+                      <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
+                    </li>
                   )}
-                  <a href={waze(s)} target="_blank" rel="noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.05] text-navy/70" aria-label={`Naviguer vers ${s.address}`}>
-                    <IconNavigation className="h-5 w-5" />
-                  </a>
-                </li>
+                  <li className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5 shadow-card">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold leading-snug">{s.address}</p>
+                      <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
+                    </div>
+                    {s.phone ? (
+                      <a href={lienTel(s.phone)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                        <IconPhone className="h-5 w-5" />
+                      </a>
+                    ) : (
+                      <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.05] text-navy/40" onClick={() => ajouterTelephone(s)} aria-label={`Ajouter le numéro de ${s.recipient ?? s.address}`}>
+                        <IconPhone className="h-5 w-5" />
+                      </button>
+                    )}
+                    <a href={waze(s)} target="_blank" rel="noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.05] text-navy/70" aria-label={`Naviguer vers ${s.address}`}>
+                      <IconNavigation className="h-5 w-5" />
+                    </a>
+                  </li>
+                </Fragment>
               ))}
             </ol>
           </section>

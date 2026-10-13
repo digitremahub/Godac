@@ -5,10 +5,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
-import { cleAdresse, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { cleAdresse, listeDeLaTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
+  /** Liste de la tournée où ranger le colis (sinon la liste implicite). */
+  list_id: z.string().uuid().nullable().optional(),
   code: z.string().trim().max(120).nullable().optional(),
   adresse: z.string().trim().min(5).max(300),
   destinataire: z.string().trim().max(120).nullable().optional(),
@@ -28,8 +30,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Adresse manquante ou trop courte." }, { status: 400 });
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
+  const listId = parsed.data.list_id ?? null;
+  if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
 
-  const { data: stops } = await supabase.from("delivery_stops").select("id, parcel_code, parcel_count, address, phone, status, position").eq("run_id", run.id);
+  const { data: stops } = await supabase.from("delivery_stops").select("id, list_id, parcel_code, parcel_count, address, phone, status, position").eq("run_id", run.id);
   const code = parsed.data.code || null;
   const telephone = normaliserTelephone(parsed.data.telephone);
   if (code && (stops ?? []).some((s) => s.parcel_code?.split(",").includes(code))) {
@@ -37,7 +41,8 @@ export async function POST(req: Request) {
   }
 
   const cle = cleAdresse(parsed.data.adresse);
-  const memeAdresse = (stops ?? []).find((s) => s.status === "pending" && cleAdresse(s.address) === cle);
+  // Regroupement seulement dans la même liste : deux listes restent distinctes.
+  const memeAdresse = (stops ?? []).find((s) => s.status === "pending" && (s.list_id ?? null) === listId && cleAdresse(s.address) === cle);
   if (memeAdresse) {
     const codes = [memeAdresse.parcel_code, code].filter(Boolean).join(",") || null;
     const { data } = await supabase
@@ -56,6 +61,7 @@ export async function POST(req: Request) {
     .insert({
       organization_id: appUser.organization_id,
       run_id: run.id,
+      ...(listId ? { list_id: listId } : {}),
       position,
       parcel_code: code,
       address: parsed.data.adresse,
