@@ -84,7 +84,7 @@ export default function ConfidentialitePage() {
 
       <Section title="Lecture automatique par intelligence artificielle">
         <p>
-          La lecture automatique des photos (ticket de carburant, compteur, amende, rapport de tournée) et
+          La lecture automatique des photos (ticket de carburant, compteur, amende, rapport de tournée, étiquette de colis) et
           l&apos;assistant sont des <strong>options désactivées par défaut</strong>, que seule l&apos;entreprise
           cliente peut activer. Lorsqu&apos;elles sont activées, les contenus concernés sont transmis à Anthropic
           (modèles Claude) pour être analysés, puis le résultat vous est proposé pour vérification. Selon ses
@@ -156,6 +156,7 @@ export default function ConfidentialitePage() {
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
+          <li>Tournées colis (adresses et noms des destinataires)* : 30 jours après la tournée.</li>
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>
           <li>Factures : 10 ans (obligation comptable).</li>
