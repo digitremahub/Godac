@@ -150,17 +150,12 @@ describe("villages sur plusieurs tournées", () => {
     expect(d[0]!.sameService).toBe(true);
   });
   it("même code INSEE entre services différents", () => {
-    const d = findDuplicates([
-      v("t1", "Voiron", [5.59, 45.36], { inseeCode: "38563" }),
-      v("t3", "VOIRON", [5.59, 45.36], { inseeCode: "38563", serviceId: "s2" }),
-    ]);
+    const d = findDuplicates([v("t1", "Voiron", [5.59, 45.36], { inseeCode: "38563" }), v("t3", "VOIRON", [5.59, 45.36], { inseeCode: "38563", serviceId: "s2" })]);
     expect(d).toHaveLength(1);
     expect(d[0]!.sameService).toBe(false);
   });
   it("pas de doublon pour deux homonymes de départements différents", () => {
-    expect(
-      findDuplicates([v("t1", "Saint-Martin", [1, 45], { inseeCode: "11111" }), v("t2", "Saint-Martin", [3, 47], { inseeCode: "22222" })]),
-    ).toEqual([]);
+    expect(findDuplicates([v("t1", "Saint-Martin", [1, 45], { inseeCode: "11111" }), v("t2", "Saint-Martin", [3, 47], { inseeCode: "22222" })])).toEqual([]);
   });
   it("un village répété dans la même tournée n'est pas un doublon entre tournées", () => {
     expect(findDuplicates([v("t1", "A", null), v("t1", "A", null)])).toEqual([]);

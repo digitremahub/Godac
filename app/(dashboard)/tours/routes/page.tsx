@@ -3,6 +3,23 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { TourRoutesBoard, type TourRoute } from "@/components/tours/TourRoutesBoard";
 
+const ROUTE_FIELDS = "id, tour_number, service_id, notes, services(name)";
+
+/**
+ * Les tournées et leurs villages, avec les coordonnées mises en cache pour
+ * la carte. Tant que la migration des coordonnées n'est pas passée, on
+ * relit sans elles : la page reste utilisable, la carte l'indique.
+ */
+async function loadRoutes(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  const withGeo = await supabase
+    .from("tour_routes")
+    .select(`${ROUTE_FIELDS}, tour_route_villages(id, name, postal_code, notes, position, lat, lng, insee_code, geocode_status)`)
+    .order("tour_number");
+  if (!withGeo.error) return { data: withGeo.data as unknown[] | null, geoReady: true };
+  const plain = await supabase.from("tour_routes").select(`${ROUTE_FIELDS}, tour_route_villages(id, name, postal_code, notes, position)`).order("tour_number");
+  return { data: plain.data as unknown[] | null, geoReady: false };
+}
+
 /**
  * One sheet per tour number with its ordered villages and practical
  * notes. Direction and chefs d'équipe edit; drivers read the tours of
@@ -14,11 +31,8 @@ export default async function TourRoutesPage() {
   const canEdit = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
-  const [{ data: routes }, { data: services }, { data: myServices }, { data: recentTours }] = await Promise.all([
-    supabase
-      .from("tour_routes")
-      .select("id, tour_number, service_id, notes, services(name), tour_route_villages(name, postal_code, notes, position)")
-      .order("tour_number"),
+  const [{ data: routes, geoReady }, { data: services }, { data: myServices }, { data: recentTours }] = await Promise.all([
+    loadRoutes(supabase),
     supabase.from("services").select("id, name").order("name"),
     supabase.from("user_services").select("service_id").eq("user_id", appUser.id),
     canEdit
@@ -35,7 +49,16 @@ export default async function TourRoutesPage() {
     notes: r.notes,
     villages: ((r.tour_route_villages ?? []) as any[])
       .sort((a, b) => a.position - b.position)
-      .map((v) => ({ name: v.name, postal_code: v.postal_code, notes: v.notes })),
+      .map((v) => ({
+        id: v.id,
+        name: v.name,
+        postal_code: v.postal_code,
+        notes: v.notes,
+        lat: v.lat ?? null,
+        lng: v.lng ?? null,
+        insee_code: v.insee_code ?? null,
+        geocode_status: v.geocode_status ?? null,
+      })),
   }));
   const visible = canEdit || appUser.role === "comptable" ? all : all.filter((r) => !r.serviceId || myServiceIds.has(r.serviceId));
 
@@ -55,7 +78,7 @@ export default async function TourRoutesPage() {
             : "Les villages de vos tournées, dans l'ordre de passage, avec les infos utiles."
         }
       />
-      <TourRoutesBoard routes={visible} canEdit={canEdit} services={services ?? []} missingTourNumbers={missingTourNumbers} />
+      <TourRoutesBoard routes={visible} canEdit={canEdit} services={services ?? []} missingTourNumbers={missingTourNumbers} geoReady={geoReady} />
     </div>
   );
 }

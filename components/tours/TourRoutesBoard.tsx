@@ -1,15 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { IconMapPin } from "@/components/layout/icons";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 
+// La carte (MapLibre) n'est chargée que si l'on ouvre l'onglet.
+const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").then((m) => m.CarteVillages), {
+  ssr: false,
+  loading: () => <p className="text-sm text-navy/60">Chargement de la carte…</p>,
+});
+
 export interface Village {
+  id?: string;
   name: string;
   postal_code: string | null;
   notes: string | null;
+  /** Coordonnées de la commune, mises en cache pour la carte. */
+  lat?: number | null;
+  lng?: number | null;
+  insee_code?: string | null;
+  /** ok | introuvable | null (pas encore cherché). */
+  geocode_status?: string | null;
 }
 
 export interface TourRoute {
@@ -217,11 +231,14 @@ export function TourRoutesBoard({
   canEdit,
   services,
   missingTourNumbers,
+  geoReady = false,
 }: {
   routes: TourRoute[];
   canEdit: boolean;
   services: { id: string; name: string }[];
   missingTourNumbers: string[];
+  /** Les colonnes de coordonnées des villages existent (migration passée). */
+  geoReady?: boolean;
 }) {
   const router = useRouter();
   const [tourNumber, setTourNumber] = useState("");
@@ -229,6 +246,7 @@ export function TourRoutesBoard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [onglet, setOnglet] = useState<"fiches" | "carte">("fiches");
 
   async function create(number: string, service: string | null) {
     setBusy(true);
@@ -287,18 +305,46 @@ export function TourRoutesBoard({
         </Card>
       )}
 
-      {routes.length > 3 && (
-        <input className="input" type="search" placeholder="Chercher une tournée ou un village…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Chercher une tournée ou un village" />
-      )}
-
-      {visible.length === 0 ? (
-        <p className="text-sm text-navy/60">{routes.length === 0 ? "Aucune tournée renseignée pour le moment." : "Aucun résultat."}</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {visible.map((r) => (
-            <RouteCard key={`${r.id}-${r.villages.length}-${r.notes}`} route={r} canEdit={canEdit} services={services} />
+      {routes.length > 0 && (
+        <div role="tablist" aria-label="Affichage" className="flex flex-wrap gap-2">
+          {(
+            [
+              ["fiches", "Fiches"],
+              ["carte", "Carte"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={onglet === key}
+              className={onglet === key ? "btn-primary !px-3 !py-1.5 text-sm" : "btn-secondary !px-3 !py-1.5 text-sm"}
+              onClick={() => setOnglet(key)}
+            >
+              {label}
+            </button>
           ))}
         </div>
+      )}
+
+      {onglet === "carte" && routes.length > 0 ? (
+        <CarteVillages routes={routes} services={services} geoReady={geoReady} />
+      ) : (
+        <>
+          {routes.length > 3 && (
+            <input className="input" type="search" placeholder="Chercher une tournée ou un village…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Chercher une tournée ou un village" />
+          )}
+
+          {visible.length === 0 ? (
+            <p className="text-sm text-navy/60">{routes.length === 0 ? "Aucune tournée renseignée pour le moment." : "Aucun résultat."}</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {visible.map((r) => (
+                <RouteCard key={`${r.id}-${r.villages.length}-${r.notes}`} route={r} canEdit={canEdit} services={services} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

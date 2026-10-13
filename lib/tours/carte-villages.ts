@@ -163,7 +163,13 @@ export function findDuplicates(villages: MapVillage[]): DuplicateIssue[] {
     if (routeIds.size < 2) continue;
     const tourNumbers = Array.from(new Set(list.map((v) => v.tourNumber))).sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
     const services = new Set(list.map((v) => v.serviceId ?? ""));
-    issues.push({ key, name: list[0]!.name, villages: list, tourNumbers, sameService: services.size === 1 });
+    issues.push({
+      key,
+      name: list[0]!.name,
+      villages: list,
+      tourNumbers,
+      sameService: services.size === 1,
+    });
   }
   return issues.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
@@ -195,7 +201,13 @@ export function findOutliers(villages: MapVillage[]): OutlierIssue[] {
     const dists = pts.map((p) => haversineKm(center, p));
     const med = median(dists);
     list.forEach((v, i) => {
-      if (isOutlierDistance(dists[i]!, med)) issues.push({ village: v, distanceKm: dists[i]!, medianKm: med, center });
+      if (isOutlierDistance(dists[i]!, med))
+        issues.push({
+          village: v,
+          distanceKm: dists[i]!,
+          medianKm: med,
+          center,
+        });
     });
   }
   return issues.sort((a, b) => b.distanceKm - a.distanceKm);
