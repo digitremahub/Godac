@@ -3,6 +3,11 @@
  * couleurs des tournées, enveloppe convexe (étendue d'une tournée),
  * détection des incohérences (village sur plusieurs tournées, village
  * loin du reste de sa tournée, village non localisé).
+ *
+ * Tournées de renfort : leurs villages sont empruntés à d'autres
+ * tournées. Ils ne comptent jamais comme « village sur plusieurs
+ * tournées » ni comme village isolé, et ne sont pas relistés comme non
+ * localisés (ils le sont déjà sous leur tournée d'origine).
  */
 
 export type LngLat = [number, number];
@@ -44,6 +49,12 @@ export const TOUR_PALETTE = [
   "#6699CC", // bleu gris
 ] as const;
 
+/**
+ * Couleurs réservées aux tournées de renfort (tracées en pointillés) :
+ * sombres et neutres, pour ne pas se confondre avec les tournées fixes.
+ */
+export const RENFORT_PALETTE = ["#3B3B3B", "#7A5C00", "#5B2A86", "#00585E", "#8A1C1C"] as const;
+
 /** Couleur au-delà de la palette : teintes réparties par l'angle d'or, saturées et assez sombres pour un contour blanc. */
 function extraColor(i: number): string {
   const hue = Math.round((i * 137.508) % 360);
@@ -55,10 +66,15 @@ function extraColor(i: number): string {
  * T2 < T10), elles prennent la palette dans l'ordre. La couleur d'une
  * tournée ne dépend donc pas du filtre de service affiché.
  */
-export function assignTourColors(tourKeys: string[]): Map<string, string> {
-  const sorted = Array.from(new Set(tourKeys)).sort((a, b) => a.localeCompare(b, "fr", { numeric: true, sensitivity: "base" }));
+export function assignTourColors(tourKeys: string[], renfortKeys: Iterable<string> = []): Map<string, string> {
+  const renfort = new Set(renfortKeys);
+  const byNumber = (a: string, b: string) => a.localeCompare(b, "fr", { numeric: true, sensitivity: "base" });
+  const unique = Array.from(new Set(tourKeys));
+  const fixed = unique.filter((k) => !renfort.has(k)).sort(byNumber);
+  const extra = unique.filter((k) => renfort.has(k)).sort(byNumber);
   const colors = new Map<string, string>();
-  sorted.forEach((k, i) => colors.set(k, i < TOUR_PALETTE.length ? TOUR_PALETTE[i]! : extraColor(i)));
+  fixed.forEach((k, i) => colors.set(k, i < TOUR_PALETTE.length ? TOUR_PALETTE[i]! : extraColor(i)));
+  extra.forEach((k, i) => colors.set(k, i < RENFORT_PALETTE.length ? RENFORT_PALETTE[i]! : extraColor(fixed.length + i)));
   return colors;
 }
 
@@ -132,6 +148,11 @@ export interface MapVillage {
   inseeCode: string | null;
   /** ok | introuvable | null (pas encore géocodé). */
   geoStatus: string | null;
+  /** Village affiché sur une tournée de renfort (emprunté ou propre au renfort). */
+  renfort?: boolean;
+  /** Village emprunté : sa tournée d'origine. */
+  homeRouteId?: string | null;
+  homeTourNumber?: string | null;
 }
 
 /** Même commune ? Code INSEE si connu (géocodée), sinon nom normalisé. */
@@ -150,10 +171,11 @@ export interface DuplicateIssue {
   sameService: boolean;
 }
 
-/** Villages présents sur plusieurs tournées. */
+/** Villages présents sur plusieurs tournées (hors tournées de renfort, qui empruntent par définition). */
 export function findDuplicates(villages: MapVillage[]): DuplicateIssue[] {
   const groups = new Map<string, MapVillage[]>();
   for (const v of villages) {
+    if (v.renfort) continue;
     const k = villageKey(v);
     groups.set(k, [...(groups.get(k) ?? []), v]);
   }
@@ -192,7 +214,7 @@ export function isOutlierDistance(distanceKm: number, medianKm: number): boolean
 /** Villages loin du reste de leur tournée (tournées d'au moins OUTLIER_MIN_VILLAGES villages localisés). */
 export function findOutliers(villages: MapVillage[]): OutlierIssue[] {
   const byRoute = new Map<string, MapVillage[]>();
-  for (const v of villages) if (v.lat !== null && v.lng !== null) byRoute.set(v.routeId, [...(byRoute.get(v.routeId) ?? []), v]);
+  for (const v of villages) if (!v.renfort && v.lat !== null && v.lng !== null) byRoute.set(v.routeId, [...(byRoute.get(v.routeId) ?? []), v]);
   const issues: OutlierIssue[] = [];
   for (const list of Array.from(byRoute.values())) {
     if (list.length < OUTLIER_MIN_VILLAGES) continue;
@@ -219,13 +241,15 @@ export interface TourExtent {
   hull: LngLat[];
   /** Plus grande distance entre deux villages de la tournée (km). */
   spanKm: number;
+  /** Tournée de renfort : tracée à part (pointillés). */
+  renfort: boolean;
 }
 
-export function tourExtent(routeId: string, points: LngLat[]): TourExtent {
+export function tourExtent(routeId: string, points: LngLat[], renfort = false): TourExtent {
   const hull = convexHull(points);
   let spanKm = 0;
   for (let i = 0; i < hull.length; i++) for (let j = i + 1; j < hull.length; j++) spanKm = Math.max(spanKm, haversineKm(hull[i]!, hull[j]!));
-  return { routeId, hull, spanKm };
+  return { routeId, hull, spanKm, renfort };
 }
 
 export interface VillageAnalysis {
@@ -239,13 +263,14 @@ export interface VillageAnalysis {
 export function analyzeVillages(villages: MapVillage[]): VillageAnalysis {
   const located = villages.filter((v) => v.lat !== null && v.lng !== null);
   const byRoute = new Map<string, LngLat[]>();
+  const renfortRoutes = new Set(villages.filter((v) => v.renfort).map((v) => v.routeId));
   for (const v of located) byRoute.set(v.routeId, [...(byRoute.get(v.routeId) ?? []), [v.lng!, v.lat!]]);
   const extents = new Map<string, TourExtent>();
-  for (const [routeId, pts] of Array.from(byRoute.entries())) extents.set(routeId, tourExtent(routeId, pts));
+  for (const [routeId, pts] of Array.from(byRoute.entries())) extents.set(routeId, tourExtent(routeId, pts, renfortRoutes.has(routeId)));
   return {
     duplicates: findDuplicates(villages),
     outliers: findOutliers(villages),
-    unlocated: villages.filter((v) => v.lat === null || v.lng === null),
+    unlocated: villages.filter((v) => !v.homeRouteId && (v.lat === null || v.lng === null)),
     extents,
   };
 }

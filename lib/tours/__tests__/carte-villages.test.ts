@@ -3,6 +3,7 @@ import {
   OUTLIER_MAX_KM,
   OUTLIER_MIN_KM,
   OUTLIER_RATIO,
+  RENFORT_PALETTE,
   TOUR_PALETTE,
   analyzeVillages,
   assignTourColors,
@@ -173,5 +174,40 @@ describe("analyse complète", () => {
   it("normalisation des noms", () => {
     expect(normalizeVillageName("  Sainte-Foy-l'Argentière ")).toBe("sainte foy l argentiere");
     expect(normalizeVillageName("Ste Foy l’Argentière")).toBe("sainte foy l argentiere");
+  });
+});
+
+describe("tournées de renfort sur la carte", () => {
+  it("un village couvert par un renfort n'est pas signalé « sur plusieurs tournées »", () => {
+    const home = v("t1", "Aubenas", [4.39, 44.62], { inseeCode: "07019" });
+    const emprunt = v("r9", "Aubenas", [4.39, 44.62], { inseeCode: "07019", renfort: true, homeRouteId: "t1", homeTourNumber: "T1" });
+    expect(findDuplicates([home, emprunt])).toEqual([]);
+  });
+  it("un vrai doublon entre deux tournées fixes reste signalé, même si un renfort couvre aussi le village", () => {
+    const d = findDuplicates([
+      v("t1", "Vals", [4.36, 44.66], { inseeCode: "07331" }),
+      v("t2", "Vals", [4.36, 44.66], { inseeCode: "07331" }),
+      v("r9", "Vals", [4.36, 44.66], { inseeCode: "07331", renfort: true, homeRouteId: "t1" }),
+    ]);
+    expect(d).toHaveLength(1);
+    expect(d[0]!.tourNumbers).toEqual(["T1", "T2"]);
+  });
+  it("pas de village isolé sur un renfort, pas de non-localisé emprunté, étendue marquée renfort", () => {
+    const a = analyzeVillages([
+      v("r9", "A", [4, 44], { renfort: true, homeRouteId: "t1" }),
+      v("r9", "B", [4.01, 44.01], { renfort: true, homeRouteId: "t1" }),
+      v("r9", "C", [6, 46], { renfort: true, homeRouteId: "t2" }),
+      v("r9", "D", null, { renfort: true, homeRouteId: "t2" }),
+    ]);
+    expect(a.outliers).toEqual([]);
+    expect(a.unlocated).toEqual([]);
+    expect(a.extents.get("r9")!.renfort).toBe(true);
+  });
+  it("les renforts prennent leur propre palette, sans décaler les couleurs des tournées fixes", () => {
+    const sans = assignTourColors(["T1", "T2"]);
+    const avec = assignTourColors(["T1", "R1", "T2"], ["R1"]);
+    expect(avec.get("T1")).toBe(sans.get("T1"));
+    expect(avec.get("T2")).toBe(sans.get("T2"));
+    expect(avec.get("R1")).toBe(RENFORT_PALETTE[0]);
   });
 });
