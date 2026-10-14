@@ -2,7 +2,7 @@ name: Apply GODAC archive
 on:
   push:
     branches: [feature/optimisation-tournees]
-    paths: [GODAC-fichiers-modifies.zip]
+    paths: [GODAC-fichiers-modifies.zip, .github/workflows/apply-godac-archive.yml]
 permissions:
   contents: write
 jobs:
@@ -17,6 +17,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .env.example MISES-A-JOUR-GODAC-2026-10-14.md components/colis lib/colis app/api/colis
-          git rm GODAC-fichiers-modifies.zip
+          git rm GODAC-fichiers-modifies.zip .github/workflows/apply-godac-archive.yml
           git commit -m "Apply GODAC tour optimization updates"
           git push
