@@ -42,6 +42,7 @@ function rng(seed: number) {
 const MODULES = [
   "fleet",
   "fuel_tracking",
+  "ocr",
   "planning",
   "maintenance_requests",
   "leave_management",
