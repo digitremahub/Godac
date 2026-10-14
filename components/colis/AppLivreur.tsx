@@ -11,6 +11,8 @@ import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { ClotureSheet } from "@/components/colis/ClotureSheet";
+import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estRamasse, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
@@ -46,6 +48,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
+  const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
@@ -183,11 +187,24 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     charger(id);
   }
 
-  async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
+  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+    setStops((all) =>
+      all.map((x) =>
+        x.id === s.id
+          ? {
+              ...x,
+              status,
+              done_at: status === "pending" ? null : new Date().toISOString(),
+              failure_reason: status === "failed" ? (echec?.motif ?? "absent") : null,
+              ...(status !== "delivered" ? { delivered_place: null, proof_code: null } : {}),
+            }
+          : x,
+      ),
+    );
     if (status !== "pending") navigator.vibrate?.(40);
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await charger(run?.id);
@@ -256,9 +273,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     await charger(null);
   }
 
-  const pending = stops.filter((s) => s.status === "pending");
+  const pending = arretsRestants(stops);
   const termines = stops.filter((s) => s.status !== "pending");
-  const prochain = pending[0];
+  // Premier arrêt non clôturé dans l'ordre, même si d'autres ont été clôturés avant leur tour.
+  const prochain = prochainArret(stops) ?? undefined;
   const suivants = pending.slice(1);
   const sansTelephone = arretsSansTelephone(suivants).length;
   const poidsRestant = formatPoids(sommePoids(pending));
@@ -365,6 +383,26 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
           {toast.text}
         </p>
+      )}
+
+      {cloture && (
+        <ClotureSheet
+          stop={cloture.stop}
+          numero={stops.indexOf(cloture.stop) + 1}
+          horsOrdre={cloture.stop.id !== prochain?.id}
+          mode={cloture.mode}
+          onClose={() => setCloture(null)}
+          onLivrer={() => {
+            const s = cloture.stop;
+            setCloture(null);
+            terminer(s);
+          }}
+          onEchec={async (motif, precision) => {
+            const s = cloture.stop;
+            setCloture(null);
+            await statut(s, "failed", { motif, precision });
+          }}
+        />
       )}
 
       {livraison && (
@@ -529,7 +567,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
                 {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
               </button>
-              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => statut(prochain, "failed")}>
+              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
                 <IconX className="h-5 w-5" /> Absent
               </button>
             </div>
@@ -587,6 +625,14 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
+                      <button
+                        type="button"
+                        className="mt-1.5 rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
+                        onClick={() => setCloture({ stop: s, mode: "choix" })}
+                        aria-label={`Clôturer ${s.recipient ?? s.address}`}
+                      >
+                        Clôturer ›
+                      </button>
                     </div>
                     <button
                       type="button"
@@ -635,6 +681,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     <p className="min-w-0 flex-1 truncate text-sm">
                       {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
                       {s.address}
+                      {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
                     </p>
                     {s.proof_code && (
                       <span className="flex shrink-0 items-center gap-1 text-xs text-navy/60" title={`QR code scanné : ${s.proof_code}`} aria-label={`Livré avec QR code ${s.proof_code}`}>

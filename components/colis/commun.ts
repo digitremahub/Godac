@@ -35,6 +35,8 @@ export interface Stop {
   proof_code?: string | null;
   /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */
   weight_kg?: number | string | null;
+  /** Échec : motif choisi par le chauffeur (lib/colis/cloture.ts). */
+  failure_reason?: string | null;
   /** Liste de la tournée (null : liste implicite « Liste principale »). */
   list_id?: string | null;
   /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */

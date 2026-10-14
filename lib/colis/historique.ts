@@ -343,6 +343,7 @@ export interface ArretDetail {
   kind?: string | null;
   proof_code?: string | null;
   weight_kg?: number | string | null;
+  failure_reason?: string | null;
 }
 
 /** Détail en lecture seule d'une tournée de l'historique (null si inaccessible). */
@@ -355,7 +356,7 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
   const [{ data: stops }, { data: listes }, { data: chauffeur }] = await Promise.all([
     supabase
       .from("delivery_stops")
-      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg")
+      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason")
       .eq("run_id", id)
       .order("position")
       .order("created_at"),

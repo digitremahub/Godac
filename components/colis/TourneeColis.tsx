@@ -16,6 +16,8 @@ import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { ClotureSheet } from "@/components/colis/ClotureSheet";
+import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
@@ -87,6 +89,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
+  const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
@@ -324,10 +328,23 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     }
   }
 
-  async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
+  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+    setStops((all) =>
+      all.map((x) =>
+        x.id === s.id
+          ? {
+              ...x,
+              status,
+              done_at: status === "pending" ? null : new Date().toISOString(),
+              failure_reason: status === "failed" ? (echec?.motif ?? "absent") : null,
+              ...(status !== "delivered" ? { delivered_place: null, proof_code: null } : {}),
+            }
+          : x,
+      ),
+    );
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await recharger(run?.id);
@@ -527,9 +544,10 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     );
   }
 
-  const pending = stops.filter((s) => s.status === "pending");
+  const pending = arretsRestants(stops);
   const colis = stops.reduce((n, s) => n + s.parcel_count, 0);
-  const prochain = pending[0];
+  // Premier arrêt non clôturé dans l'ordre, même si d'autres ont été clôturés avant leur tour.
+  const prochain = prochainArret(stops) ?? undefined;
   const livres = stops.filter((s) => s.status === "delivered").length;
   const ramasses = stops.filter(estRamasse).length;
   const poidsTotal = formatPoids(sommePoids(stops));
@@ -632,6 +650,25 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
         <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
           {toast.text}
         </p>
+      )}
+      {cloture && (
+        <ClotureSheet
+          stop={cloture.stop}
+          numero={stops.indexOf(cloture.stop) + 1}
+          horsOrdre={cloture.stop.id !== prochain?.id}
+          mode={cloture.mode}
+          onClose={() => setCloture(null)}
+          onLivrer={() => {
+            const s = cloture.stop;
+            setCloture(null);
+            terminer(s);
+          }}
+          onEchec={async (motif, precision) => {
+            const s = cloture.stop;
+            setCloture(null);
+            await statut(s, "failed", { motif, precision });
+          }}
+        />
       )}
       {livraison && (
         <LivraisonSheet
@@ -738,7 +775,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
               {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
             </button>
-            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => statut(prochain, "failed")}>
+            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
               <IconX className="h-5 w-5" /> Échec / absent
             </button>
           </div>
@@ -929,6 +966,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                               formatPoids(s.weight_kg),
                               estRamasse(s) && s.status !== "pending" && libelleStatut(s),
                               s.status === "delivered" && libellePreuve(s),
+                              s.status === "failed" && libelleMotif(s.failure_reason),
                               s.lat === null && "⚠ adresse non localisée",
                             ]
                               .filter(Boolean)
@@ -960,6 +998,16 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       </div>
                       {s.status === "pending" && run.status !== "done" && edition?.id !== s.id && (
                         <div className="mt-1.5 flex flex-wrap gap-1 pl-9 text-xs">
+                          {enLivraison && (
+                            <button
+                              type="button"
+                              className="btn-secondary !px-3 !py-1 font-semibold"
+                              onClick={() => setCloture({ stop: s, mode: "choix" })}
+                              aria-label={`Clôturer ${s.address}`}
+                            >
+                              Clôturer
+                            </button>
+                          )}
                           <button type="button" className="btn-ghost !px-2 !py-1" aria-label={`Monter ${s.address}`} onClick={() => deplacer(s, "haut")}>
                             ↑
                           </button>
