@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       lng = geo?.lng ?? null;
     }
     if (!adresse && lat !== null && lng !== null) adresse = (await reverseGeocode(lat, lng, pays)) ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    return adresse && adresse.length >= 3 ? { adresse, lat, lng, nom: p.nom, telephone: normaliserTelephone(p.telephone) } : null;
+    return adresse && adresse.length >= 3 ? { adresse, lat, lng, nom: p.nom, telephone: normaliserTelephone(p.telephone, pays) } : null;
   });
 
   // Import dans une nouvelle liste : la liste implicite devient d'abord une

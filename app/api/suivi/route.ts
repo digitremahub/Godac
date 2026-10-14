@@ -13,7 +13,7 @@ export interface TourneeSuivie {
   statut: "loading" | "in_progress" | "done";
   position: { lat: number; lng: number; at: string } | null;
   depot: { lat: number; lng: number } | null;
-  arrets: { lat: number; lng: number; status: string; ordre: number }[];
+  arrets: { lat: number; lng: number; status: string; ordre: number; ramasse?: boolean }[];
   adressesRestantes: number;
   colisRestants: number;
   adressesFaites: number;
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   const { data: runs } = await supabase
     .from("delivery_runs")
     .select(
-      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, parcel_count, lat, lng, done_at, position, address, window_start, window_end)",
+      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, kind, parcel_count, lat, lng, done_at, position, address, window_start, window_end)",
     )
     .eq("run_date", aujourdhuiParis())
     .in("status", ["in_progress", "loading", "done"])
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
         statut: r.status,
         position,
         depot,
-        arrets: stops.filter((s) => s.lat !== null).map((s, i) => ({ lat: Number(s.lat), lng: Number(s.lng), status: s.status, ordre: i + 1 })),
+        arrets: stops.filter((s) => s.lat !== null).map((s, i) => ({ lat: Number(s.lat), lng: Number(s.lng), status: s.status, ordre: i + 1, ramasse: s.kind === "ramasse" })),
         ...av,
         finEstimee: r.status === "in_progress" ? av.finEstimee : null,
       };

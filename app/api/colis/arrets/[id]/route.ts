@@ -7,9 +7,20 @@ import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
+import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
+import { MOTIFS_ECHEC, libelleMotif, refusCloture } from "@/lib/colis/cloture";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
+  /** Échec : motif (« absent », « adresse_introuvable »…) et précision facultative, ajoutée aux consignes. */
+  motif: z.enum(MOTIFS_ECHEC.map((m) => m.key) as [string, ...string[]]).optional(),
+  precision: z.string().trim().max(200).nullable().optional(),
+  /** Tournée attendue : l'arrêt doit lui appartenir (clôture depuis la liste). */
+  run_id: z.string().uuid().optional(),
+  /** Livraison ou ramasse (enlèvement chez un expéditeur). */
+  type: z.enum(["livraison", "ramasse"]).optional(),
+  /** Poids des colis de l'arrêt en kg ; null : poids inconnu. */
+  poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
   notes: z.string().trim().max(500).nullable().optional(),
   destinataire: z.string().trim().max(120).nullable().optional(),
@@ -32,7 +43,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-/** Livré / échec / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
+/** Livré / échec / type (livraison ou ramasse) / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
@@ -40,7 +51,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
@@ -77,15 +88,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (destinataire !== undefined) update.recipient = destinataire || null;
   if (parcel_count !== undefined) update.parcel_count = parcel_count;
   if (telephone !== undefined) {
-    const tel = normaliserTelephone(telephone);
+    const tel = normaliserTelephone(telephone, await codePays(appUser.organization_id));
     if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
     update.phone = tel;
   }
   if (status) {
+    // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
+    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id);
+    if (run_id) q = q.eq("run_id", run_id);
+    const { data: actuel } = await q.maybeSingle();
+    if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
+    const refus = refusCloture(actuel.status, status);
+    if (refus) return NextResponse.json({ error: refus }, { status: 409 });
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
-    if (status !== "delivered") update.delivered_place = null;
+    if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
+    update.failure_reason = status === "failed" ? (motif ?? "absent") : null;
+    if (status === "failed" && precision) {
+      update.notes = [actuel.notes, `${libelleMotif(motif ?? "absent")} : ${precision}`].filter(Boolean).join(" · ").slice(0, 500);
+    }
   }
+  if (type) update.kind = type;
+  if (poids !== undefined) update.weight_kg = poids === null ? null : lirePoids(poids);
   if (notes !== undefined) update.notes = notes;
   if (creneau !== undefined) {
     const heure = (v: string | null | undefined) => (v ? ecrireHeure(lireHeure(v)!) : null);
@@ -95,9 +119,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
   }
-  const { data, error } = await supabase.from("delivery_stops").update(update).eq("id", id).select(STOP_FIELDS).maybeSingle();
+  let maj = supabase.from("delivery_stops").update(update).eq("id", id);
+  // Garde contre deux clôtures simultanées (deux téléphones, double appui).
+  if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
+  const { data, error } = await maj.select(STOP_FIELDS).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  if (!data) return NextResponse.json({ error: status ? "Arrêt déjà clôturé ou modifié entre-temps : actualisez." : "Arrêt introuvable." }, { status: status ? 409 : 404 });
   return NextResponse.json({ stop: data });
 }
 

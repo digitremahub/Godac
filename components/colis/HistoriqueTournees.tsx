@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Card, EmptyState } from "@/components/ui";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
 import { versParams, type Historique, type detailTournee } from "@/lib/colis/historique";
-import { libelleLieu } from "@/lib/colis/livraison";
+import { estRamasse, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
+import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
+import { formatPoids } from "@/lib/colis/poids";
+import { libelleMotif } from "@/lib/colis/cloture";
 
 const STATUTS: Record<string, string> = { loading: "En chargement", in_progress: "En livraison", done: "Clôturée" };
-const ARRET: Record<string, string> = { pending: "Non fait", delivered: "Livré", failed: "Échec / absent" };
 
 const heure = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) : "—");
 const date = (jour: string) => new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -143,7 +145,8 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
       ) : (
         <ol className="divide-y divide-navy/[0.07]">
           {arrets.map((s, i) => (
-            <li key={s.id} className="py-2">
+            <li key={s.id} className={`relative py-2 ${estRamasse(s) ? "pl-3" : ""}`}>
+              {estRamasse(s) && <EncocheRamasse />}
               {plusieursListes && (i === 0 || arrets[i - 1]!.liste !== s.liste) && <p className="pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy/55">{s.liste}</p>}
               <div className="flex items-start gap-3">
                 <span
@@ -155,14 +158,17 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
+                  {estRamasse(s) && <BadgeRamasse className="mb-1" />}
                   <p className="text-sm font-semibold leading-snug">{s.address}</p>
                   <p className="text-xs text-navy/60">
                     {[
-                      ARRET[s.status] ?? s.status,
+                      libelleStatut(s),
                       s.done_at && heure(s.done_at),
-                      s.status === "delivered" && s.delivered_place && libelleLieu(s.delivered_place),
+                      s.status === "delivered" && libellePreuve(s),
+                      s.status === "failed" && libelleMotif(s.failure_reason),
                       s.recipient,
                       s.parcel_count > 1 && `${s.parcel_count} colis`,
+                      formatPoids(s.weight_kg),
                       s.parcel_code && `n° ${s.parcel_code}`,
                       s.notes,
                     ]

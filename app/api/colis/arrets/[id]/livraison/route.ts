@@ -4,7 +4,8 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
-import { LIEUX_LIVRAISON, libelleLieu, photoObligatoire } from "@/lib/colis/livraison";
+import { refusCloture } from "@/lib/colis/cloture";
+import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, photoObligatoire, qrObligatoire } from "@/lib/colis/livraison";
 
 const BUCKET = "delivery-proofs";
 const bodySchema = z.object({
@@ -12,11 +13,14 @@ const bodySchema = z.object({
   precision: z.string().trim().max(200).nullable().optional(),
   // Photo JPEG réduite côté téléphone (≈ 1600 px) : 5 Mo en base64 au plus.
   image: z.string().max(7_000_000).nullable().optional(),
+  /** Livraison avec QR code : valeur lue sur le QR code (ou code de retrait) du destinataire. */
+  code_qr: z.string().max(CODE_QR_MAX * 2).nullable().optional(),
 });
 
 /**
  * Colis livré : lieu de dépôt + photo (obligatoire pour la boîte aux
- * lettres et le jardin). L'accès à l'arrêt est vérifié par la RLS
+ * lettres et le jardin), ou QR code du destinataire scanné (livraison
+ * « avec QR code » : la valeur lue est la preuve de remise). L'accès à l'arrêt est vérifié par la RLS
  * (chauffeur de la tournée ou encadrement) avant tout envoi de fichier.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,9 +34,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (photoObligatoire(lieu as never) && !image) {
     return NextResponse.json({ error: `Photo obligatoire pour une livraison « ${libelleLieu(lieu)} ».` }, { status: 400 });
   }
+  const codeQr = qrObligatoire(lieu as never) ? normaliserCodeQr(parsed.data.code_qr) : null;
+  if (qrObligatoire(lieu as never) && !codeQr) {
+    return NextResponse.json({ error: "Scannez le QR code du destinataire (ou saisissez son code de retrait)." }, { status: 400 });
+  }
 
-  const { data: stop } = await supabase.from("delivery_stops").select("id, notes, proof_photo_path, delivery_runs(run_date)").eq("id", id).maybeSingle();
+  const { data: stop } = await supabase.from("delivery_stops").select("id, status, notes, proof_photo_path, delivery_runs(run_date)").eq("id", id).maybeSingle();
   if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  // N'importe quel arrêt de la tournée peut être livré, mais une seule fois.
+  const refus = refusCloture(stop.status, "delivered");
+  if (refus) return NextResponse.json({ error: refus }, { status: 409 });
 
   const admin = createAdminSupabaseClient();
   let path: string | null = stop.proof_photo_path;
@@ -55,12 +66,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       done_at: new Date().toISOString(),
       delivered_place: lieu,
       proof_photo_path: path,
+      proof_code: codeQr,
+      failure_reason: null,
       ...(note ? { notes: [stop.notes, note].filter(Boolean).join(" · ").slice(0, 500) } : {}),
     })
     .eq("id", id)
+    .eq("status", "pending")
     .select(STOP_FIELDS)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Arrêt déjà clôturé entre-temps : actualisez." }, { status: 409 });
   return NextResponse.json({ stop: data });
 }
 

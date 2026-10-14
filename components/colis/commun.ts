@@ -29,6 +29,14 @@ export interface Stop {
   done_at?: string | null;
   delivered_place: string | null;
   proof_photo_path: string | null;
+  /** Livraison (par défaut) ou ramasse ; absent avant la migration 170. */
+  kind?: "livraison" | "ramasse" | null;
+  /** Livraison avec QR code : valeur scannée (preuve de remise). */
+  proof_code?: string | null;
+  /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */
+  weight_kg?: number | string | null;
+  /** Échec : motif choisi par le chauffeur (lib/colis/cloture.ts). */
+  failure_reason?: string | null;
   /** Liste de la tournée (null : liste implicite « Liste principale »). */
   list_id?: string | null;
   /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */

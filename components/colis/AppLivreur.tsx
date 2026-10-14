@@ -4,11 +4,17 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
-import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
+import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { formatPoids, sommePoids } from "@/lib/colis/poids";
+import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { ClotureSheet } from "@/components/colis/ClotureSheet";
+import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
+import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
+import { estRamasse, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
@@ -33,7 +39,7 @@ const MEMO = "godac-tournee-colis";
  * suivantes avec leur bouton d'appel. L'écran reste allumé pendant la
  * tournée quand le téléphone le permet.
  */
-export function AppLivreur({ prenom }: { prenom: string | null }) {
+export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pays?: string }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -42,6 +48,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
+  const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
@@ -179,21 +187,40 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
     charger(id);
   }
 
-  async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
+  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+    setStops((all) =>
+      all.map((x) =>
+        x.id === s.id
+          ? {
+              ...x,
+              status,
+              done_at: status === "pending" ? null : new Date().toISOString(),
+              failure_reason: status === "failed" ? (echec?.motif ?? "absent") : null,
+              ...(status !== "delivered" ? { delivered_place: null, proof_code: null } : {}),
+            }
+          : x,
+      ),
+    );
     if (status !== "pending") navigator.vibrate?.(40);
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await charger(run?.id);
     }
   }
 
+  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
+  function terminer(s: Stop) {
+    if (estRamasse(s)) return statut(s, "delivered");
+    setLivraison(s);
+  }
+
   async function ajouterTelephone(s: Stop) {
     const saisi = prompt(`Téléphone du client — ${s.recipient ?? s.address}`, s.phone ?? "");
     if (saisi === null) return;
-    const tel = normaliserTelephone(saisi);
+    const tel = normaliserTelephone(saisi, pays);
     if (saisi.trim() && !tel) return setToast({ ok: false, text: "Numéro non reconnu." });
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ telephone: tel }) });
@@ -246,10 +273,13 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
     await charger(null);
   }
 
-  const pending = stops.filter((s) => s.status === "pending");
+  const pending = arretsRestants(stops);
   const termines = stops.filter((s) => s.status !== "pending");
-  const prochain = pending[0];
+  // Premier arrêt non clôturé dans l'ordre, même si d'autres ont été clôturés avant leur tour.
+  const prochain = prochainArret(stops) ?? undefined;
   const suivants = pending.slice(1);
+  const sansTelephone = arretsSansTelephone(suivants).length;
+  const poidsRestant = formatPoids(sommePoids(pending));
   // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
   const groupes = grouperParListe(stops, lists);
   const multi = groupes.length > 1 || groupes[0]?.liste != null;
@@ -315,6 +345,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               <p className="mt-2 text-xs text-white/80">
                 <strong className="text-white">{avancement.adressesRestantes}</strong> adresse{avancement.adressesRestantes > 1 ? "s" : ""} ·{" "}
                 <strong className="text-white">{avancement.colisRestants}</strong> colis restant{avancement.colisRestants > 1 ? "s" : ""}
+                {poidsRestant && ` (≈ ${poidsRestant})`}
                 {avancement.finEstimee && (
                   <>
                     {" "}
@@ -354,6 +385,26 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         </p>
       )}
 
+      {cloture && (
+        <ClotureSheet
+          stop={cloture.stop}
+          numero={stops.indexOf(cloture.stop) + 1}
+          horsOrdre={cloture.stop.id !== prochain?.id}
+          mode={cloture.mode}
+          onClose={() => setCloture(null)}
+          onLivrer={() => {
+            const s = cloture.stop;
+            setCloture(null);
+            terminer(s);
+          }}
+          onEchec={async (motif, precision) => {
+            const s = cloture.stop;
+            setCloture(null);
+            await statut(s, "failed", { motif, precision });
+          }}
+        />
+      )}
+
       {livraison && (
         <LivraisonSheet
           stop={livraison}
@@ -390,12 +441,17 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </p>
             )}
             {arretCarte ? (
-              <div className="pointer-events-auto mx-auto flex max-w-xl flex-col gap-3 rounded-2xl bg-surface p-4 shadow-pop">
+              <div className="pointer-events-auto relative mx-auto flex max-w-xl flex-col gap-3 overflow-hidden rounded-2xl bg-surface p-4 shadow-pop">
+                {estRamasse(arretCarte) && <EncocheRamasse large />}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-                    Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
-                    {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
-                    {arretCarte.status === "delivered" ? " · livré" : arretCarte.status === "failed" ? " · absent" : arretCarte.id === prochain?.id ? " · prochain" : ""}
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+                    {estRamasse(arretCarte) && <BadgeRamasse />}
+                    <span>
+                      Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
+                      {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
+                      {formatPoids(arretCarte.weight_kg) && ` · ${formatPoids(arretCarte.weight_kg)}`}
+                      {arretCarte.status !== "pending" ? ` · ${libelleStatut(arretCarte).toLowerCase()}` : arretCarte.id === prochain?.id ? " · prochain" : ""}
+                    </span>
                   </p>
                   <p className="font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
                   {arretCarte.recipient && <p className="text-sm text-navy/70">{arretCarte.recipient}</p>}
@@ -415,8 +471,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                     </button>
                   )}
                   {arretCarte.status === "pending" ? (
-                    <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => setLivraison(arretCarte)}>
-                      <IconCheck className="h-4 w-4" /> Livré
+                    <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => terminer(arretCarte)}>
+                      <IconCheck className="h-4 w-4" /> {estRamasse(arretCarte) ? "Ramassé" : "Livré"}
                     </button>
                   ) : (
                     <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
@@ -457,11 +513,19 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             </Link>
           </section>
         ) : prochain ? (
-          <section className="flex flex-col gap-4 rounded-2xl border-2 border-teal/60 bg-surface p-5 shadow-card" aria-label="Arrêt en cours">
+          <section
+            className={`relative flex flex-col gap-4 overflow-hidden rounded-2xl border-2 bg-surface p-5 shadow-card ${estRamasse(prochain) ? "border-gold/80" : "border-teal/60"}`}
+            aria-label={estRamasse(prochain) ? "Ramasse en cours" : "Arrêt en cours"}
+          >
+            {estRamasse(prochain) && <EncocheRamasse large />}
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-              Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis`}
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+              {estRamasse(prochain) && <BadgeRamasse />}
+              <span>
+                Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
+                {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+                {formatPoids(prochain.weight_kg) && ` · ${formatPoids(prochain.weight_kg)}`}
+              </span>
             </p>
             <div>
               <p className="font-display text-2xl font-bold leading-tight">{prochain.address}</p>
@@ -500,10 +564,10 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </a>
             </div>
             <div className="grid grid-cols-[2fr_1fr] gap-2">
-              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => setLivraison(prochain)}>
-                <IconCheck className="h-6 w-6" /> Livré
+              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
+                {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
               </button>
-              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => statut(prochain, "failed")}>
+              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
                 <IconX className="h-5 w-5" /> Absent
               </button>
             </div>
@@ -512,7 +576,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
           <section className="flex flex-col items-center gap-3 rounded-2xl bg-surface p-6 text-center shadow-card">
             <p className="font-display text-xl font-bold">Tournée terminée 🎉</p>
             <p className="text-sm text-navy/65">
-              {stops.filter((s) => s.status === "delivered").length} livré(s), {stops.filter((s) => s.status === "failed").length} absent(s).
+              {stops.filter((s) => s.status === "delivered" && !estRamasse(s)).length} livré(s)
+              {stops.some(estRamasse) && `, ${stops.filter((s) => s.status === "delivered" && estRamasse(s)).length} ramasse(s) faite(s)`}, {stops.filter((s) => s.status === "failed").length} absent(s).
             </p>
             {run.status !== "done" && (
               <button type="button" className="btn-primary !py-3" onClick={cloturer}>
@@ -525,7 +590,14 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         {run && run.status !== "loading" && suivants.length > 0 && (
           <section aria-label="Adresses suivantes">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-navy/60">Ensuite · {suivants.length}</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-navy/60">
+                Ensuite · {suivants.length}
+                {sansTelephone > 0 && (
+                  <span className="ml-2 rounded-full bg-orange/15 px-2 py-0.5 text-[11px] normal-case tracking-normal text-orange-ink" title={ALERTE_SANS_TELEPHONE}>
+                    {sansTelephone} sans téléphone
+                  </span>
+                )}
+              </h2>
               <button type="button" className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={reoptimiser}>
                 {busy ? "Calcul…" : "Recalculer depuis ici"}
               </button>
@@ -540,12 +612,27 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                     </li>
                   )}
-                  <li className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5 shadow-card">
+                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
+                    {estRamasse(s) && <EncocheRamasse />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
+                      {(estRamasse(s) || !s.phone) && (
+                        <div className="mb-1 flex flex-wrap gap-1">
+                          {estRamasse(s) && <BadgeRamasse />}
+                          {!s.phone && <BadgeSansTelephone />}
+                        </div>
+                      )}
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
-                      <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
+                      <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
+                      <button
+                        type="button"
+                        className="mt-1.5 rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
+                        onClick={() => setCloture({ stop: s, mode: "choix" })}
+                        aria-label={`Clôturer ${s.recipient ?? s.address}`}
+                      >
+                        Clôturer ›
+                      </button>
                     </div>
                     <button
                       type="button"
@@ -583,11 +670,25 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             {voirTermines && (
               <ol className="mt-1 flex flex-col gap-1.5">
                 {termines.map((s) => (
-                  <li key={s.id} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2 opacity-70">
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}>
+                  <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
+                    {estRamasse(s) && <EncocheRamasse />}
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}
+                      title={libelleStatut(s)}
+                    >
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
-                    <p className="min-w-0 flex-1 truncate text-sm">{s.address}</p>
+                    <p className="min-w-0 flex-1 truncate text-sm">
+                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
+                      {s.address}
+                      {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
+                    </p>
+                    {s.proof_code && (
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-navy/60" title={`QR code scanné : ${s.proof_code}`} aria-label={`Livré avec QR code ${s.proof_code}`}>
+                        <IconQrCode className="h-4 w-4" />
+                        <span className="hidden font-mono sm:inline">{resumeCodeQr(s.proof_code, 14)}</span>
+                      </span>
+                    )}
                     {s.proof_photo_path && (
                       <a href={`/api/colis/arrets/${s.id}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs" aria-label={`Photo de livraison — ${s.address}`}>
                         📷

@@ -4,15 +4,20 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
-import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconX } from "@/components/layout/icons";
+import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import { lienSms, lienTel } from "@/lib/colis/telephone";
-import { libelleLieu } from "@/lib/colis/livraison";
+import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
+import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
+import { estRamasse, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { ClotureSheet } from "@/components/colis/ClotureSheet";
+import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
@@ -24,7 +29,14 @@ interface Draft {
   destinataire: string;
   telephone: string;
   code: string | null;
+  /** Livraison (par défaut, y compris scan et lecture d'étiquette) ou ramasse. */
+  type: TypeArret;
+  /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
+  poids: string;
 }
+
+/** Poids saisi → texte du champ (« 2,5 »). */
+const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
 /** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
 function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
@@ -74,9 +86,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
+  const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
@@ -201,8 +215,12 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           adresse: d.adresse,
           destinataire: d.destinataire || null,
           telephone: d.telephone.trim() || null,
+          type: d.type,
+          poids: lirePoids(d.poids),
         }),
       });
+      // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
+      const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) ? ` ${ALERTE_SANS_TELEPHONE}` : "";
       setToast(
         r.duplicate
           ? { ok: false, text: "Colis déjà scanné." }
@@ -210,7 +228,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             ? { ok: true, text: "Ajouté à un arrêt existant (même adresse)." }
             : r.geocoded === false
               ? { ok: false, text: "Ajouté, mais adresse introuvable sur la carte : vérifiez-la." }
-              : { ok: true, text: run?.status === "in_progress" ? "Adresse ajoutée en fin de tournée : réoptimisez pour l'insérer au bon endroit." : "Colis ajouté." },
+              : {
+                  ok: !sansTel,
+                  text:
+                    (run?.status === "in_progress"
+                      ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
+                      : d.type === "ramasse"
+                        ? "Ramasse ajoutée."
+                        : "Colis ajouté.") + sansTel,
+                },
       );
       setDraft(null);
       await recharger(run?.id);
@@ -223,14 +249,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
   /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
   function onCode(text: string): boolean {
-    const lu = analyserCode(text);
+    const lu = analyserCode(text, pays);
     if (lu.adresse) {
       // Adresse dans le code : ajout direct, sans quitter le scanner.
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code });
+      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       return true;
     } else {
       setScanner(false);
-      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code });
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
       return false;
     }
@@ -253,7 +279,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     setBusy("photo");
     try {
       const image = await imageEnBase64(file);
-      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null }>("/api/colis/etiquette", {
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
       });
@@ -262,6 +288,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
         destinataire: lu.destinataire ?? d?.destinataire ?? "",
         telephone: lu.telephone ?? d?.telephone ?? "",
         code: d?.code ?? lu.code,
+        type: d?.type ?? "livraison",
+        poids: lu.poids ? champPoids(lu.poids) : (d?.poids ?? ""),
       }));
       if (!lu.adresse) setToast({ ok: false, text: "Adresse illisible : saisissez-la." });
     } catch (e) {
@@ -300,10 +328,23 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     }
   }
 
-  async function statut(s: Stop, status: Stop["status"]) {
-    setStops((all) => all.map((x) => (x.id === s.id ? { ...x, status, done_at: status === "pending" ? null : new Date().toISOString() } : x)));
+  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+    setStops((all) =>
+      all.map((x) =>
+        x.id === s.id
+          ? {
+              ...x,
+              status,
+              done_at: status === "pending" ? null : new Date().toISOString(),
+              failure_reason: status === "failed" ? (echec?.motif ?? "absent") : null,
+              ...(status !== "delivered" ? { delivered_place: null, proof_code: null } : {}),
+            }
+          : x,
+      ),
+    );
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await recharger(run?.id);
@@ -328,6 +369,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           destinataire: edition.destinataire.trim() || null,
           telephone: edition.telephone.trim() || null,
           parcel_count: Math.max(1, edition.colis),
+          ...(avant && edition.type !== typeArret(avant.kind) ? { type: edition.type } : {}),
+          ...(avant && lirePoids(edition.poids) !== lirePoids(avant.weight_kg ?? null) ? { poids: lirePoids(edition.poids) } : {}),
         }),
       });
       setEdition(null);
@@ -338,6 +381,12 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     } finally {
       setBusy(null);
     }
+  }
+
+  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
+  function terminer(s: Stop) {
+    if (estRamasse(s)) return statut(s, "delivered");
+    setLivraison(s);
   }
 
   async function deplacer(st: Stop, sens: "haut" | "bas") {
@@ -495,10 +544,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     );
   }
 
-  const pending = stops.filter((s) => s.status === "pending");
+  const pending = arretsRestants(stops);
   const colis = stops.reduce((n, s) => n + s.parcel_count, 0);
-  const prochain = pending[0];
+  // Premier arrêt non clôturé dans l'ordre, même si d'autres ont été clôturés avant leur tour.
+  const prochain = prochainArret(stops) ?? undefined;
   const livres = stops.filter((s) => s.status === "delivered").length;
+  const ramasses = stops.filter(estRamasse).length;
+  const poidsTotal = formatPoids(sommePoids(stops));
+  const sansTelephone = arretsSansTelephone(stops).length;
   const enLivraison = run.status === "in_progress";
   const avancement = estimerAvancement(
     stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
@@ -538,7 +591,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <div className="min-w-0">
               <p className="text-sm font-semibold">{nomGroupe(g)}</p>
               <p className="text-xs text-navy/60">
-                {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis · {c.restants} restant{c.restants > 1 ? "s" : ""}
+                {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis{formatPoids(sommePoids(g.arrets)) && ` (${formatPoids(sommePoids(g.arrets))})`} · {c.restants} restant{c.restants > 1 ? "s" : ""}
               </p>
             </div>
             {modifiable && (
@@ -598,6 +651,25 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           {toast.text}
         </p>
       )}
+      {cloture && (
+        <ClotureSheet
+          stop={cloture.stop}
+          numero={stops.indexOf(cloture.stop) + 1}
+          horsOrdre={cloture.stop.id !== prochain?.id}
+          mode={cloture.mode}
+          onClose={() => setCloture(null)}
+          onLivrer={() => {
+            const s = cloture.stop;
+            setCloture(null);
+            terminer(s);
+          }}
+          onEchec={async (motif, precision) => {
+            const s = cloture.stop;
+            setCloture(null);
+            await statut(s, "failed", { motif, precision });
+          }}
+        />
+      )}
       {livraison && (
         <LivraisonSheet
           stop={livraison}
@@ -640,13 +712,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       </div>
       <div className="grid grid-cols-3 gap-2">
         {[
-          ["Arrêts", stops.length],
-          ["Colis", colis],
+          ["Arrêts", stops.length, ramasses ? `dont ${ramasses} ramasse${ramasses > 1 ? "s" : ""}` : null],
+          ["Colis", colis, poidsTotal && `≈ ${poidsTotal}`],
           ["Livrés", `${livres}/${stops.length}`],
-        ].map(([l, v]) => (
+        ].map(([l, v, detail]) => (
           <Card key={l as string} className="!px-3 !py-2.5 text-center">
             <p className="text-xs text-navy/60">{l}</p>
             <p className="font-display text-xl font-bold tabular-nums">{v}</p>
+            {detail && <p className={`text-[11px] font-semibold ${l === "Arrêts" ? "text-gold-ink" : "text-navy/60"}`}>{detail}</p>}
           </Card>
         ))}
       </div>
@@ -666,11 +739,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       )}
 
       {enLivraison && prochain ? (
-        <Card className="flex flex-col gap-3 border-2 border-teal/50">
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-            Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-            {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis`}
-            {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
+        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${estRamasse(prochain) ? "border-gold/80" : "border-teal/50"}`}>
+          {estRamasse(prochain) && <EncocheRamasse large />}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+            {estRamasse(prochain) && <BadgeRamasse />}
+            <span>
+              Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
+              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+              {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
+            </span>
           </p>
           <div>
             <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
@@ -695,10 +772,10 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <a href={gmaps(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
-            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => setLivraison(prochain)}>
-              <IconCheck className="h-5 w-5" /> Livré
+            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
+              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
             </button>
-            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => statut(prochain, "failed")}>
+            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
               <IconX className="h-5 w-5" /> Échec / absent
             </button>
           </div>
@@ -740,7 +817,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                 <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Lecture…" : "Photo d'étiquette"}
               </button>
             )}
-            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
+            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison", poids: "" })}>
               + Saisir une adresse
             </button>
           </div>
@@ -773,7 +850,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
       {enLivraison && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison", poids: "" })}>
             + Ajouter une adresse
           </button>
           <button type="button" className="btn-secondary !py-2 text-sm" onClick={ouvrirScanner}>
@@ -786,27 +863,43 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {draft && (
         <Card className="flex flex-col gap-3 border-2 border-teal/40">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg">Nouveau colis</h2>
+            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
               <IconX className="h-5 w-5" />
             </button>
           </div>
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
+          <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
           <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
-            className="input"
+            className={`input ${normaliserTelephone(draft.telephone, pays) ? "" : "!border-orange ring-2 ring-orange/30"}`}
             type="tel"
             inputMode="tel"
             value={draft.telephone}
             onChange={(e) => setDraft({ ...draft, telephone: e.target.value })}
-            placeholder="Téléphone du client (facultatif)"
+            placeholder="Téléphone du client"
             aria-label="Téléphone du client"
+            aria-invalid={!normaliserTelephone(draft.telephone, pays)}
           />
+          {!normaliserTelephone(draft.telephone, pays) && <AlerteSansTelephone />}
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-navy/65">Poids</span>
+            <input
+              className="input !w-28"
+              inputMode="decimal"
+              value={draft.poids}
+              onChange={(e) => setDraft({ ...draft, poids: e.target.value })}
+              placeholder="ex. 2,5"
+              aria-label="Poids du colis en kg"
+            />
+            <span className="text-navy/65">kg</span>
+            {draft.poids.trim() && !lirePoids(draft.poids) && <span className="text-xs text-orange-ink">Poids non reconnu</span>}
+          </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
-              Ajouter à la tournée
+              {draft.type === "ramasse" ? "Ajouter la ramasse" : "Ajouter à la tournée"}
             </button>
             {lectureEtiquette && (
               <button type="button" className="btn-secondary" disabled={busy === "photo"} onClick={() => fileRef.current?.click()}>
@@ -820,7 +913,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {(stops.length > 0 || multi) && (
         <Card className="!p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 sm:px-5">
-            <h2 className="text-lg">{run.optimized_at ? "Ordre de passage" : "Colis chargés"}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg">{run.optimized_at ? "Ordre de passage" : "Colis chargés"}</h2>
+              {sansTelephone > 0 && (
+                <span className="rounded-full bg-orange/15 px-2 py-0.5 text-xs font-semibold text-orange-ink" title={ALERTE_SANS_TELEPHONE}>
+                  {sansTelephone} arrêt{sansTelephone > 1 ? "s" : ""} sans téléphone
+                </span>
+              )}
+            </div>
             {run.status !== "done" && pending.length > 1 && (
               <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(enLivraison)}>
                 {busy === "optim" ? "Calcul…" : run.optimized_at ? "Réoptimiser" : "Optimiser l'ordre"}
@@ -840,7 +940,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   return (
-                    <li key={s.id} className={`px-4 py-2.5 sm:px-5 ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estRamasse(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                      {estRamasse(s) && <EncocheRamasse />}
                       <div className="flex items-start gap-3">
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
@@ -850,9 +951,26 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
+                          {(estRamasse(s) || (s.status === "pending" && !s.phone)) && (
+                            <div className="mb-1 flex flex-wrap gap-1">
+                              {estRamasse(s) && <BadgeRamasse />}
+                              {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
+                            </div>
+                          )}
                           <p className="text-sm font-semibold leading-snug">{s.address}</p>
                           <p className="text-xs text-navy/60">
-                            {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.status === "delivered" && libelleLieu(s.delivered_place), s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
+                            {[
+                              s.recipient,
+                              s.phone,
+                              s.parcel_count > 1 && `${s.parcel_count} colis`,
+                              formatPoids(s.weight_kg),
+                              estRamasse(s) && s.status !== "pending" && libelleStatut(s),
+                              s.status === "delivered" && libellePreuve(s),
+                              s.status === "failed" && libelleMotif(s.failure_reason),
+                              s.lat === null && "⚠ adresse non localisée",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
                           {s.status === "pending" && (
                             <BadgeHoraires
@@ -880,6 +998,16 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       </div>
                       {s.status === "pending" && run.status !== "done" && edition?.id !== s.id && (
                         <div className="mt-1.5 flex flex-wrap gap-1 pl-9 text-xs">
+                          {enLivraison && (
+                            <button
+                              type="button"
+                              className="btn-secondary !px-3 !py-1 font-semibold"
+                              onClick={() => setCloture({ stop: s, mode: "choix" })}
+                              aria-label={`Clôturer ${s.address}`}
+                            >
+                              Clôturer
+                            </button>
+                          )}
                           <button type="button" className="btn-ghost !px-2 !py-1" aria-label={`Monter ${s.address}`} onClick={() => deplacer(s, "haut")}>
                             ↑
                           </button>
@@ -889,7 +1017,17 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           <button
                             type="button"
                             className="btn-ghost !px-2 !py-1"
-                            onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count })}
+                            onClick={() =>
+                              setEdition({
+                                id: s.id,
+                                adresse: s.address,
+                                destinataire: s.recipient ?? "",
+                                telephone: s.phone ?? "",
+                                colis: s.parcel_count,
+                                type: typeArret(s.kind),
+                                poids: champPoids(s.weight_kg),
+                              })
+                            }
                           >
                             Modifier
                           </button>
@@ -920,6 +1058,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       )}
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
+                          <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
                           <AdresseInput france={pays === "FR"} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
                           <input
                             className="input"
@@ -947,6 +1086,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                               +
                             </button>
                           </div>
+                          <label className="flex items-center gap-2 text-sm">
+                            <span className="text-navy/65">Poids total</span>
+                            <input
+                              className="input !w-28"
+                              inputMode="decimal"
+                              value={edition.poids}
+                              onChange={(e) => setEdition({ ...edition, poids: e.target.value })}
+                              placeholder="—"
+                              aria-label="Poids des colis en kg"
+                            />
+                            <span className="text-navy/65">kg</span>
+                          </label>
                           <div className="flex flex-wrap gap-2">
                             <button type="button" className="btn-primary !py-2 text-sm" disabled={busy !== null || edition.adresse.trim().length < 5} onClick={enregistrerEdition}>
                               Enregistrer
