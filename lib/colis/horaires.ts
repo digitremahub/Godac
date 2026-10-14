@@ -411,6 +411,22 @@ export function ordonnerAvecHoraires(
       fen: arrets.map((a) => a.fenetres),
     };
     ordre = ameliorer(p, initial, (i) => arrets[i]!.fenetres !== null);
+
+    // Après optimisation, classer comme impossibles les arrêts dont l'heure
+    // d'arrivée calculée dépasse réellement la dernière fermeture. Le temps
+    // de trajet GPS et les 3 minutes de service par livraison sont inclus.
+    const simulation = simulerPassages(
+      { point: depart, minute: debut },
+      ordre.map((i) => ({ point: arrets[i]!.point, fenetres: arrets[i]!.fenetres })),
+      minutesParArret,
+      { distance },
+    );
+    const retard = new Set<number>();
+    ordre.forEach((i, position) => {
+      if (simulation.passages[position]?.statut === "hors") retard.add(i);
+    });
+    impossibles.push(...ordre.filter((i) => retard.has(i)));
+    ordre = ordre.filter((i) => !retard.has(i));
   }
   return { ordre: [...ordre, ...impossibles, ...fermes], fermes, impossibles };
 }
