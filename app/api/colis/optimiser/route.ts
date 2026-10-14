@@ -336,21 +336,30 @@ await Promise.all(
 );
 
 
-  const fenetres = new Map<string, Fenetres>(
-    arrets.map((s) => [
+  
+const fenetres = new Map<string, Fenetres>(
+  arrets.map((s) => {
+    const horairesExistants = fiches.get(
+      cleAdresse(s.address)
+    )?.weekly_schedule;
+
+    const horairesOSM = horairesOSMParAdresse.get(
+      cleAdresse(s.address)
+    );
+
+    return [
       s.id,
       fenetresArret(
         {
-          semaine: fiches.get(
-            cleAdresse(s.address)
-          )?.weekly_schedule,
+          semaine: horairesExistants,
           debut: s.window_start,
           fin: s.window_end,
         },
         jour
       ),
-    ])
-  );
+    ];
+  })
+);
 
   const r = sequenceParListes(
     arrets,
