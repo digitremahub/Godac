@@ -43,7 +43,9 @@ export function OnboardingWizard({ stripeStatus, catalog }: { stripeStatus?: str
   const [siret, setSiret] = useState("");
   const [entreprise, setEntreprise] = useState<InfosEntreprise | null>(null);
   const [planId, setPlanId] = useState<PlanId>(catalog.plans[0]?.id ?? "starter");
-  const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
+  // OCR activé par défaut dès la création : la direction peut le décocher ici,
+  // puis le réactiver à tout moment dans Modules & tarifs.
+  const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>(["ocr"]);
   const [vehicles, setVehicles] = useState<VehicleCsvRow[]>([]);
   const [drivers, setDrivers] = useState<DriverCsvRow[]>([]);
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
