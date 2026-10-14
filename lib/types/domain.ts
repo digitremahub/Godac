@@ -34,7 +34,8 @@ export type AlertType =
   | "tank_overflow"
   | "ocr_failure"
   | "maintenance_request"
-  | "odometer_anomaly";
+  | "odometer_anomaly"
+  | "usage_quota";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 

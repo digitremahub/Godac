@@ -7,6 +7,8 @@ const patchSchema = z.object({
   tour_number: z.string().trim().min(1).max(60).optional(),
   service_id: z.string().uuid().nullable().optional(),
   notes: z.string().trim().max(4000).nullable().optional(),
+  /** Tournée de renfort : couvre des villages d'autres tournées du service. */
+  is_renfort: z.boolean().optional(),
 });
 
 async function guard() {

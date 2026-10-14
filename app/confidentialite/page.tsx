@@ -67,6 +67,12 @@ export default function ConfidentialitePage() {
             réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
           </li>
           <li>
+            <strong>Véhicules loués :</strong> si l&apos;entreprise l&apos;active, une demande d&apos;entretien validée par un responsable
+            (immatriculation, modèle, kilométrage, urgence, description et photos, nom et coordonnées du responsable) est transmise au
+            loueur ou au garage choisi par l&apos;entreprise, qui en devient destinataire. Il y accède par un lien personnel limité à cette
+            seule demande (30 jours) et peut y répondre et déposer sa facture.
+          </li>
+          <li>
             <strong>Messagerie :</strong> messages, réactions, accusés de lecture des Infos équipe et pièces jointes échangés entre collègues dans GODAC, en discussion directe ou dans les groupes d&apos;équipe (un compte désactivé quitte aussitôt tous ses groupes).
           </li>
           <li>

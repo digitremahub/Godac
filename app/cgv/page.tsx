@@ -126,6 +126,16 @@ export default function CgvPage() {
             retrait d’un Module prend effet à la fin de la période d’engagement en cours.
           </li>
           <li>
+            Les fonctions de lecture automatique et l’assistant (article 12) sont incluses dans chaque Formule dans la limite
+            d’un volume mensuel par fonction, publié sur la page{" "}
+            <Link href="/modules" className={lien}>Modules &amp; tarifs</Link>. Au-delà, et si le Client a autorisé le
+            dépassement facturé (option activée par défaut, modifiable à tout moment par la direction dans son espace), chaque
+            utilisation supplémentaire est facturée au prix unitaire publié sur cette même page, en fin de mois, sur la facture
+            suivante de l’abonnement. Si le Client a désactivé cette option, la fonction concernée est suspendue jusqu’au mois
+            suivant, la saisie manuelle restant possible. Le Client est alerté à 80 % et à 100 % du volume inclus et suit sa
+            consommation dans son espace. Une limite journalière de sécurité peut s’appliquer pour prévenir tout usage anormal.
+          </li>
+          <li>
             Si le nombre de véhicules du Client dépasse la tranche de sa Formule, l’Éditeur peut proposer la Formule
             supérieure, applicable au mois suivant l’accord du Client.
           </li>

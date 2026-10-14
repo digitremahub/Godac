@@ -10,6 +10,9 @@ import { PlanningDayView } from "@/components/planning/PlanningDayView";
 import { PlanningMonthView } from "@/components/planning/PlanningMonthView";
 import { PlanningKanbanView } from "@/components/planning/PlanningKanbanView";
 import { PlanningListView } from "@/components/planning/PlanningListView";
+import { PresencePlanning } from "@/components/planning/PresencePlanning";
+import { PRESENCE_STATUS, estPoleBureau } from "@/lib/organization/poles";
+import { parisCalendarDate } from "@/lib/planning/dates";
 import { mondayOf, toISODate, addDays, todayISO, firstOfMonth, addMonths, currentMonth, monthCalendarDays } from "@/lib/planning/dates";
 
 type PlanningView = "week" | "day" | "month" | "kanban" | "list";
@@ -62,10 +65,10 @@ export default async function PlanningPage({
 
   const [{ data: allServices }, { data: myServiceRows }, { data: vehicles }, { data: drivers }, { data: entries }, { data: lastTours }, { data: validations }, { data: qualifications }] =
     await Promise.all([
-      isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
+      isDirection ? supabase.from("services").select("id, name, pole").order("name") : Promise.resolve({ data: null }),
       isDirection
         ? Promise.resolve({ data: null })
-        : supabase.from("user_services").select("services(id, name)").eq("user_id", appUser.id),
+        : supabase.from("user_services").select("services(id, name, pole)").eq("user_id", appUser.id),
       supabase.from("vehicles").select("id, registration, service_id").order("registration"),
       supabase
         .from("users")
@@ -80,6 +83,8 @@ export default async function PlanningPage({
         )
         .gte("start_at", `${rangeStart}T00:00:00`)
         .lt("start_at", `${rangeEnd}T00:00:00`)
+        // Présences des pôles bureau : affichées par PresencePlanning, pas dans les vues tournées.
+        .neq("status", PRESENCE_STATUS)
         .order("start_at"),
       // Lot: "affectation automatique à la dernière tournée" — most
       // recent entry per driver, any week, used to pre-fill the
@@ -90,6 +95,7 @@ export default async function PlanningPage({
         .from("planning_entries")
         .select("driver_id, vehicle_id, tour_number, start_at")
         .not("driver_id", "is", null)
+        .neq("status", PRESENCE_STATUS)
         .order("start_at", { ascending: false })
         .limit(500),
       // "Valider et envoyer" (see app/api/planning/validate) — one row
@@ -116,7 +122,46 @@ export default async function PlanningPage({
     );
   }
 
-  const filteredServices = params.service ? services.filter((s: any) => s.id === params.service) : services;
+  // Pôle bureau choisi : planning de présence (horaires des personnes
+  // du pôle) au lieu des vues tournées.
+  const selectedPole = params.service ? services.find((s: any) => s.id === params.service && estPoleBureau(s.pole)) : undefined;
+  if (selectedPole) {
+    const [{ data: members }, { data: presences }] = await Promise.all([
+      supabase.from("user_services").select("users(id, full_name, active)").eq("service_id", selectedPole.id),
+      supabase
+        .from("planning_entries")
+        .select("id, driver_id, start_at, end_at")
+        .eq("service_id", selectedPole.id)
+        .eq("status", PRESENCE_STATUS)
+        // Marge d'une journée : instants UTC, regroupés par jour de Paris à l'écran.
+        .gte("start_at", `${addDays(weekStart, -1)}T00:00:00Z`)
+        .lt("start_at", `${addDays(weekStart, 8)}T00:00:00Z`)
+        .order("start_at"),
+    ]);
+    const people = ((members ?? []) as any[])
+      .map((m) => m.users)
+      .filter((u) => u && u.active !== false)
+      .map((u) => ({ id: u.id as string, full_name: u.full_name as string }))
+      .sort((a, b) => a.full_name.localeCompare(b.full_name, "fr"));
+    const weekDays = new Set(Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)));
+    return (
+      <div>
+        <PageHeader title="Planning" description="Pôles bureau : horaires de présence de chaque personne, semaine par semaine." />
+        <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
+        <PresencePlanning
+          service={{ id: selectedPole.id, name: selectedPole.name, pole: selectedPole.pole ?? null }}
+          people={people}
+          entries={((presences ?? []) as any[]).filter((e) => weekDays.has(parisCalendarDate(e.start_at)))}
+          weekStart={weekStart}
+          canEdit={appUser.role === "manager" || appUser.role === "manager_chauffeur" || isDirection}
+        />
+      </div>
+    );
+  }
+
+  // Vues tournées : services d'exploitation seulement.
+  const transportServices = services.filter((s: any) => !estPoleBureau(s.pole));
+  const filteredServices = params.service ? transportServices.filter((s: any) => s.id === params.service) : transportServices;
 
   const lastTourByDriver = new Map<string, { vehicleId: string; tourNumber: string }>();
   for (const row of (lastTours ?? []) as any[]) {
@@ -133,7 +178,7 @@ export default async function PlanningPage({
   }
 
   const commonProps = {
-    services,
+    services: transportServices,
     filteredServices,
     vehicles: vehicles ?? [],
     drivers: drivers ?? [],
@@ -148,6 +193,7 @@ export default async function PlanningPage({
     const { data: windowEntries } = await supabase
       .from("planning_entries")
       .select("id, driver_id, tour_number, start_at, status, created_at, users!planning_entries_driver_id_fkey(full_name)")
+      .neq("status", PRESENCE_STATUS)
       .gte("start_at", new Date(Date.now() - 60 * 86_400_000).toISOString())
       .lt("start_at", new Date(Date.now() + 60 * 86_400_000).toISOString());
     const day = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" });

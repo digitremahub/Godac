@@ -12,6 +12,7 @@ const RESOLVE_URL: Record<string, string> = {
   tank_deliveries: "/tanks?tab=approvisionnements",
   fines: "/fines",
   customer_disputes: "/contestations",
+  rental_maintenance_requests: "/loueurs/demandes",
   planning_entries: "/tours/history",
   support_requests: "/support",
   meeting_requests: "/intranet",
@@ -43,6 +44,8 @@ const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) =
   // A driver asked for papers of this vehicle: open its fiche, where
   // the documents are uploaded / made consultable.
   vehicle_document_request: (relatedId) => (relatedId ? `/vehicles/${relatedId}#papiers` : "/vehicles"),
+  // Fin de contrat / forfait km d'un véhicule loué : sa fiche.
+  rental_contract: (relatedId) => (relatedId ? `/vehicles/${relatedId}#location` : "/vehicles"),
 };
 
 export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null): string | null {

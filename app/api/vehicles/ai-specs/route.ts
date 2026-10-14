@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { fetchVehicleAiSpecs } from "@/lib/vehicles/ai-specs";
 
 const bodySchema = z.object({
@@ -47,6 +49,11 @@ export async function POST(req: Request) {
       { error: `Limite de ${RATE_LIMIT_PER_HOUR} estimations IA par heure atteinte pour votre organisation. Réessayez plus tard.` },
       { status: 429 },
     );
+  }
+
+  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "vehicle_ai_specs");
+  if (!quota.ok) {
+    return NextResponse.json({ error: quota.raison }, { status: 429 });
   }
 
   const result = await fetchVehicleAiSpecs(parsed.data);

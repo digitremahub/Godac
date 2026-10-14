@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { lireContestation } from "@/lib/contestations/lecture";
 import { suggererChauffeur } from "@/lib/contestations/rattachement";
@@ -33,10 +35,15 @@ export async function POST(req: Request) {
 
   let champs: Record<string, unknown> = { client_name: parsed.data.client_name ?? null, reason: parsed.data.reason ?? null };
   let lecture: "ok" | "desactivee" | "echec" | null = null;
+  let lectureErreur: string | null = null;
   if (path) {
     if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
       const { data: blob } = await supabase.storage.from("dispute-docs").download(path);
-      if (blob) {
+      const quota = blob ? await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "contestation") : null;
+      if (quota && !quota.ok) {
+        lecture = "echec";
+        lectureErreur = quota.raison;
+      } else if (blob) {
         const mediaType = path.endsWith(".pdf") ? "application/pdf" : path.endsWith(".png") ? "image/png" : path.endsWith(".webp") ? "image/webp" : "image/jpeg";
         const r = await lireContestation(Buffer.from(await blob.arrayBuffer()), mediaType);
         if (r.ok) {
@@ -68,5 +75,5 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ id: data.id, lecture, suggestion });
+  return NextResponse.json({ id: data.id, lecture, lectureErreur, suggestion });
 }

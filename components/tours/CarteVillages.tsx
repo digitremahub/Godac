@@ -38,30 +38,57 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
   const [selection, setSelection] = useState<string | null>(null);
 
   // Tous les villages, avec les coordonnées trouvées pendant cette visite.
-  const villages: MapVillage[] = useMemo(
-    () =>
-      routes.flatMap((r) =>
-        r.villages
-          .filter((v) => v.id)
-          .map((v) => {
-            const g = geo.get(v.id!);
-            return {
-              id: v.id!,
-              routeId: r.id,
-              tourNumber: r.tourNumber,
-              serviceId: r.serviceId,
-              serviceName: r.serviceName,
-              name: v.name,
-              postalCode: v.postal_code,
-              lat: g ? g.lat : (v.lat ?? null),
-              lng: g ? g.lng : (v.lng ?? null),
-              inseeCode: g ? g.inseeCode : (v.insee_code ?? null),
-              geoStatus: g ? g.geoStatus : (v.geocode_status ?? null),
-            };
-          }),
-      ),
-    [routes, geo],
-  );
+  // Une tournée de renfort reprend les villages qu'elle couvre par défaut,
+  // aux coordonnées de leur tournée d'origine.
+  const villages: MapVillage[] = useMemo(() => {
+    const parId = new Map(routes.flatMap((r) => r.villages.filter((v) => v.id).map((v) => [v.id!, { v, r }] as const)));
+    return routes.flatMap((r) => {
+      const propres = r.villages
+        .filter((v) => v.id)
+        .map((v) => {
+          const g = geo.get(v.id!);
+          return {
+            id: v.id!,
+            routeId: r.id,
+            tourNumber: r.tourNumber,
+            serviceId: r.serviceId,
+            serviceName: r.serviceName,
+            name: v.name,
+            postalCode: v.postal_code,
+            lat: g ? g.lat : (v.lat ?? null),
+            lng: g ? g.lng : (v.lng ?? null),
+            inseeCode: g ? g.inseeCode : (v.insee_code ?? null),
+            geoStatus: g ? g.geoStatus : (v.geocode_status ?? null),
+            renfort: r.isRenfort,
+          };
+        });
+      if (!r.isRenfort) return propres;
+      const empruntes = r.renfortVillageIds.flatMap((vid) => {
+        const home = parId.get(vid);
+        if (!home) return [];
+        const g = geo.get(vid);
+        return [
+          {
+            id: `${r.id}:${vid}`,
+            routeId: r.id,
+            tourNumber: r.tourNumber,
+            serviceId: r.serviceId,
+            serviceName: r.serviceName,
+            name: home.v.name,
+            postalCode: home.v.postal_code,
+            lat: g ? g.lat : (home.v.lat ?? null),
+            lng: g ? g.lng : (home.v.lng ?? null),
+            inseeCode: g ? g.inseeCode : (home.v.insee_code ?? null),
+            geoStatus: g ? g.geoStatus : (home.v.geocode_status ?? null),
+            renfort: true,
+            homeRouteId: home.r.id,
+            homeTourNumber: home.r.tourNumber,
+          },
+        ];
+      });
+      return [...propres, ...empruntes];
+    });
+  }, [routes, geo]);
 
   // Localisation des villages jamais cherchés, par lots.
   useEffect(() => {
@@ -111,7 +138,10 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
   }, [geoReady, routes]);
 
   const couleurs = useMemo(() => {
-    const parNumero = assignTourColors(routes.map((r) => r.tourNumber));
+    const parNumero = assignTourColors(
+      routes.map((r) => r.tourNumber),
+      routes.filter((r) => r.isRenfort).map((r) => r.tourNumber),
+    );
     return new Map(routes.map((r) => [r.id, parNumero.get(r.tourNumber)!]));
   }, [routes]);
 
@@ -160,18 +190,46 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
             type: "fill",
             source: "etendues",
             filter: ["==", ["geometry-type"], "Polygon"],
-            paint: { "fill-color": ["get", "couleur"], "fill-opacity": 0.12 },
+            paint: { "fill-color": ["get", "couleur"], "fill-opacity": ["case", ["==", ["get", "renfort"], true], 0.05, 0.12] },
           });
           m.addLayer({
             id: "etendues-bord",
             type: "line",
             source: "etendues",
+            filter: ["!=", ["get", "renfort"], true],
             paint: {
               "line-color": ["get", "couleur"],
               "line-width": 2,
               "line-opacity": 0.75,
             },
             layout: { "line-join": "round" },
+          });
+          // Tournées de renfort : contour en pointillés, plus épais.
+          m.addLayer({
+            id: "etendues-bord-renfort",
+            type: "line",
+            source: "etendues",
+            filter: ["==", ["get", "renfort"], true],
+            paint: {
+              "line-color": ["get", "couleur"],
+              "line-width": 2.5,
+              "line-opacity": 0.9,
+              "line-dasharray": [2, 1.5],
+            },
+            layout: { "line-join": "round" },
+          });
+          // Village couvert par un renfort : anneau à la couleur du renfort autour du point de sa tournée.
+          m.addLayer({
+            id: "villages-renfort",
+            type: "circle",
+            source: "villages",
+            filter: ["==", ["get", "emprunt"], true],
+            paint: {
+              "circle-radius": 10,
+              "circle-color": "rgba(0,0,0,0)",
+              "circle-stroke-color": ["get", "couleur"],
+              "circle-stroke-width": 2.5,
+            },
           });
           m.addLayer({
             id: "villages-alerte",
@@ -189,6 +247,7 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
             id: "villages",
             type: "circle",
             source: "villages",
+            filter: ["!=", ["get", "emprunt"], true],
             paint: {
               "circle-radius": ["case", ["==", ["get", "choisi"], true], 9, 6],
               "circle-color": ["get", "couleur"],
@@ -238,8 +297,9 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
         properties: {
           id: v.id,
           couleur: couleurs.get(v.routeId) ?? NAVY,
-          alerte: idsIsoles.has(v.id) || clesDoublons.has(villageKey(v)),
+          alerte: !v.renfort && (idsIsoles.has(v.id) || clesDoublons.has(villageKey(v))),
           choisi: v.id === selection,
+          emprunt: Boolean(v.homeRouteId),
         },
         geometry: { type: "Point", coordinates: [v.lng!, v.lat!] },
       })),
@@ -248,7 +308,7 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
       .filter((e) => affichees.has(e.routeId) && e.hull.length >= 2)
       .map((e) => ({
         type: "Feature" as const,
-        properties: { couleur: couleurs.get(e.routeId) ?? NAVY },
+        properties: { couleur: couleurs.get(e.routeId) ?? NAVY, renfort: e.renfort },
         geometry:
           e.hull.length >= 3
             ? {
@@ -311,15 +371,17 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
         flexShrink: "0",
       });
       ligne.appendChild(pastille);
-      ligne.appendChild(document.createTextNode(`Tournée ${v.tourNumber} · ${v.serviceName ?? "Tous services"}`));
+      ligne.appendChild(document.createTextNode(`Tournée ${v.tourNumber}${v.renfort ? " (renfort)" : ""} · ${v.serviceName ?? "Tous services"}`));
       el.appendChild(ligne);
     }
+    // Un renfort qui couvre le village n'est pas une incohérence.
+    const fixes = memes.filter((v) => !v.renfort).length;
     const isole = analyse.outliers.find((o) => o.village.id === choisi.id);
-    if (memes.length > 1 || isole) {
+    if (fixes > 1 || isole) {
       const alerte = document.createElement("p");
       alerte.style.color = "#B4410F";
       alerte.style.marginTop = "4px";
-      alerte.textContent = [memes.length > 1 ? `Sur ${memes.length} tournées` : null, isole ? `À ${Math.round(isole.distanceKm)} km du centre de sa tournée` : null]
+      alerte.textContent = [fixes > 1 ? `Sur ${fixes} tournées` : null, isole ? `À ${Math.round(isole.distanceKm)} km du centre de sa tournée` : null]
         .filter(Boolean)
         .join(" · ");
       el.appendChild(alerte);
@@ -363,7 +425,7 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
 
   const sansService = routes.some((r) => !r.serviceId);
   const servicesUtilises = services.filter((s) => routes.some((r) => r.serviceId === s.id));
-  const totalVillages = villages.filter((v) => idsService.has(v.routeId)).length;
+  const totalVillages = villages.filter((v) => idsService.has(v.routeId) && !v.homeRouteId).length;
   const totalLocalises = totalVillages - nonLocalises.length;
 
   return (
@@ -426,18 +488,25 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
               <ul className="flex max-h-[300px] flex-col overflow-y-auto">
                 {tourneesDuService.map((r) => {
                   const etendue = analyse.extents.get(r.id);
-                  const localises = villages.filter((v) => v.routeId === r.id && v.lat !== null).length;
+                  const siens = villages.filter((v) => v.routeId === r.id);
+                  const localises = siens.filter((v) => v.lat !== null).length;
                   return (
                     <li key={r.id}>
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1.5 hover:bg-navy/[0.04]">
                         <input type="checkbox" className="h-4 w-4 shrink-0" checked={!masquees.has(r.id)} onChange={() => basculer(r.id)} />
-                        <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-white shadow" style={{ background: couleurs.get(r.id) }} aria-hidden />
+                        {r.isRenfort ? (
+                          <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-dashed bg-white" style={{ borderColor: couleurs.get(r.id) }} aria-hidden />
+                        ) : (
+                          <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-white shadow" style={{ background: couleurs.get(r.id) }} aria-hidden />
+                        )}
                         <span className="min-w-0 flex-1 text-sm">
                           <span className="font-semibold tabular-nums">{r.tourNumber}</span>
+                          {r.isRenfort && <span className="font-semibold text-navy/70"> · renfort</span>}
                           <span className="text-navy/60"> · {r.serviceName ?? "Tous services"}</span>
                           <span className="block text-xs text-navy/55">
-                            {plural(r.villages.length, "village")}
-                            {localises < r.villages.length && ` (${r.villages.length - localises} non localisé${r.villages.length - localises > 1 ? "s" : ""})`}
+                            {plural(siens.length, "village")}
+                            {r.isRenfort && " couverts par défaut"}
+                            {localises < siens.length && ` (${siens.length - localises} non localisé${siens.length - localises > 1 ? "s" : ""})`}
                             {etendue && etendue.spanKm >= 1 && ` · étendue ${Math.round(etendue.spanKm)} km`}
                           </span>
                         </span>
@@ -520,6 +589,11 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
               Cerclés d&apos;orange sur la carte : villages sur plusieurs tournées ou à plus de {OUTLIER_RATIO.toLocaleString("fr-FR")}× la distance habituelle (ou
               {` ${OUTLIER_MAX_KM}`} km) du centre de leur tournée. Commune mal placée ? Ajoutez son code postal dans la fiche.
             </p>
+            {routes.some((r) => r.isRenfort) && (
+              <p className="text-xs text-navy/50">
+                Tournées de renfort : contour en pointillés et anneau autour des villages qu&apos;elles couvrent par défaut. Un village couvert par un renfort n&apos;est pas une incohérence.
+              </p>
+            )}
           </Card>
         </div>
       </div>
