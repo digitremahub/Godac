@@ -1,4 +1,4 @@
-
+import { rechercherHorairesOSM } from "@/lib/colis/horaires-internet";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
@@ -294,13 +294,47 @@ export async function POST(req: Request) {
     enRoute
   );
 
-  const fiches = await horairesDesAdresses(
-    supabase,
-    appUser.organization_id,
-    arrets
-      .filter((s) => s.status === "pending")
-      .map((s) => s.address)
-  );
+  
+const fiches = await horairesDesAdresses(
+  supabase,
+  appUser.organization_id,
+  arrets
+    .filter((s) => s.status === "pending")
+    .map((s) => s.address)
+);
+
+const horairesOSMParAdresse = new Map<
+  string,
+  { nom: string; horaires: string | null }
+>();
+
+await Promise.all(
+  arrets
+    .filter(
+      (s) =>
+        s.status === "pending" &&
+        s.lat !== null &&
+        s.lng !== null
+    )
+    .map(async (s) => {
+      const resultat = await rechercherHorairesOSM({
+        address: s.address,
+        lat: Number(s.lat),
+        lng: Number(s.lng),
+      });
+
+      if (resultat) {
+        horairesOSMParAdresse.set(
+          cleAdresse(s.address),
+          {
+            nom: resultat.nom,
+            horaires: resultat.horaires,
+          }
+        );
+      }
+    })
+);
+
 
   const fenetres = new Map<string, Fenetres>(
     arrets.map((s) => [
