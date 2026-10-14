@@ -352,7 +352,7 @@ function evaluer(p: Probleme, ordre: number[]) {
     if (fenetres?.length) {
       const fermeture = fenetres[fenetres.length - 1]![1];
       const marge = fermeture - t;
-      urgence += Math.max(0, 30 - marge) * 5;
+      urgence += Math.max(0, 30 - marge) * 50;
     }
     const s = servir(t, fenetres);
     if (s.statut === "hors") {
