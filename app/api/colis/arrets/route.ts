@@ -1,3 +1,11 @@
+import { rechercherHorairesOSM } from "@/lib/colis/horaires-internet";
+const horairesOSM = geo
+  ? await rechercherHorairesOSM({
+      address: parsed.data.adresse,
+      lat: geo.lat,
+      lng: geo.lng,
+    })
+  : null;
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
