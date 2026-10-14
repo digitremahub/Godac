@@ -105,6 +105,8 @@ export interface ResumeOptimisation {
   horsHoraires: string[];
   fermes: string[];
   impossibles: string[];
+  /** false quand le moteur de routage est indisponible et que GODAC utilise une estimation. */
+  distanceRoutiere?: boolean;
 }
 
 const heureIso = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", " h ") : "—");

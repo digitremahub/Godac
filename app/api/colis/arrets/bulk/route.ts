@@ -17,6 +17,14 @@ const pointSchema = z.object({
 // Géocodage d'une longue liste hors de France (une adresse par seconde).
 export const maxDuration = 300;
 
+function communeDepuisAdresse(adresse: string): string | null {
+  const parties = adresse.split(",").map((x) => x.trim()).filter(Boolean).filter((x) => !/^(france|fr)$/i.test(x));
+  const codePostal = [...parties].reverse().find((x) => /^\d{5}\s+/.test(x));
+  if (codePostal) return codePostal.replace(/^\d{5}\s+/, "").trim().slice(0, 60) || null;
+  const derniere = parties[parties.length - 1];
+  return parties.length >= 2 && derniere && !/^\d/.test(derniere) ? derniere.slice(0, 60) : null;
+}
+
 const bodySchema = z.object({
   run_id: z.string().uuid(),
   points: z.array(pointSchema).min(1).max(200),
@@ -89,9 +97,29 @@ export async function POST(req: Request) {
     }
   }
 
+  const { data: existantesListes } = await supabase.from("delivery_lists").select("id, name, position").eq("run_id", run.id).order("position");
+  const listeParVillage = new Map<string, string>();
+  let prochainePositionListe = (existantesListes ?? []).reduce((max, l) => Math.max(max, l.position), -1) + 1;
+  for (const p of complets) {
+    if (!p?.adresse) continue;
+    const village = communeDepuisAdresse(p.adresse);
+    if (!village) continue;
+    const cleVillage = village.toLocaleLowerCase("fr-FR");
+    if (listeParVillage.has(cleVillage)) continue;
+    const deja = (existantesListes ?? []).find((l) => l.name.trim().toLocaleLowerCase("fr-FR") === cleVillage);
+    if (deja) { listeParVillage.set(cleVillage, deja.id); continue; }
+    const { data: creee, error } = await supabase.from("delivery_lists").insert({
+      organization_id: appUser.organization_id,
+      run_id: run.id,
+      name: village,
+      position: prochainePositionListe,
+    }).select("id").single();
+    if (!error && creee) { listeParVillage.set(cleVillage, creee.id); prochainePositionListe += 1; }
+  }
+
   const { data: existants } = await supabase.from("delivery_stops").select("id, list_id, address, parcel_count, phone, status, position").eq("run_id", run.id);
-  // Regroupement par adresse seulement dans la liste visée.
-  const parCle = new Map((existants ?? []).filter((s) => s.status === "pending" && (s.list_id ?? null) === listId).map((s) => [cleAdresse(s.address), s]));
+  // Regroupement par commune/liste ET adresse : un même lieu ne crée pas deux arrêts.
+  const parCle = new Map((existants ?? []).filter((s) => s.status === "pending").map((s) => [`${s.list_id ?? ""}|${cleAdresse(s.address)}`, s]));
   let position = (existants ?? []).reduce((m, s) => Math.max(m, s.position), -1) + 1;
   const nouveaux = new Map<string, Record<string, unknown>>();
   let regroupes = 0;
@@ -102,7 +130,10 @@ export async function POST(req: Request) {
       ignores++;
       continue;
     }
-    const cle = cleAdresse(p.adresse);
+    const village = communeDepuisAdresse(p.adresse);
+    const idVillage = village ? listeParVillage.get(village.toLocaleLowerCase("fr-FR")) : undefined;
+    const listePoint = idVillage ?? listId;
+    const cle = `${listePoint ?? ""}|${cleAdresse(p.adresse)}`;
     const existant = parCle.get(cle);
     const nouveau = nouveaux.get(cle);
     if (existant) {
@@ -118,7 +149,7 @@ export async function POST(req: Request) {
       nouveaux.set(cle, {
         organization_id: appUser.organization_id,
         run_id: run.id,
-        ...(listId ? { list_id: listId } : {}),
+        ...(listePoint ? { list_id: listePoint } : {}),
         position: position++,
         address: p.adresse,
         recipient: p.nom,

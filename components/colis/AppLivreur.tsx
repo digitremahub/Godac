@@ -47,6 +47,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
+  const [confirmationLancement, setConfirmationLancement] = useState(false);
+  const [villagesConfirmes, setVillagesConfirmes] = useState<string[]>([]);
   const [livraison, setLivraison] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
@@ -230,12 +232,24 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
+  async function demanderDemarrage() {
+    setVillagesConfirmes([]);
+    setConfirmationLancement(true);
+  }
+
   async function demarrer() {
     if (!run) return;
+    const groupesAvantDepart = grouperParListe(stops, lists);
+    const idsVillages = groupesAvantDepart.map((g) => g.liste?.id ?? "__principale__");
+    if (idsVillages.some((id) => !villagesConfirmes.includes(id))) {
+      setToast({ ok: false, text: "Confirmez chaque village avant de lancer la tournée." });
+      return;
+    }
     setBusy(true);
     try {
       if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
       await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
+      setConfirmationLancement(false);
       await charger(run.id);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -258,7 +272,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
       const hors = r.horsHoraires.length + r.impossibles.length;
       setToast({
         ok: !hors && !r.fermes.length,
-        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
+        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
       });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -488,6 +502,30 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         </section>
       )}
 
+      {confirmationLancement && run && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirmation-tournee-title">
+          <section className="w-full max-w-xl rounded-2xl bg-surface p-5 shadow-pop">
+            <h2 id="confirmation-tournee-title" className="font-display text-xl font-bold">Confirmation de la tournée</h2>
+            <p className="mt-1 text-sm text-navy/65">Vérifiez la tournée attribuée à votre planning et cochez chaque village dont vous prenez bien les colis avant le départ.</p>
+            <div className="mt-4 flex flex-col gap-2">
+              {grouperParListe(stops, lists).map((g) => {
+                const id = g.liste?.id ?? "__principale__";
+                const nom = nomGroupe(g);
+                const ok = villagesConfirmes.includes(id);
+                return <label key={id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${ok ? "border-teal bg-teal/5" : "border-navy/15"}`}>
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-teal" checked={ok} onChange={(e) => setVillagesConfirmes((anciens) => e.target.checked ? [...anciens, id] : anciens.filter((x) => x !== id))} />
+                  <span className="flex-1"><strong>{nom}</strong><span className="block text-xs text-navy/60">{g.arrets.length} adresse(s) · {g.arrets.reduce((n, s) => n + s.parcel_count, 0)} colis</span></span>
+                </label>;
+              })}
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button type="button" className="btn-secondary flex-1" disabled={busy} onClick={() => setConfirmationLancement(false)}>Annuler</button>
+              <button type="button" className="btn-primary flex-1" disabled={busy || !grouperParListe(stops, lists).length || grouperParListe(stops, lists).some((g) => !villagesConfirmes.includes(g.liste?.id ?? "__principale__"))} onClick={demarrer}>{busy ? "Optimisation…" : "Je confirme et je démarre"}</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
@@ -505,8 +543,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <p className="text-sm text-navy/65">
               {stops.length} adresse(s) chargée(s). GODAC calcule le meilleur ordre puis vous guide arrêt par arrêt.
             </p>
-            <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demarrer}>
-              {busy ? "Calcul de l'ordre…" : "Démarrer la livraison"}
+            <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demanderDemarrage}>
+              Vérifier les villages et démarrer
             </button>
             <Link href="/colis" className="btn-ghost w-fit !px-2 text-sm">
               Ajouter ou modifier des colis

@@ -115,6 +115,63 @@ export function normaliserSemaine(v: unknown): Semaine {
   return s;
 }
 
+/**
+ * Convertit les horaires OpenStreetMap simples en semaine ISO.
+ * Exemples pris en charge : "Mo-Fr 08:00-12:00,14:00-18:00; Sa 09:00-12:00; Su off".
+ * Les règles complexes (jours fériés, dates, semaines alternées, sunrise/sunset)
+ * sont ignorées plutôt que d'inventer des horaires.
+ */
+export function convertirHorairesOSM(value: string | null | undefined): Semaine | null {
+  if (!value || value.length > 500) return null;
+  const index: Record<string, Jour> = { Mo: 1, Tu: 2, We: 3, Th: 4, Fr: 5, Sa: 6, Su: 7 };
+  const semaine: Semaine = {};
+  let reconnu = false;
+
+  for (const regle of value.split(";").map((x) => x.trim()).filter(Boolean)) {
+    const espace = regle.search(/\s/);
+    if (espace < 0) continue;
+    const joursTexte = regle.slice(0, espace).trim();
+    const plageTexte = regle.slice(espace + 1).trim();
+    const actifs = new Set<Jour>();
+
+    for (const groupe of joursTexte.split(",")) {
+      const morceaux = groupe.split("-");
+      const debut = index[morceaux[0] ?? ""];
+      const fin = index[morceaux[1] ?? morceaux[0] ?? ""];
+      if (!debut || !fin || morceaux.length > 2) continue;
+      let j = debut;
+      for (let i = 0; i < 7; i++) {
+        actifs.add(j);
+        if (j === fin) break;
+        j = ((j % 7) + 1) as Jour;
+      }
+    }
+    if (!actifs.size) continue;
+
+    if (/^(off|closed)$/i.test(plageTexte)) {
+      for (const j of actifs) semaine[`${j}`] = [];
+      reconnu = true;
+      continue;
+    }
+
+    const plages = plageTexte.match(/\d{1,2}:\d{2}-\d{1,2}:\d{2}/g) ?? [];
+    const creneaux: Creneau[] = [];
+    for (const plage of plages) {
+      const [debut, fin] = plage.split("-");
+      const ouverture = lireHeure(debut);
+      const fermeture = lireHeure(fin);
+      if (ouverture !== null && fermeture !== null && ouverture < fermeture) {
+        creneaux.push({ open: ecrireHeure(ouverture), close: ecrireHeure(fermeture) });
+      }
+    }
+    if (!creneaux.length) continue;
+    for (const j of actifs) semaine[`${j}`] = [...(semaine[`${j}`] ?? []), ...creneaux];
+    reconnu = true;
+  }
+
+  return reconnu ? normaliserSemaine(semaine) : null;
+}
+
 /** Créneaux d'un jour de la semaine type ; null si ce jour n'est pas renseigné. */
 export function creneauxDuJour(semaine: Semaine | null | undefined, jour: Jour): Creneau[] | null {
   return semaine?.[`${jour}`] ?? null;
@@ -248,11 +305,13 @@ export function simulerPassages(
   depart: { point: Point | null; minute: number },
   arrets: ArretPlanifiable[],
   minutesParArret = MINUTES_PAR_ARRET,
+  options: { distance?: (a: Point, b: Point) => number } = {},
 ): { passages: Passage[]; fin: number; dernier: Point | null } {
+  const distance = options.distance ?? distanceKm;
   let t = depart.minute;
   let prec = depart.point;
   const passages = arrets.map((a) => {
-    if (prec && a.point) t += minutesTrajet(distanceKm(prec, a.point));
+    if (prec && a.point) t += minutesTrajet(distance(prec, a.point));
     if (a.point) prec = a.point;
     const s = servir(t, a.fenetres);
     const p: Passage = { arrivee: t, debut: s.debut, attente: s.debut - t, statut: s.statut };
@@ -306,11 +365,11 @@ function evaluer(p: Probleme, ordre: number[]) {
 export function ordonnerAvecHoraires(
   depart: Point | null,
   arrets: { point: Point; fenetres: Fenetres }[],
-  options: { debut: number; retour?: boolean; arrivee?: Point | null; minutesParArret?: number },
+  options: { debut: number; retour?: boolean; arrivee?: Point | null; minutesParArret?: number; distance?: (a: Point, b: Point) => number },
 ): { ordre: number[]; fermes: number[]; impossibles: number[] } {
-  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET } = options;
+  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET, distance = distanceKm } = options;
   const n = arrets.length;
-  const trajet = (a: Point | null, b: Point | null) => (a && b ? minutesTrajet(distanceKm(a, b)) : 0);
+  const trajet = (a: Point | null, b: Point | null) => (a && b ? minutesTrajet(distance(a, b)) : 0);
   const fermes: number[] = [];
   const impossibles: number[] = [];
   const reste: number[] = [];
@@ -327,6 +386,7 @@ export function ordonnerAvecHoraires(
     reste.map((i) => arrets[i]!.point),
     retour,
     arrivee,
+    distance,
   ).map((k) => reste[k]!);
 
   let ordre = initial;
