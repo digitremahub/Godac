@@ -18,7 +18,7 @@ export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
-  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }] =
+  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }, { data: activeUsers }] =
     await Promise.all([
       supabase
         .from("organizations")
@@ -30,7 +30,7 @@ export default async function OrganizationSettingsPage() {
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       isModuleEnabled(supabase, appUser.organization_id, "assistant"),
       isDirection ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
-      supabase.from("services").select("id, name, code, pole, depot_address, team_leader_name, team_leader_phone, team_leader_email").order("name"),
+      supabase.from("services").select("id, name, code, pole, depot_address, team_leader_name, team_leader_phone, team_leader_email, team_leader_user_id").order("name"),
       supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
       supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
       isDirection
@@ -38,6 +38,7 @@ export default async function OrganizationSettingsPage() {
         : Promise.resolve({ data: null }),
       // Qui est dans quel pôle bureau — affiché sous chaque pôle.
       supabase.from("user_services").select("service_id, users(full_name, active)"),
+      supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).order("full_name"),
     ]);
 
   const membersByService = new Map<string, string[]>();
@@ -102,7 +103,7 @@ export default async function OrganizationSettingsPage() {
         urssafNumber={organization?.urssaf_number ?? null}
         country={organization?.country ?? "FR"}
       />
-      <ServicesPanel services={servicesWithMembers} />
+      <ServicesPanel services={servicesWithMembers} users={activeUsers ?? []} />
       <TanksPanel tanks={tanks ?? []} services={transportServices} />
       {payslipsEnabled && (
         <PayslipContributionLinesPanel

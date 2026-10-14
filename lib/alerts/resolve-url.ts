@@ -30,6 +30,9 @@ const RESOLVE_URL: Record<string, string> = {
 const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) => string)> = {
   planning_validated: "/planning/mine",
   new_message: (relatedId) => (relatedId ? `/messenger?with=${relatedId}` : "/messenger"),
+  // Groupe d'équipe du Messenger (mention @prénom ou Info équipe) :
+  // related_id est l'id du groupe (message_groups.id).
+  group_message: (relatedId) => (relatedId ? `/messenger?groupe=${relatedId}` : "/messenger"),
   // The requester's own "your question was answered" alert — distinct
   // from the "support_request" broadcast to managers/direction
   // (related_table support_requests → /support above), which that

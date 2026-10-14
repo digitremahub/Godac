@@ -73,7 +73,7 @@ export default function ConfidentialitePage() {
             seule demande (30 jours) et peut y répondre et déposer sa facture.
           </li>
           <li>
-            <strong>Messagerie :</strong> messages et pièces jointes échangés entre collègues dans GODAC.
+            <strong>Messagerie :</strong> messages, réactions, accusés de lecture des Infos équipe et pièces jointes échangés entre collègues dans GODAC, en discussion directe ou dans les groupes d&apos;équipe (un compte désactivé quitte aussitôt tous ses groupes).
           </li>
           <li>
             <strong>Données techniques :</strong> journaux de connexion, abonnement aux notifications de

@@ -132,7 +132,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
     etapes: [
       { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/intranet", label: "Intranet" }, module: "intranet" },
-      { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : messages, photos et documents restent dans l'entreprise.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
+      { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : le groupe de votre équipe, les Infos équipe épinglées, @prénom pour mentionner un collègue ; messages, photos et documents restent dans l'entreprise.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/payslips", label: "Fiches de paie" }, module: "payslips" },
       { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/contestations", label: "Contestations" }, module: "customer_disputes" },
     ],
@@ -164,6 +164,7 @@ const ENCADREMENT: SectionGuide[] = [
         texte:
           "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
         lien: { href: "/tours/routes", label: "Tournées & villages" }, module: "planning" },
+      { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
       { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/qr-codes", label: "Badges QR" } },
