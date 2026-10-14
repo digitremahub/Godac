@@ -185,7 +185,7 @@ export default async function TourHistoryPage({
             : "Tournées passées de votre périmètre — démarrées ou terminées."
         }
       />
-      <TourneesTabs />
+      <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
 
       {monthlyEarnings && <MonthlyEarningsCard {...monthlyEarnings} />}
 
