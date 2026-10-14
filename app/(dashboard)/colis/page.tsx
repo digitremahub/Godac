@@ -66,7 +66,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
           title="Tournée colis"
           description={encadrement ? "Historique des tournées colis de l'entreprise : filtrez par date, service, chauffeur ou camion." : "Historique de vos tournées colis."}
         />
-        <TourneesTabs />
+        <TourneesTabs canTrack={encadrement} />
         {onglets}
         <HistoriqueTournees historique={historique} detail={detail} aujourdhui={aujourdhui} encadrement={encadrement} />
       </div>
@@ -76,7 +76,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader title="Tournée colis" description="Scannez vos colis, GODAC place les adresses dans le meilleur ordre de passage." />
-      <TourneesTabs />
+      <TourneesTabs canTrack={encadrement} />
       {onglets}
       <TourneeColis lectureEtiquette pays={pays.code} />
     </div>
