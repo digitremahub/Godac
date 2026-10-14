@@ -5,6 +5,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
+import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
 import { detailTournee, historiqueTournees, lireFiltres } from "@/lib/colis/historique";
 import { parisDay } from "@/lib/utils/paris-time";
@@ -65,6 +66,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
           title="Tournée colis"
           description={encadrement ? "Historique des tournées colis de l'entreprise : filtrez par date, service, chauffeur ou camion." : "Historique de vos tournées colis."}
         />
+        <TourneesTabs canTrack={encadrement} />
         {onglets}
         <HistoriqueTournees historique={historique} detail={detail} aujourdhui={aujourdhui} encadrement={encadrement} />
       </div>
@@ -74,6 +76,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader title="Tournée colis" description="Scannez vos colis, GODAC place les adresses dans le meilleur ordre de passage." />
+      <TourneesTabs canTrack={encadrement} />
       {onglets}
       <TourneeColis lectureEtiquette pays={pays.code} />
     </div>

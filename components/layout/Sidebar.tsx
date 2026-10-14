@@ -75,10 +75,7 @@ const SECTIONS: NavSection[] = [
       { href: "/tours/help", label: "J'entre pour un collègue", icon: IconUsers, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/planning/mine", label: "Mon planning", icon: IconCalendar, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/planning", label: "Planning", icon: IconCalendar, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
-      { href: "/suivi", label: "Suivi des tournées", icon: IconMapPin, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "route_optimizer" },
-      { href: "/colis", label: "Tournée colis", icon: IconQrCode, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "route_optimizer" },
-      { href: "/tours/routes", label: "Tournées & villages", icon: IconMapPin, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
-      { href: "/tours/history", label: "Historique des tournées", icon: IconClock, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "planning" },
+      { href: "/colis", label: "Tournées colis", icon: IconQrCode, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "route_optimizer", alsoActive: ["/suivi", "/tours/routes", "/tours/history"] },
     ],
   },
   {

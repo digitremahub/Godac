@@ -8,6 +8,7 @@ import { MonthlyEarningsCard } from "@/components/tours/MonthlyEarningsCard";
 import { addDays, todayISO, firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
 import { estimateReturnDistanceDeltaKm } from "@/lib/business/fuel-profitability";
 import { computeHourlyRates, estimateSalary, countWeekdays, leaveDayHoursEquivalent } from "@/lib/business/payroll";
+import { TourneesTabs } from "@/components/colis/TourneesTabs";
 
 const STATUS_LABEL: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
 const RETURN_TYPE_LABEL: Record<string, string> = { depot: "Dépôt", domicile: "Domicile" };
@@ -184,6 +185,7 @@ export default async function TourHistoryPage({
             : "Tournées passées de votre périmètre — démarrées ou terminées."
         }
       />
+      <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
 
       {monthlyEarnings && <MonthlyEarningsCard {...monthlyEarnings} />}
 
