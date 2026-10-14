@@ -4,9 +4,9 @@ import type { UserRole } from "@/lib/types/domain";
  * Groupes d'équipe du Messenger — règles pures, partagées par les
  * routes API (contrôles avant écriture) et testées dans
  * lib/messenger/__tests__. La synchronisation réelle des membres est
- * faite en base par public.sync_message_group_members() (migration
- * 20260101000160) : computeTeamGroupMembers() en est le miroir exact,
- * toute évolution doit être faite des deux côtés.
+ * faite côté serveur par lib/messenger/synchro-serveur.ts :
+ * computeTeamGroupMembers() est la règle unique,
+ * utilisée par la synchro et par les routes.
  */
 
 export type GroupMemberRole = "admin" | "member";

@@ -45,7 +45,7 @@ export async function consommer(
   const jour = debutJourParis(maintenant);
 
   const [orgRes, prixRes, totauxRes] = await Promise.all([
-    admin.from("organizations").select("plan, plan_id, usage_overage_enabled").eq("id", organizationId).maybeSingle(),
+    admin.from("organizations").select("plan, usage_overage_enabled").eq("id", organizationId).maybeSingle(),
     admin.from("usage_prices").select("unit_price_eur").eq("feature", feature).maybeSingle(),
     admin.rpc("usage_feature_totals", { p_org: organizationId, p_feature: feature, p_month_start: mois.debut, p_day_start: jour }),
   ]);
@@ -54,7 +54,7 @@ export async function consommer(
     return { ok: true, eventId: null, unitesDepassement: 0 };
   }
 
-  const formule = resoudreFormule(orgRes.data?.plan, orgRes.data?.plan_id);
+  const formule = resoudreFormule(orgRes.data?.plan);
   const { data: quota } = await admin
     .from("usage_quotas")
     .select("included_per_month, daily_cap")
