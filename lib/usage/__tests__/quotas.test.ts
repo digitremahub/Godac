@@ -3,7 +3,9 @@ import {
   bornesMoisParis,
   debutJourParis,
   deciderConsommation,
+  derniersMois,
   descriptionLigneFacture,
+  lignesConsommation,
   libellePeriode,
   lignesDepassement,
   messageRefus,
@@ -111,6 +113,20 @@ describe("bornes heure de Paris", () => {
   it("début du jour", () => {
     expect(debutJourParis(new Date("2026-07-10T23:30:00Z"))).toBe("2026-07-10T22:00:00.000Z");
     expect(debutJourParis(new Date("2026-12-10T08:00:00Z"))).toBe("2026-12-09T23:00:00.000Z");
+  });
+});
+
+describe("tableau de consommation", () => {
+  it("lignesConsommation", () => {
+    const [l] = lignesConsommation(
+      [{ feature: "ocr_ticket", label: "Tickets", unit_label: "ticket", unit_price_eur: 0.05 }],
+      { ocr_ticket: 300 },
+      { ocr_ticket: 420 },
+    );
+    expect(l).toMatchObject({ utilise: 420, inclus: 300, depassement: 120, coutEstime: 6, pourcentage: 140 });
+  });
+  it("derniersMois", () => {
+    expect(derniersMois(new Date("2026-02-10T12:00:00Z"), 3)).toEqual(["2026-02", "2026-01", "2025-12"]);
   });
 });
 

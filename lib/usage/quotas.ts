@@ -173,3 +173,47 @@ export function lignesDepassement(
   }
   return out;
 }
+
+// ── Tableau « Consommation » (page Abonnement) ────────────────────────
+
+export interface LigneConsommation {
+  feature: string;
+  libelle: string;
+  uniteLibelle: string;
+  utilise: number;
+  inclus: number;
+  depassement: number;
+  prixUnitaire: number;
+  coutEstime: number;
+  /** Part du volume inclus consommée, en % (0 si rien d'inclus). */
+  pourcentage: number;
+}
+
+/** Une ligne par fonction tarifée, dans l'ordre de la grille de prix. */
+export function lignesConsommation(
+  prix: { feature: string; label: string; unit_label: string; unit_price_eur: number }[],
+  inclus: Record<string, number>,
+  utilise: Record<string, number>,
+): LigneConsommation[] {
+  return prix.map((p) => {
+    const u = utilise[p.feature] ?? 0;
+    const i = inclus[p.feature] ?? 0;
+    const depassement = unitesEnDepassement(u, i);
+    return {
+      feature: p.feature,
+      libelle: p.label,
+      uniteLibelle: p.unit_label,
+      utilise: u,
+      inclus: i,
+      depassement,
+      prixUnitaire: Number(p.unit_price_eur),
+      coutEstime: montantCentimes(depassement, Number(p.unit_price_eur)) / 100,
+      pourcentage: i > 0 ? Math.round((u / i) * 100) : 0,
+    };
+  });
+}
+
+/** Les `n` derniers mois (heure de Paris), du plus récent au plus ancien, mois courant compris. */
+export function derniersMois(instant: Date, n: number): string[] {
+  return Array.from({ length: n }, (_, k) => bornesMoisParis(instant, -k).periode);
+}
