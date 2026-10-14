@@ -17,6 +17,7 @@ import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, typ
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { ExportTournee } from "@/components/colis/ExportTournee";
+import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
 interface Draft {
   adresse: string;
@@ -77,6 +78,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
+  const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
+  /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
+  const [resume, setResume] = useState<ResumeOptimisation | null>(null);
+  const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -278,10 +284,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           }),
         );
       }
-      const r = await api<{ kmAvant: number; kmApres: number; sansGps: number }>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run?.id, depuis }) });
+      const r = await api<ResumeOptimisation>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run?.id, depuis }) });
       const gain = r.kmAvant - r.kmApres;
       await recharger(run?.id);
-      setToast({ ok: true, text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}.` });
+      setResume(r);
+      const signales = r.horsHoraires.length + r.fermes.length + r.impossibles.length;
+      setToast({
+        ok: !signales,
+        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
+      });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -490,7 +501,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const livres = stops.filter((s) => s.status === "delivered").length;
   const enLivraison = run.status === "in_progress";
   const avancement = estimerAvancement(
-    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null })),
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
     {
       depot: run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
       retourDepot: run.return_to_start,
@@ -597,6 +608,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           }}
         />
       )}
+      {horairesStop && (
+        <HorairesSheet
+          stop={horairesStop}
+          jour={horaires.jour}
+          onClose={() => setHorairesStop(null)}
+          onSaved={async (texte) => {
+            setHorairesStop(null);
+            setToast({ ok: true, text: texte });
+            await recharger(run.id);
+          }}
+        />
+      )}
       {scanner && <ParcelScanner onCode={onCode} onClose={() => setScanner(false)} />}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
@@ -653,6 +676,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
             {prochain.recipient && <p className="text-sm text-navy/70">{prochain.recipient}</p>}
             {prochain.notes && <p className="mt-1 text-sm text-navy/70">{prochain.notes}</p>}
+            <BadgeHoraires stop={prochain} fenetres={horaires.fenetres.get(prochain.id) ?? null} passage={horaires.passages.get(prochain.id)} />
           </div>
           {prochain.phone && (
             <div className="grid grid-cols-2 gap-2">
@@ -726,11 +750,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
               + Nouvelle liste
             </button>
           </div>
-          {run.start_label ? (
-            <p className="text-xs text-navy/60">Départ : {run.start_label}{run.return_to_start ? " (retour au dépôt)" : ""}</p>
-          ) : (
-            <p className="text-xs text-navy/60">Pas d&apos;adresse de dépôt : l&apos;ordre partira du premier arrêt. Renseignez le dépôt dans Organisation → Services.</p>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {run.start_label ? (
+              <p className="text-xs text-navy/60">Départ : {run.start_label}{run.return_to_start ? " (retour au dépôt)" : ""}</p>
+            ) : (
+              <p className="text-xs text-navy/60">Pas d&apos;adresse de dépôt : l&apos;ordre partira du premier arrêt. Renseignez le dépôt dans Organisation → Services.</p>
+            )}
+            <HeureDepartChamp run={run} onChange={() => recharger(run.id)} />
+          </div>
           <ImportTournee
             runId={run.id}
             cibles={cibles}
@@ -800,6 +827,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
               </button>
             )}
           </div>
+          {resume && (
+            <div className="px-4 pt-2 sm:px-5">
+              <ResumeOptimisationCarte resume={resume} stops={stops} onFermer={() => setResume(null)} />
+            </div>
+          )}
           <ol className="mt-2 divide-y divide-navy/[0.07]">
             {groupes.map((g, k) => (
               <Fragment key={g.liste?.id ?? "principale"}>
@@ -822,6 +854,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           <p className="text-xs text-navy/60">
                             {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.status === "delivered" && libelleLieu(s.delivered_place), s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
                           </p>
+                          {s.status === "pending" && (
+                            <BadgeHoraires
+                              stop={s}
+                              fenetres={horaires.fenetres.get(s.id) ?? null}
+                              passage={run.optimized_at || enLivraison ? horaires.passages.get(s.id) : null}
+                            />
+                          )}
                         </div>
                         {s.phone && s.status === "pending" && (
                           <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
@@ -853,6 +892,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                             onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count })}
                           >
                             Modifier
+                          </button>
+                          <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setHorairesStop(s)} aria-label={`Horaires — ${s.address}`}>
+                            Horaires
                           </button>
                           <button type="button" className="btn-ghost !px-2 !py-1 text-orange-ink" onClick={() => supprimer(s)} aria-label={`Retirer ${s.address}`}>
                             Retirer

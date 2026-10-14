@@ -13,6 +13,7 @@ import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, ty
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
+import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
@@ -46,6 +47,9 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
   const [maPosition, setMaPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
+  const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
+  const horaires = useHoraires(run, stops, maPosition);
   const dernierEnvoi = useRef(0);
 
   useEffect(() => {
@@ -222,9 +226,13 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
           ? navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }), () => resolve(null), { enableHighAccuracy: true, timeout: 10000 })
           : resolve(null),
       );
-      const r = await api<{ kmApres: number }>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id, depuis }) });
+      const r = await api<ResumeOptimisation>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id, depuis }) });
       await charger(run.id);
-      setToast({ ok: true, text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km.` });
+      const hors = r.horsHoraires.length + r.impossibles.length;
+      setToast({
+        ok: !hors && !r.fermes.length,
+        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
+      });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -254,7 +262,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const actives = (runs ?? []).filter((t) => t.status !== "done");
   const progression = stops.length ? Math.round((termines.length / stops.length) * 100) : 0;
   const avancement = estimerAvancement(
-    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null })),
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
     {
       position: maPosition,
       depot: run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
@@ -357,6 +365,19 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         />
       )}
 
+      {horairesStop && (
+        <HorairesSheet
+          stop={horairesStop}
+          jour={horaires.jour}
+          onClose={() => setHorairesStop(null)}
+          onSaved={async (texte) => {
+            setHorairesStop(null);
+            setToast({ ok: true, text: texte });
+            await charger(run?.id);
+          }}
+        />
+      )}
+
       {enCarte && run && (
         <section className="relative min-h-0 flex-1" aria-label="Carte de la tournée">
           <CarteTournee run={run} stops={stops} selection={arretCarte?.id ?? null} onSelection={choisirArret} onItineraire={setItineraire} />
@@ -378,6 +399,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                   </p>
                   <p className="font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
                   {arretCarte.recipient && <p className="text-sm text-navy/70">{arretCarte.recipient}</p>}
+                  {arretCarte.status === "pending" && <BadgeHoraires stop={arretCarte} fenetres={horaires.fenetres.get(arretCarte.id) ?? null} passage={horaires.passages.get(arretCarte.id)} />}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <a href={waze(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm" target="_blank" rel="noreferrer">
@@ -446,6 +468,12 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               {prochain.recipient && <p className="mt-1 text-base text-navy/75">{prochain.recipient}</p>}
               {prochain.notes && <p className="mt-1 text-sm text-navy/65">{prochain.notes}</p>}
               {prochain.lat === null && <p className="mt-1 text-xs font-semibold text-orange-ink">Adresse non localisée : vérifiez-la dans la navigation.</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <BadgeHoraires stop={prochain} fenetres={horaires.fenetres.get(prochain.id) ?? null} passage={horaires.passages.get(prochain.id)} />
+                <button type="button" className="btn-ghost mt-1 !px-2 !py-0.5 text-xs" onClick={() => setHorairesStop(prochain)}>
+                  🕘 Horaires
+                </button>
+              </div>
             </div>
 
             {prochain.phone ? (
@@ -517,7 +545,16 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
+                      <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
                     </div>
+                    <button
+                      type="button"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.05] text-base"
+                      onClick={() => setHorairesStop(s)}
+                      aria-label={`Horaires de ${s.recipient ?? s.address}`}
+                    >
+                      🕘
+                    </button>
                     {s.phone ? (
                       <a href={lienTel(s.phone)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                         <IconPhone className="h-5 w-5" />
