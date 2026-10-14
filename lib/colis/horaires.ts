@@ -342,9 +342,19 @@ function evaluer(p: Probleme, ordre: number[]) {
   let prec = -1;
   let hors = 0;
   let retard = 0;
+  let urgence = 0;
   for (const i of ordre) {
     t += prec < 0 ? p.depuisDepart[i]! : p.t[prec]![i]!;
-    const s = servir(t, p.fen[i]!);
+    const fenetres = p.fen[i]!;
+    // Une fermeture proche doit peser dans l'ordre même si les deux arrêts
+    // restent techniquement livrables : on évite de perdre la marge restante
+    // sur une adresse à échéance serrée pour gagner quelques minutes de trajet.
+    if (fenetres?.length) {
+      const fermeture = fenetres[fenetres.length - 1]![1];
+      const marge = fermeture - t;
+      urgence += Math.max(0, 30 - marge) * 5;
+    }
+    const s = servir(t, fenetres);
     if (s.statut === "hors") {
       hors++;
       retard += s.retard;
@@ -353,7 +363,7 @@ function evaluer(p: Probleme, ordre: number[]) {
     prec = i;
   }
   if (prec >= 0) t += p.versFin[prec]!;
-  return { hors, cout: hors * PENALITE_HORS + retard * PENALITE_RETARD + (t - p.debut) };
+  return { hors, cout: hors * PENALITE_HORS + retard * PENALITE_RETARD + urgence + (t - p.debut) };
 }
 
 /**
