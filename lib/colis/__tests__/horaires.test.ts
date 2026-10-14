@@ -318,8 +318,8 @@ describe("listes enchaînées avec horaires", () => {
       arret("a", 0, 2, "L1"),
       arret("x", 1, 1, "L1"),
       arret("n", 2, null, "L1"),
-      arret("b", 3, 6, "L2"),
-      arret("c", 4, 8, "L2"),
+      arret("b", 3, 8, "L2"),
+      arret("c", 4, 6, "L2"),
       arret("f", 5, 3, "L2", "delivered"),
     ];
     const fen: Record<string, Fenetres> = { x: [], c: [[0, 500]] };
