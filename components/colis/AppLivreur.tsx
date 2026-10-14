@@ -4,11 +4,13 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
+import { IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
+import { estRamasse, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
@@ -188,6 +190,12 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await charger(run?.id);
     }
+  }
+
+  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
+  function terminer(s: Stop) {
+    if (estRamasse(s)) return statut(s, "delivered");
+    setLivraison(s);
   }
 
   async function ajouterTelephone(s: Stop) {
@@ -390,12 +398,16 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </p>
             )}
             {arretCarte ? (
-              <div className="pointer-events-auto mx-auto flex max-w-xl flex-col gap-3 rounded-2xl bg-surface p-4 shadow-pop">
+              <div className="pointer-events-auto relative mx-auto flex max-w-xl flex-col gap-3 overflow-hidden rounded-2xl bg-surface p-4 shadow-pop">
+                {estRamasse(arretCarte) && <EncocheRamasse large />}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-                    Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
-                    {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
-                    {arretCarte.status === "delivered" ? " · livré" : arretCarte.status === "failed" ? " · absent" : arretCarte.id === prochain?.id ? " · prochain" : ""}
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+                    {estRamasse(arretCarte) && <BadgeRamasse />}
+                    <span>
+                      Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
+                      {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
+                      {arretCarte.status !== "pending" ? ` · ${libelleStatut(arretCarte).toLowerCase()}` : arretCarte.id === prochain?.id ? " · prochain" : ""}
+                    </span>
                   </p>
                   <p className="font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
                   {arretCarte.recipient && <p className="text-sm text-navy/70">{arretCarte.recipient}</p>}
@@ -415,8 +427,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                     </button>
                   )}
                   {arretCarte.status === "pending" ? (
-                    <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => setLivraison(arretCarte)}>
-                      <IconCheck className="h-4 w-4" /> Livré
+                    <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => terminer(arretCarte)}>
+                      <IconCheck className="h-4 w-4" /> {estRamasse(arretCarte) ? "Ramassé" : "Livré"}
                     </button>
                   ) : (
                     <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
@@ -457,11 +469,18 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             </Link>
           </section>
         ) : prochain ? (
-          <section className="flex flex-col gap-4 rounded-2xl border-2 border-teal/60 bg-surface p-5 shadow-card" aria-label="Arrêt en cours">
+          <section
+            className={`relative flex flex-col gap-4 overflow-hidden rounded-2xl border-2 bg-surface p-5 shadow-card ${estRamasse(prochain) ? "border-gold/80" : "border-teal/60"}`}
+            aria-label={estRamasse(prochain) ? "Ramasse en cours" : "Arrêt en cours"}
+          >
+            {estRamasse(prochain) && <EncocheRamasse large />}
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-              Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis`}
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+              {estRamasse(prochain) && <BadgeRamasse />}
+              <span>
+                Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
+                {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+              </span>
             </p>
             <div>
               <p className="font-display text-2xl font-bold leading-tight">{prochain.address}</p>
@@ -500,8 +519,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               </a>
             </div>
             <div className="grid grid-cols-[2fr_1fr] gap-2">
-              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => setLivraison(prochain)}>
-                <IconCheck className="h-6 w-6" /> Livré
+              <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
+                {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
               </button>
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => statut(prochain, "failed")}>
                 <IconX className="h-5 w-5" /> Absent
@@ -512,7 +531,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
           <section className="flex flex-col items-center gap-3 rounded-2xl bg-surface p-6 text-center shadow-card">
             <p className="font-display text-xl font-bold">Tournée terminée 🎉</p>
             <p className="text-sm text-navy/65">
-              {stops.filter((s) => s.status === "delivered").length} livré(s), {stops.filter((s) => s.status === "failed").length} absent(s).
+              {stops.filter((s) => s.status === "delivered" && !estRamasse(s)).length} livré(s)
+              {stops.some(estRamasse) && `, ${stops.filter((s) => s.status === "delivered" && estRamasse(s)).length} ramasse(s) faite(s)`}, {stops.filter((s) => s.status === "failed").length} absent(s).
             </p>
             {run.status !== "done" && (
               <button type="button" className="btn-primary !py-3" onClick={cloturer}>
@@ -540,9 +560,11 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                     </li>
                   )}
-                  <li className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5 shadow-card">
+                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
+                    {estRamasse(s) && <EncocheRamasse />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
+                      {estRamasse(s) && <BadgeRamasse className="mb-1" />}
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
@@ -583,11 +605,24 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
             {voirTermines && (
               <ol className="mt-1 flex flex-col gap-1.5">
                 {termines.map((s) => (
-                  <li key={s.id} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2 opacity-70">
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}>
+                  <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
+                    {estRamasse(s) && <EncocheRamasse />}
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}
+                      title={libelleStatut(s)}
+                    >
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
-                    <p className="min-w-0 flex-1 truncate text-sm">{s.address}</p>
+                    <p className="min-w-0 flex-1 truncate text-sm">
+                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
+                      {s.address}
+                    </p>
+                    {s.proof_code && (
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-navy/60" title={`QR code scanné : ${s.proof_code}`} aria-label={`Livré avec QR code ${s.proof_code}`}>
+                        <IconQrCode className="h-4 w-4" />
+                        <span className="hidden font-mono sm:inline">{resumeCodeQr(s.proof_code, 14)}</span>
+                      </span>
+                    )}
                     {s.proof_photo_path && (
                       <a href={`/api/colis/arrets/${s.id}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs" aria-label={`Photo de livraison — ${s.address}`}>
                         📷
