@@ -22,6 +22,17 @@ const bodySchema = z.object({
   ptac_kg: z.coerce.number().positive().nullable().optional(),
   reference_consumption_l_100km: z.coerce.number().positive().nullable().optional(),
   spec_sources: z.record(z.string(), specSourceEntrySchema).optional(),
+  // Module « Véhicules loués (loueurs) ».
+  ownership: z.enum(["propre", "location", "credit_bail", "location_longue_duree"]).optional(),
+  rental_provider_id: z.string().uuid().nullable().optional(),
+  rental_contract_ref: z.string().trim().max(120).nullable().optional(),
+  rental_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  rental_end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  rental_km_allowance: z.coerce.number().int().positive().nullable().optional(),
+  rental_start_km: z.coerce.number().min(0).nullable().optional(),
+}).refine((d) => !(d.rental_start_date && d.rental_end_date) || d.rental_end_date > d.rental_start_date, {
+  message: "La fin du contrat doit suivre son début.",
+  path: ["rental_end_date"],
 });
 
 /** Minimal lookup for flows that only have a vehicle_id (QR scan, tour start/end) and need its label. */

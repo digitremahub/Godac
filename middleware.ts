@@ -40,6 +40,10 @@ const PUBLIC_PREFIXES = [
   "/join",
   "/api/public/driver-signup",
   "/api/public/demo-request",
+  // Module loueurs : le prestataire répond sans compte GODAC, via un
+  // lien à jeton (haché en base, 30 jours, une seule demande).
+  "/prestataire/",
+  "/api/public/prestataire/",
 ];
 
 function isPublicPath(pathname: string): boolean {

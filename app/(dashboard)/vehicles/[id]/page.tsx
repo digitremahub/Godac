@@ -17,6 +17,10 @@ import { VehicleDocumentsPanel } from "@/components/vehicles/VehicleDocumentsPan
 import { listVehicleDocuments } from "@/lib/vehicles/documents";
 import { parisCalendarDate } from "@/lib/planning/dates";
 import { getVehicleLatestKmReading } from "@/lib/vehicles/odometer-reference";
+import { VehicleRentalPanel, type KmSummary } from "@/components/rental/VehicleRentalPanel";
+import { RentalRequestsList } from "@/components/rental/RentalRequestsList";
+import { loadRentalRequests } from "@/lib/rental/load-requests";
+import { daysUntil, evaluateKmAllowance, formatKm, KM_LEVEL_LABELS } from "@/lib/rental/contract";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -36,9 +40,10 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
 
-  const [fleetEnabled, washesEnabled] = await Promise.all([
+  const [fleetEnabled, washesEnabled, rentalEnabled] = await Promise.all([
     isModuleEnabled(supabase, appUser.organization_id, "fleet"),
     isModuleEnabled(supabase, appUser.organization_id, "washes"),
+    isModuleEnabled(supabase, appUser.organization_id, "rental_providers"),
   ]);
   if (!fleetEnabled) {
     return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
@@ -58,7 +63,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       supabase
         .from("vehicles")
         .select(
-          "id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name), assigned_driver_id, users!vehicles_assigned_driver_id_fkey(full_name), brand, model, model_year, gearbox, fuel_type, adblue_capacity_liters, ptac_kg, reference_consumption_l_100km, spec_sources",
+          "id, registration, type, status, tank_capacity_liters, initial_km, created_at, service_id, services(name), assigned_driver_id, users!vehicles_assigned_driver_id_fkey(full_name), brand, model, model_year, gearbox, fuel_type, adblue_capacity_liters, ptac_kg, reference_consumption_l_100km, spec_sources, ownership, rental_provider_id, rental_contract_ref, rental_start_date, rental_end_date, rental_km_allowance, rental_start_km",
         )
         .eq("id", id)
         .single(),
@@ -151,6 +156,36 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       .map((i: any) => ({ at: i.created_at, km: i.odometer_km, label: `Intervention : ${i.type}` })),
   ];
 
+  // Module « Véhicules loués » : contrat, forfait km au prorata, demandes au loueur.
+  const canManageRental = rentalEnabled && hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const today = parisCalendarDate(new Date().toISOString());
+  const [rentalProviders, rentalRequests, linkedRequests] = canManageRental
+    ? await Promise.all([
+        supabase.from("rental_providers").select("id, name, active").order("name").then((r) => (r.data ?? []) as { id: string; name: string; active: boolean }[]),
+        loadRentalRequests(supabase, { vehicleId: id }, 50),
+        supabase.from("rental_maintenance_requests").select("intervention_id").eq("vehicle_id", id).then((r) => (r.data ?? []) as { intervention_id: string }[]),
+      ])
+    : [[], [], []];
+  const rentalProviderName = rentalProviders.find((p) => p.id === v.rental_provider_id)?.name ?? null;
+  const kmEval =
+    v.rental_km_allowance && v.rental_start_date && v.rental_end_date && v.rental_start_km != null && kmActuel
+      ? evaluateKmAllowance({
+          allowanceKm: Number(v.rental_km_allowance),
+          startDate: v.rental_start_date,
+          endDate: v.rental_end_date,
+          startKm: Number(v.rental_start_km),
+          currentKm: kmActuel.km,
+          today,
+        })
+      : null;
+  const kmSummary: KmSummary | null = kmEval
+    ? { level: kmEval.level, levelLabel: KM_LEVEL_LABELS[kmEval.level], drivenKm: formatKm(kmEval.drivenKm), prorataKm: formatKm(kmEval.prorataKm), projectedKm: formatKm(kmEval.projectedKm) }
+    : null;
+  const requestedInterventionIds = new Set(linkedRequests.map((l) => l.intervention_id));
+  const orphanInterventions = ((interventions ?? []) as any[])
+    .filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !requestedInterventionIds.has(i.id))
+    .map((i) => ({ id: i.id as string, type: i.type as string, created_at: i.created_at as string }));
+
   const canManageDocuments = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
   const vehicleDocuments = canManageDocuments ? await listVehicleDocuments(supabase, id) : [];
 
@@ -190,6 +225,13 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col gap-4 lg:col-span-2">
           {canManageDocuments && (
             <VehicleDocumentsPanel vehicleId={id} documents={vehicleDocuments} today={parisCalendarDate(new Date().toISOString())} />
+          )}
+
+          {canManageRental && v.ownership !== "propre" && (
+            <div>
+              <h3 className="mb-2 text-base">Demandes au loueur{rentalProviderName ? ` (${rentalProviderName})` : ""}</h3>
+              <RentalRequestsList requests={rentalRequests} showVehicle={false} />
+            </div>
           )}
 
           <InterventionsPanel
@@ -280,6 +322,26 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               <p className="text-sm text-navy/60">Aucun relevé : il s&apos;affichera au premier départ de tournée ou au premier plein.</p>
             )}
           </Card>
+          {canManageRental && (
+            <VehicleRentalPanel
+              vehicleId={v.id}
+              info={{
+                ownership: v.ownership ?? "propre",
+                rental_provider_id: v.rental_provider_id,
+                rental_contract_ref: v.rental_contract_ref,
+                rental_start_date: v.rental_start_date,
+                rental_end_date: v.rental_end_date,
+                rental_km_allowance: v.rental_km_allowance,
+                rental_start_km: v.rental_start_km != null ? Number(v.rental_start_km) : null,
+              }}
+              providerName={rentalProviderName}
+              providers={rentalProviders.filter((p) => p.active || p.id === v.rental_provider_id)}
+              canEdit
+              daysLeft={v.rental_end_date ? daysUntil(v.rental_end_date, today) : null}
+              km={kmSummary}
+              orphanInterventions={orphanInterventions}
+            />
+          )}
           {(v.brand || v.model) && (
             <Card className="w-full">
               <p className="text-sm text-navy/65">Modèle</p>
