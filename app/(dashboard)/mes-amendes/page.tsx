@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
+import { DriverFineActions } from "@/components/fines/DriverFineActions";
 
 export default async function MesAmendesPage() {
   const user = await requireAppUser();
@@ -36,9 +37,7 @@ export default async function MesAmendesPage() {
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm"><span><strong>Montant :</strong> {Number(f.amount).toLocaleString("fr-FR",{minimumFractionDigits:2})} €</span><span><strong>Référence :</strong> {f.reference ?? "—"}</span></div>
         {f.notified_at && <p className="text-xs text-navy/55">Notification reçue le {new Date(f.notified_at).toLocaleDateString("fr-FR")}</p>}
-        {f.status === "identified" && <form action={`/api/fines/${f.id}/contest`} method="post">
-          <button className="btn-secondary" formAction={undefined} type="button" onClick={undefined}>Contester cette amende</button>
-        </form>}
+        {f.status === "identified" && <DriverFineActions id={f.id} />}
       </Card>)}</div>}
   </div>;
 }
