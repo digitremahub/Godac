@@ -11,12 +11,13 @@ const ONGLETS = [
 ] as const;
 
 /** Navigation unifiée entre les vues opérationnelles de tournée. */
-export function TourneesTabs() {
+export function TourneesTabs({ canTrack = true }: { canTrack?: boolean }) {
   const pathname = usePathname() ?? "";
+  const ongletsVisibles = canTrack ? ONGLETS : ONGLETS.filter((onglet) => onglet.href !== "/suivi");
   return (
     <nav aria-label="Tournées colis" className="mb-5 overflow-x-auto border-b border-navy/10">
       <div className="flex min-w-max gap-1" role="tablist" aria-label="Vues des tournées">
-        {ONGLETS.map((onglet) => {
+        {ongletsVisibles.map((onglet) => {
           const active = pathname === onglet.href || pathname.startsWith(`${onglet.href}/`);
           return (
             <Link
