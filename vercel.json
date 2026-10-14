@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/usage-billing",
       "schedule": "15 4 1 * *"
+    },
+    {
+      "path": "/api/cron/loueurs",
+      "schedule": "30 4 * * *"
     }
   ]
 }
