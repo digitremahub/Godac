@@ -73,7 +73,8 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       },
       {
         titre: "Les villages de ma tournée",
-        texte: "« Tournées & villages » donne la liste des villages de chaque tournée et le contact de votre chef d'équipe.",
+        texte:
+          "« Tournées & villages » donne, en liste, les villages des tournées de votre service (et de celles où vous êtes planifié), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
         lien: { href: "/tours/routes", label: "Tournées & villages" },
         module: "planning",
       },
@@ -158,7 +159,11 @@ const ENCADREMENT: SectionGuide[] = [
         lien: { href: "/planning", label: "Planning" },
         module: "planning",
       },
-      { titre: "Tournées, villages et chefs d'équipe", texte: "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service.", lien: { href: "/tours/routes", label: "Tournées & villages" }, module: "planning" },
+      {
+        titre: "Tournées, villages et chefs d'équipe",
+        texte:
+          "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
+        lien: { href: "/tours/routes", label: "Tournées & villages" }, module: "planning" },
       { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
       { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/qr-codes", label: "Badges QR" } },

@@ -11,6 +11,37 @@ import { DayStrip, type StripTour } from "@/components/planning/DayStrip";
 import { presenceByDay } from "@/lib/planning/presence";
 import { addDays, addMonths, firstOfMonth, parisCalendarDate } from "@/lib/planning/dates";
 import type { AppUser } from "@/lib/auth/session";
+import { coverageForEntries } from "@/lib/tours/renfort";
+
+type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
+
+/** La fiche de la tournée du jour ; sans la migration des renforts, relue sans le drapeau. */
+async function loadTodayRoute(supabase: Supabase, tourNumber: string) {
+  const villages = "tour_route_villages(name, postal_code, notes, position)";
+  const withRenfort = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
+  if (!withRenfort.error) return withRenfort;
+  return supabase.from("tour_routes").select(`id, tour_number, notes, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
+}
+
+/** Villages couverts par un renfort pour ce passage (choix du jour, sinon couverture par défaut). */
+async function loadRenfortVillages(supabase: Supabase, routeId: string, entryId: string | null) {
+  const [{ data: defaults }, { data: day }] = await Promise.all([
+    supabase.from("tour_route_renfort_villages").select("village_id").eq("renfort_route_id", routeId),
+    entryId ? supabase.from("planning_entry_renfort_villages").select("village_id").eq("planning_entry_id", entryId) : Promise.resolve({ data: [] as { village_id: string }[] }),
+  ]);
+  const entry = { planningEntryId: entryId ?? "", renfortRouteId: routeId, tourNumber: "" };
+  const ids =
+    coverageForEntries(
+      [entry],
+      ((defaults ?? []) as any[]).map((l) => ({ renfortRouteId: routeId, villageId: l.village_id as string })),
+      ((day ?? []) as any[]).map((l) => ({ planningEntryId: entry.planningEntryId, villageId: l.village_id as string })),
+    ).get(entry.planningEntryId)?.villageIds ?? [];
+  if (!ids.length) return [];
+  const { data: rows } = await supabase.from("tour_route_villages").select("id, name, position, tour_routes(tour_number)").in("id", ids);
+  return ((rows ?? []) as any[])
+    .map((v) => ({ name: v.name as string, homeTour: (v.tour_routes?.tour_number as string | undefined) ?? undefined, position: v.position as number }))
+    .sort((a, b) => (a.homeTour ?? "").localeCompare(b.homeTour ?? "", "fr", { numeric: true }) || a.position - b.position);
+}
 
 /**
  * The driver's own day at a glance: start/end the tour (the one action
@@ -120,16 +151,19 @@ export async function ChauffeurDashboard({
   // Team leader(s) of the driver's service(s), and the villages of
   // today's tour (the one in progress, else today's planned one).
   const todayTourNumber = openTour?.tour_number ?? weekToursByDay[todayParis]?.[0]?.tour_number ?? null;
+  const todayEntryId = openTour?.id ?? weekToursByDay[todayParis]?.[0]?.id ?? null;
   const [{ data: myServiceRows }, { data: todayRoute }] = await Promise.all([
     supabase.from("user_services").select("services(id, name, team_leader_name, team_leader_phone, team_leader_email)").eq("user_id", appUser.id),
-    todayTourNumber && planningEnabled
-      ? supabase.from("tour_routes").select("tour_number, notes, tour_route_villages(name, postal_code, notes, position)").eq("tour_number", todayTourNumber).maybeSingle()
-      : Promise.resolve({ data: null }),
+    todayTourNumber && planningEnabled ? loadTodayRoute(supabase, todayTourNumber) : Promise.resolve({ data: null }),
   ]);
   const teamLeaders = ((myServiceRows ?? []) as any[])
     .map((r) => r.services)
     .filter((sv) => sv && (sv.team_leader_name || sv.team_leader_phone || sv.team_leader_email));
-  const todayVillages = (((todayRoute as any)?.tour_route_villages ?? []) as any[]).sort((a, b) => a.position - b.position);
+  // Tournée de renfort : les villages empruntés du jour (choisis pour ce passage, sinon par défaut), avec leur tournée.
+  const todayIsRenfort = Boolean((todayRoute as any)?.is_renfort);
+  const todayVillages: { name: string; homeTour?: string }[] = todayIsRenfort
+    ? await loadRenfortVillages(supabase, (todayRoute as any).id, todayEntryId)
+    : (((todayRoute as any)?.tour_route_villages ?? []) as any[]).sort((a, b) => a.position - b.position);
 
   return (
     <div>
@@ -161,16 +195,19 @@ export async function ChauffeurDashboard({
           {todayVillages.length > 0 && (
             <Card>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg">Villages de la tournée {todayTourNumber}</h2>
+                <h2 className="text-lg">
+                  {todayIsRenfort ? `Villages du renfort ${todayTourNumber}` : `Villages de la tournée ${todayTourNumber}`}
+                </h2>
                 <Link href="/tours/routes" className="text-sm text-teal-ink hover:underline">
                   Détails
                 </Link>
               </div>
               <ol className="flex flex-wrap gap-1.5">
-                {todayVillages.map((v: any, i: number) => (
+                {todayVillages.map((v, i) => (
                   <li key={i} className="flex items-center gap-1.5 rounded-full bg-navy/[0.045] py-1 pl-1 pr-3 text-sm">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
                     {v.name}
+                    {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
                   </li>
                 ))}
               </ol>
