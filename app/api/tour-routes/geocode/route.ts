@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { peutVoirCarteTournees } from "@/lib/tours/acces-tournees";
 import { chooseCommune, postalCodeFromAddress, searchCommunes } from "@/lib/geo/communes";
 import { normalizeVillageName } from "@/lib/tours/carte-villages";
 
@@ -27,10 +27,15 @@ const depotOf = (lat: unknown, lng: unknown): Depot => (lat != null && lng != nu
  * du village, puis la commune la plus proche du dépôt du service (ou de
  * l'entreprise). Réseau indisponible : on s'arrête et on renvoie
  * `offline`, les villages restent « non localisés » et seront retentés.
+ *
+ * Réservé à ceux qui voient la carte (chefs d'équipe, direction) : les
+ * autres rôles n'ont qu'une liste, sans carte ni coordonnées.
  */
 export async function POST() {
   const appUser = await requireAppUser();
-  const canEdit = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  if (!peutVoirCarteTournees(appUser.role)) {
+    return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
+  }
   const supabase = await createServerSupabaseClient();
 
   const { data: rows, error } = await supabase.from("tour_route_villages").select("id, name, postal_code, tour_routes(service_id)").is("geocoded_at", null).limit(1000);
@@ -129,22 +134,12 @@ export async function POST() {
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-  // Les chefs d'équipe / la direction écrivent avec leurs droits ; pour les
-  // autres rôles (lecture seule), le cache est rempli par le serveur, limité
-  // aux villages de leur organisation lus ci-dessus.
-  let writer: typeof supabase | null = supabase;
-  if (!canEdit) {
-    try {
-      writer = createAdminSupabaseClient() as unknown as typeof supabase;
-    } catch {
-      writer = null;
-    }
-  }
-  let persisted = Boolean(writer);
-  if (writer) {
+  // Les chefs d'équipe / la direction écrivent avec leurs propres droits.
+  let persisted = true;
+  {
     const now = new Date().toISOString();
     for (const { ids, patch } of done) {
-      const { error: updateError } = await writer
+      const { error: updateError } = await supabase
         .from("tour_route_villages")
         .update({
           lat: patch.lat,
