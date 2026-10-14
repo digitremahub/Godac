@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/paliers",
       "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/loueurs",
+      "schedule": "30 4 * * *"
     }
   ]
 }
