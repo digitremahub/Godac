@@ -13,6 +13,8 @@ export const RETENTION_DAYS = {
   parcelRuns: 365,
   /** Au-delà : nom complet réduit aux initiales, téléphone et consignes effacés. */
   parcelRecipients: 30,
+  /** Journal anti-abus du lien prestataire (IP hachées). */
+  providerAccessLog: 30,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -78,6 +80,9 @@ export async function purgeExpiredData() {
     .delete({ count: "exact" })
     .lt("run_date", limite);
   results.parcelRuns = runs.error ? runs.error.message : (runs.count ?? 0);
+
+  const access = await admin.from("rental_provider_access_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.providerAccessLog));
+  results.providerAccessLog = access.error ? access.error.message : (access.count ?? 0);
 
   return results;
 }
