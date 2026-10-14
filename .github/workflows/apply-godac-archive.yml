@@ -1,0 +1,22 @@
+name: Apply GODAC archive
+on:
+  push:
+    branches: [feature/optimisation-tournees]
+    paths: [GODAC-fichiers-modifies.zip]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/optimisation-tournees
+      - run: unzip -o GODAC-fichiers-modifies.zip -d .
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .env.example MISES-A-JOUR-GODAC-2026-10-14.md components/colis lib/colis app/api/colis
+          git rm GODAC-fichiers-modifies.zip
+          git commit -m "Apply GODAC tour optimization updates"
+          git push
