@@ -33,6 +33,8 @@ export interface Stop {
   kind?: "livraison" | "ramasse" | null;
   /** Livraison avec QR code : valeur scannée (preuve de remise). */
   proof_code?: string | null;
+  /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */
+  weight_kg?: number | string | null;
   /** Liste de la tournée (null : liste implicite « Liste principale »). */
   list_id?: string | null;
   /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */

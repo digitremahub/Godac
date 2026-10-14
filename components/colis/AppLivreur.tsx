@@ -5,7 +5,9 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
-import { lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { formatPoids, sommePoids } from "@/lib/colis/poids";
+import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
@@ -35,7 +37,7 @@ const MEMO = "godac-tournee-colis";
  * suivantes avec leur bouton d'appel. L'écran reste allumé pendant la
  * tournée quand le téléphone le permet.
  */
-export function AppLivreur({ prenom }: { prenom: string | null }) {
+export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pays?: string }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -201,7 +203,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   async function ajouterTelephone(s: Stop) {
     const saisi = prompt(`Téléphone du client — ${s.recipient ?? s.address}`, s.phone ?? "");
     if (saisi === null) return;
-    const tel = normaliserTelephone(saisi);
+    const tel = normaliserTelephone(saisi, pays);
     if (saisi.trim() && !tel) return setToast({ ok: false, text: "Numéro non reconnu." });
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ telephone: tel }) });
@@ -258,6 +260,8 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
   const termines = stops.filter((s) => s.status !== "pending");
   const prochain = pending[0];
   const suivants = pending.slice(1);
+  const sansTelephone = arretsSansTelephone(suivants).length;
+  const poidsRestant = formatPoids(sommePoids(pending));
   // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
   const groupes = grouperParListe(stops, lists);
   const multi = groupes.length > 1 || groupes[0]?.liste != null;
@@ -323,6 +327,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               <p className="mt-2 text-xs text-white/80">
                 <strong className="text-white">{avancement.adressesRestantes}</strong> adresse{avancement.adressesRestantes > 1 ? "s" : ""} ·{" "}
                 <strong className="text-white">{avancement.colisRestants}</strong> colis restant{avancement.colisRestants > 1 ? "s" : ""}
+                {poidsRestant && ` (≈ ${poidsRestant})`}
                 {avancement.finEstimee && (
                   <>
                     {" "}
@@ -406,6 +411,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                     <span>
                       Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
                       {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
+                      {formatPoids(arretCarte.weight_kg) && ` · ${formatPoids(arretCarte.weight_kg)}`}
                       {arretCarte.status !== "pending" ? ` · ${libelleStatut(arretCarte).toLowerCase()}` : arretCarte.id === prochain?.id ? " · prochain" : ""}
                     </span>
                   </p>
@@ -480,6 +486,7 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
               <span>
                 Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
                 {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+                {formatPoids(prochain.weight_kg) && ` · ${formatPoids(prochain.weight_kg)}`}
               </span>
             </p>
             <div>
@@ -545,7 +552,14 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
         {run && run.status !== "loading" && suivants.length > 0 && (
           <section aria-label="Adresses suivantes">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-navy/60">Ensuite · {suivants.length}</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-navy/60">
+                Ensuite · {suivants.length}
+                {sansTelephone > 0 && (
+                  <span className="ml-2 rounded-full bg-orange/15 px-2 py-0.5 text-[11px] normal-case tracking-normal text-orange-ink" title={ALERTE_SANS_TELEPHONE}>
+                    {sansTelephone} sans téléphone
+                  </span>
+                )}
+              </h2>
               <button type="button" className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={reoptimiser}>
                 {busy ? "Calcul…" : "Recalculer depuis ici"}
               </button>
@@ -564,9 +578,14 @@ export function AppLivreur({ prenom }: { prenom: string | null }) {
                     {estRamasse(s) && <EncocheRamasse />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
-                      {estRamasse(s) && <BadgeRamasse className="mb-1" />}
+                      {(estRamasse(s) || !s.phone) && (
+                        <div className="mb-1 flex flex-wrap gap-1">
+                          {estRamasse(s) && <BadgeRamasse />}
+                          {!s.phone && <BadgeSansTelephone />}
+                        </div>
+                      )}
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
-                      <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</p>
+                      <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
                     </div>
                     <button

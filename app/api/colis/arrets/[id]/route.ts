@@ -7,11 +7,14 @@ import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
+import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
   /** Livraison ou ramasse (enlèvement chez un expéditeur). */
   type: z.enum(["livraison", "ramasse"]).optional(),
+  /** Poids des colis de l'arrêt en kg ; null : poids inconnu. */
+  poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
   notes: z.string().trim().max(500).nullable().optional(),
   destinataire: z.string().trim().max(120).nullable().optional(),
@@ -42,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, type, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, type, poids, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
@@ -79,7 +82,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (destinataire !== undefined) update.recipient = destinataire || null;
   if (parcel_count !== undefined) update.parcel_count = parcel_count;
   if (telephone !== undefined) {
-    const tel = normaliserTelephone(telephone);
+    const tel = normaliserTelephone(telephone, await codePays(appUser.organization_id));
     if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
     update.phone = tel;
   }
@@ -89,6 +92,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
   }
   if (type) update.kind = type;
+  if (poids !== undefined) update.weight_kg = poids === null ? null : lirePoids(poids);
   if (notes !== undefined) update.notes = notes;
   if (creneau !== undefined) {
     const heure = (v: string | null | undefined) => (v ? ecrireHeure(lireHeure(v)!) : null);

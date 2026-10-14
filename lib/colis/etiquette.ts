@@ -1,4 +1,5 @@
 import { extraireTelephone, normaliserTelephone } from "@/lib/colis/telephone";
+import { extrairePoids, lirePoids } from "@/lib/colis/poids";
 
 /**
  * Contenu d'un code scanné sur un colis. Selon le transporteur, le
@@ -13,17 +14,21 @@ export interface LectureCode {
   destinataire: string | null;
   /** Numéro du destinataire quand l'étiquette le porte. */
   telephone?: string | null;
+  /** Poids du colis en kg quand l'étiquette le porte. */
+  poids?: number | null;
 }
 
 const CP_VILLE = /\b(0[1-9]|[1-8]\d|9[0-8])\d{3}\s+[A-Za-zÀ-ÿ' -]{2,}/;
 
-export function analyserCode(brut: string): LectureCode {
-  const lu = analyserSansTelephone(brut);
-  const telephone = lu.telephone ?? (lu.adresse ? extraireTelephone(brut) : null);
-  return telephone ? { ...lu, telephone } : lu;
+/** `pays` : pays de l'entreprise, pour reconnaître les numéros nationaux hors de France. */
+export function analyserCode(brut: string, pays = "FR"): LectureCode {
+  const lu = analyserSansTelephone(brut, pays);
+  const telephone = lu.telephone ?? (lu.adresse ? extraireTelephone(brut, pays) : null);
+  const poids = lu.poids ?? (lu.adresse ? extrairePoids(brut) : null);
+  return { ...lu, ...(telephone ? { telephone } : {}), ...(poids ? { poids } : {}) };
 }
 
-function analyserSansTelephone(brut: string): LectureCode {
+function analyserSansTelephone(brut: string, pays: string): LectureCode {
   const texte = brut.replace(/\r/g, "").trim();
   if (!texte) return { code: null, adresse: null, destinataire: null };
 
@@ -36,12 +41,15 @@ function analyserSansTelephone(brut: string): LectureCode {
         return null;
       };
       const adresse = pick("address", "adresse") ?? [pick("street", "rue"), [pick("zip", "cp", "postcode", "postal_code"), pick("city", "ville")].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      const telephone = normaliserTelephone(pick("phone", "tel", "telephone", "téléphone", "mobile"));
+      const telephone = normaliserTelephone(pick("phone", "tel", "telephone", "téléphone", "mobile"), pays);
+      const brutPoids = Object.entries(o).find(([k]) => ["weight", "poids", "weight_kg", "poids_kg"].includes(k.toLowerCase()))?.[1];
+      const poids = lirePoids(brutPoids);
       return {
         code: pick("tracking", "parcel", "colis", "id", "barcode"),
         adresse: adresse || null,
         destinataire: pick("name", "nom", "recipient", "destinataire"),
         ...(telephone ? { telephone } : {}),
+        ...(poids ? { poids } : {}),
       };
     } catch {
       /* pas du JSON : on continue */
@@ -52,7 +60,9 @@ function analyserSansTelephone(brut: string): LectureCode {
   const lignes = texte
     .split(/\n|\||;/)
     .map((l) => l.trim())
-    .filter((l) => l && !(extraireTelephone(l) && l.replace(/^(t[ée]l[ée]?(phone)?|mobile|portable|gsm)\s*[:.]?\s*/i, "").replace(/[\d\s.+()-]/g, "") === ""));
+    .filter((l) => l && !(extraireTelephone(l, pays) && l.replace(/^(t[ée]l[ée]?(phone)?|mobile|portable|gsm)\s*[:.]?\s*/i, "").replace(/[\d\s.+()-]/g, "") === ""))
+    // Ni les lignes de poids (« Poids : 2,3 kg »).
+    .filter((l) => !/^(poids|weight|pds)?\s*[:.]?\s*\d+(?:[.,]\d+)?\s*(kgs?|g|gr)\.?$/i.test(l));
   const iVille = lignes.findIndex((l) => CP_VILLE.test(l));
   if (iVille >= 0 && /^\D*\d{1,4}\D.*\b\d{5}\b/.test(lignes[iVille]!) && lignes[iVille]!.match(CP_VILLE)!.index! > 3) {
     // Rue et ville sur la même ligne (« 3 avenue Foch, 69006 Lyon »).

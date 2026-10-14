@@ -31,3 +31,18 @@ describe("analyserCode — téléphone", () => {
     expect(analyserCode('{"address":"3 avenue Foch, 69006 Lyon","phone":"+33612345678"}').telephone).toBe("06 12 34 56 78");
   });
 });
+
+describe("analyserCode — poids", () => {
+  it("lit le poids sans le prendre pour la rue", () => {
+    const r = analyserCode("MARTIN Julie\n12 rue des Lilas\n69230 Saint-Genis-Laval\nPoids : 2,3 kg\n09876543210987");
+    expect(r.poids).toBe(2.3);
+    expect(r.adresse).toBe("12 rue des Lilas, 69230 Saint-Genis-Laval");
+    expect(r.code).toBe("09876543210987");
+  });
+  it("JSON avec poids en grammes", () => {
+    expect(analyserCode('{"address":"3 avenue Foch, 69006 Lyon","weight":"850 g"}').poids).toBe(0.85);
+  });
+  it("pas de poids sur un simple numéro de suivi", () => {
+    expect(analyserCode("01234567890123").poids).toBeUndefined();
+  });
+});

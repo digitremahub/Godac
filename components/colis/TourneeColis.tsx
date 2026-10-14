@@ -8,7 +8,9 @@ import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPho
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import { lienSms, lienTel } from "@/lib/colis/telephone";
+import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
+import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { estRamasse, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
@@ -27,7 +29,12 @@ interface Draft {
   code: string | null;
   /** Livraison (par défaut, y compris scan et lecture d'étiquette) ou ramasse. */
   type: TypeArret;
+  /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
+  poids: string;
 }
+
+/** Poids saisi → texte du champ (« 2,5 »). */
+const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
 /** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
 function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
@@ -77,7 +84,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
@@ -205,8 +212,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           destinataire: d.destinataire || null,
           telephone: d.telephone.trim() || null,
           type: d.type,
+          poids: lirePoids(d.poids),
         }),
       });
+      // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
+      const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) ? ` ${ALERTE_SANS_TELEPHONE}` : "";
       setToast(
         r.duplicate
           ? { ok: false, text: "Colis déjà scanné." }
@@ -215,13 +225,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             : r.geocoded === false
               ? { ok: false, text: "Ajouté, mais adresse introuvable sur la carte : vérifiez-la." }
               : {
-                  ok: true,
+                  ok: !sansTel,
                   text:
-                    run?.status === "in_progress"
+                    (run?.status === "in_progress"
                       ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
                       : d.type === "ramasse"
                         ? "Ramasse ajoutée."
-                        : "Colis ajouté.",
+                        : "Colis ajouté.") + sansTel,
                 },
       );
       setDraft(null);
@@ -235,14 +245,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
   /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
   function onCode(text: string): boolean {
-    const lu = analyserCode(text);
+    const lu = analyserCode(text, pays);
     if (lu.adresse) {
       // Adresse dans le code : ajout direct, sans quitter le scanner.
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison" });
+      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       return true;
     } else {
       setScanner(false);
-      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison" });
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
       return false;
     }
@@ -265,7 +275,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     setBusy("photo");
     try {
       const image = await imageEnBase64(file);
-      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null }>("/api/colis/etiquette", {
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
       });
@@ -275,6 +285,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
         telephone: lu.telephone ?? d?.telephone ?? "",
         code: d?.code ?? lu.code,
         type: d?.type ?? "livraison",
+        poids: lu.poids ? champPoids(lu.poids) : (d?.poids ?? ""),
       }));
       if (!lu.adresse) setToast({ ok: false, text: "Adresse illisible : saisissez-la." });
     } catch (e) {
@@ -342,6 +353,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           telephone: edition.telephone.trim() || null,
           parcel_count: Math.max(1, edition.colis),
           ...(avant && edition.type !== typeArret(avant.kind) ? { type: edition.type } : {}),
+          ...(avant && lirePoids(edition.poids) !== lirePoids(avant.weight_kg ?? null) ? { poids: lirePoids(edition.poids) } : {}),
         }),
       });
       setEdition(null);
@@ -520,6 +532,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const prochain = pending[0];
   const livres = stops.filter((s) => s.status === "delivered").length;
   const ramasses = stops.filter(estRamasse).length;
+  const poidsTotal = formatPoids(sommePoids(stops));
+  const sansTelephone = arretsSansTelephone(stops).length;
   const enLivraison = run.status === "in_progress";
   const avancement = estimerAvancement(
     stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
@@ -559,7 +573,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <div className="min-w-0">
               <p className="text-sm font-semibold">{nomGroupe(g)}</p>
               <p className="text-xs text-navy/60">
-                {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis · {c.restants} restant{c.restants > 1 ? "s" : ""}
+                {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis{formatPoids(sommePoids(g.arrets)) && ` (${formatPoids(sommePoids(g.arrets))})`} · {c.restants} restant{c.restants > 1 ? "s" : ""}
               </p>
             </div>
             {modifiable && (
@@ -662,13 +676,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       <div className="grid grid-cols-3 gap-2">
         {[
           ["Arrêts", stops.length, ramasses ? `dont ${ramasses} ramasse${ramasses > 1 ? "s" : ""}` : null],
-          ["Colis", colis],
+          ["Colis", colis, poidsTotal && `≈ ${poidsTotal}`],
           ["Livrés", `${livres}/${stops.length}`],
         ].map(([l, v, detail]) => (
           <Card key={l as string} className="!px-3 !py-2.5 text-center">
             <p className="text-xs text-navy/60">{l}</p>
             <p className="font-display text-xl font-bold tabular-nums">{v}</p>
-            {detail && <p className="text-[11px] font-semibold text-gold-ink">{detail}</p>}
+            {detail && <p className={`text-[11px] font-semibold ${l === "Arrêts" ? "text-gold-ink" : "text-navy/60"}`}>{detail}</p>}
           </Card>
         ))}
       </div>
@@ -766,7 +780,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                 <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Lecture…" : "Photo d'étiquette"}
               </button>
             )}
-            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison" })}>
+            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison", poids: "" })}>
               + Saisir une adresse
             </button>
           </div>
@@ -799,7 +813,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
       {enLivraison && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison" })}>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison", poids: "" })}>
             + Ajouter une adresse
           </button>
           <button type="button" className="btn-secondary !py-2 text-sm" onClick={ouvrirScanner}>
@@ -823,14 +837,29 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
-            className="input"
+            className={`input ${normaliserTelephone(draft.telephone, pays) ? "" : "!border-orange ring-2 ring-orange/30"}`}
             type="tel"
             inputMode="tel"
             value={draft.telephone}
             onChange={(e) => setDraft({ ...draft, telephone: e.target.value })}
-            placeholder="Téléphone du client (facultatif)"
+            placeholder="Téléphone du client"
             aria-label="Téléphone du client"
+            aria-invalid={!normaliserTelephone(draft.telephone, pays)}
           />
+          {!normaliserTelephone(draft.telephone, pays) && <AlerteSansTelephone />}
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-navy/65">Poids</span>
+            <input
+              className="input !w-28"
+              inputMode="decimal"
+              value={draft.poids}
+              onChange={(e) => setDraft({ ...draft, poids: e.target.value })}
+              placeholder="ex. 2,5"
+              aria-label="Poids du colis en kg"
+            />
+            <span className="text-navy/65">kg</span>
+            {draft.poids.trim() && !lirePoids(draft.poids) && <span className="text-xs text-orange-ink">Poids non reconnu</span>}
+          </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
               {draft.type === "ramasse" ? "Ajouter la ramasse" : "Ajouter à la tournée"}
@@ -847,7 +876,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {(stops.length > 0 || multi) && (
         <Card className="!p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 sm:px-5">
-            <h2 className="text-lg">{run.optimized_at ? "Ordre de passage" : "Colis chargés"}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg">{run.optimized_at ? "Ordre de passage" : "Colis chargés"}</h2>
+              {sansTelephone > 0 && (
+                <span className="rounded-full bg-orange/15 px-2 py-0.5 text-xs font-semibold text-orange-ink" title={ALERTE_SANS_TELEPHONE}>
+                  {sansTelephone} arrêt{sansTelephone > 1 ? "s" : ""} sans téléphone
+                </span>
+              )}
+            </div>
             {run.status !== "done" && pending.length > 1 && (
               <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(enLivraison)}>
                 {busy === "optim" ? "Calcul…" : run.optimized_at ? "Réoptimiser" : "Optimiser l'ordre"}
@@ -878,13 +914,19 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {estRamasse(s) && <BadgeRamasse className="mb-1" />}
+                          {(estRamasse(s) || (s.status === "pending" && !s.phone)) && (
+                            <div className="mb-1 flex flex-wrap gap-1">
+                              {estRamasse(s) && <BadgeRamasse />}
+                              {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
+                            </div>
+                          )}
                           <p className="text-sm font-semibold leading-snug">{s.address}</p>
                           <p className="text-xs text-navy/60">
                             {[
                               s.recipient,
                               s.phone,
                               s.parcel_count > 1 && `${s.parcel_count} colis`,
+                              formatPoids(s.weight_kg),
                               estRamasse(s) && s.status !== "pending" && libelleStatut(s),
                               s.status === "delivered" && libellePreuve(s),
                               s.lat === null && "⚠ adresse non localisée",
@@ -928,7 +970,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                             type="button"
                             className="btn-ghost !px-2 !py-1"
                             onClick={() =>
-                              setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count, type: typeArret(s.kind) })
+                              setEdition({
+                                id: s.id,
+                                adresse: s.address,
+                                destinataire: s.recipient ?? "",
+                                telephone: s.phone ?? "",
+                                colis: s.parcel_count,
+                                type: typeArret(s.kind),
+                                poids: champPoids(s.weight_kg),
+                              })
                             }
                           >
                             Modifier
@@ -988,6 +1038,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                               +
                             </button>
                           </div>
+                          <label className="flex items-center gap-2 text-sm">
+                            <span className="text-navy/65">Poids total</span>
+                            <input
+                              className="input !w-28"
+                              inputMode="decimal"
+                              value={edition.poids}
+                              onChange={(e) => setEdition({ ...edition, poids: e.target.value })}
+                              placeholder="—"
+                              aria-label="Poids des colis en kg"
+                            />
+                            <span className="text-navy/65">kg</span>
+                          </label>
                           <div className="flex flex-wrap gap-2">
                             <button type="button" className="btn-primary !py-2 text-sm" disabled={busy !== null || edition.adresse.trim().length < 5} onClick={enregistrerEdition}>
                               Enregistrer

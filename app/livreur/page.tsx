@@ -5,6 +5,7 @@ import { getCurrentAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { AppLivreur } from "@/components/colis/AppLivreur";
+import { paysOrganisation } from "@/lib/pays/serveur";
 
 export const metadata: Metadata = { title: "Livraison — GODAC" };
 
@@ -28,5 +29,6 @@ export default async function LivreurPage() {
       </main>
     );
   }
-  return <AppLivreur prenom={appUser.full_name.split(" ")[0] || null} />;
+  const pays = await paysOrganisation(supabase, appUser.organization_id);
+  return <AppLivreur prenom={appUser.full_name.split(" ")[0] || null} pays={pays.code} />;
 }

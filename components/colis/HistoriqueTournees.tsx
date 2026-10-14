@@ -4,6 +4,7 @@ import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/Historique
 import { versParams, type Historique, type detailTournee } from "@/lib/colis/historique";
 import { estRamasse, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
 import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
+import { formatPoids } from "@/lib/colis/poids";
 
 const STATUTS: Record<string, string> = { loading: "En chargement", in_progress: "En livraison", done: "Clôturée" };
 
@@ -165,6 +166,7 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
                       s.status === "delivered" && libellePreuve(s),
                       s.recipient,
                       s.parcel_count > 1 && `${s.parcel_count} colis`,
+                      formatPoids(s.weight_kg),
                       s.parcel_code && `n° ${s.parcel_code}`,
                       s.notes,
                     ]
