@@ -4,12 +4,13 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
-import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconX } from "@/components/layout/icons";
+import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
-import { libelleLieu } from "@/lib/colis/livraison";
+import { estRamasse, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
@@ -24,6 +25,8 @@ interface Draft {
   destinataire: string;
   telephone: string;
   code: string | null;
+  /** Livraison (par défaut, y compris scan et lecture d'étiquette) ou ramasse. */
+  type: TypeArret;
 }
 
 /** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
@@ -74,7 +77,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
@@ -201,6 +204,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           adresse: d.adresse,
           destinataire: d.destinataire || null,
           telephone: d.telephone.trim() || null,
+          type: d.type,
         }),
       });
       setToast(
@@ -210,7 +214,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             ? { ok: true, text: "Ajouté à un arrêt existant (même adresse)." }
             : r.geocoded === false
               ? { ok: false, text: "Ajouté, mais adresse introuvable sur la carte : vérifiez-la." }
-              : { ok: true, text: run?.status === "in_progress" ? "Adresse ajoutée en fin de tournée : réoptimisez pour l'insérer au bon endroit." : "Colis ajouté." },
+              : {
+                  ok: true,
+                  text:
+                    run?.status === "in_progress"
+                      ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
+                      : d.type === "ramasse"
+                        ? "Ramasse ajoutée."
+                        : "Colis ajouté.",
+                },
       );
       setDraft(null);
       await recharger(run?.id);
@@ -226,11 +238,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     const lu = analyserCode(text);
     if (lu.adresse) {
       // Adresse dans le code : ajout direct, sans quitter le scanner.
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code });
+      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison" });
       return true;
     } else {
       setScanner(false);
-      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code });
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison" });
       setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
       return false;
     }
@@ -262,6 +274,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
         destinataire: lu.destinataire ?? d?.destinataire ?? "",
         telephone: lu.telephone ?? d?.telephone ?? "",
         code: d?.code ?? lu.code,
+        type: d?.type ?? "livraison",
       }));
       if (!lu.adresse) setToast({ ok: false, text: "Adresse illisible : saisissez-la." });
     } catch (e) {
@@ -328,6 +341,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           destinataire: edition.destinataire.trim() || null,
           telephone: edition.telephone.trim() || null,
           parcel_count: Math.max(1, edition.colis),
+          ...(avant && edition.type !== typeArret(avant.kind) ? { type: edition.type } : {}),
         }),
       });
       setEdition(null);
@@ -338,6 +352,12 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     } finally {
       setBusy(null);
     }
+  }
+
+  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
+  function terminer(s: Stop) {
+    if (estRamasse(s)) return statut(s, "delivered");
+    setLivraison(s);
   }
 
   async function deplacer(st: Stop, sens: "haut" | "bas") {
@@ -499,6 +519,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const colis = stops.reduce((n, s) => n + s.parcel_count, 0);
   const prochain = pending[0];
   const livres = stops.filter((s) => s.status === "delivered").length;
+  const ramasses = stops.filter(estRamasse).length;
   const enLivraison = run.status === "in_progress";
   const avancement = estimerAvancement(
     stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
@@ -640,13 +661,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       </div>
       <div className="grid grid-cols-3 gap-2">
         {[
-          ["Arrêts", stops.length],
+          ["Arrêts", stops.length, ramasses ? `dont ${ramasses} ramasse${ramasses > 1 ? "s" : ""}` : null],
           ["Colis", colis],
           ["Livrés", `${livres}/${stops.length}`],
-        ].map(([l, v]) => (
+        ].map(([l, v, detail]) => (
           <Card key={l as string} className="!px-3 !py-2.5 text-center">
             <p className="text-xs text-navy/60">{l}</p>
             <p className="font-display text-xl font-bold tabular-nums">{v}</p>
+            {detail && <p className="text-[11px] font-semibold text-gold-ink">{detail}</p>}
           </Card>
         ))}
       </div>
@@ -666,11 +688,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       )}
 
       {enLivraison && prochain ? (
-        <Card className="flex flex-col gap-3 border-2 border-teal/50">
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">
-            Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-            {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis`}
-            {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
+        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${estRamasse(prochain) ? "border-gold/80" : "border-teal/50"}`}>
+          {estRamasse(prochain) && <EncocheRamasse large />}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+            {estRamasse(prochain) && <BadgeRamasse />}
+            <span>
+              Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
+              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+              {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
+            </span>
           </p>
           <div>
             <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
@@ -695,8 +721,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             <a href={gmaps(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
-            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => setLivraison(prochain)}>
-              <IconCheck className="h-5 w-5" /> Livré
+            <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
+              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
             </button>
             <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => statut(prochain, "failed")}>
               <IconX className="h-5 w-5" /> Échec / absent
@@ -740,7 +766,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                 <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Lecture…" : "Photo d'étiquette"}
               </button>
             )}
-            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
+            <button type="button" className="btn-secondary justify-center !py-3" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison" })}>
               + Saisir une adresse
             </button>
           </div>
@@ -773,7 +799,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
       {enLivraison && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null })}>
+          <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison" })}>
             + Ajouter une adresse
           </button>
           <button type="button" className="btn-secondary !py-2 text-sm" onClick={ouvrirScanner}>
@@ -786,12 +812,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {draft && (
         <Card className="flex flex-col gap-3 border-2 border-teal/40">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg">Nouveau colis</h2>
+            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
               <IconX className="h-5 w-5" />
             </button>
           </div>
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
+          <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
           <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
@@ -806,7 +833,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           />
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
-              Ajouter à la tournée
+              {draft.type === "ramasse" ? "Ajouter la ramasse" : "Ajouter à la tournée"}
             </button>
             {lectureEtiquette && (
               <button type="button" className="btn-secondary" disabled={busy === "photo"} onClick={() => fileRef.current?.click()}>
@@ -840,7 +867,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   return (
-                    <li key={s.id} className={`px-4 py-2.5 sm:px-5 ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estRamasse(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                      {estRamasse(s) && <EncocheRamasse />}
                       <div className="flex items-start gap-3">
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
@@ -850,9 +878,19 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
+                          {estRamasse(s) && <BadgeRamasse className="mb-1" />}
                           <p className="text-sm font-semibold leading-snug">{s.address}</p>
                           <p className="text-xs text-navy/60">
-                            {[s.recipient, s.phone, s.parcel_count > 1 && `${s.parcel_count} colis`, s.status === "delivered" && libelleLieu(s.delivered_place), s.lat === null && "⚠ adresse non localisée"].filter(Boolean).join(" · ")}
+                            {[
+                              s.recipient,
+                              s.phone,
+                              s.parcel_count > 1 && `${s.parcel_count} colis`,
+                              estRamasse(s) && s.status !== "pending" && libelleStatut(s),
+                              s.status === "delivered" && libellePreuve(s),
+                              s.lat === null && "⚠ adresse non localisée",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
                           {s.status === "pending" && (
                             <BadgeHoraires
@@ -889,7 +927,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           <button
                             type="button"
                             className="btn-ghost !px-2 !py-1"
-                            onClick={() => setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count })}
+                            onClick={() =>
+                              setEdition({ id: s.id, adresse: s.address, destinataire: s.recipient ?? "", telephone: s.phone ?? "", colis: s.parcel_count, type: typeArret(s.kind) })
+                            }
                           >
                             Modifier
                           </button>
@@ -920,6 +960,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       )}
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
+                          <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
                           <AdresseInput france={pays === "FR"} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
                           <input
                             className="input"
