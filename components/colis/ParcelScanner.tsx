@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
-
-type Detector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]> };
+import { creerDetecteur, type Detecteur } from "@/lib/colis/detecteur";
 
 /**
  * Scanner continu pour charger une tournée : on passe les colis devant
- * la caméra les uns après les autres. Utilise le détecteur natif du
- * téléphone (QR, Datamatrix, codes-barres 1D) quand le navigateur le
- * propose, sinon jsQR (QR uniquement). Un même code n'est remonté
+ * la caméra les uns après les autres. Lit QR, Datamatrix et codes-barres
+ * 1D avec le détecteur natif du navigateur, ou ZXing là où il manque
+ * (iPhone, Firefox) — voir lib/colis/detecteur.ts. jsQR (QR seulement)
+ * ne sert que si aucun des deux ne se charge. Un même code n'est remonté
  * qu'une fois toutes les 3 secondes.
  */
 export function ParcelScanner({ onCode, onClose }: { onCode: (text: string) => void; onClose: () => void }) {
@@ -26,17 +26,13 @@ export function ParcelScanner({ onCode, onClose }: { onCode: (text: string) => v
     let stream: MediaStream | null = null;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-    let detector: Detector | null = null;
+    let detector: Detecteur | null = null;
 
-    const BD = (globalThis as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
-    if (BD) {
-      try {
-        detector = new BD({ formats: ["qr_code", "data_matrix", "code_128", "code_39", "ean_13", "itf", "pdf417", "aztec"] });
-        setNatif(true);
-      } catch {
-        detector = null;
-      }
-    }
+    creerDetecteur().then((d) => {
+      if (cancelled) return;
+      detector = d;
+      setNatif(d !== null);
+    });
 
     const emit = (text: string) => {
       const now = Date.now();
