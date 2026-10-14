@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const ONGLETS = [
   { href: "/colis", label: "Tournée colis" },
   { href: "/suivi", label: "Suivi en direct" },
-  { href: "/colis?onglet=historique", label: "Historique colis", activePath: "/colis" },
   { href: "/tours/routes", label: "Tournées villages" },
   { href: "/tours/history", label: "Historique planning" },
 ] as const;
@@ -18,12 +17,10 @@ export function TourneesTabs() {
     <nav aria-label="Tournées colis" className="mb-5 overflow-x-auto border-b border-navy/10">
       <div className="flex min-w-max gap-1" role="tablist" aria-label="Vues des tournées">
         {ONGLETS.map((onglet) => {
-          const active = pathname === onglet.activePath
-            ? false
-            : pathname === onglet.href.split("?")[0];
+          const active = pathname === onglet.href || pathname.startsWith(`${onglet.href}/`);
           return (
             <Link
-              key={onglet.label}
+              key={onglet.href}
               href={onglet.href}
               role="tab"
               aria-selected={active}
