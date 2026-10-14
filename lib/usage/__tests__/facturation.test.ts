@@ -6,8 +6,8 @@ function depotMemoire(totaux: Record<string, { feature: string; units: number }[
   const runs = new Map<string, { stripe_invoice_item_id: string | null }>();
   const depot: DepotFacturation = {
     organisations: async () => [
-      { id: "org-a", plan: "essentiel", plan_id: null, stripe_customer_id: "cus_a", stripe_subscription_id: "sub_a" },
-      { id: "org-b", plan: "pro", plan_id: null, stripe_customer_id: "cus_b", stripe_subscription_id: null },
+      { id: "org-a", plan: "essentiel", stripe_customer_id: "cus_a", stripe_subscription_id: "sub_a" },
+      { id: "org-b", plan: "pro", stripe_customer_id: "cus_b", stripe_subscription_id: null },
     ],
     quotas: async () => [
       { plan_id: "essentiel", feature: "ocr_ticket", included_per_month: 300 },

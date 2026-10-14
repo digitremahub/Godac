@@ -1,3 +1,5 @@
+import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
@@ -38,5 +40,6 @@ export async function POST(req: Request) {
     if (error.code === "23505") return NextResponse.json({ error: "Un service ou un pôle porte déjà ce nom." }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  await synchroniserGroupesEquipeSansErreur(createAdminSupabaseClient(), appUser.organization_id);
   return NextResponse.json({ service: data });
 }

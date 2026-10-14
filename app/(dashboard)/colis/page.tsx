@@ -20,9 +20,8 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
-  const [actif, ocr, pays] = await Promise.all([
+  const [actif, pays] = await Promise.all([
     isModuleEnabled(supabase, appUser.organization_id, "route_optimizer"),
-    isModuleEnabled(supabase, appUser.organization_id, "ocr"),
     paysOrganisation(supabase, appUser.organization_id),
   ]);
   if (!actif) return <EmptyState title="Module Tournée colis non activé" description="La direction peut l'activer depuis Modules & tarifs." />;
@@ -76,7 +75,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
     <div>
       <PageHeader title="Tournée colis" description="Scannez vos colis, GODAC place les adresses dans le meilleur ordre de passage." />
       {onglets}
-      <TourneeColis lectureEtiquette={ocr} pays={pays.code} />
+      <TourneeColis lectureEtiquette pays={pays.code} />
     </div>
   );
 }

@@ -8,7 +8,7 @@ export function depotFacturationSupabase(admin: SupabaseClient): DepotFacturatio
     async organisations() {
       const { data, error } = await admin
         .from("organizations")
-        .select("id, plan, plan_id, stripe_customer_id, stripe_subscription_id")
+        .select("id, plan, stripe_customer_id, stripe_subscription_id")
         .not("stripe_customer_id", "is", null);
       if (error) throw new Error(`Organisations illisibles : ${error.message}`);
       return (data ?? []) as OrgFacturable[];

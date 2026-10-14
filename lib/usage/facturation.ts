@@ -15,7 +15,6 @@ import { bornesMoisParis, descriptionLigneFacture, lignesDepassement, resoudreFo
 export interface OrgFacturable {
   id: string;
   plan: string | null;
-  plan_id: string | null;
   stripe_customer_id: string;
   stripe_subscription_id: string | null;
 }
@@ -57,7 +56,7 @@ export async function facturerDepassements(depot: DepotFacturation, creerLigne: 
 
   const resultat: ResultatFacturation = { periode, lignes: [], ignorees: 0, erreurs: [] };
   for (const org of orgs) {
-    const formule = resoudreFormule(org.plan, org.plan_id);
+    const formule = resoudreFormule(org.plan);
     const inclus = Object.fromEntries(quotas.filter((q) => q.plan_id === formule).map((q) => [q.feature, Number(q.included_per_month)]));
     const totaux = await depot.totaux(org.id, debut, fin);
     for (const ligne of lignesDepassement(totaux, inclus, prixParFonction)) {
