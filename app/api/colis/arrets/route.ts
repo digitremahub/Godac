@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
+import { typeArret } from "@/lib/colis/livraison";
 import { cleAdresse, listeDeLaTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
 const bodySchema = z.object({
@@ -15,6 +16,8 @@ const bodySchema = z.object({
   adresse: z.string().trim().min(5).max(300),
   destinataire: z.string().trim().max(120).nullable().optional(),
   telephone: z.string().trim().max(40).nullable().optional(),
+  /** Livraison (par défaut) ou ramasse. */
+  type: z.enum(["livraison", "ramasse"]).optional(),
 });
 
 /**
@@ -33,7 +36,7 @@ export async function POST(req: Request) {
   const listId = parsed.data.list_id ?? null;
   if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
 
-  const { data: stops } = await supabase.from("delivery_stops").select("id, list_id, parcel_code, parcel_count, address, phone, status, position").eq("run_id", run.id);
+  const { data: stops } = await supabase.from("delivery_stops").select("id, list_id, kind, parcel_code, parcel_count, address, phone, status, position").eq("run_id", run.id);
   const code = parsed.data.code || null;
   const telephone = normaliserTelephone(parsed.data.telephone);
   if (code && (stops ?? []).some((s) => s.parcel_code?.split(",").includes(code))) {
@@ -41,8 +44,12 @@ export async function POST(req: Request) {
   }
 
   const cle = cleAdresse(parsed.data.adresse);
-  // Regroupement seulement dans la même liste : deux listes restent distinctes.
-  const memeAdresse = (stops ?? []).find((s) => s.status === "pending" && (s.list_id ?? null) === listId && cleAdresse(s.address) === cle);
+  const kind = parsed.data.type ?? "livraison";
+  // Regroupement seulement dans la même liste et pour le même type : une
+  // ramasse et une livraison à la même adresse restent deux arrêts.
+  const memeAdresse = (stops ?? []).find(
+    (s) => s.status === "pending" && (s.list_id ?? null) === listId && typeArret(s.kind) === kind && cleAdresse(s.address) === cle,
+  );
   if (memeAdresse) {
     const codes = [memeAdresse.parcel_code, code].filter(Boolean).join(",") || null;
     const { data } = await supabase
@@ -63,6 +70,7 @@ export async function POST(req: Request) {
       run_id: run.id,
       ...(listId ? { list_id: listId } : {}),
       position,
+      ...(kind === "ramasse" ? { kind } : {}),
       parcel_code: code,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,

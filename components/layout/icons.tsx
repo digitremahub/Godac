@@ -443,3 +443,14 @@ export function IconPin(props: IconProps) {
     </Svg>
   );
 }
+
+/** Ramasse (enlèvement de colis) : colis soulevé, flèche vers le haut. */
+export function IconRamasse(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 11h16v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8Z" />
+      <path d="M10 15h4" />
+      <path d="M12 8V2M9 5l3-3 3 3" />
+    </Svg>
+  );
+}

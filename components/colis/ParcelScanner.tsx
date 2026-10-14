@@ -11,8 +11,24 @@ type Detector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: str
  * téléphone (QR, Datamatrix, codes-barres 1D) quand le navigateur le
  * propose, sinon jsQR (QR uniquement). Un même code n'est remonté
  * qu'une fois toutes les 3 secondes.
+ *
+ * `consigne`, `bouton` et `calque` adaptent le scanner à d'autres usages
+ * (QR code du destinataire à la livraison, au-dessus de la feuille de
+ * livraison).
  */
-export function ParcelScanner({ onCode, onClose }: { onCode: (text: string) => void; onClose: () => void }) {
+export function ParcelScanner({
+  onCode,
+  onClose,
+  consigne = "Passez les colis un par un devant la caméra",
+  bouton = "Terminer le scan",
+  calque = "z-[60]",
+}: {
+  onCode: (text: string) => void;
+  onClose: () => void;
+  consigne?: string;
+  bouton?: string;
+  calque?: string;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const last = useRef<{ text: string; at: number }>({ text: "", at: 0 });
@@ -97,21 +113,21 @@ export function ParcelScanner({ onCode, onClose }: { onCode: (text: string) => v
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
+    <div className={`fixed inset-0 ${calque} flex flex-col bg-black`}>
       <div className="relative flex-1 overflow-hidden">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
         <div aria-hidden="true" className={`pointer-events-none absolute inset-x-8 top-1/2 h-48 -translate-y-1/2 rounded-2xl border-4 transition-colors ${flash ? "border-teal" : "border-white/70"}`} />
         <p className="absolute inset-x-0 top-4 text-center text-sm font-semibold text-white drop-shadow">
-          Passez les colis un par un devant la caméra
+          {consigne}
           <span className="block text-xs font-normal text-white/75">{natif ? "QR, Datamatrix et codes-barres" : "Codes QR"}</span>
         </p>
         {error && <p className="absolute inset-x-4 bottom-24 rounded-xl bg-orange px-4 py-3 text-sm font-semibold text-white">{error}</p>}
       </div>
       <div className="bg-marine p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <button type="button" className="btn-primary w-full !py-3 text-base" onClick={onClose}>
-          Terminer le scan
+          {bouton}
         </button>
       </div>
     </div>

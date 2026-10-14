@@ -6,13 +6,14 @@ import { Card } from "@/components/ui";
 import { IconCamera, IconFileText } from "@/components/layout/icons";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { resumeCodeQr } from "@/lib/colis/livraison";
 
 export interface Contestation {
   id: string;
   status: "to_validate" | "assigned" | "answered" | "resolved" | "rejected";
   has_document: boolean;
   /** Livraison retrouvée dans une tournée colis (lieu de dépôt, photo). */
-  preuve: { stopId: string; photo: boolean; lieu: string | null; livreLe: string | null } | null;
+  preuve: { stopId: string; photo: boolean; lieu: string | null; code?: string | null; livreLe: string | null } | null;
   client_name: string | null;
   reference: string | null;
   parcel_code: string | null;
@@ -36,6 +37,14 @@ function PreuveLivraison({ c }: { c: Contestation }) {
   if (!c.preuve) return null;
   const quand = c.preuve.livreLe ? new Date(c.preuve.livreLe).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
   const texte = ["Livré", c.preuve.lieu?.toLowerCase(), quand && `le ${quand}`].filter(Boolean).join(" ");
+  // Livraison avec QR code : la valeur scannée chez le destinataire fait preuve.
+  if (c.preuve.code) {
+    return (
+      <span className="self-center text-xs text-navy/60" title={c.preuve.code}>
+        {texte} · QR code scanné : <span className="font-mono text-navy/80">{resumeCodeQr(c.preuve.code, 40)}</span>
+      </span>
+    );
+  }
   return c.preuve.photo ? (
     <a href={`/api/colis/arrets/${c.preuve.stopId}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !py-2 text-sm text-teal-ink">
       📷 Photo de livraison{c.preuve.lieu || quand ? ` · ${texte}` : ""}

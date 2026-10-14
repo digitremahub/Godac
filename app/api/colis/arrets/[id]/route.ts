@@ -10,6 +10,8 @@ import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
+  /** Livraison ou ramasse (enlèvement chez un expéditeur). */
+  type: z.enum(["livraison", "ramasse"]).optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
   notes: z.string().trim().max(500).nullable().optional(),
   destinataire: z.string().trim().max(120).nullable().optional(),
@@ -32,7 +34,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-/** Livré / échec / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
+/** Livré / échec / type (livraison ou ramasse) / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
@@ -40,7 +42,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, type, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
@@ -84,8 +86,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (status) {
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
-    if (status !== "delivered") update.delivered_place = null;
+    if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
   }
+  if (type) update.kind = type;
   if (notes !== undefined) update.notes = notes;
   if (creneau !== undefined) {
     const heure = (v: string | null | undefined) => (v ? ecrireHeure(lireHeure(v)!) : null);

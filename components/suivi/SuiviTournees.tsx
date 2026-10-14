@@ -98,15 +98,16 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
       t.arrets.forEach((a) => {
         const el = document.createElement("div");
         const fait = a.status !== "pending";
+        // Ramasse : carré à bordure dorée (même encoche que la liste des arrêts).
         Object.assign(el.style, {
           width: "12px",
           height: "12px",
-          borderRadius: "999px",
+          borderRadius: a.ramasse ? "3px" : "999px",
           background: fait ? "#9AA3B5" : couleur,
-          border: "2px solid #FFFFFF",
+          border: a.ramasse ? "2px solid #F5C842" : "2px solid #FFFFFF",
           opacity: attenue ? "0.25" : fait ? "0.7" : "1",
         });
-        el.title = `${t.chauffeur} — arrêt ${a.ordre}${fait ? " (fait)" : ""}`;
+        el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
         marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([a.lng, a.lat]).addTo(m));
         if (!attenue) pts.push([a.lng, a.lat]);
       });
