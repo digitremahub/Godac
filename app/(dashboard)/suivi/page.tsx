@@ -3,6 +3,7 @@ import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { TourneesTabs } from "@/components/colis/TourneesTabs";
 
 export const metadata = { title: "Suivi des tournées — GODAC" };
 
@@ -24,7 +25,8 @@ export default async function SuiviPage() {
   const { data: services } = await supabase.from("services").select("id, name").order("name");
   return (
     <div>
-      <PageHeader title="Suivi des tournées" description="Où en sont les chauffeurs : position, adresses et colis restants, heure de fin estimée." />
+      <PageHeader title="Tournées colis" description="Suivi en direct des chauffeurs, des historiques et des tournées villages." />
+      <TourneesTabs />
       <SuiviTournees services={services ?? []} />
     </div>
   );
