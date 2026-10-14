@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { estPresence, libelleEntreePlanning } from "@/lib/organization/poles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -27,7 +28,7 @@ function TourLine({ entry }: { entry: any }) {
   return (
     <div className="flex min-w-0 items-center gap-2 text-sm">
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[entry.status] ?? "bg-navy/30"}`} />
-      <span className="shrink-0 font-semibold tabular-nums">n°{entry.tour_number}</span>
+      <span className="shrink-0 font-semibold tabular-nums">{libelleEntreePlanning(entry)}</span>
       <span className="min-w-0 truncate text-navy/70">{entry.vehicles?.registration ?? "—"}</span>
       <span className="ml-auto shrink-0 tabular-nums text-navy/70">
         {timeFmt(entry.start_at)}
@@ -154,7 +155,7 @@ export default async function MyPlanningPage({
 
   return (
     <div>
-      <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées." />
+      <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées, et vos horaires de présence si vous êtes dans un pôle bureau." />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {(["month", "week", "day"] as const).map((v) => (
@@ -203,7 +204,7 @@ export default async function MyPlanningPage({
                 <Link
                   key={dayISO}
                   href={`/planning/mine?view=day&anchor=${dayISO}`}
-                  aria-label={`${Number(dayISO.slice(8, 10))} : ${dayEntries.length ? dayEntries.map((e) => `tournée ${e.tour_number}`).join(", ") : "repos"}`}
+                  aria-label={`${Number(dayISO.slice(8, 10))} : ${dayEntries.length ? dayEntries.map((e) => (estPresence(e) ? "présence" : `tournée ${e.tour_number}`)).join(", ") : "repos"}`}
                   className={`flex min-h-[58px] flex-col gap-1 rounded-lg border p-1 sm:min-h-[78px] sm:p-1.5 ${
                     !inMonth ? "border-transparent opacity-40" : first ? "border-navy/10 bg-surface" : "border-navy/[0.06] bg-transparent"
                   } ${dayISO === today ? "ring-2 ring-teal-ink/50" : ""}`}
@@ -213,7 +214,7 @@ export default async function MyPlanningPage({
                   </span>
                   {first && (
                     <span className={`truncate rounded px-1 py-0.5 text-center text-[11px] font-semibold tabular-nums ${STATUS_CHIP[first.status] ?? STATUS_CHIP.planned}`}>
-                      {first.tour_number}
+                      {estPresence(first) ? "Présence" : first.tour_number}
                     </span>
                   )}
                   {dayEntries.length > 1 && <span className="text-center text-[11px] text-navy/60">+{dayEntries.length - 1}</span>}

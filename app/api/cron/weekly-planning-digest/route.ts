@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { estPresence } from "@/lib/organization/poles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { mondayOf, toISODate, addDays } from "@/lib/planning/dates";
 
 interface DigestEntry {
   tour_number: string;
   start_at: string;
+  end_at?: string | null;
+  status?: string | null;
   vehicles: { registration: string } | null;
 }
 
@@ -13,6 +16,10 @@ function buildDigestMessage(entries: DigestEntry[]): string {
     const d = new Date(e.start_at);
     const day = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Paris" });
     const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+    if (estPresence(e)) {
+      const end = e.end_at ? new Date(e.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }) : null;
+      return `${day} ${time}${end ? `–${end}` : ""} — présence`;
+    }
     return `${day} ${time} — n°${e.tour_number}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
   });
   return `Votre planning de la semaine prochaine :\n${lines.join("\n")}`;
@@ -56,7 +63,7 @@ export async function GET(req: Request) {
   for (const { organization_id } of planningOrgs ?? []) {
     const { data: entries, error: entriesError } = await supabase
       .from("planning_entries")
-      .select("driver_id, tour_number, start_at, vehicles(registration)")
+      .select("driver_id, tour_number, start_at, end_at, status, vehicles(registration)")
       .eq("organization_id", organization_id)
       .not("driver_id", "is", null)
       .gte("start_at", `${nextMonday}T00:00:00`)

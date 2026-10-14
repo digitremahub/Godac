@@ -118,6 +118,11 @@ export function estPresence(entry: { kind?: string | null; status?: string | nul
   return entry.kind === PRESENCE_KIND || entry.status === PRESENCE_STATUS || Boolean(entry.tour_number?.startsWith("PRESENCE-"));
 }
 
+/** Libellé court d'une ligne de planning : « n°T106 » pour une tournée, « Présence » pour un pôle bureau. */
+export function libelleEntreePlanning(entry: { kind?: string | null; status?: string | null; tour_number: string }): string {
+  return estPresence(entry) ? "Présence" : `n°${entry.tour_number}`;
+}
+
 /** Durée d'une présence en heures (0 si fin absente ou avant le début). */
 export function heuresPresence(startAt: string, endAt: string | null): number {
   if (!endAt) return 0;
