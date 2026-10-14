@@ -14,7 +14,10 @@ function parisDate(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 function shiftDay(iso: string, days: number) {
-  const [y, m, d] = iso.split("-").map(Number);
+  const parts = iso.split("-").map(Number);
+  const y = parts[0] ?? 1970;
+  const m = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
