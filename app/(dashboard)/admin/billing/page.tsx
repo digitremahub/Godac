@@ -10,7 +10,7 @@ export default async function BillingPage() {
   const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")
-    .select("plan, plan_id, subscription_status, stripe_customer_id")
+    .select("plan, subscription_status, stripe_customer_id")
     .eq("id", appUser.organization_id)
     .single();
 
@@ -19,7 +19,7 @@ export default async function BillingPage() {
   const { data: reglages } = isDirection
     ? await supabase.from("organizations").select("usage_overage_enabled").eq("id", appUser.organization_id).maybeSingle()
     : { data: null };
-  const consommation = isDirection ? await chargerConsommation(supabase, appUser.organization_id, resoudreFormule(organization?.plan, organization?.plan_id)) : null;
+  const consommation = isDirection ? await chargerConsommation(supabase, appUser.organization_id, resoudreFormule(organization?.plan)) : null;
 
   return (
     <div className="flex flex-col gap-6">

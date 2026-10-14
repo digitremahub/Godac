@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { MessageForm } from "@/components/messenger/MessageForm";
@@ -53,10 +55,9 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  // Filet de sécurité : les déclencheurs tiennent les groupes à jour,
-  // ceci rejoue la synchro des équipes de l'utilisateur à l'ouverture.
-  const { error: syncError } = await supabase.rpc("ensure_my_message_groups");
-  if (syncError) console.warn(`messenger: ensure_my_message_groups failed: ${syncError.message}`);
+  // Groupes d'équipe tenus à jour à l'ouverture (et après chaque
+  // changement de service ou de compte, voir lib/messenger/synchro-serveur).
+  await synchroniserGroupesEquipeSansErreur(createAdminSupabaseClient(), appUser.organization_id);
 
   const [{ data: colleagues }, { data: groupRows }] = await Promise.all([
     supabase

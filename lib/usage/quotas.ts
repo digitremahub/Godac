@@ -40,13 +40,12 @@ export const LIBELLES_FONCTION: Record<UsageFeature, string> = {
 };
 
 /**
- * Formule de l'entreprise : `organizations.plan` (texte écrit par
- * Stripe/onboarding, celui que le checkout facture) d'abord, sinon
- * `plan_id`, sinon Starter (formule par défaut à l'inscription).
+ * Formule de l'entreprise : `organizations.plan` (écrit par
+ * Stripe/onboarding, celui que le checkout facture), sinon Starter
+ * (formule par défaut à l'inscription).
  */
-export function resoudreFormule(plan: string | null | undefined, planId?: string | null): PlanTier {
-  for (const p of [plan, planId]) if (p && (PLAN_TIERS as readonly string[]).includes(p)) return p as PlanTier;
-  return "starter";
+export function resoudreFormule(plan: string | null | undefined): PlanTier {
+  return plan && (PLAN_TIERS as readonly string[]).includes(plan) ? (plan as PlanTier) : "starter";
 }
 
 /** Plafond journalier de sécurité par défaut : 10× la moyenne journalière incluse, 20 au minimum. */

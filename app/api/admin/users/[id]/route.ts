@@ -1,3 +1,5 @@
+import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
@@ -208,5 +210,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       details: { role: parsed.data.role, active: parsed.data.active, reset_pin: reset_pin || undefined },
     });
   }
+  await synchroniserGroupesEquipeSansErreur(createAdminSupabaseClient(), appUser.organization_id);
   return NextResponse.json({ user: targetUser ?? { id } });
 }

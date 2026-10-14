@@ -89,9 +89,9 @@ describe("montants", () => {
 
 describe("formule et plafond", () => {
   it("resoudreFormule", () => {
-    expect(resoudreFormule("pro", "essentiel")).toBe("pro");
-    expect(resoudreFormule("inconnu", "business")).toBe("business");
-    expect(resoudreFormule(null, null)).toBe("starter");
+    expect(resoudreFormule("pro")).toBe("pro");
+    expect(resoudreFormule("inconnu")).toBe("starter");
+    expect(resoudreFormule(null)).toBe("starter");
   });
   it("plafond journalier ≈ 10× la moyenne", () => {
     expect(plafondJournalierParDefaut(300)).toBe(100);
