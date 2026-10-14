@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { extractFineFromImage } from "@/lib/ocr/fine";
 
@@ -29,6 +31,11 @@ export async function POST(req: Request) {
   // organisation has the "ocr" module off.
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "ocr"))) {
     return NextResponse.json({ fields: null, error: "Lecture automatique désactivée pour votre entreprise — complétez les champs à la main." });
+  }
+
+  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "ocr_fine");
+  if (!quota.ok) {
+    return NextResponse.json({ fields: null, error: quota.raison });
   }
 
   const imageBytes = Buffer.from(await fileBlob.arrayBuffer());

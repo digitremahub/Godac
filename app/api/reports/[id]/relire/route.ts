@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { extractTourReportFromImage, type TourReportFields } from "@/lib/ocr/tour-report";
 import { arretsLivraison } from "@/lib/ocr/arrets";
@@ -35,6 +37,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     ["start_sheet", tour.start_sheet_path],
     ["end", tour.end_photo_path],
   ] as const;
+  if (!etapes.some(([, chemin]) => chemin)) return NextResponse.json({ error: "Aucun scan à relire." }, { status: 422 });
+  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "tour_report_reread");
+  if (!quota.ok) return NextResponse.json({ error: quota.raison }, { status: 429 });
+
   const lectures: Partial<Record<(typeof etapes)[number][0], TourReportFields>> = {};
   const echecs: string[] = [];
   await Promise.all(

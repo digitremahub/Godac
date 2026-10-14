@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
   let ticket: TicketExtras | null = null;
   if (await isModuleEnabled(supabase, appUser.organization_id, "ocr")) {
-    ticket = await processFuelEntryOcr(parsed.data.fuelEntryId);
+    ticket = await processFuelEntryOcr(parsed.data.fuelEntryId, appUser.id);
   }
 
   return NextResponse.json({ ok: true, ticket });

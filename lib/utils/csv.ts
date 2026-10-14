@@ -169,5 +169,7 @@ export async function parseImportFile<S extends z.ZodType<any, any, any>>(
   }
 
   const result = validateRows(json.rows as Record<string, unknown>[], schema);
-  return { ...result, aiExtracted: json.source === "ai" };
+  // Lecture IA refusée (quota) : le message explique pourquoi le fichier n'a pas été relu.
+  const errors = json.warning ? [{ row: 0, message: json.warning as string }, ...result.errors] : result.errors;
+  return { ...result, errors, aiExtracted: json.source === "ai" };
 }
