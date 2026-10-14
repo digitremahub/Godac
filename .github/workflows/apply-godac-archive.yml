@@ -2,7 +2,6 @@ name: Apply GODAC archive
 on:
   push:
     branches: [feature/optimisation-tournees]
-    paths: [GODAC-fichiers-modifies.zip, .github/workflows/apply-godac-archive.yml]
 permissions:
   contents: write
 jobs:
