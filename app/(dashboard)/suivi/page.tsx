@@ -26,7 +26,7 @@ export default async function SuiviPage() {
   return (
     <div>
       <PageHeader title="Tournées colis" description="Suivi en direct des chauffeurs, des historiques et des tournées villages." />
-      <TourneesTabs />
+      <TourneesTabs canTrack />
       <SuiviTournees services={services ?? []} />
     </div>
   );
