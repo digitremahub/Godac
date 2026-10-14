@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parametresLegauxAu, FRAIS_CONVENTIONNELS } from "@/lib/paie/parametres";
 import { HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
 import { countWeekdays } from "@/lib/business/payroll";
+import { PRESENCE_STATUS } from "@/lib/organization/poles";
 import type { ParametresEntreprise, ParametresLegaux, ProfilSalarie, RegimeTransport, VariablesMois } from "@/lib/paie/types";
 
 /** "2026-10" → bornes du mois (fin incluse). */
@@ -69,10 +70,12 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     supabase.from("user_contracts").select("monthly_gross_salary, contractual_monthly_hours").eq("user_id", userId).maybeSingle(),
     supabase
       .from("planning_entries")
-      .select("start_at, end_at")
+      .select("start_at, end_at, status")
       .eq("organization_id", organizationId)
       .eq("driver_id", userId)
-      .eq("status", "done")
+      // Tournées terminées, et présences planifiées des pôles bureau
+      // (secrétariat, comptabilité… — lib/organization/poles.ts).
+      .in("status", ["done", PRESENCE_STATUS])
       .gte("start_at", avant)
       .lt("start_at", apres),
     supabase
@@ -99,7 +102,16 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   const tauxHoraire = Number(profil?.hourly_rate ?? tauxContrat ?? 0);
 
   const paris = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(iso));
-  const toursMois = (tours ?? []).filter((t) => t.end_at && paris(t.start_at) >= debut && paris(t.start_at) <= fin);
+  // Une présence ne compte qu'une fois la journée terminée : le planning
+  // d'un jour à venir n'est pas encore du temps travaillé.
+  const maintenant = Date.now();
+  const toursMois = (tours ?? []).filter(
+    (t) =>
+      t.end_at &&
+      paris(t.start_at) >= debut &&
+      paris(t.start_at) <= fin &&
+      (t.status !== PRESENCE_STATUS || Date.parse(t.end_at) <= maintenant),
+  );
   const heuresTours = toursMois.reduce((h, t) => h + Math.max(0, (Date.parse(t.end_at!) - Date.parse(t.start_at)) / 3_600_000), 0);
   const joursTravailles = new Set(toursMois.map((t) => paris(t.start_at))).size;
 

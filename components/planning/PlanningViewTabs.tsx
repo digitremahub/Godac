@@ -2,10 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { todayISO, currentMonth } from "@/lib/planning/dates";
+import { grouperParPole } from "@/lib/organization/poles";
 
 interface ServiceOption {
   id: string;
   name: string;
+  pole?: string | null;
 }
 
 const VIEWS: { key: string; label: string }[] = [
@@ -82,10 +84,14 @@ export function PlanningViewTabs({
       {services.length > 0 && (
         <select aria-label="Filtrer par service" className="input !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
           <option value="">Tous les services</option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
+          {grouperParPole(services).map(({ pole, services: groupe }) => (
+            <optgroup key={pole.key} label={pole.operationnel ? pole.label : `${pole.label} — présence`}>
+              {groupe.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       )}

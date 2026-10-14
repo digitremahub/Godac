@@ -1,5 +1,6 @@
 "use client";
 
+import { libelleEntreePlanning } from "@/lib/organization/poles";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -78,7 +79,7 @@ export function DayStrip({
                 <div key={t.id} className="flex overflow-hidden rounded-lg bg-navy/[0.045]">
                   <span aria-hidden="true" className={`w-1 shrink-0 ${STATUS_BAR[t.status] ?? STATUS_BAR.planned}`} />
                   <div className="min-w-0 px-2 py-1.5">
-                    <p className="text-sm font-semibold tabular-nums leading-tight">n°{t.tour_number}</p>
+                    <p className="text-sm font-semibold tabular-nums leading-tight">{libelleEntreePlanning(t)}</p>
                     <p className="text-xs tabular-nums text-navy/70">
                       {timeFmt(t.start_at)}
                       {t.end_at ? `–${timeFmt(t.end_at)}` : ""}

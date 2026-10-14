@@ -1,3 +1,4 @@
+import { PRESENCE_STATUS, estPoleBureau, libelleServiceAvecPole } from "@/lib/organization/poles";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
@@ -91,7 +92,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       supabase
         .from("users")
         .select(
-          "id, full_name, email, phone, address, contact_email, role, role_title, active, auth_method, pin_set_at, driver_code, user_services(service_id, status, services(name))",
+          "id, full_name, email, phone, address, contact_email, role, role_title, active, auth_method, pin_set_at, driver_code, user_services(service_id, status, services(name, pole))",
         )
         .eq("id", id)
         .single(),
@@ -100,6 +101,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             .from("planning_entries")
             .select("id, tour_number, start_at, status, vehicles(registration)")
             .eq("driver_id", id)
+            // Les présences d'un pôle bureau ne sont pas des tournées.
+            .neq("status", PRESENCE_STATUS)
             .order("start_at", { ascending: false })
             .limit(15)
         : Promise.resolve({ data: null }),
@@ -111,7 +114,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             .order("occurred_at", { ascending: false })
             .limit(15)
         : Promise.resolve({ data: null }),
-      isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
+      isDirection ? supabase.from("services").select("id, name, pole").order("name") : Promise.resolve({ data: null }),
       canSeePayrollAndHr
         ? supabase.from("user_contracts").select("monthly_gross_salary, monthly_net_salary, contractual_monthly_hours").eq("user_id", id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -173,14 +176,18 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
   const serviceNames = (u.user_services ?? [])
     .filter((us: any) => us.services?.name)
-    .map((us: any) => `${us.services.name} (${STATUS_LABELS[us.status] ?? us.status})`)
+    .map((us: any) =>
+      estPoleBureau(us.services.pole)
+        ? `Pôle ${libelleServiceAvecPole(us.services)}`
+        : `${us.services.name} (${STATUS_LABELS[us.status] ?? us.status})`,
+    )
     .join(", ");
   const serviceAssignments = (u.user_services ?? []).map((us: any) => ({ service_id: us.service_id, status: us.status }));
   // Titulaire/polyvalent n'est pas un champ à part : un chauffeur
   // qualifié sur 2+ services est de fait polyvalent entre eux (et
   // c'est ce qui autorise le Kanban "Par service" à le proposer en
   // glisser-déposer) ; qualifié sur un seul, il est titulaire de celui-ci.
-  const qualificationCount = (u.user_services ?? []).length;
+  const qualificationCount = (u.user_services ?? []).filter((us: any) => !estPoleBureau(us.services?.pole)).length;
   const qualificationBadge =
     qualificationCount >= 2 ? { label: "Polyvalent", className: "badge-gold" } : qualificationCount === 1 ? { label: "Titulaire", className: "badge-neutral" } : null;
 
@@ -206,7 +213,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </Card>
         <Card>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-navy/65">Service</p>
+            <p className="text-sm text-navy/65">Service / pôle</p>
             {qualificationBadge && <span className={qualificationBadge.className}>{qualificationBadge.label}</span>}
           </div>
           <p>{serviceNames || "—"}</p>

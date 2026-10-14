@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRESENCE_STATUS } from "@/lib/organization/poles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -58,6 +59,8 @@ export async function ChauffeurDashboard({
           .from("planning_entries")
           .select("id, tour_number, start_at, end_at, status, vehicles(registration)")
           .eq("driver_id", appUser.id)
+          // Tournées seulement : la fiche du jour (tournée, villages) n'a pas de sens pour une présence de pôle bureau.
+          .neq("status", PRESENCE_STATUS)
           // A day of margin each side: rows are UTC instants, grouped by Paris day below.
           .gte("start_at", `${addDays(weekStart, -1)}T00:00:00Z`)
           .lt("start_at", `${addDays(weekStart, 8)}T00:00:00Z`)

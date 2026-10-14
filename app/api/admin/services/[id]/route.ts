@@ -4,6 +4,7 @@ import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
+import { estPoleBureau } from "@/lib/organization/poles";
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -46,17 +47,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .from("services")
     .update(updateFields)
     .eq("id", id)
-    .select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email")
+    .select("id, name, code, pole, depot_address, team_leader_name, team_leader_phone, team_leader_email")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") return NextResponse.json({ error: "Un service ou un pôle porte déjà ce nom." }, { status: 409 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ service: data });
 }
 
 /**
  * Vehicles/tanks reference service_id with `on delete set null` — a
  * service with an existing fleet stays deletable, they just become
- * unassigned rather than blocking this action.
+ * unassigned rather than blocking this action. Les pôles bureau
+ * (lib/organization/poles.ts) sont communs à toutes les entreprises :
+ * jamais supprimés, seulement renommés.
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -66,6 +72,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   }
 
   const supabase = await createServerSupabaseClient();
+  const { data: service } = await supabase.from("services").select("pole").eq("id", id).maybeSingle();
+  if (service && estPoleBureau(service.pole)) {
+    return NextResponse.json({ error: "Les pôles de l'entreprise ne se suppriment pas — vous pouvez les renommer." }, { status: 409 });
+  }
   const { error } = await supabase.from("services").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
