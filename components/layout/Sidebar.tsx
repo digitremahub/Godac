@@ -68,6 +68,8 @@ const SECTIONS: NavSection[] = [
       { href: "/my-vehicle", label: "Mon véhicule", icon: IconTruck, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/qr-codes", label: "Badges QR", icon: IconQrCode, allow: ["manager", "manager_chauffeur", "direction"] },
       { href: "/maintenance", label: "Demandes d'entretien", icon: IconWrench, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "maintenance_requests" },
+      { href: "/loueurs/demandes", label: "Demandes aux loueurs", icon: IconWrench, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "rental_providers" },
+      { href: "/loueurs", label: "Loueurs & prestataires", icon: IconBuilding, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "rental_providers" },
       { href: "/tours/start", label: "Démarrer une tournée", icon: IconClock, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/tours/end", label: "Terminer une tournée", icon: IconFlag, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "planning" },
       { href: "/tours/help", label: "J'entre pour un collègue", icon: IconUsers, allow: ["chauffeur", "manager_chauffeur"] },

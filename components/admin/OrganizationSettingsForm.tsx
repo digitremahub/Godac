@@ -8,6 +8,7 @@ import { textSafeVariant } from "@/lib/theme/contrast";
 import { IconMapPin, IconNavigation } from "@/components/layout/icons";
 import { PAYS, paysDe, type CodePays } from "@/lib/pays/pays";
 import { ReglesPays } from "@/components/admin/ReglesPays";
+import { analyserIdentifiant } from "@/lib/organization/siret";
 
 const DEFAULT_ACCENT = "#1BE4C1";
 
@@ -321,6 +322,9 @@ export function OrganizationSettingsForm({
         <div>
           <label className="block"><span className="label">{pays.identifiants.entreprise}</span>
           <input className="input" placeholder={`ex: ${pays.identifiants.exempleEntreprise}`} value={siretValue} onChange={(e) => setSiretValue(e.target.value)} /></label>
+          {pays.code === "FR" && siretValue.trim() && analyserIdentifiant(siretValue).type === "invalide" && (
+            <p className="mt-1 text-sm text-orange-ink">{(analyserIdentifiant(siretValue) as { raison: string }).raison}</p>
+          )}
         </div>
 
         {pays.code === "FR" && (
@@ -334,7 +338,7 @@ export function OrganizationSettingsForm({
           <label className="block"><span className="label">Convention collective applicable</span>
           <input
             className="input"
-            placeholder="ex: Transports routiers (IDCC 1340)"
+            placeholder="ex: Transports routiers et activités auxiliaires du transport (IDCC 16)"
             value={conventionCollectiveValue}
             onChange={(e) => setConventionCollectiveValue(e.target.value)}
           /></label>

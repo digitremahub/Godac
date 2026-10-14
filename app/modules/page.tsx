@@ -24,7 +24,14 @@ export const metadata = {
  */
 export default async function ModulesPage() {
   const supabase = await createServerSupabaseClient();
-  const [{ plans: allPlans, modules, prices }, paliers] = await Promise.all([getFullCatalog(supabase), getPaliers(supabase)]);
+  const [{ plans: allPlans, modules, prices }, paliers, { data: usagePrices }, { data: usageQuotas }] = await Promise.all([
+    getFullCatalog(supabase),
+    getPaliers(supabase),
+    supabase.from("usage_prices").select("feature, label, unit_label, unit_price_eur").order("sort_order"),
+    supabase.from("usage_quotas").select("plan_id, feature, included_per_month"),
+  ]);
+  const inclusPour = (planId: string, feature: string) =>
+    (usageQuotas ?? []).find((q) => q.plan_id === planId && q.feature === feature)?.included_per_month;
   const plans = allPlans.filter((p) => p.is_public);
   const cheapestPlanId = plans[0]?.id;
 
@@ -94,6 +101,48 @@ export default async function ModulesPage() {
             );
           })}
         </div>
+
+        {(usagePrices ?? []).length > 0 && (
+          <section className="mb-12">
+            <h2 className="mb-2 text-2xl sm:text-3xl">Lectures automatiques et assistant : volumes inclus</h2>
+            <p className="mb-6 max-w-3xl text-sm text-navy/70">
+              Chaque formule inclut chaque mois un volume de lectures automatiques (tickets, rapports, compteurs…) et de messages à
+              l&apos;assistant. Au-delà, vous choisissez : continuer avec une facturation à l&apos;unité sur la facture suivante, ou
+              bloquer la fonction jusqu&apos;au mois suivant (la saisie manuelle reste toujours possible).
+            </p>
+            <div className="card overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="text-left text-navy/60">
+                  <tr>
+                    <th className="pb-2">Fonction</th>
+                    {plans.map((p) => (
+                      <th key={p.id} className="pb-2 text-right">
+                        {p.name}
+                      </th>
+                    ))}
+                    <th className="pb-2 text-right">Au-delà, par unité</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(usagePrices ?? []).map((u) => (
+                    <tr key={u.feature} className="border-t border-navy/5">
+                      <td className="py-2">{u.label}</td>
+                      {plans.map((p) => (
+                        <td key={p.id} className="py-2 text-right tabular-nums">
+                          {inclusPour(p.id, u.feature)?.toLocaleString("fr-FR") ?? "—"}
+                        </td>
+                      ))}
+                      <td className="py-2 text-right font-semibold tabular-nums text-gold-ink">
+                        {Number(u.unit_price_eur).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} € / {u.unit_label}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-xs text-navy/60">Volumes par mois et par entreprise ; prix hors taxes.</p>
+          </section>
+        )}
 
         <p className="mb-8 text-center text-xs text-navy/60">
           * Tarifs mensuels, hors frais de mise en service éventuels (facturés une seule fois,

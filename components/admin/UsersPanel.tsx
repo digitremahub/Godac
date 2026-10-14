@@ -7,6 +7,8 @@ import { Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import type { UserRole } from "@/lib/types/domain";
+import { grouperParPole } from "@/lib/organization/poles";
+import { PoleBadge } from "@/components/shared/PoleBadge";
 
 interface UserRow {
   id: string;
@@ -25,6 +27,24 @@ const PIN_DRIVER_ROLES: UserRole[] = ["chauffeur", "manager_chauffeur"];
 interface ServiceOption {
   id: string;
   name: string;
+  pole?: string | null;
+}
+
+/** Options du sélecteur de service, groupées par pôle (Exploitation, puis les pôles bureau). */
+function ServiceOptions({ services }: { services: ServiceOption[] }) {
+  return (
+    <>
+      {grouperParPole(services).map(({ pole, services: groupe }) => (
+        <optgroup key={pole.key} label={pole.label}>
+          {groupe.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
 }
 
 const ROLES: UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"];
@@ -288,14 +308,10 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
             /></label>
           </div>
           <div>
-            <label className="block"><span className="label">Service</span>
+            <label className="block"><span className="label">Service ou pôle</span>
             <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
               <option value="">Aucun</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
+              <ServiceOptions services={services} />
             </select></label>
           </div>
           {mode === "email" ? (
@@ -338,7 +354,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
               <th className="pb-2">Titre</th>
               <th className="pb-2">Email</th>
               <th className="pb-2">Téléphone</th>
-              <th className="pb-2">Service</th>
+              <th className="pb-2">Service / pôle</th>
               <th className="pb-2">Rôle (permissions)</th>
               <th className="pb-2">Statut</th>
               <th className="pb-2"></th>
@@ -394,14 +410,19 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     {isEditing ? (
                       <select aria-label="Service" className="input !w-auto !py-1" value={editServiceId} onChange={(e) => setEditServiceId(e.target.value)}>
                         <option value="">Aucun</option>
-                        {services.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
+                        <ServiceOptions services={services} />
                       </select>
                     ) : (
-                      services.find((s) => s.id === u.service_id)?.name ?? "—"
+                      (() => {
+                        const service = services.find((s) => s.id === u.service_id);
+                        if (!service) return "—";
+                        return (
+                          <span className="flex flex-col gap-0.5">
+                            {service.name}
+                            <PoleBadge pole={service.pole} />
+                          </span>
+                        );
+                      })()
                     )}
                   </td>
                   <td className="py-2">

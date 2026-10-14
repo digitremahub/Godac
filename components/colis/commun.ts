@@ -1,4 +1,5 @@
 /** Types et petits utilitaires partagés par la tournée colis et l'application chauffeur. */
+import type { FicheHoraires } from "@/lib/colis/horaires";
 export type { Liste } from "@/lib/colis/listes";
 export interface Run {
   id: string;
@@ -10,6 +11,8 @@ export interface Run {
   start_lng: number | null;
   return_to_start: boolean;
   optimized_at: string | null;
+  /** Heure de départ prévue (« 08:00:00 ») ; null = 08:00. */
+  planned_start?: string | null;
 }
 export interface Stop {
   id: string;
@@ -28,6 +31,11 @@ export interface Stop {
   proof_photo_path: string | null;
   /** Liste de la tournée (null : liste implicite « Liste principale »). */
   list_id?: string | null;
+  /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */
+  window_start?: string | null;
+  window_end?: string | null;
+  /** Fiche de l'annuaire des adresses pro (horaires d'ouverture), si l'adresse y figure. */
+  horaire?: FicheHoraires | null;
 }
 export interface RunResume {
   id: string;

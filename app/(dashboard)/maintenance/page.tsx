@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -37,6 +38,13 @@ export default async function MaintenancePage({
     supabase.from("organizations").select("emergency_phone").eq("id", appUser.organization_id).single(),
   ]);
 
+  // Module « Véhicules loués » : rappel des demandes à valider avant transmission au loueur.
+  const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const rentalToValidate =
+    canManage && (await isModuleEnabled(supabase, appUser.organization_id, "rental_providers"))
+      ? ((await supabase.from("rental_maintenance_requests").select("id", { count: "exact", head: true }).eq("status", "a_valider")).count ?? 0)
+      : 0;
+
   const rows = (requests ?? []) as any[];
   rows.sort((a, b) => (URGENCY_RANK[a.urgency] ?? 2) - (URGENCY_RANK[b.urgency] ?? 2));
 
@@ -59,6 +67,15 @@ export default async function MaintenancePage({
         title="Demandes d'entretien"
         description="Signalement chauffeur → gestionnaire, avec niveau d'urgence."
       />
+
+      {rentalToValidate > 0 && (
+        <Link href="/loueurs/demandes?statut=a_valider" className="card flex items-center justify-between gap-3 border-gold/50 text-sm hover:border-gold">
+          <span>
+            <strong>{rentalToValidate}</strong> demande{rentalToValidate > 1 ? "s" : ""} sur des véhicules loués à valider avant transmission au loueur.
+          </span>
+          <span className="text-teal-ink">Valider →</span>
+        </Link>
+      )}
 
       <MaintenanceRequestForm vehicles={vehicles ?? []} initialVehicleId={vehicle} emergencyPhone={organization?.emergency_phone} />
 

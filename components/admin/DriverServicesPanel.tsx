@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { grouperParPole } from "@/lib/organization/poles";
 
 interface ServiceOption {
   id: string;
   name: string;
+  pole?: string | null;
 }
 
 type QualificationStatus = "titulaire" | "formation" | "remplacement";
@@ -23,6 +25,8 @@ const STATUS_LABELS: Record<QualificationStatus, string> = {
  * once ("formé à plusieurs services"), each at its own level. Direction-
  * only (matches the "user_services: direction manages" RLS policy) —
  * only rendered on the driver's fiche when appUser.role === 'direction'.
+ * Groupé par pôle (lib/organization/poles.ts) : une personne des
+ * bureaux se rattache ici à son pôle (Comptabilité, Secrétariat…).
  */
 export function DriverServicesPanel({
   userId,
@@ -81,13 +85,20 @@ export function DriverServicesPanel({
 
   return (
     <Card className="flex flex-col gap-3">
-      <p className="text-sm font-medium">Services qualifiés</p>
+      <p className="text-sm font-medium">Services et pôles</p>
       <p className="text-xs text-navy/60">
-        Un chauffeur peut être formé sur plusieurs services à la fois — cochez chacun et précisez son niveau.
+        Un chauffeur peut être formé sur plusieurs services à la fois — cochez chacun et précisez son niveau. Une personne des
+        bureaux se rattache à son pôle (Comptabilité, Secrétariat…) : elle y apparaît et son planning de présence s&apos;y fait.
       </p>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      <div className="flex flex-col gap-2">
-        {services.map((s) => {
+      <div className="flex flex-col gap-3">
+        {grouperParPole(services).map(({ pole, services: groupe }) => (
+          <div key={pole.key} className="flex flex-col gap-2">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-navy/55">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${pole.dotClass}`} aria-hidden="true" />
+              {pole.label}
+            </p>
+        {groupe.map((s) => {
           const status = assignments.get(s.id);
           return (
             <div key={s.id} className="flex items-center gap-3">
@@ -111,6 +122,8 @@ export function DriverServicesPanel({
             </div>
           );
         })}
+          </div>
+        ))}
         {services.length === 0 && <p className="text-xs text-navy/60">Aucun service dans l&apos;organisation.</p>}
       </div>
       <div className="flex items-center gap-3">

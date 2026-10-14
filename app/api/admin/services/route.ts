@@ -28,10 +28,15 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("services")
-    .insert({ organization_id: appUser.organization_id, name: parsed.data.name, code: parsed.data.code || null })
-    .select("id, name, code")
+    // Toujours un service transport : les pôles bureau sont créés d'office
+    // (seed_standard_poles, migration 20260101000126), un par pôle.
+    .insert({ organization_id: appUser.organization_id, name: parsed.data.name, code: parsed.data.code || null, pole: "exploitation" })
+    .select("id, name, code, pole")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") return NextResponse.json({ error: "Un service ou un pôle porte déjà ce nom." }, { status: 409 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ service: data });
 }

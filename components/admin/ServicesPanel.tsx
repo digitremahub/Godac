@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { IconMapPin, IconNavigation } from "@/components/layout/icons";
+import { PoleIcon } from "@/components/shared/PoleBadge";
+import { POLES_BUREAU, poleDe } from "@/lib/organization/poles";
 
 interface ServiceRow {
   id: string;
@@ -13,9 +15,20 @@ interface ServiceRow {
   team_leader_name: string | null;
   team_leader_phone: string | null;
   team_leader_email: string | null;
+  pole?: string | null;
+  /** Noms des personnes rattachées (user_services) — affichés sous chaque pôle bureau. */
+  members?: string[];
 }
 
+/**
+ * Services groupés par pôle (lib/organization/poles.ts) : les services
+ * transport sous « Exploitation », entièrement modifiables ; puis les
+ * pôles bureau, présents dans toute entreprise — renommables, jamais
+ * supprimables (refus côté API aussi).
+ */
 export function ServicesPanel({ services }: { services: ServiceRow[] }) {
+  const exploitation = services.filter((s) => poleDe(s.pole).operationnel);
+  const bureaux = POLES_BUREAU.map((pole) => ({ pole, services: services.filter((s) => s.pole === pole.key) }));
   const router = useRouter();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -108,8 +121,14 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
   }
 
   return (
+    <>
     <Card className="flex flex-col gap-4">
-      <h3 className="text-lg">Services</h3>
+      <div>
+        <h3 className="flex items-center gap-2 text-lg">
+          <PoleIcon pole="exploitation" className="h-5 w-5 text-teal-ink" /> Exploitation — services transport
+        </h3>
+        <p className="text-sm text-navy/65">Chaque service a son dépôt, ses tournées, ses chauffeurs et ses véhicules.</p>
+      </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -126,11 +145,11 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
         </button>
       </div>
 
-      {services.length === 0 ? (
+      {exploitation.length === 0 ? (
         <p className="text-sm text-navy/60">Aucun service configuré.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {services.map((s) => (
+          {exploitation.map((s) => (
             <li key={s.id} className="flex flex-col gap-2 rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
               <div className="flex items-center gap-3">
                 <input aria-label="Nom du service"
@@ -200,5 +219,45 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
         </ul>
       )}
     </Card>
+
+    <Card className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-lg">Pôles de l&apos;entreprise</h3>
+        <p className="text-sm text-navy/65">
+          Les mêmes pôles dans toutes les entreprises GODAC, pour les personnes des bureaux. Rattachez chaque personne à son pôle
+          depuis sa fiche (Utilisateurs) ; son planning de présence se fait dans Planning en choisissant le pôle. Renommables,
+          pas supprimables.
+        </p>
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {bureaux.map(({ pole, services: lignes }) => (
+          <li key={pole.key} className="flex flex-col gap-1.5 rounded-xl bg-navy/[0.035] px-3.5 py-2.5">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${pole.dotClass}`} aria-hidden="true" />
+              <PoleIcon pole={pole.key} className="h-4 w-4 text-navy/60" />
+              {pole.label}
+            </p>
+            {lignes.length === 0 && (
+              <p className="text-xs text-navy/60">Pas encore créé — il le sera à la prochaine mise à jour de la base.</p>
+            )}
+            {lignes.map((s) => (
+              <div key={s.id} className="flex flex-col gap-1">
+                <input
+                  aria-label={`Nom affiché du pôle ${pole.label}`}
+                  className="input !py-1"
+                  defaultValue={s.name}
+                  onBlur={(e) => e.target.value.trim() && e.target.value !== s.name && renameService(s.id, e.target.value.trim())}
+                  disabled={busy}
+                />
+                <p className="text-xs text-navy/60">
+                  {s.members && s.members.length > 0 ? s.members.join(", ") : "Personne de rattaché pour l'instant."}
+                </p>
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </Card>
+    </>
   );
 }

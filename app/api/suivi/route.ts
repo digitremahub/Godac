@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
+import { cleAdresse, horairesDesAdresses, moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { estimerAvancement } from "@/lib/colis/estimation";
+import { fenetresArret } from "@/lib/colis/horaires";
 
 export interface TourneeSuivie {
   id: string;
@@ -36,13 +37,20 @@ export async function GET(req: Request) {
   const { data: runs } = await supabase
     .from("delivery_runs")
     .select(
-      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, parcel_count, lat, lng, done_at, position)",
+      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, parcel_count, lat, lng, done_at, position, address, window_start, window_end)",
     )
     .eq("run_date", aujourdhuiParis())
     .in("status", ["in_progress", "loading", "done"])
     .order("created_at");
 
   const maintenant = new Date();
+  // Horaires des adresses pro restantes : la fin estimée compte l'attente à l'ouverture.
+  const jour = aujourdhuiParis();
+  const fiches = await horairesDesAdresses(
+    supabase,
+    appUser.organization_id,
+    ((runs ?? []) as any[]).flatMap((r) => ((r.delivery_stops ?? []) as any[]).filter((s) => s.status === "pending").map((s) => s.address as string)),
+  );
   const tournees: TourneeSuivie[] = ((runs ?? []) as any[])
     .map((r) => {
       const services = ((r.users?.user_services ?? []) as any[]).map((us) => us.services).filter(Boolean).map((s: any) => ({ id: s.id, nom: s.name }));
@@ -50,7 +58,14 @@ export async function GET(req: Request) {
       const position = r.last_lat !== null && r.last_lng !== null ? { lat: Number(r.last_lat), lng: Number(r.last_lng), at: r.last_position_at as string } : null;
       const depot = r.start_lat !== null && r.start_lng !== null ? { lat: Number(r.start_lat), lng: Number(r.start_lng) } : null;
       const av = estimerAvancement(
-        stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat === null ? null : Number(s.lat), lng: s.lng === null ? null : Number(s.lng), done_at: s.done_at })),
+        stops.map((s) => ({
+          status: s.status,
+          parcel_count: s.parcel_count,
+          lat: s.lat === null ? null : Number(s.lat),
+          lng: s.lng === null ? null : Number(s.lng),
+          done_at: s.done_at,
+          fenetres: s.status === "pending" ? fenetresArret({ semaine: fiches.get(cleAdresse(s.address ?? ""))?.weekly_schedule, debut: s.window_start, fin: s.window_end }, jour) : null,
+        })),
         { maintenant, position, depot, retourDepot: r.return_to_start },
       );
       return {

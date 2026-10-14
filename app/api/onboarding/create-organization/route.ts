@@ -4,10 +4,16 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { PAYS, type CodePays } from "@/lib/pays/pays";
 import { getFullCatalog, priceFor } from "@/lib/organization/catalog";
+import { appliquerInfosEntreprise, infosEntrepriseSchema, type BilanApplication } from "@/lib/organization/entreprise-serveur";
+import { analyserIdentifiant } from "@/lib/organization/siret";
 
 const bodySchema = z.object({
   name: z.string().min(1),
   country: z.enum(PAYS.map((p) => p.code) as [CodePays, ...CodePays[]]).default("FR"),
+  /** Fiche SIRENE trouvée par /api/entreprise/recherche (bouton « Rechercher »). */
+  entreprise: infosEntrepriseSchema.optional(),
+  /** SIRET saisi sans recherche (API injoignable, ou saisie manuelle). */
+  siret: z.string().trim().max(30).optional(),
 });
 
 /**
@@ -86,5 +92,32 @@ export async function POST(req: Request) {
     });
   await admin.from("organization_modules").upsert(baseline, { onConflict: "organization_id,module_key" });
 
-  return NextResponse.json({ organizationId: organization.id });
+  // Pôles standard (direction, secrétariat, comptabilité…) : un service
+  // par pôle bureau, comme pour les entreprises existantes (migration
+  // 20260101000126). Idempotent ; un échec ne bloque pas l'inscription,
+  // la même fonction peut être rejouée.
+  const { error: polesError } = await admin.rpc("seed_standard_poles", { p_organization_id: organization.id });
+  if (polesError) console.error("seed_standard_poles", polesError.message);
+
+  // Fiche SIRENE → identité légale, dépôt, convention et réglages de
+  // paie. Organisation neuve : tous les champs sont vides, rien n'est
+  // écrasé. Un échec laisse la saisie manuelle dans Organisation.
+  let bilan: BilanApplication | null = null;
+  if (parsed.data.entreprise) {
+    try {
+      bilan = await appliquerInfosEntreprise(admin, organization.id, parsed.data.entreprise, []);
+    } catch (e) {
+      console.error("appliquerInfosEntreprise", e);
+    }
+  } else if (parsed.data.siret) {
+    const id = analyserIdentifiant(parsed.data.siret);
+    if (id.type !== "invalide") {
+      await admin
+        .from("organizations")
+        .update(id.type === "siret" ? { siret: id.valeur, siren: id.siren } : { siren: id.siren })
+        .eq("id", organization.id);
+    }
+  }
+
+  return NextResponse.json({ organizationId: organization.id, bilan });
 }

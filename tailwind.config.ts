@@ -4,6 +4,8 @@ const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
+    // lib/organization/poles.ts porte les pastilles de couleur des pôles.
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
