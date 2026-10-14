@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
   const now = new Date();
   const parisHour = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }).format(now);
-  if (parisHour !== "17") return NextResponse.json({ skipped: true, reason: "Not 17:00 Europe/Paris" });
+  if (parisHour !== "16" && parisHour !== "17") return NextResponse.json({ skipped: true, reason: "Outside the 16:00–17:00 Europe/Paris delivery window" });
 
   const tomorrow = shiftDay(parisDate(now), 1);
   const dayAfter = shiftDay(tomorrow, 1);
