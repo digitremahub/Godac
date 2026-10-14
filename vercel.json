@@ -6,11 +6,11 @@
   "crons": [
     {
       "path": "/api/cron/weekly-planning-digest",
-      "schedule": "0 15,16 * * 5"
+      "schedule": "0 15 * * 5"
     },
     {
       "path": "/api/cron/daily-planning-reminder",
-      "schedule": "0 15,16 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/cron/reset-demo",
