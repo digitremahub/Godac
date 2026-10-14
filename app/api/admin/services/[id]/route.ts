@@ -18,6 +18,9 @@ const bodySchema = z.object({
   team_leader_name: z.string().trim().max(120).nullable().optional(),
   team_leader_phone: z.string().trim().max(40).nullable().optional(),
   team_leader_email: z.string().trim().email().max(200).nullable().optional().or(z.literal("").transform(() => null)),
+  // Compte GODAC du chef d'équipe (facultatif) : responsable du groupe
+  // d'équipe du Messenger, même s'il n'est pas rattaché au service.
+  team_leader_user_id: z.string().uuid().nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,11 +45,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  if (fields.team_leader_user_id) {
+    const { data: leader } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", fields.team_leader_user_id)
+      .eq("organization_id", appUser.organization_id)
+      .maybeSingle();
+    if (!leader) return NextResponse.json({ error: "Compte du chef d'équipe introuvable." }, { status: 400 });
+  }
   const { data, error } = await supabase
     .from("services")
     .update(updateFields)
     .eq("id", id)
-    .select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email")
+    .select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email, team_leader_user_id")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

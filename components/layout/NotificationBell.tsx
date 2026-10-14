@@ -18,7 +18,7 @@ const POLL_MS = 30000;
 
 function iconFor(type: string) {
   if (type.startsWith("planning")) return IconCalendar;
-  if (type === "new_message") return IconChatBubble;
+  if (type === "new_message" || type === "group_message") return IconChatBubble;
   if (type.startsWith("maintenance") || type.startsWith("vehicle")) return IconWrench;
   return IconAlertTriangle;
 }

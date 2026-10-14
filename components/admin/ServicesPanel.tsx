@@ -13,9 +13,10 @@ interface ServiceRow {
   team_leader_name: string | null;
   team_leader_phone: string | null;
   team_leader_email: string | null;
+  team_leader_user_id?: string | null;
 }
 
-export function ServicesPanel({ services }: { services: ServiceRow[] }) {
+export function ServicesPanel({ services, users = [] }: { services: ServiceRow[]; users?: { id: string; full_name: string }[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -164,6 +165,26 @@ export function ServicesPanel({ services }: { services: ServiceRow[] }) {
                     />
                   </label>
                 ))}
+                <label className="block sm:col-span-3">
+                  <span className="sr-only">Compte GODAC du chef d&apos;équipe</span>
+                  <select
+                    className="input !py-1"
+                    aria-label="Compte GODAC du chef d'équipe"
+                    defaultValue={s.team_leader_user_id ?? ""}
+                    onChange={(e) => patchService(s.id, { team_leader_user_id: e.target.value || null })}
+                    disabled={busy}
+                  >
+                    <option value="">Compte GODAC du chef — repéré par son e-mail, sinon aucun</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-0.5 block text-xs text-navy/55">
+                    Le chef d&apos;équipe est responsable du groupe d&apos;équipe du Messenger (Infos équipe, mode annonces, groupes ponctuels).
+                  </span>
+                </label>
               </fieldset>
               <div>
                 <label className="block"><span className="label">Adresse du dépôt de ce service</span>

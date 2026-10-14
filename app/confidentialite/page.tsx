@@ -67,7 +67,7 @@ export default function ConfidentialitePage() {
             réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
           </li>
           <li>
-            <strong>Messagerie :</strong> messages et pièces jointes échangés entre collègues dans GODAC.
+            <strong>Messagerie :</strong> messages, réactions, accusés de lecture des Infos équipe et pièces jointes échangés entre collègues dans GODAC, en discussion directe ou dans les groupes d&apos;équipe (un compte désactivé quitte aussitôt tous ses groupes).
           </li>
           <li>
             <strong>Données techniques :</strong> journaux de connexion, abonnement aux notifications de

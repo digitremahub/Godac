@@ -434,3 +434,12 @@ export function IconDownload(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconPin(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6Z" />
+    </Svg>
+  );
+}

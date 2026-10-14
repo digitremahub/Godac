@@ -13,7 +13,7 @@ export default async function OrganizationSettingsPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
-  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }] =
+  const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: activeUsers }] =
     await Promise.all([
       supabase
         .from("organizations")
@@ -25,12 +25,13 @@ export default async function OrganizationSettingsPage() {
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       isModuleEnabled(supabase, appUser.organization_id, "assistant"),
       isDirection ? isModuleEnabled(supabase, appUser.organization_id, "payslips") : Promise.resolve(false),
-      supabase.from("services").select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email").order("name"),
+      supabase.from("services").select("id, name, code, depot_address, team_leader_name, team_leader_phone, team_leader_email, team_leader_user_id").order("name"),
       supabase.from("tanks").select("id, name, fuel_type, capacity_liters, current_totalizer_index, service_id").order("name"),
       supabase.from("assistant_notes").select("id, title, content, roles").order("created_at", { ascending: false }),
       isDirection
         ? supabase.from("payslip_contribution_lines").select("id, label, salarial_rate, patronal_rate").order("created_at")
         : Promise.resolve({ data: null }),
+      supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).order("full_name"),
     ]);
 
   return (
@@ -55,7 +56,7 @@ export default async function OrganizationSettingsPage() {
         urssafNumber={organization?.urssaf_number ?? null}
         country={organization?.country ?? "FR"}
       />
-      <ServicesPanel services={services ?? []} />
+      <ServicesPanel services={services ?? []} users={activeUsers ?? []} />
       <TanksPanel tanks={tanks ?? []} services={services ?? []} />
       {payslipsEnabled && (
         <PayslipContributionLinesPanel
