@@ -3,9 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { LISTE_PRINCIPALE, type Liste } from "@/lib/colis/listes";
+import { normaliserSemaine, type FicheHoraires } from "@/lib/colis/horaires";
 
-export const RUN_FIELDS = "id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at";
-export const STOP_FIELDS = "id, list_id, position, parcel_code, parcel_count, address, lat, lng, recipient, phone, notes, status, done_at, delivered_place, proof_photo_path";
+export const RUN_FIELDS = "id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start";
+export const STOP_FIELDS = "id, list_id, position, parcel_code, parcel_count, address, lat, lng, recipient, phone, notes, status, done_at, delivered_place, proof_photo_path, window_start, window_end";
 export const LIST_FIELDS = "id, name, position";
 
 export function aujourdhuiParis(): string {
@@ -150,4 +151,35 @@ export function cleAdresse(adresse: string): string {
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+export const HOURS_FIELDS = "id, address_key, label, address, weekly_schedule, notes, updated_at";
+
+/**
+ * Fiches horaires de l'entreprise pour ces adresses, indexées par adresse
+ * normalisée (cleAdresse). RLS : lecture dans l'entreprise. En cas
+ * d'erreur (annuaire indisponible), aucune contrainte horaire.
+ */
+export async function horairesDesAdresses(supabase: SupabaseClient, organizationId: string, adresses: string[]): Promise<Map<string, FicheHoraires>> {
+  const cles = [...new Set(adresses.map(cleAdresse).filter(Boolean))];
+  const fiches = new Map<string, FicheHoraires>();
+  for (let i = 0; i < cles.length; i += 200) {
+    const { data } = await supabase
+      .from("delivery_address_hours")
+      .select(HOURS_FIELDS)
+      .eq("organization_id", organizationId)
+      .in("address_key", cles.slice(i, i + 200));
+    for (const f of (data ?? []) as FicheHoraires[]) fiches.set(f.address_key, { ...f, weekly_schedule: normaliserSemaine(f.weekly_schedule) });
+  }
+  return fiches;
+}
+
+/** Arrêts complétés de leur fiche horaires (`horaire`, null si l'adresse n'est pas dans l'annuaire). */
+export async function avecHoraires<T extends { address: string }>(supabase: SupabaseClient, organizationId: string, stops: T[]): Promise<(T & { horaire: FicheHoraires | null })[]> {
+  const fiches = await horairesDesAdresses(
+    supabase,
+    organizationId,
+    stops.map((s) => s.address),
+  );
+  return stops.map((s) => ({ ...s, horaire: fiches.get(cleAdresse(s.address)) ?? null }));
 }
