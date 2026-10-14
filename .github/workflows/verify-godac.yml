@@ -3,13 +3,6 @@ on:
   push:
     branches:
       - feature/optimisation-tournees
-    paths:
-      - '**.ts'
-      - '**.tsx'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - '.github/workflows/verify-godac.yml'
 permissions:
   contents: read
 jobs:
