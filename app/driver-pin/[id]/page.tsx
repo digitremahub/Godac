@@ -17,7 +17,7 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
   const [{ data: user }, { count: passkeyCount }] = await Promise.all([
     admin
       .from("users")
-      .select("full_name, email, auth_method, pin_set_at, active, pending_approval")
+      .select("full_name, auth_method, pin_set_at, active, pending_approval")
       .eq("id", id)
       .maybeSingle(),
     admin.from("webauthn_credentials").select("id", { count: "exact", head: true }).eq("user_id", id),
@@ -39,7 +39,6 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
       <DriverPinFlow
         id={id}
         fullName={user.full_name}
-        email={user.email}
         needsSetup={!user.pin_set_at}
         pendingApproval={user.pending_approval}
         hasPasskey={(passkeyCount ?? 0) > 0}

@@ -13,6 +13,8 @@ export const RETENTION_DAYS = {
   parcelRuns: 365,
   /** Au-delà : nom complet réduit aux initiales, téléphone et consignes effacés. */
   parcelRecipients: 30,
+  /** Journal d'audit des actions sensibles. */
+  auditLog: 3 * 365,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -37,6 +39,9 @@ export async function purgeExpiredData() {
     .lt("clocked_in_at", gpsCutoff)
     .not("clock_out_lat", "is", null);
   results.clockGpsOut = gpsOut.error ? gpsOut.error.message : (gpsOut.count ?? 0);
+
+  const audit = await admin.from("audit_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.auditLog));
+  results.auditLog = audit.error ? audit.error.message : (audit.count ?? 0);
 
   const convs = await admin
     .from("assistant_conversations")

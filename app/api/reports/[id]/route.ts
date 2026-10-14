@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -85,5 +86,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { error } = await supabase.from("planning_entries").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "rapport_correction",
+    targetTable: "planning_entries",
+    targetId: id,
+    details: parsed.data,
+  });
   return NextResponse.json({ ok: true });
 }

@@ -19,10 +19,15 @@ const PUBLIC_PATHS = [
   "/bon-de-commande",
   // « Voir la démo » signs the visitor into the demo organization.
   "/demo",
+  // Référencement : lus par les moteurs de recherche sans session.
+  "/robots.txt",
+  "/sitemap.xml",
 ];
 const PUBLIC_PREFIXES = [
   "/api/webhooks",
   "/api/cron",
+  // Rapports CSP envoyés par le navigateur, connecté ou non.
+  "/api/csp-report",
   // Lot 7: a chauffeur's QR badge is their login for a `pin`-auth
   // account — both must work signed out. Scoped to exactly these two
   // prefixes (not all of /scan or /api/auth) so vehicle/tank badges

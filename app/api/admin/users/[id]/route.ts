@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAppUser } from "@/lib/auth/session";
@@ -197,5 +198,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
+  if (parsed.data.role !== undefined || parsed.data.active !== undefined || reset_pin) {
+    await journaliser({
+      organizationId: appUser.organization_id,
+      userId: appUser.id,
+      action: reset_pin ? "pin_reinitialise" : parsed.data.role !== undefined ? "role_modifie" : "utilisateur_desactive",
+      targetTable: "users",
+      targetId: id,
+      details: { role: parsed.data.role, active: parsed.data.active, reset_pin: reset_pin || undefined },
+    });
+  }
   return NextResponse.json({ user: targetUser ?? { id } });
 }

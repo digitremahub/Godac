@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_URL } from "@/lib/site";
 import { Syne, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { DISPLAY_PREFERENCES_SCRIPT } from "@/lib/display/preferences";
@@ -20,7 +21,16 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "GODAC — Gestion et Optimisation Des Assets et Carburant",
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "GODAC",
+    title: "GODAC — Logiciel de gestion carburant et flotte pour le transport routier",
+    description:
+      "Contrôlez et réduisez le carburant de votre entreprise de transport : chaque plein tracé, anomalies détectées, TICPE récupérée. Flotte, planning, tournées et paie dans le même outil.",
+  },
+  title: "GODAC — Logiciel de gestion carburant et flotte pour le transport routier",
   description:
     "Contrôlez et réduisez le carburant de votre entreprise de transport : chaque plein tracé, anomalies détectées, TICPE récupérée. Flotte, planning, tournées et paie dans le même outil.",
   // iOS only exposes PushManager to a page added to the home screen and

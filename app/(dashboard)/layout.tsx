@@ -4,6 +4,10 @@ import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import type { Metadata } from "next";
+
+/** Espace privé : jamais indexé par les moteurs de recherche. */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function DashboardLayout({
   children,
