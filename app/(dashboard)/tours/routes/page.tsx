@@ -6,6 +6,7 @@ import { TourRoutesBoard, type TourRoute, type VillageRef } from "@/components/t
 import { addDays, parisCalendarDate } from "@/lib/planning/dates";
 import { peutGererTournees, peutVoirCarteTournees, tourneesVisibles } from "@/lib/tours/acces-tournees";
 import { coverageForEntries, renfortByVillage, type RenfortEntry } from "@/lib/tours/renfort";
+import { TourneesTabs } from "@/components/colis/TourneesTabs";
 
 type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -178,6 +179,11 @@ export default async function TourRoutesPage({ searchParams }: { searchParams: P
 
   return (
     <div>
+      <PageHeader
+        title="Tournées colis"
+        description="Gestion des tournées et des villages, avec les informations de passage."
+      />
+      <TourneesTabs />
       <PageHeader
         title="Tournées & villages"
         description={
