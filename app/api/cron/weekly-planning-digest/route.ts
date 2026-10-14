@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   }
 
   const paris = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }).format(new Date());
-  if (paris !== "17") return NextResponse.json({ skipped: true, reason: "Not 17:00 Europe/Paris" });
+  if (paris !== "16" && paris !== "17") return NextResponse.json({ skipped: true, reason: "Outside the 16:00–17:00 Europe/Paris delivery window" });
 
   const supabase = createAdminSupabaseClient();
 
