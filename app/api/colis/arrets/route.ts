@@ -1,3 +1,15 @@
+import { importerHorairesProfessionnels } from "@/lib/colis/horaires-internet";
+const geo = await geocodeAddress(parsed.data.adresse, pays);
+const infoProfessionnel = geo
+  ? await importerHorairesProfessionnels({
+      supabase,
+      organizationId: appUser.organization_id,
+      userId: appUser.id,
+      address: parsed.data.adresse,
+      lat: geo.lat,
+      lng: geo.lng,
+    })
+  : null;
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
