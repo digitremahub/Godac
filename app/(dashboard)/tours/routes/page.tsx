@@ -181,17 +181,13 @@ export default async function TourRoutesPage({ searchParams }: { searchParams: P
     <div>
       <PageHeader
         title="Tournées colis"
-        description="Gestion des tournées et des villages, avec les informations de passage."
-      />
-      <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
-      <PageHeader
-        title="Tournées & villages"
         description={
           gestion
             ? "Renseignez les villages de chaque tournée, dans l'ordre de passage, avec les infos utiles. Les chauffeurs du service les retrouvent ici (en liste) et sur leur tableau de bord."
             : "Les villages des tournées de votre service, dans l'ordre de passage, avec les infos utiles."
         }
       />
+      <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
       <TourRoutesBoard
         routes={visible}
         canEdit={gestion}
