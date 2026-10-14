@@ -5,7 +5,7 @@
  * « Liste principale », toujours en tête : une tournée sans liste se
  * comporte exactement comme avant.
  */
-import { distanceKm, longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { distanceEstimee, distanceKm, longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
 import { minutesTrajet } from "@/lib/colis/estimation";
 import { ordonnerAvecHoraires, simulerPassages, type Fenetres, type Passage } from "@/lib/colis/horaires";
 
@@ -76,6 +76,8 @@ export interface OptionsHoraires {
   /** Fenêtres d'ouverture de l'arrêt ce jour-là (null : pas de contrainte). */
   fenetres: (id: string) => Fenetres;
   minutesParArret?: number;
+  /** Distance routière fournie par un moteur de routage ; repli géographique si indisponible. */
+  distance?: (a: Point, b: Point) => number;
 }
 
 export interface ResultatSequence {
@@ -132,6 +134,7 @@ export function sequenceParListes(
   const impossibles: string[] = [];
   let courant = depart;
   let heure = horaires?.debut ?? 0;
+  const distance = horaires?.distance ?? distanceEstimee;
   groupes.forEach((g, i) => {
     const pts = g.avecGps.map((s) => pt(s)!);
     avant.push(...pts);
@@ -144,7 +147,7 @@ export function sequenceParListes(
       const r = ordonnerAvecHoraires(
         courant,
         pts.map((p, k) => ({ point: p, fenetres: fen[k]! })),
-        { debut: heure, retour: boucle ? fin : false, arrivee: boucle ? null : fin ? depart : null, minutesParArret: horaires.minutesParArret },
+        { debut: heure, retour: boucle ? fin : false, arrivee: boucle ? null : fin ? depart : null, minutesParArret: horaires.minutesParArret, distance },
       );
       ordre = r.ordre;
       fermes.push(...r.fermes.map((k) => g.avecGps[k]!.id));
@@ -153,11 +156,12 @@ export function sequenceParListes(
         { point: courant, minute: heure },
         ordre.map((k) => ({ point: pts[k]!, fenetres: fen[k]! })),
         horaires.minutesParArret,
+        { distance },
       );
       ordre.forEach((k, j) => (passages[g.avecGps[k]!.id] = sim.passages[j]!));
       heure = sim.fin;
     } else {
-      ordre = boucle ? optimiserOrdre(courant, pts, fin) : optimiserOrdre(courant, pts, false, fin ? depart : null);
+      ordre = boucle ? optimiserOrdre(courant, pts, fin, null, distance) : optimiserOrdre(courant, pts, false, fin ? depart : null, distance);
     }
     for (const k of ordre) {
       sequence.push(g.avecGps[k]!.id);
@@ -170,8 +174,8 @@ export function sequenceParListes(
   const signales = new Set([...fermes, ...impossibles]);
   return {
     sequence,
-    kmAvant: longueurParcours(depart, avant, retour),
-    kmApres: longueurParcours(depart, apres, retour),
+    kmAvant: longueurParcours(depart, avant, retour, distance),
+    kmApres: longueurParcours(depart, apres, retour, distance),
     sansGps: groupes.reduce((n, g) => n + g.sansGps.length, 0),
     passages,
     horsHoraires: Object.entries(passages)
@@ -179,7 +183,7 @@ export function sequenceParListes(
       .map(([id]) => id),
     fermes,
     impossibles,
-    fin: horaires ? heure + (retour && depart && courant && courant !== depart ? minutesTrajet(distanceKm(courant, depart)) : 0) : null,
+    fin: horaires ? heure + (retour && depart && courant && courant !== depart ? minutesTrajet(distance(courant, depart)) : 0) : null,
   };
 }
 

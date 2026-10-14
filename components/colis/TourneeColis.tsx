@@ -96,6 +96,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
+  const [rechercheAdresse, setRechercheAdresse] = useState("");
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -170,6 +171,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
   async function supprimerTournee() {
     if (!run) return;
+    if (run.status === "done") { setToast({ ok: false, text: "Une tournée clôturée ne peut pas être supprimée." }); return; }
     if (!confirm(`Supprimer « ${run.name ?? "cette tournée"} » et ses ${stops.length} arrêt(s) ? C'est définitif.`)) return;
     setBusy("suppr");
     try {
@@ -206,7 +208,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   async function ajouter(d: Draft) {
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string }>("/api/colis/arrets", {
+      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; horairesProfessionnel?: boolean }>("/api/colis/arrets", {
         method: "POST",
         body: JSON.stringify({
           run_id: run?.id,
@@ -235,7 +237,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
                       : d.type === "ramasse"
                         ? "Ramasse ajoutée."
-                        : "Colis ajouté.") + sansTel,
+                        : "Colis ajouté.") + (r.professionnel ? ` · Professionnel détecté : ${r.professionnel}${r.horairesProfessionnel ? " (horaires importés)" : " (horaires à vérifier)"}.` : "") + sansTel,
                 },
       );
       setDraft(null);
@@ -319,7 +321,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       const signales = r.horsHoraires.length + r.fermes.length + r.impossibles.length;
       setToast({
         ok: !signales,
-        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
+        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
       });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -478,10 +480,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   // Arrêts par liste. Une seule liste implicite : affichage identique à une tournée sans liste.
-  const groupes = grouperParListe(stops, lists);
-  const multi = groupes.length > 1 || groupes[0]?.liste != null;
-  const listeCible = groupes.some((g) => (g.liste?.id ?? null) === cible) ? cible : (groupes[groupes.length - 1]?.liste?.id ?? null);
-  const cibles = groupes.map((g) => ({ id: g.liste?.id ?? null, nom: nomGroupe(g) }));
+  const groupesComplets = grouperParListe(stops, lists);
+  const termeAdresse = rechercheAdresse.trim().toLocaleLowerCase("fr-FR");
+  const groupes = termeAdresse
+    ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
+    : groupesComplets;
+  const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
+  const listeCible = groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? cible : (groupesComplets[groupesComplets.length - 1]?.liste?.id ?? null);
+  const cibles = groupesComplets.map((g) => ({ id: g.liste?.id ?? null, nom: nomGroupe(g) }));
   const choixCible = multi && (
     <label className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
@@ -561,7 +567,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     },
   );
 
-  const explicites = groupes.filter((g) => g.liste);
+  const explicites = groupesComplets.filter((g) => g.liste);
   /** En-tête d'une liste : nom (renommable), compteurs, ordre, suppression. */
   const enteteListe = (g: (typeof groupes)[number], k: number) => {
     const c = compteurs(g.arrets);
@@ -705,11 +711,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm" onClick={renommer}>
             Renommer
           </button>
-          <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
+          {run.status !== "done" && <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
             Supprimer la tournée
-          </button>
+          </button>}
         </div>
       </div>
+      <label className="relative block">
+        <span className="sr-only">Rechercher une adresse dans la tournée</span>
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45">⌕</span>
+        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
+        {rechercheAdresse && <button type="button" className="absolute inset-y-0 right-2 px-2 text-sm text-navy/60" onClick={() => setRechercheAdresse("")}>Effacer</button>}
+      </label>
+      {rechercheAdresse && <p className="-mt-2 text-xs text-navy/60">{groupes.reduce((n, g) => n + g.arrets.length, 0)} résultat(s) sur {stops.length} arrêt(s).</p>}
       <div className="grid grid-cols-3 gap-2">
         {[
           ["Arrêts", stops.length, ramasses ? `dont ${ramasses} ramasse${ramasses > 1 ? "s" : ""}` : null],
@@ -933,6 +946,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             </div>
           )}
           <ol className="mt-2 divide-y divide-navy/[0.07]">
+            {rechercheAdresse && groupes.length === 0 && <li className="px-4 py-6 text-center text-sm text-navy/60">Aucune adresse ne correspond à « {rechercheAdresse} ».</li>}
             {groupes.map((g, k) => (
               <Fragment key={g.liste?.id ?? "principale"}>
                 {multi && enteteListe(g, k)}
@@ -1121,17 +1135,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
       {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
-          <button
-            type="button"
-            className="btn-primary w-full !py-3.5 text-base"
-            disabled={busy !== null}
-            onClick={async () => {
-              if (!run.optimized_at) await optimiser(false);
-              await phase("in_progress");
-              router.push("/livreur");
-            }}
-          >
-            Démarrer la livraison ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
+          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => router.push("/livreur")}>
+            Vérifier la tournée et démarrer ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
           </button>
         </div>
       )}

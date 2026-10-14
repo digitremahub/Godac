@@ -64,7 +64,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await contexte((await params).id);
   if ("erreur" in ctx) return ctx.erreur;
-  const { error } = await ctx.supabase.from("delivery_runs").delete().eq("id", ctx.run.id);
+  if (ctx.run.status === "done") return NextResponse.json({ error: "Une tournée clôturée ne peut pas être supprimée : elle est conservée dans l'historique de livraison." }, { status: 409 });
+  const { error } = await ctx.supabase.from("delivery_runs").delete().eq("id", ctx.run.id).neq("status", "done");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
