@@ -86,6 +86,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [scanStatus, setScanStatus] = useState("");
+  const scanQueue = useRef<{ image: string; code: string | null; telephone: string | null }[]>([]);
+  const scanProcessing = useRef(false);
   const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
@@ -249,53 +252,55 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     }
   }
 
-  /** QR/code-barres : si le code ne contient pas l'adresse, l'image caméra est lue par IA. */
-  async function lireImageScannee(image: string, code: string | null, telephone: string | null) {
+  /** Lit les étiquettes en série, pendant que la caméra reste ouverte. */
+  async function lireImageScannee(image: string, code: string | null, telephone: string | null): Promise<boolean> {
     setBusy("photo");
     try {
-      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", {
-        method: "POST",
-        body: JSON.stringify({ image, mediaType: "image/jpeg" }),
-      });
-      const d: Draft = {
-        adresse: lu.adresse ?? "",
-        destinataire: lu.destinataire ?? "",
-        telephone: lu.telephone ?? telephone ?? "",
-        code: code ?? lu.code,
-        type: "livraison",
-        poids: champPoids(lu.poids),
-      };
-      if (d.adresse.trim().length >= 5) {
-        setDraft(null);
-        await ajouter(d);
-      } else {
-        setDraft(d);
-        setToast({ ok: false, text: "QR/code lu, mais adresse non reconnue. Complétez les champs." });
-      }
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
+      const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      if (d.adresse.trim().length >= 5) { await ajouter(d); return true; }
+      setDraft(d); setScanner(false);
+      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " lu, mais adresse non reconnue. Complétez les champs." });
+      return false;
     } catch (e) {
       setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
-      setToast({ ok: false, text: `Lecture automatique impossible : ${networkErrorMessage(e)}. Complétez l'adresse.` });
-    } finally {
-      setBusy(null);
-    }
+      setScanner(false);
+      setToast({ ok: false, text: "Lecture impossible pour " + (code ?? "ce colis") + " : " + networkErrorMessage(e) + ". Complétez l’adresse." });
+      return false;
+    } finally { setBusy(null); }
   }
 
-  /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
+  async function traiterFileScans() {
+    if (scanProcessing.current) return;
+    scanProcessing.current = true;
+    try {
+      while (scanQueue.current.length) {
+        const item = scanQueue.current.shift()!;
+        setScanStatus("Colis " + (item.code ?? "détecté") + " — lecture des informations…");
+        const ok = await lireImageScannee(item.image, item.code, item.telephone);
+        if (!ok) { scanQueue.current = []; setScanStatus(""); return; }
+        setScanStatus(scanQueue.current.length ? "Colis ajouté · " + scanQueue.current.length + " en attente" : "Colis " + (item.code ?? "") + " ajouté");
+      }
+    } finally { scanProcessing.current = false; }
+  }
+
   function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
+      void ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
+      setScanStatus("Adresse détectée · " + (lu.code ?? "colis"));
       return true;
     }
-    setScanner(false);
     if (lectureEtiquette && image) {
-      void lireImageScannee(image, lu.code, lu.telephone ?? null);
-      setToast({ ok: true, text: "Code lu : lecture automatique de l'étiquette…" });
+      scanQueue.current.push({ image, code: lu.code, telephone: lu.telephone ?? null });
+      setScanStatus("Code lu : " + (lu.code ?? text) + " · lecture automatique");
+      void traiterFileScans();
     } else {
+      setScanner(false);
       setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      setToast({ ok: true, text: "Code lu : photographiez l'étiquette ou saisissez l'adresse." });
+      setToast({ ok: true, text: "Numéro de colis lu : " + (lu.code ?? text) + ". Complétez l’adresse." });
     }
-    return false;
+    return true;
   }
 
   /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
@@ -734,7 +739,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           }}
         />
       )}
-      {scanner && <ParcelScanner onCode={onCode} onClose={() => setScanner(false)} />}
+      {scanner && <ParcelScanner onCode={onCode} onClose={() => { setScanner(false); scanQueue.current = []; setScanStatus(""); }} statut={scanStatus} />}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
       {selecteur}
