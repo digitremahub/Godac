@@ -1,18 +1,20 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { flushOfflineMutations, listOfflineMutations, OFFLINE_QUEUE_EVENT } from "@/lib/offline/outbox";
+import { flushOfflineMutations, listOfflineFiles, listOfflineMutations, OFFLINE_QUEUE_EVENT } from "@/lib/offline/outbox";
 
 export function OfflineSyncStatus() {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const refresh = useCallback(async () => {
     setOnline(navigator.onLine);
     try {
-      const items = await listOfflineMutations();
+      const [items, files] = await Promise.all([listOfflineMutations(), listOfflineFiles()]);
       setPending(items.length);
+      setPendingFiles(files.length);
       setError(items.find((x) => x.lastError)?.lastError ?? null);
     } catch {
       setError("Le stockage hors ligne n'est pas disponible sur cet appareil.");
@@ -49,14 +51,15 @@ export function OfflineSyncStatus() {
     };
   }, [refresh, sync]);
 
-  if (online && pending === 0 && !error) return null;
+  if (online && pending === 0 && pendingFiles === 0 && !error) return null;
   return (
     <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${!online ? "border-orange/40 bg-orange/10 text-orange-ink" : error ? "border-orange/40 bg-orange/10 text-orange-ink" : "border-teal/30 bg-teal/10 text-teal-ink"}`}>
       <span>
         {!online ? "Hors réseau — les actions compatibles sont conservées sur ce téléphone." :
           syncing ? "Synchronisation des actions en attente…" :
           error ? `${pending} action(s) en attente — ${error}` :
-          `${pending} action(s) en attente de synchronisation.`}
+          pending > 0 ? `${pending} action(s) en attente de synchronisation.` :
+          `${pendingFiles} document(s) conservé(s) sur le téléphone, en attente de validation du formulaire.`}
       </span>
       {online && pending > 0 && <button type="button" onClick={() => void sync()} className="font-semibold underline underline-offset-2">Réessayer</button>}
     </div>
