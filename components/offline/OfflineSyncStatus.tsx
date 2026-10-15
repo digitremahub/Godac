@@ -28,7 +28,7 @@ export function OfflineSyncStatus() {
       const result = await flushOfflineMutations();
       setPending(result.pending);
       setError(result.error ?? null);
-      if (result.synced > 0) window.dispatchEvent(new Event("godac:offline-synced"));
+      if (result.synced > 0 && result.pending === 0) window.dispatchEvent(new Event("godac:offline-synced"));
     } finally {
       setSyncing(false);
       await refresh();
