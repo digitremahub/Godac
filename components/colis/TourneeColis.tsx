@@ -250,18 +250,21 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
-  function onCode(text: string): boolean {
+  function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
-      // Adresse dans le code : ajout direct, sans quitter le scanner.
       ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       return true;
-    } else {
-      setScanner(false);
-      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
-      return false;
     }
+    setScanner(false);
+    if (lectureEtiquette && image) {
+      void lireImageScannee(image, lu.code, lu.telephone ?? null);
+      setToast({ ok: true, text: "Code lu : lecture automatique de l'étiquette…" });
+    } else {
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
+      setToast({ ok: true, text: "Code lu : photographiez l'étiquette ou saisissez l'adresse." });
+    }
+    return false;
   }
 
   /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
