@@ -236,6 +236,18 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
                   </div>
                 </div>
                 {t.statut === "in_progress" && <p className="mt-1 text-[11px] text-navy/50">📍 {depuis(t.position?.at)}</p>}
+                <div className="mt-3 border-t border-navy/10 pt-2">
+                  <p className="mb-1 text-xs font-semibold text-navy/70">Ordre de passage</p>
+                  <ol className="flex flex-col gap-1">
+                    {t.arrets.map((a) => (
+                      <li key={`${t.id}-${a.ordre}`} className="flex gap-2 text-xs">
+                        <span className={`w-5 shrink-0 text-right font-bold ${a.status === "pending" ? "text-teal-ink" : "text-navy/40"}`}>{a.ordre}.</span>
+                        <span className="min-w-0 flex-1 break-words">{a.ramasse ? "Ramasse · " : ""}{a.adresse}</span>
+                        <span className="shrink-0 text-navy/45">{a.status === "pending" ? "À faire" : "Fait"}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </button>
             );
           })}
