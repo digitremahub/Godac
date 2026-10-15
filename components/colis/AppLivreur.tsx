@@ -14,7 +14,7 @@ import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
-import { estRamasse, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
+import { estRamasse, estPointRelais, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
@@ -559,6 +559,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
               {estRamasse(prochain) && <BadgeRamasse />}
+              {estPointRelais(prochain) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>
               <span>
                 Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
                 {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
@@ -654,9 +655,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     {estRamasse(s) && <EncocheRamasse />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
-                      {(estRamasse(s) || !s.phone) && (
+                      {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                         <div className="mb-1 flex flex-wrap gap-1">
                           {estRamasse(s) && <BadgeRamasse />}
+                          {estPointRelais(s) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>
                           {!s.phone && <BadgeSansTelephone />}
                         </div>
                       )}
@@ -717,7 +719,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
                     <p className="min-w-0 flex-1 truncate text-sm">
-                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
+                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}{estPointRelais(s) && <span className="mr-1 font-semibold text-teal-ink">Point relais ·</span>}
                       {s.address}
                       {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
                     </p>
