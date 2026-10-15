@@ -569,7 +569,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
               {estRamasse(prochain) && <BadgeRamasse />}
-              {estPointRelais(prochain) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>
+              {estPointRelais(prochain) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
               <span>
                 Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
                 {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
@@ -668,7 +668,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                         <div className="mb-1 flex flex-wrap gap-1">
                           {estRamasse(s) && <BadgeRamasse />}
-                          {estPointRelais(s) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>
+                          {estPointRelais(s) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
                           {!s.phone && <BadgeSansTelephone />}
                         </div>
                       )}
