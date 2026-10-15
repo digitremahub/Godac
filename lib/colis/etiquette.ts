@@ -32,6 +32,42 @@ function analyserSansTelephone(brut: string, pays: string): LectureCode {
   const texte = brut.replace(/\r/g, "").trim();
   if (!texte) return { code: null, adresse: null, destinataire: null };
 
+  // Certains QR contiennent une URL avec les informations directement dans ses paramètres.
+  // On les extrait localement ; aucune requête n'est faite vers le site du transporteur.
+  if (/^https?:\/\//i.test(texte)) {
+    try {
+      const url = new URL(texte);
+      const params = new Map<string, string>();
+      url.searchParams.forEach((value, key) => params.set(key.toLowerCase().replace(/[._-]/g, ""), value.trim()));
+      const pickParam = (...keys: string[]) => {
+        for (const key of keys) {
+          const value = params.get(key.toLowerCase().replace(/[._-]/g, ""));
+          if (value) return value;
+        }
+        return null;
+      };
+      const payload = {
+        tracking: pickParam("tracking", "trackingNumber", "parcel", "parcelNumber", "colis", "barcode", "shipmentId", "shipment"),
+        name: pickParam("name", "recipient", "recipientName", "destinataire", "nom"),
+        address: pickParam("address", "deliveryAddress", "adresse", "fullAddress"),
+        street: pickParam("street", "streetAddress", "rue"),
+        zip: pickParam("zip", "postalCode", "postcode", "cp"),
+        city: pickParam("city", "ville"),
+        phone: pickParam("phone", "telephone", "tel", "mobile"),
+        weight: pickParam("weight", "weightKg", "poids", "poidsKg"),
+      };
+      if (Object.values(payload).some(Boolean)) {
+        const extrait = analyserSansTelephone(JSON.stringify(payload), pays);
+        if (extrait.code || extrait.adresse || extrait.destinataire) return extrait;
+      }
+      // L'URL peut être un lien de suivi seulement : on conserve le code, sans prétendre
+      // connaître les détails du colis. Le scan de l'étiquette photo prendra le relais.
+      return { code: texte.slice(0, 80), adresse: null, destinataire: null };
+    } catch {
+      /* URL mal formée : traitement comme texte brut */
+    }
+  }
+
   // JSON éventuel ({"address": …, "name": …, "tracking": …}).
   if (texte.startsWith("{")) {
     try {
