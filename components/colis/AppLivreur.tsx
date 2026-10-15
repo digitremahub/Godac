@@ -11,6 +11,7 @@ import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
+import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
@@ -663,6 +664,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
+                      <HistoriqueArret stop={s} />
                       <button
                         type="button"
                         className="mt-1.5 rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
