@@ -12,7 +12,7 @@ type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 const ROUTE_FIELDS = "id, tour_number, service_id, notes, services(name)";
 const GEO_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup_addresses, position, lat, lng, insee_code, geocode_status)";
-const PLAIN_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup_addresses, position)";
+const PLAIN_VILLAGES = "tour_route_villages(id, name, postal_code, notes, position)";
 
 /**
  * Les tournées et leurs villages, avec les coordonnées mises en cache pour
