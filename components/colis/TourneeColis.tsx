@@ -269,7 +269,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
   /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
   async function ouvrirScanner() {
-    if (!scannerNatifDisponible()) return setScanner(true);
+    // La lecture automatique d'étiquette a besoin de l'image caméra complète.
+    // Le scanner natif ne fournit que le texte du code, donc on utilise le scanner web.
+    if (lectureEtiquette || !scannerNatifDisponible()) return setScanner(true);
     try {
       for (;;) {
         const code = await scannerNatif();
