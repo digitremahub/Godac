@@ -63,14 +63,14 @@ export function ParcelScanner({
       let image: string | undefined;
       const video = videoRef.current;
       if (video?.videoWidth && video.videoHeight) {
-        const scale = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight));
+        const scale = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
         const shot = document.createElement("canvas");
         shot.width = Math.round(video.videoWidth * scale);
         shot.height = Math.round(video.videoHeight * scale);
         const ctx = shot.getContext("2d");
         if (ctx) {
           ctx.drawImage(video, 0, 0, shot.width, shot.height);
-          image = shot.toDataURL("image/jpeg", 0.55).split(",")[1];
+          image = shot.toDataURL("image/jpeg", 0.45).split(",")[1];
         }
       }
       onCodeRef.current(text, image);
