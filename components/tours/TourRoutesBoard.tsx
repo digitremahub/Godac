@@ -19,6 +19,8 @@ export interface Village {
   name: string;
   postal_code: string | null;
   notes: string | null;
+  /** Adresses de ramasse planifiées par la direction, une par ligne. */
+  pickup_addresses?: string[];
   /** Coordonnées de la commune, mises en cache pour la carte (gestion seulement). */
   lat?: number | null;
   lng?: number | null;
@@ -304,7 +306,7 @@ function RouteCard({
         await send(`/api/tour-routes/${route.id}/villages`, "PUT", {
           villages: villages
             .filter((v) => v.name.trim())
-            .map((v) => ({ ...(v.id ? { id: v.id } : {}), name: v.name.trim(), postal_code: v.postal_code?.trim() || null, notes: v.notes?.trim() || null })),
+            .map((v) => ({ ...(v.id ? { id: v.id } : {}), name: v.name.trim(), postal_code: v.postal_code?.trim() || null, notes: v.notes?.trim() || null, pickup_addresses: v.pickup_addresses ?? [] })),
         });
       }
       setEditing(false);
@@ -466,6 +468,16 @@ function RouteCard({
                     onChange={(e) => update(i, { notes: e.target.value })}
                     aria-label={`Infos du village ${i + 1}`}
                   />
+                  <label className="block">
+                    <span className="label">Ramasses prévues dans ce village (une adresse par ligne)</span>
+                    <textarea
+                      className="input min-h-[72px] !py-1.5 text-sm"
+                      placeholder="Une adresse de ramasse par ligne"
+                      value={(v.pickup_addresses ?? []).join("\n")}
+                      onChange={(e) => update(i, { pickup_addresses: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
+                      aria-label={`Adresses de ramasse du village ${i + 1}`}
+                    />
+                  </label>
                   <div className="flex gap-1.5 text-xs">
                     <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Monter">
                       ↑
@@ -479,7 +491,7 @@ function RouteCard({
                   </div>
                 </div>
               ))}
-              <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null }])}>
+              <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [] }])}>
                 + Ajouter un village
               </button>
             </>
