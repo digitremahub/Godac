@@ -73,6 +73,12 @@ export function EndTourFlow({
   const [done, setDone] = useState(false);
   const [pendingOffline, setPendingOffline] = useState(false);
 
+  useEffect(() => {
+    const synced = () => { setPendingOffline(false); router.refresh(); };
+    window.addEventListener("godac:offline-synced", synced);
+    return () => window.removeEventListener("godac:offline-synced", synced);
+  }, [router]);
+
   // Loaded up front, before any scan, so the vehicle used at
   // departure is confirmed in one tap — the QR scanner is only shown
   // for an explicit "changement de véhicule" (handleScan below,
