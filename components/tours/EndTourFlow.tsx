@@ -316,6 +316,7 @@ export function EndTourFlow({
             initUrl="/api/ocr/odometer/init"
             processUrl="/api/ocr/odometer/process"
             bucket="tour-photos"
+            offlineSupported
             onCaptured={({ photoPath, reading }) => {
               setEndKmPhotoPath(photoPath);
               if (reading !== null) setEndKm(String(reading));
@@ -389,6 +390,7 @@ export function EndTourFlow({
 
       <TourReportPhotoCapture
         label="Photo du compte-rendu de tournée (optionnel — lecture auto)"
+        offlineSupported
         onCaptured={({ photoPath, fields }) => {
           setSheetPhotoPath(photoPath);
           setReportFields(fields);
