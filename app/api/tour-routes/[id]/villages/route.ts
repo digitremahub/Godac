@@ -14,6 +14,7 @@ const bodySchema = z.object({
         name: z.string().trim().min(1).max(120),
         postal_code: z.string().trim().max(10).nullable().optional(),
         notes: z.string().trim().max(2000).nullable().optional(),
+        pickup_addresses: z.array(z.string().trim().min(1).max(300)).max(100).optional(),
       }),
     )
     .max(200),
@@ -58,7 +59,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const inserts: Record<string, unknown>[] = [];
   const updates: { id: string; patch: Record<string, unknown> }[] = [];
   parsed.data.villages.forEach((v, i) => {
-    const base = { position: i, name: v.name, postal_code: v.postal_code || null, notes: v.notes || null };
+    const base = { position: i, name: v.name, postal_code: v.postal_code || null, notes: v.notes || null, pickup_addresses: v.pickup_addresses ?? [] };
     const geo = known.get(geoKey(v.name, v.postal_code));
     const old = v.id ? previousById.get(v.id) : undefined;
     if (old && !kept.has(old.id)) {
