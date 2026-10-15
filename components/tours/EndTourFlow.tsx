@@ -149,6 +149,22 @@ export function EndTourFlow({
     setBusy(true);
     setError(null);
     try {
+      if ([sheetPhotoPath, endKmPhotoPath].some((path) => path.startsWith("offline://"))) {
+        if (problemPhotoFile) throw new Error("La photo du problème doit être envoyée en ligne avant de valider le retour. Retirez-la temporairement ou reconnectez-vous.");
+        await enqueueOfflineMutation(`/api/tours/${openTour.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            vehicle_id: vehicleId, end_km: Number(endKm), end_km_photo_path: endKmPhotoPath || undefined,
+            sheet_photo_path: sheetPhotoPath || undefined,
+            report_fields: reportFields || ramasses.trim() !== "" ? { ...(reportFields ?? {}), ...(ramasses.trim() !== "" ? { pickups: Number(ramasses) } : {}) } : undefined,
+            notes: notes || undefined, return_type: returnType, vehicle_ok: vehicleOk,
+            problem_description: vehicleOk ? undefined : problemDescription,
+            change_reason: vehicleChanged ? changeReason : undefined, change_type: vehicleChanged ? changeType : undefined,
+            change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
+          }),
+        });
+        setPendingOffline(true); setDone(true); return;
+      }
       const patchRes = await fetch(`/api/tours/${openTour.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...tourHeaders },
