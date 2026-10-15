@@ -1054,6 +1054,21 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           </button>
                         )}
                       </div>
+                      {s.status === "pending" && run.status !== "done" && estRamasse(s) && edition?.id !== s.id && (
+                        <div className="mt-1 pl-9">
+                          <button type="button" className="btn-secondary !px-3 !py-1 text-xs" onClick={async () => {
+                            const valeur = prompt("Nombre de colis réellement ramassés", String(s.packages_picked_up ?? ""));
+                            if (valeur === null || !valeur.trim()) return;
+                            const nombre = Number(valeur);
+                            if (!Number.isInteger(nombre) || nombre < 0 || nombre > 500) { setToast({ ok: false, text: "Saisissez un nombre entier entre 0 et 500." }); return; }
+                            try {
+                              await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ packages_picked_up: nombre }) });
+                              await recharger(run.id);
+                              setToast({ ok: true, text: `${nombre} colis ramassé(s) enregistré(s).` });
+                            } catch (e) { setToast({ ok: false, text: networkErrorMessage(e) }); }
+                          }}>📦 Saisir les colis ramassés</button>
+                        </div>
+                      )}
                       {s.status === "pending" && run.status !== "done" && edition?.id !== s.id && (
                         <div className="mt-1.5 flex flex-wrap gap-1 pl-9 text-xs">
                           {enLivraison && (
