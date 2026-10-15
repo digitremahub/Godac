@@ -60,7 +60,7 @@ export default async function FuelPage({
       <div className="mx-auto max-w-lg">
         <PageHeader
           title="Nouveau ravitaillement"
-          description="Plein à la cuve de l'entreprise ou achat en station (ticket)."
+          description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un ravitaillement oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
           actions={
             <Link href="/fuel" className="btn-secondary">
               ← Historique
