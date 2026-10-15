@@ -398,6 +398,14 @@ function RouteCard({
                         </p>
                       ) : null}
                       {v.notes && <p className="mt-0.5 whitespace-pre-line text-sm text-navy/70">{v.notes}</p>}
+                      {(v.pickup_addresses ?? []).length > 0 && (
+                        <div className="mt-2 rounded-lg border border-gold/40 bg-gold/10 p-2">
+                          <p className="text-xs font-bold uppercase tracking-wide">Ramasses prévues</p>
+                          <ul className="mt-1 list-inside list-disc text-sm">
+                            {(v.pickup_addresses ?? []).map((address, j) => <li key={j}>{address}</li>)}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                     <a href={mapsLink(v)} target="_blank" rel="noreferrer" className="shrink-0 self-center text-teal-ink" aria-label={`Ouvrir ${v.name} dans Google Maps`}>
                       <IconMapPin className="h-5 w-5" />
