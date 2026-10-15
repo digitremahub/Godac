@@ -11,6 +11,7 @@ import { TourReportPhotoCapture } from "@/components/shared/TourReportPhotoCaptu
 import { Card, EmptyState } from "@/components/ui";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
 import { IconCamera, IconCheck, IconRefresh } from "@/components/layout/icons";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 
 interface OpenTour {
   id: string;
@@ -70,6 +71,7 @@ export function EndTourFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [pendingOffline, setPendingOffline] = useState(false);
 
   // Loaded up front, before any scan, so the vehicle used at
   // departure is confirmed in one tap — the QR scanner is only shown
@@ -182,7 +184,33 @@ export function EndTourFlow({
       setDone(true);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inattendue");
+      if (isNetworkFailure(e) && !problemPhotoFile) {
+        try {
+          await enqueueOfflineMutation(`/api/tours/${openTour.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              vehicle_id: vehicleId,
+              end_km: Number(endKm),
+              end_km_photo_path: endKmPhotoPath || undefined,
+              sheet_photo_path: sheetPhotoPath || undefined,
+              report_fields: reportFields || ramasses.trim() !== "" ? { ...(reportFields ?? {}), ...(ramasses.trim() !== "" ? { pickups: Number(ramasses) } : {}) } : undefined,
+              notes: notes || undefined,
+              return_type: returnType,
+              vehicle_ok: vehicleOk,
+              problem_description: vehicleOk ? undefined : problemDescription,
+              change_reason: vehicleChanged ? changeReason : undefined,
+              change_type: vehicleChanged ? changeType : undefined,
+              change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
+            }),
+          });
+          setPendingOffline(true);
+          setDone(true);
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Enregistrement hors ligne impossible");
+        }
+      } else {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      }
     } finally {
       setBusy(false);
     }
@@ -191,8 +219,8 @@ export function EndTourFlow({
   if (done) {
     return (
       <EmptyState
-        title="Tournée terminée"
-        description={onBehalf ? `Le retour de ${onBehalf.colleagueName} a été enregistré à son nom.` : "Le retour a été enregistré. À demain !"}
+        title={pendingOffline ? "Retour enregistré sur le téléphone" : "Tournée terminée"}
+        description={pendingOffline ? "Le retour est en attente de synchronisation. Laissez GODAC ouvert ou reconnectez-vous pour l’envoyer. Vérifiez ensuite que la tournée est clôturée dans l’application." : onBehalf ? `Le retour de ${onBehalf.colleagueName} a été enregistré à son nom.` : "Le retour a été enregistré. À demain !"}
       />
     );
   }
