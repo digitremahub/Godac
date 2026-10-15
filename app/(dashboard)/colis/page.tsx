@@ -5,6 +5,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
+import { AffecterTourneeColis } from "@/components/colis/AffecterTourneeColis";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
@@ -31,6 +32,14 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   const encadrement = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
   const historiqueVisible = encadrement || appUser.role === "chauffeur";
   const onglet = historiqueVisible && params.onglet === "historique" ? "historique" : "jour";
+
+  const [{ data: services }, { data: drivers }, { data: vehicles }] = encadrement
+    ? await Promise.all([
+        supabase.from("services").select("id, name").order("name"),
+        supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+        supabase.from("vehicles").select("id, registration, service_id").order("registration"),
+      ])
+    : [{ data: null }, { data: null }, { data: null }];
 
   const onglets = historiqueVisible && (
     <div className="mb-5 flex gap-1 border-b border-navy/10" role="tablist" aria-label="Tournée colis">
@@ -80,6 +89,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
       <TourneesTabs canTrack={encadrement} />
       {onglets}
       {encadrement && <AffecterTournee />}
+      {encadrement && <AffecterTourneeColis services={(services ?? []) as { id: string; name: string }[]} drivers={(drivers ?? []) as { id: string; full_name: string }[]} vehicles={(vehicles ?? []) as { id: string; registration: string; service_id: string | null }[]} />}
       <TourneeColis lectureEtiquette pays={pays.code} />
     </div>
   );
