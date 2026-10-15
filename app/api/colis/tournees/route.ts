@@ -25,7 +25,80 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
   try {
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
-    // Les ramasses habituelles sont des arrêts de la tournée, pas un onglet séparé.
+    const pays = await codePays(appUser.organization_id);
+    let position = 0;
+    const adressesAjoutees = new Set<string>();
+    const cle = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("fr-FR").replace(/[^a-z0-9]+/g, " ").trim();
+
+    // 1) Ramasses saisies par la Direction dans la fiche de chaque village.
+    // On récupère la tournée affectée à ce chauffeur pour la date de la tournée colis.
+    const date = run.run_date;
+    const veille = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString();
+    const lendemain = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString();
+    const { data: planning, error: erreurPlanning } = await supabase
+      .from("planning_entries")
+      .select("tour_number, service_id, start_at")
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", appUser.id)
+      .gte("start_at", veille)
+      .lt("start_at", lendemain)
+      .order("start_at");
+    if (erreurPlanning) throw erreurPlanning;
+    const passage = (planning ?? []).find((entry: any) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(entry.start_at)) === date
+      && entry.tour_number
+      && (!run.service_id || !entry.service_id || entry.service_id === run.service_id)
+    );
+
+    if (passage?.tour_number) {
+      const { data: route, error: erreurRoute } = await supabase
+        .from("tour_routes")
+        .select("id")
+        .eq("organization_id", appUser.organization_id)
+        .eq("tour_number", passage.tour_number)
+        .maybeSingle();
+      if (erreurRoute) throw erreurRoute;
+      if (route) {
+        const { data: villages, error: erreurVillages } = await supabase
+          .from("tour_route_villages")
+          .select("id, name, pickup_addresses, position")
+          .eq("tour_route_id", route.id)
+          .order("position");
+        if (erreurVillages) throw erreurVillages;
+        for (const village of villages ?? []) {
+          const adresses = Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [];
+          const adressesUniques = adresses.map((a: string) => a.trim()).filter((a: string) => a.length >= 5 && !adressesAjoutees.has(cle(a)));
+          if (!adressesUniques.length) continue;
+          const { data: liste, error: erreurListe } = await supabase
+            .from("delivery_lists")
+            .insert({ organization_id: appUser.organization_id, run_id: run.id, name: village.name.slice(0, 60), position })
+            .select("id")
+            .single();
+          if (erreurListe) throw new Error(`Tournée créée, mais la liste du village « ${village.name} » n’a pas pu être créée : ${erreurListe.message}`);
+          position += 1;
+          for (const address of adressesUniques) {
+            const geo = await geocodeAddress(address, pays).catch(() => null);
+            const { error } = await supabase.from("delivery_stops").insert({
+              organization_id: appUser.organization_id,
+              run_id: run.id,
+              list_id: liste.id,
+              position,
+              kind: "ramasse",
+              address,
+              parcel_count: 1,
+              status: "pending",
+              lat: geo?.lat ?? null,
+              lng: geo?.lng ?? null,
+            });
+            if (error) throw new Error(`Tournée créée, mais la ramasse « ${address} » n’a pas pu être ajoutée : ${error.message}`);
+            adressesAjoutees.add(cle(address));
+            position += 1;
+          }
+        }
+      }
+    }
+
+    // 2) Ramasses habituelles du chauffeur, en complément des ramasses de village.
     const { data: habitudes, error: erreurHabitudes } = await supabase
       .from("driver_pickup_templates")
       .select("address, recipient, phone")
@@ -34,25 +107,25 @@ export async function POST(req: Request) {
       .eq("active", true)
       .order("created_at");
     if (erreurHabitudes && erreurHabitudes.code !== "42P01") throw erreurHabitudes;
-    if (habitudes?.length) {
-      const pays = await codePays(appUser.organization_id);
-      for (const [index, habitude] of habitudes.entries()) {
-        const geo = await geocodeAddress(habitude.address, pays).catch(() => null);
-        const { error } = await supabase.from("delivery_stops").insert({
-          organization_id: appUser.organization_id,
-          run_id: run.id,
-          position: index,
-          kind: "ramasse",
-          address: habitude.address,
-          recipient: habitude.recipient,
-          phone: habitude.phone,
-          parcel_count: 1,
-          status: "pending",
-          lat: geo?.lat ?? null,
-          lng: geo?.lng ?? null,
-        });
-        if (error) throw new Error(`Tournée créée, mais une ramasse habituelle n’a pas pu être ajoutée : ${error.message}`);
-      }
+    for (const habitude of habitudes ?? []) {
+      if (adressesAjoutees.has(cle(habitude.address))) continue;
+      const geo = await geocodeAddress(habitude.address, pays).catch(() => null);
+      const { error } = await supabase.from("delivery_stops").insert({
+        organization_id: appUser.organization_id,
+        run_id: run.id,
+        position,
+        kind: "ramasse",
+        address: habitude.address,
+        recipient: habitude.recipient,
+        phone: habitude.phone,
+        parcel_count: 1,
+        status: "pending",
+        lat: geo?.lat ?? null,
+        lng: geo?.lng ?? null,
+      });
+      if (error) throw new Error(`Tournée créée, mais une ramasse habituelle n’a pas pu être ajoutée : ${error.message}`);
+      adressesAjoutees.add(cle(habitude.address));
+      position += 1;
     }
     return NextResponse.json({ run });
   } catch (e) {
