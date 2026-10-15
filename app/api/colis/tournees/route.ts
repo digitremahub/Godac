@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 import { creerTournee, listerTournees, moduleActif } from "@/lib/colis/serveur";
 
 /** Tournées colis du chauffeur connecté (jour en cours + non clôturées de la semaine). */
@@ -22,7 +24,24 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
   try {
-    return NextResponse.json({ run: await creerTournee(supabase, appUser, parsed.data.name ?? null) });
+    const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
+    // Charge automatiquement les ramasses habituelles propres au chauffeur.
+    const { data: habitudes } = await supabase.from("driver_pickup_templates")
+      .select("address, recipient, phone").eq("driver_id", appUser.id).eq("organization_id", appUser.organization_id).order("created_at");
+    if (habitudes?.length) {
+      const pays = await codePays(appUser.organization_id);
+      for (const [index, habitude] of habitudes.entries()) {
+        const geo = await geocodeAddress(habitude.address, pays).catch(() => null);
+        const { error } = await supabase.from("delivery_stops").insert({
+          organization_id: appUser.organization_id, run_id: run.id, position: index,
+          kind: "ramasse", address: habitude.address, recipient: habitude.recipient,
+          phone: habitude.phone, parcel_count: 1, status: "pending",
+          lat: geo?.lat ?? null, lng: geo?.lng ?? null,
+        });
+        if (error) throw new Error(`Tournée créée, mais une ramasse habituelle n’a pas pu être ajoutée : ${error.message}`);
+      }
+    }
+    return NextResponse.json({ run });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création impossible" }, { status: 500 });
   }
