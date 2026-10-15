@@ -30,7 +30,7 @@ export interface Stop {
   delivered_place: string | null;
   proof_photo_path: string | null;
   /** Livraison (par défaut) ou ramasse ; absent avant la migration 170. */
-  kind?: "livraison" | "ramasse" | null;
+  kind?: "livraison" | "ramasse" | "point_relais" | null;
   /** Livraison avec QR code : valeur scannée (preuve de remise). */
   proof_code?: string | null;
   /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */
