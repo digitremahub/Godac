@@ -258,12 +258,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     try {
       const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
       const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      // Seuls le numéro et l'adresse sont bloquants. Nom, téléphone et poids
+      // restent facultatifs : ne pas interrompre le chauffeur pour ces champs.
       const manquants = [
         !d.code && "numéro de colis",
         d.adresse.trim().length < 5 && "adresse",
-        !d.destinataire.trim() && "destinataire",
-        !normaliserTelephone(d.telephone, pays) && "téléphone",
-        !lirePoids(d.poids) && "poids",
       ].filter(Boolean);
       if (manquants.length === 0) { await ajouter(d); return true; }
       setDraft(d);
@@ -296,7 +295,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
       const d: Draft = { adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) };
-      const complet = Boolean(d.code && d.adresse.trim().length >= 5 && d.destinataire.trim() && normaliserTelephone(d.telephone, pays) && lirePoids(d.poids));
+      const complet = Boolean(d.code && d.adresse.trim().length >= 5);
       if (complet) {
         void ajouter(d);
         setScanStatus("Colis complet détecté · " + d.code);
