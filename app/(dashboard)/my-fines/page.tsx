@@ -1,17 +1,10 @@
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 
 export default async function MesAmendesPage() {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
-  const enabled = await isModuleEnabled(supabase, appUser.organization_id, "fines");
-
-  if (!enabled) {
-    return <EmptyState title="Module Amendes non activé" description="Demandez à la direction d’activer le module Amendes." />;
-  }
-
   const { data } = await supabase
     .from("fines")
     .select("id, infraction_at, amount, reference, status, vehicles(registration)")
