@@ -8,6 +8,7 @@ export type OfflineMutation = {
   url: string;
   method: string;
   body: string | null;
+  headers?: Record<string, string>;
   createdAt: string;
   attempts: number;
   lastError?: string;
@@ -106,6 +107,7 @@ export async function enqueueOfflineMutation(url: string, init: RequestInit): Pr
     url,
     method,
     body: typeof init.body === "string" ? init.body : null,
+    headers: init.headers ? Object.fromEntries(new Headers(init.headers).entries()) : {},
     createdAt: new Date().toISOString(),
     attempts: 0,
   };
@@ -137,7 +139,7 @@ export async function flushOfflineMutations(): Promise<{ synced: number; pending
       const response = await fetch(item.url, {
         method: item.method,
         credentials: "same-origin",
-        headers: item.body ? { "Content-Type": "application/json", "X-GODAC-Offline-Action": item.id } : { "X-GODAC-Offline-Action": item.id },
+        headers: { ...(item.headers ?? {}), ...(body ? { "Content-Type": "application/json" } : {}), "X-GODAC-Offline-Action": item.id },
         body: body ?? undefined,
       });
       if (!response.ok) {
