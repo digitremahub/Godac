@@ -460,6 +460,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                 <div>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
                     {estRamasse(arretCarte) && <BadgeRamasse />}
+                    {estPointRelais(arretCarte) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
                     <span>
                       Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
                       {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
