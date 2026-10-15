@@ -77,6 +77,12 @@ export function StartTourFlow({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pendingOffline, setPendingOffline] = useState(false);
+
+  useEffect(() => {
+    const synced = () => { setPendingOffline(false); router.refresh(); };
+    window.addEventListener("godac:offline-synced", synced);
+    return () => window.removeEventListener("godac:offline-synced", synced);
+  }, [router]);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [vehicleChanged, setVehicleChanged] = useState(false);
   const [changeReason, setChangeReason] = useState("");
