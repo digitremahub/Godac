@@ -129,6 +129,10 @@ export async function POST(req: Request) {
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await supabase.from("delivery_stop_events").insert({
+    organization_id: appUser.organization_id, run_id: run.id, stop_id: data.id, actor_id: appUser.id,
+    event_type: "stop_created", new_value: { address: data.address, kind: data.kind ?? "livraison" }, details: "Arrêt ajouté à la tournée",
+  });
   // Toute ramasse non exceptionnelle devient une habitude réutilisée à l’ouverture des prochaines tournées.
   if (kind === "ramasse" && !exceptionnelle) {
     await supabase.from("driver_pickup_templates").upsert({
