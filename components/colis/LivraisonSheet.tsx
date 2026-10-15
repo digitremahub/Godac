@@ -6,6 +6,7 @@ import { IconCamera, IconCheck, IconQrCode, IconX } from "@/components/layout/ic
 import { LIEUX_LIVRAISON, normaliserCodeQr, photoObligatoire, qrObligatoire, resumeCodeQr, type LieuLivraison } from "@/lib/colis/livraison";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { api, imageEnBase64, type Stop } from "@/components/colis/commun";
 
 // Scanner web (caméra + jsQR) chargé seulement pour une livraison avec QR code.
@@ -91,7 +92,26 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
       navigator.vibrate?.(40);
       onLivre(maj);
     } catch (e) {
-      setErreur(networkErrorMessage(e));
+      if (isNetworkFailure(e)) {
+        try {
+          await enqueueOfflineMutation(`/api/colis/arrets/${stop.id}/livraison`, {
+            method: "POST",
+            body: JSON.stringify({ lieu, precision: precision.trim() || null, image: photo?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
+          });
+          onLivre({
+            ...stop,
+            status: "delivered",
+            done_at: new Date().toISOString(),
+            delivered_place: lieu,
+            proof_code: avecQr ? codeLu : null,
+          });
+          return;
+        } catch (queueError) {
+          setErreur(networkErrorMessage(queueError));
+        }
+      } else {
+        setErreur(networkErrorMessage(e));
+      }
     } finally {
       setBusy(null);
     }
