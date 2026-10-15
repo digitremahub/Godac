@@ -11,7 +11,7 @@ import { networkErrorMessage } from "@/lib/utils/network-error";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
-import { estRamasse, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { estRamasse, estPointRelais, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
@@ -938,7 +938,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {draft && (
         <Card className="flex flex-col gap-3 border-2 border-teal/40">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : "Nouveau colis"}</h2>
+            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : draft.type === "point_relais" ? "Dépôt en point relais" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
               <IconX className="h-5 w-5" />
             </button>
@@ -974,7 +974,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
-              {draft.type === "ramasse" ? "Ajouter la ramasse" : "Ajouter à la tournée"}
+              {draft.type === "ramasse" ? "Ajouter la ramasse" : draft.type === "point_relais" ? "Ajouter au point relais" : "Ajouter à la tournée"}
             </button>
             {lectureEtiquette && (
               <button type="button" className="btn-secondary" disabled={busy === "photo"} onClick={() => fileRef.current?.click()}>
@@ -1027,9 +1027,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {(estRamasse(s) || (s.status === "pending" && !s.phone)) && (
+                          {(estRamasse(s) || estPointRelais(s) || (s.status === "pending" && !s.phone)) && (
                             <div className="mb-1 flex flex-wrap gap-1">
                               {estRamasse(s) && <BadgeRamasse />}
+                              {estPointRelais(s) && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
+                                  <IconMapPin className="h-3.5 w-3.5" /> Point relais
+                                </span>
+                              )}
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
                           )}
