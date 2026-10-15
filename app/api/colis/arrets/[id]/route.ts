@@ -86,7 +86,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const autre = liste[j]!;
     await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id);
     await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id);
-    const { data: eventStop } = await supabase.from("delivery_stops").select("organization_id").eq("id", id).maybeSingle();
     await supabase.from("delivery_stop_events").insert({
       organization_id: appUser.organization_id, run_id: stop.run_id, stop_id: id, actor_id: appUser.id,
       event_type: "reordered", previous_value: { position: stop.position }, new_value: { position: autre.position },
