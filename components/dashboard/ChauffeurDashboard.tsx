@@ -164,7 +164,7 @@ export async function ChauffeurDashboard({
     .filter((sv) => sv && (sv.team_leader_name || sv.team_leader_phone || sv.team_leader_email));
   // Tournée de renfort : les villages empruntés du jour (choisis pour ce passage, sinon par défaut), avec leur tournée.
   const todayIsRenfort = Boolean((todayRoute as any)?.is_renfort);
-  const todayVillages: { name: string; homeTour?: string }[] = todayIsRenfort
+  const todayVillages: { name: string; homeTour?: string; pickup_addresses?: string[] }[] = todayIsRenfort
     ? await loadRenfortVillages(supabase, (todayRoute as any).id, todayEntryId)
     : (((todayRoute as any)?.tour_route_villages ?? []) as any[]).sort((a, b) => a.position - b.position);
 
@@ -209,8 +209,9 @@ export async function ChauffeurDashboard({
                 {todayVillages.map((v, i) => (
                   <li key={i} className="flex items-center gap-1.5 rounded-full bg-navy/[0.045] py-1 pl-1 pr-3 text-sm">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
-                    {v.name}
+                    <span>{v.name}</span>
                     {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
+                    {(v.pickup_addresses ?? []).length > 0 && <span className="ml-1 text-xs font-semibold text-orange-ink">· {(v.pickup_addresses ?? []).length} ramasse(s)</span>}
                   </li>
                 ))}
               </ol>
