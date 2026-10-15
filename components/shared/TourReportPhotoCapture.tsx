@@ -23,10 +23,12 @@ export function TourReportPhotoCapture({
   label,
   onCaptured,
   onUploadBusyChange,
+  offlineSupported = false,
 }: {
   label: string;
   onCaptured: (result: { photoPath: string; fields: TourReportFields | null }) => void;
   onUploadBusyChange?: (busy: boolean) => void;
+  offlineSupported?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [status, setStatus] = useState<"idle" | "uploading" | "extracting" | "done" | "error">("idle");
@@ -85,7 +87,7 @@ export function TourReportPhotoCapture({
         onCaptured({ photoPath: storagePath, fields: null });
       }
     } catch (e) {
-      if (!uploadedPath && isNetworkFailure(e)) {
+      if (!uploadedPath && isNetworkFailure(e) && offlineSupported) {
         try {
           const localPath = await enqueueOfflineFile(file, { initUrl: "/api/ocr/tour-report/init", processUrl: "/api/ocr/tour-report/process", bucket: "tour-photos" });
           setStatus("done");
