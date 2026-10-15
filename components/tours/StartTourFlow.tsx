@@ -169,6 +169,22 @@ export function StartTourFlow({
     setBusy(true);
     setError(null);
     try {
+      if ([sheetPhotoPath, startSheetPath, startKmPhotoPath].some((path) => path.startsWith("offline://"))) {
+        if (problemPhotoFile) throw new Error("La photo du problème doit être envoyée en ligne avant de valider le départ. Retirez-la temporairement ou reconnectez-vous.");
+        await enqueueOfflineMutation("/api/tours", {
+          method: "POST",
+          body: JSON.stringify({
+            vehicle_id: vehicleId, service_id: polyvalentServices ? serviceId : undefined,
+            tour_number: tourNumber || undefined, planned_entry_id: plannedToday?.id, start_km: Number(startKm),
+            start_km_photo_path: startKmPhotoPath || undefined, sheet_photo_path: sheetPhotoPath || undefined,
+            start_sheet_path: startSheetPath || undefined, report_fields: reportFields ?? undefined,
+            vehicle_ok: vehicleOk, problem_description: vehicleOk ? undefined : problemDescription,
+            change_reason: vehicleChanged ? changeReason : undefined, change_type: vehicleChanged ? changeType : undefined,
+            change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
+          }),
+        });
+        setPendingOffline(true); setDone(true); return;
+      }
       const res = await fetch("/api/tours", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tourHeaders },
