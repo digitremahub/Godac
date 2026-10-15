@@ -18,6 +18,18 @@ describe("analyserCode", () => {
     const r = analyserCode('{"tracking":"ABC123456","name":"SARL Dupont","street":"1 chemin du Moulin","zip":"69510","city":"Soucieu-en-Jarrest"}');
     expect(r).toEqual({ code: "ABC123456", adresse: "1 chemin du Moulin, 69510 Soucieu-en-Jarrest", destinataire: "SARL Dupont" });
   });
+  it("QR contenant une URL avec les champs du colis", () => {
+    const r = analyserCode("https://example.test/parcel?trackingNumber=ABC123456&recipientName=SARL%20Dupont&street=1%20chemin%20du%20Moulin&postalCode=69510&city=Soucieu-en-Jarrest&weight=850g");
+    expect(r.code).toBe("ABC123456");
+    expect(r.adresse).toBe("1 chemin du Moulin, 69510 Soucieu-en-Jarrest");
+    expect(r.destinataire).toBe("SARL Dupont");
+    expect(r.poids).toBe(0.85);
+  });
+  it("URL de suivi seule : ne prétend pas connaître l'adresse", () => {
+    const r = analyserCode("https://tracking.example.test/ABC123456");
+    expect(r.adresse).toBeNull();
+    expect(r.code).toContain("https://tracking.example.test");
+  });
 });
 
 describe("analyserCode — téléphone", () => {
