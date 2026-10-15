@@ -153,6 +153,7 @@ export function EndTourFlow({
         if (problemPhotoFile) throw new Error("La photo du problème doit être envoyée en ligne avant de valider le retour. Retirez-la temporairement ou reconnectez-vous.");
         await enqueueOfflineMutation(`/api/tours/${openTour.id}`, {
           method: "PATCH",
+          headers: tourHeaders,
           body: JSON.stringify({
             vehicle_id: vehicleId, end_km: Number(endKm), end_km_photo_path: endKmPhotoPath || undefined,
             sheet_photo_path: sheetPhotoPath || undefined,
@@ -204,6 +205,7 @@ export function EndTourFlow({
         try {
           await enqueueOfflineMutation(`/api/tours/${openTour.id}`, {
             method: "PATCH",
+            headers: tourHeaders,
             body: JSON.stringify({
               vehicle_id: vehicleId,
               end_km: Number(endKm),
