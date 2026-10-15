@@ -38,33 +38,64 @@ interface Draft {
 /** Poids saisi → texte du champ (« 2,5 »). */
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
-/** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
+/** Suggestions d'adresses et d'entreprises : BAN en France + lieux professionnels OpenStreetMap. */
 function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<{ label: string; detail?: string }[]>([]);
+  const [loading, setLoading] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  const request = useRef(0);
+
   function change(v: string) {
     onChange(v);
     clearTimeout(timer.current);
-    if (!france || v.trim().length < 4) return setSuggestions([]);
+    const query = v.trim();
+    const id = ++request.current;
+    if (query.length < 3) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
     timer.current = setTimeout(async () => {
+      setLoading(true);
       try {
-        const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(v)}&limit=5&autocomplete=1`);
-        const data = (await res.json()) as { features?: { properties?: { label?: string } }[] };
-        setSuggestions((data.features ?? []).map((f) => f.properties?.label ?? "").filter(Boolean));
-      } catch {
-        setSuggestions([]);
+        const jobs: Promise<{ label: string; detail?: string }[]>[] = [
+          fetch(`/api/geo/search?q=${encodeURIComponent(query)}&country=${france ? "FR" : "CH"}`)
+            .then(async (res) => res.ok ? (await res.json() as { results?: { label: string; detail?: string }[] }).results ?? [] : [])
+            .catch(() => []),
+        ];
+        if (france) {
+          jobs.push(fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5&autocomplete=1`)
+            .then(async (res) => {
+              const data = await res.json() as { features?: { properties?: { label?: string } }[] };
+              return (data.features ?? []).map((f) => ({ label: f.properties?.label ?? "" })).filter((x) => x.label);
+            }).catch(() => []));
+        }
+        const results = (await Promise.all(jobs)).flat();
+        if (request.current !== id) return;
+        const seen = new Set<string>();
+        setSuggestions(results.filter((x) => {
+          const key = x.label.toLocaleLowerCase("fr-FR");
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 7));
+      } finally {
+        if (request.current === id) setLoading(false);
       }
-    }, 250);
+    }, 450);
   }
+
   return (
     <div className="relative">
-      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="N°, rue, code postal, ville" autoFocus={autoFocus} aria-label="Adresse de livraison" autoComplete="off" />
+      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="Entreprise, commerce ou adresse…" autoFocus={autoFocus} aria-label="Entreprise ou adresse de livraison" autoComplete="off" />
+      {loading && <p className="absolute right-3 top-3 text-xs text-navy/45">Recherche…</p>}
       {suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-navy/10 bg-surface shadow-pop">
+        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-navy/10 bg-surface shadow-pop">
           {suggestions.map((s) => (
-            <li key={s}>
-              <button type="button" className="block w-full px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05]" onClick={() => (onChange(s), setSuggestions([]))}>
-                {s}
+            <li key={s.label}>
+              <button type="button" className="block w-full px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05]" onClick={() => (onChange(s.label), setSuggestions([]))}>
+                <span className="block font-medium">{s.label}</span>
+                {s.detail && <span className="mt-0.5 block text-xs text-navy/55">{s.detail}</span>}
               </button>
             </li>
           ))}
