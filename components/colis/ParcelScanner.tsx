@@ -21,12 +21,14 @@ export function ParcelScanner({
   onClose,
   consigne = "Passez les colis un par un devant la caméra",
   bouton = "Terminer le scan",
+  statut = "",
   calque = "z-[60]",
 }: {
   onCode: (text: string, image?: string) => void;
   onClose: () => void;
   consigne?: string;
   bouton?: string;
+  statut?: string;
   calque?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -132,6 +134,7 @@ export function ParcelScanner({
         <p className="absolute inset-x-0 top-4 text-center text-sm font-semibold text-white drop-shadow">
           {consigne}
           <span className="block text-xs font-normal text-white/75">{natif ? "QR, Datamatrix et codes-barres" : "Codes QR"}</span>
+          {statut && <span className="mx-auto mt-2 block max-w-[90%] rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white">{statut}</span>}
         </p>
         {error && <p className="absolute inset-x-4 bottom-24 rounded-xl bg-orange px-4 py-3 text-sm font-semibold text-white">{error}</p>}
       </div>
