@@ -1,4 +1,4 @@
-import { IconRamasse } from "@/components/layout/icons";
+import { IconRamasse, IconMapPin } from "@/components/layout/icons";
 import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
 
 /**
@@ -21,10 +21,10 @@ export function BadgeRamasse({ className = "" }: { className?: string }) {
   );
 }
 
-/** Choix Livraison / Ramasse à la création ou l'édition d'un arrêt. */
+/** Choix de la catégorie à la création ou l'édition d'un arrêt. */
 export function ChoixTypeArret({ value, onChange }: { value: TypeArret; onChange: (t: TypeArret) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-xl bg-navy/[0.05] p-1 text-sm font-semibold" role="radiogroup" aria-label="Type d'arrêt">
+    <div className="grid grid-cols-3 gap-1 rounded-xl bg-navy/[0.05] p-1 text-xs font-semibold sm:text-sm" role="radiogroup" aria-label="Type d'arrêt">
       {TYPES_ARRET.map((t) => (
         <button
           key={t.key}
@@ -33,10 +33,11 @@ export function ChoixTypeArret({ value, onChange }: { value: TypeArret; onChange
           aria-checked={value === t.key}
           onClick={() => onChange(t.key)}
           className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors ${
-            value === t.key ? (t.key === "ramasse" ? "bg-gold text-marine shadow-card" : "bg-surface shadow-card") : "text-navy/60 hover:text-navy"
+            value === t.key ? (t.key === "ramasse" ? "bg-gold text-marine shadow-card" : t.key === "point_relais" ? "bg-teal text-marine shadow-card" : "bg-surface shadow-card") : "text-navy/60 hover:text-navy"
           }`}
         >
           {t.key === "ramasse" && <IconRamasse className="h-4 w-4" />}
+          {t.key === "point_relais" && <IconMapPin className="h-4 w-4" />}
           {t.label}
         </button>
       ))}
