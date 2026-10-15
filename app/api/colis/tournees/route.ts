@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { geocodeAddress } from "@/lib/geo/geocode";
+import { codePays } from "@/lib/pays/serveur";
 import { creerTournee, listerTournees, moduleActif } from "@/lib/colis/serveur";
 
 /** Tournées colis du chauffeur connecté (jour en cours + non clôturées de la semaine). */
