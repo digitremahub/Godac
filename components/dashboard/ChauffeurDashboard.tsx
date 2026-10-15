@@ -18,7 +18,7 @@ type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 /** La fiche de la tournée du jour ; sans la migration des renforts, relue sans le drapeau. */
 async function loadTodayRoute(supabase: Supabase, tourNumber: string) {
-  const villages = "tour_route_villages(name, postal_code, notes, position)";
+  const villages = "tour_route_villages(name, postal_code, notes, pickup_addresses, position)";
   const withRenfort = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
   if (!withRenfort.error) return withRenfort;
   return supabase.from("tour_routes").select(`id, tour_number, notes, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
