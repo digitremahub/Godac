@@ -60,6 +60,7 @@ export function libellePreuve(s: { delivered_place: string | null; proof_code?: 
 export const TYPES_ARRET = [
   { key: "livraison", label: "Livraison" },
   { key: "ramasse", label: "Ramasse" },
+  { key: "point_relais", label: "Point relais" },
 ] as const;
 
 export type TypeArret = (typeof TYPES_ARRET)[number]["key"];
