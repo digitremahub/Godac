@@ -22,6 +22,9 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
   const [precision, setPrecision] = useState("");
   const [photo, setPhoto] = useState<{ base64: string; apercu: string } | null>(null);
   const [codeQr, setCodeQr] = useState("");
+  const [messageLaisse, setMessageLaisse] = useState(false);
+  const [reserveOuverte, setReserveOuverte] = useState(false);
+  const [reserve, setReserve] = useState("");
   const [scanWeb, setScanWeb] = useState(false);
   const [busy, setBusy] = useState<"photo" | "envoi" | "scan" | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
     try {
       const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${stop.id}/livraison`, {
         method: "POST",
-        body: JSON.stringify({ lieu, precision: precision.trim() || null, image: photo?.base64 ?? null, code_qr: avecQr ? codeLu : null }),
+        body: JSON.stringify({ lieu, precision: precision.trim() || null, image: photo?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
       });
       navigator.vibrate?.(40);
       onLivre(maj);
@@ -136,6 +139,21 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
             ))}
           </div>
         </fieldset>
+
+        <div className="flex flex-col gap-2 rounded-xl border border-navy/10 p-3">
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" checked={messageLaisse} onChange={(e) => setMessageLaisse(e.target.checked)} className="h-4 w-4 accent-teal" />
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange/10 text-sm font-extrabold text-orange-ink">M</span>
+            <span className="flex-1">Message laissé / avis de passage</span>
+          </label>
+          <button type="button" className="btn-secondary justify-center !py-2.5 text-sm" onClick={() => setReserveOuverte((v) => !v)}>
+            {reserveOuverte ? "Fermer les réserves" : "＋ Ajouter une réserve"}
+          </button>
+          {reserveOuverte && (
+            <textarea className="input min-h-20 resize-y" value={reserve} onChange={(e) => setReserve(e.target.value)} maxLength={500} placeholder="Précisez le problème ou la réserve constatée…" aria-label="Réserve de livraison" />
+          )}
+          <p className="text-xs text-navy/55">Le M et la réserve seront enregistrés dans la trace de livraison.</p>
+        </div>
 
         {(lieu === "voisin" || lieu === "autre") && (
           <input
