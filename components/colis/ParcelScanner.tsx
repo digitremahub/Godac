@@ -23,7 +23,7 @@ export function ParcelScanner({
   bouton = "Terminer le scan",
   calque = "z-[60]",
 }: {
-  onCode: (text: string) => void;
+  onCode: (text: string, image?: string) => void;
   onClose: () => void;
   consigne?: string;
   bouton?: string;
@@ -57,7 +57,21 @@ export function ParcelScanner({
       navigator.vibrate?.(60);
       setFlash(true);
       setTimeout(() => setFlash(false), 250);
-      onCodeRef.current(text);
+      // Capture l'étiquette au moment du scan pour lire l'adresse automatiquement.
+      let image: string | undefined;
+      const video = videoRef.current;
+      if (video?.videoWidth && video.videoHeight) {
+        const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+        const shot = document.createElement("canvas");
+        shot.width = Math.round(video.videoWidth * scale);
+        shot.height = Math.round(video.videoHeight * scale);
+        const ctx = shot.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, shot.width, shot.height);
+          image = shot.toDataURL("image/jpeg", 0.72).split(",")[1];
+        }
+      }
+      onCodeRef.current(text, image);
     };
 
     async function tick() {
