@@ -6,6 +6,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { MobileActionBar } from "@/components/layout/MobileActionBar";
 import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
 import type { UserRole } from "@/lib/types/domain";
+import { OfflineSyncStatus } from "@/components/offline/OfflineSyncStatus";
 
 export function DashboardShell({
   role,
@@ -91,7 +92,7 @@ export function DashboardShell({
         )}
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
         <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{children}</div>
         </main>
       </div>
       {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} />}
