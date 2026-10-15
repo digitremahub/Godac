@@ -249,19 +249,53 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     }
   }
 
+  /** QR/code-barres : si le code ne contient pas l'adresse, l'image caméra est lue par IA. */
+  async function lireImageScannee(image: string, code: string | null, telephone: string | null) {
+    setBusy("photo");
+    try {
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", {
+        method: "POST",
+        body: JSON.stringify({ image, mediaType: "image/jpeg" }),
+      });
+      const d: Draft = {
+        adresse: lu.adresse ?? "",
+        destinataire: lu.destinataire ?? "",
+        telephone: lu.telephone ?? telephone ?? "",
+        code: code ?? lu.code,
+        type: "livraison",
+        poids: champPoids(lu.poids),
+      };
+      if (d.adresse.trim().length >= 5) {
+        setDraft(null);
+        await ajouter(d);
+      } else {
+        setDraft(d);
+        setToast({ ok: false, text: "QR/code lu, mais adresse non reconnue. Complétez les champs." });
+      }
+    } catch (e) {
+      setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
+      setToast({ ok: false, text: `Lecture automatique impossible : ${networkErrorMessage(e)}. Complétez l'adresse.` });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
-  function onCode(text: string): boolean {
+  function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
-      // Adresse dans le code : ajout direct, sans quitter le scanner.
       ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
       return true;
-    } else {
-      setScanner(false);
-      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
-      return false;
     }
+    setScanner(false);
+    if (lectureEtiquette && image) {
+      void lireImageScannee(image, lu.code, lu.telephone ?? null);
+      setToast({ ok: true, text: "Code lu : lecture automatique de l'étiquette…" });
+    } else {
+      setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
+      setToast({ ok: true, text: "Code lu : photographiez l'étiquette ou saisissez l'adresse." });
+    }
+    return false;
   }
 
   /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
