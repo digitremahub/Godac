@@ -33,7 +33,7 @@ function dbOpen(): Promise<IDBDatabase> {
 function signal() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CHANGE_EVENT));
 }
-export type OfflineFile = { id: string; blob: Blob; name: string; type: string; createdAt: string };
+export type OfflineFile = { id: string; blob: Blob; name: string; type: string; createdAt: string; initUrl: string; processUrl: string; bucket: string };
 
 export async function listOfflineFiles(): Promise<OfflineFile[]> {
   const db = await dbOpen();
@@ -43,12 +43,12 @@ export async function listOfflineFiles(): Promise<OfflineFile[]> {
     request.onerror = () => reject(request.error);
   });
 }
-export async function enqueueOfflineFile(file: File): Promise<string> {
+export async function enqueueOfflineFile(file: File, options?: { initUrl?: string; processUrl?: string; bucket?: string }): Promise<string> {
   const id = crypto.randomUUID();
   const db = await dbOpen();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(FILE_STORE, "readwrite");
-    tx.objectStore(FILE_STORE).add({ id, blob: file, name: file.name, type: file.type || "application/octet-stream", createdAt: new Date().toISOString() } satisfies OfflineFile);
+    tx.objectStore(FILE_STORE).add({ id, blob: file, name: file.name, type: file.type || "application/octet-stream", createdAt: new Date().toISOString(), initUrl: options?.initUrl ?? "/api/ocr/tour-report/init", processUrl: options?.processUrl ?? "/api/ocr/tour-report/process", bucket: options?.bucket ?? "tour-photos" } satisfies OfflineFile);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -76,15 +76,15 @@ async function removeOfflineFile(id: string) {
 async function uploadOfflineFile(id: string): Promise<string> {
   const item = await getOfflineFile(id);
   if (!item) throw new Error("Le fichier local lié à ce document est introuvable.");
-  const init = await fetch("/api/ocr/tour-report/init", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: item.type }) });
+  const init = await fetch(item.initUrl, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: item.type }) });
   const initJson = await init.json().catch(() => ({})) as { storagePath?: string; error?: string };
   if (!init.ok || !initJson.storagePath) throw new Error(initJson.error ?? "Impossible de préparer l'envoi du document.");
   const { createBrowserSupabaseClient } = await import("@/lib/supabase/client");
   const supabase = createBrowserSupabaseClient();
   const file = new File([item.blob], item.name, { type: item.type });
-  const uploaded = await supabase.storage.from("tour-photos").upload(initJson.storagePath, file, { contentType: item.type });
+  const uploaded = await supabase.storage.from(item.bucket).upload(initJson.storagePath, file, { contentType: item.type });
   if (uploaded.error) throw new Error(uploaded.error.message);
-  await fetch("/api/ocr/tour-report/process", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storagePath: initJson.storagePath }) }).catch(() => undefined);
+  await fetch(item.processUrl, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storagePath: initJson.storagePath }) }).catch(() => undefined);
   await removeOfflineFile(id);
   return initJson.storagePath;
 }
