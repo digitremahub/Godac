@@ -390,6 +390,7 @@ export function StartTourFlow({
             initUrl="/api/ocr/odometer/init"
             processUrl="/api/ocr/odometer/process"
             bucket="tour-photos"
+            offlineSupported
             onCaptured={({ photoPath, reading }) => {
               setStartKmPhotoPath(photoPath);
               if (reading !== null) setStartKm(String(reading));
@@ -448,6 +449,7 @@ export function StartTourFlow({
       />
       <TourReportPhotoCapture
         label="Feuille de début de tournée — photo ou PDF (optionnel)"
+        offlineSupported
         onUploadBusyChange={setSheetUploadBusy}
         onCaptured={({ photoPath, fields }) => {
           setStartSheetPath(photoPath);
