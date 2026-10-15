@@ -65,6 +65,8 @@ export function StartTourFlow({
   const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
   const [startSheetPath, setStartSheetPath] = useState("");
+  const [scanUploadBusy, setScanUploadBusy] = useState(false);
+  const [sheetUploadBusy, setSheetUploadBusy] = useState(false);
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
@@ -149,6 +151,8 @@ export function StartTourFlow({
   }
 
   const canSubmit =
+    !scanUploadBusy &&
+    !sheetUploadBusy &&
     Boolean(vehicleId) &&
     Boolean(startKm) &&
     (!requireOdometerPhoto || Boolean(startKmPhotoPath)) &&
@@ -389,6 +393,7 @@ export function StartTourFlow({
 
       <TourReportPhotoCapture
         label="Scan de l'écran « Statistiques Tournée » du terminal (optionnel — lecture auto)"
+        onUploadBusyChange={setScanUploadBusy}
         onCaptured={({ photoPath, fields }) => {
           setSheetPhotoPath(photoPath);
           setReportFields(fields);
@@ -397,6 +402,7 @@ export function StartTourFlow({
       />
       <TourReportPhotoCapture
         label="Feuille de début de tournée — photo ou PDF (optionnel)"
+        onUploadBusyChange={setSheetUploadBusy}
         onCaptured={({ photoPath, fields }) => {
           setStartSheetPath(photoPath);
           // Complète ce que l'écran du terminal n'a pas donné.
@@ -425,7 +431,7 @@ export function StartTourFlow({
       </label>
 
       <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>
-        {busy ? "Envoi…" : "Valider mon départ"}
+        {busy ? "Envoi…" : scanUploadBusy || sheetUploadBusy ? "Attendez la fin de l’envoi des documents…" : "Valider mon départ"}
       </button>
     </Card>
   );
