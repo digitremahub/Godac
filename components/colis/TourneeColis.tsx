@@ -818,6 +818,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           {estRamasse(prochain) && <EncocheRamasse large />}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
             {estRamasse(prochain) && <BadgeRamasse />}
+            {estPointRelais(prochain) && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
+                <IconMapPin className="h-3.5 w-3.5" /> Point relais
+              </span>
+            )}
             <span>
               Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
               {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
