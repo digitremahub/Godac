@@ -8,6 +8,7 @@ import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPho
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -441,7 +442,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
-      setToast({ ok: false, text: networkErrorMessage(e) });
+      if (isNetworkFailure(e)) {
+        try {
+          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+          setToast({ ok: true, text: "Action enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
+          return;
+        } catch (queueError) {
+          setToast({ ok: false, text: networkErrorMessage(queueError) });
+        }
+      } else setToast({ ok: false, text: networkErrorMessage(e) });
       await recharger(run?.id);
     }
   }
