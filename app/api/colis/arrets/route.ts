@@ -34,6 +34,7 @@ const bodySchema = z.object({
   type: z.enum(["livraison", "ramasse"]).optional(),
   /** Poids du colis en kg (lu sur l'étiquette ou saisi). */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
+  exceptionnelle: z.boolean().optional(),
 });
 
 /**
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
 
   const cle = cleAdresse(parsed.data.adresse);
   const kind = parsed.data.type ?? "livraison";
+  const exceptionnelle = parsed.data.exceptionnelle === true;
   // Regroupement seulement dans la même liste et pour le même type : une
   // ramasse et une livraison à la même adresse restent deux arrêts.
   const memeAdresse = (stops ?? []).find(
@@ -115,7 +117,7 @@ export async function POST(req: Request) {
       run_id: run.id,
       ...(listId ? { list_id: listId } : {}),
       position,
-      ...(kind === "ramasse" ? { kind } : {}),
+      ...(kind === "ramasse" ? { kind, exceptional_pickup: exceptionnelle } : {}),
       parcel_code: code,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
@@ -127,5 +129,16 @@ export async function POST(req: Request) {
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Toute ramasse non exceptionnelle devient une habitude réutilisée à l’ouverture des prochaines tournées.
+  if (kind === "ramasse" && !exceptionnelle) {
+    await supabase.from("driver_pickup_templates").upsert({
+      organization_id: appUser.organization_id,
+      driver_id: appUser.id,
+      address: parsed.data.adresse,
+      recipient: parsed.data.destinataire || null,
+      phone: telephone,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "driver_id,address" });
+  }
   return NextResponse.json({ stop: data, geocoded: Boolean(geo) });
 }
