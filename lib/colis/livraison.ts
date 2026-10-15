@@ -65,14 +65,17 @@ export const TYPES_ARRET = [
 export type TypeArret = (typeof TYPES_ARRET)[number]["key"];
 
 export const estRamasse = (s: { kind?: string | null }) => s.kind === "ramasse";
+export const estPointRelais = (s: { kind?: string | null }) => s.kind === "point_relais";
 
-/** Type lu en base (ou absent avant la migration) : tout ce qui n'est pas « ramasse » est une livraison. */
-export const typeArret = (kind: string | null | undefined): TypeArret => (kind === "ramasse" ? "ramasse" : "livraison");
+/** Type lu en base ; les arrêts historiques sans type sont des livraisons. */
+export const typeArret = (kind: string | null | undefined): TypeArret =>
+  kind === "ramasse" || kind === "point_relais" ? kind : "livraison";
 
 /** Statut d'un arrêt pour l'affichage, selon son type (« Ramassé » plutôt que « Livré »). */
 export function libelleStatut(s: { kind?: string | null; status: string }): string {
   const ramasse = estRamasse(s);
-  if (s.status === "delivered") return ramasse ? "Ramassé" : "Livré";
-  if (s.status === "failed") return ramasse ? "Ramasse manquée" : "Échec / absent";
-  return ramasse ? "Ramasse non faite" : "Non fait";
+  const relais = estPointRelais(s);
+  if (s.status === "delivered") return ramasse ? "Ramassé" : relais ? "Déposé au point relais" : "Livré";
+  if (s.status === "failed") return ramasse ? "Ramasse manquée" : relais ? "Dépôt en point relais impossible" : "Échec / absent";
+  return ramasse ? "Ramasse non faite" : relais ? "Dépôt relais à faire" : "Non fait";
 }
