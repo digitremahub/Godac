@@ -34,6 +34,8 @@ const bodySchema = z.object({
   type: z.enum(["livraison", "ramasse", "point_relais"]).optional(),
   /** Poids du colis en kg (lu sur l'étiquette ou saisi). */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
+  /** Une ramasse exceptionnelle ne devient pas une habitude quotidienne. */
+  exceptionnelle: z.boolean().optional(),
 });
 
 /**
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
       ...(listId ? { list_id: listId } : {}),
       position,
       ...(kind !== "livraison" ? { kind } : {}),
+      ...(kind === "ramasse" ? { exceptional_pickup: parsed.data.exceptionnelle === true } : {}),
       parcel_code: code,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
@@ -127,5 +130,22 @@ export async function POST(req: Request) {
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Toute ramasse non exceptionnelle devient une habitude de ce chauffeur.
+  // Elle sera recréée comme arrêt dans ses prochaines tournées.
+  if (kind === "ramasse" && parsed.data.exceptionnelle !== true) {
+    const { error: erreurHabitude } = await supabase.from("driver_pickup_templates").upsert({
+      organization_id: appUser.organization_id,
+      driver_id: appUser.id,
+      address: parsed.data.adresse,
+      recipient: parsed.data.destinataire || null,
+      phone: telephone,
+      active: true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "organization_id,driver_id,address" });
+    if (erreurHabitude && erreurHabitude.code !== "42P01") {
+      return NextResponse.json({ error: `Ramasse ajoutée, mais mémorisation quotidienne impossible : ${erreurHabitude.message}` }, { status: 500 });
+    }
+  }
   return NextResponse.json({ stop: data, geocoded: Boolean(geo) });
 }
