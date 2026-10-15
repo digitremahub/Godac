@@ -147,7 +147,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       previous_value: { status: previousStatus }, new_value: { status },
       details: status === "delivered" ? "Livraison / ramasse effectuée" : status === "failed" ? `Échec de livraison : ${data.failure_reason ?? "motif non précisé"}` : "Arrêt rouvert",
     });
-    if (status !== "pending") events.push({
+    events.push({
       organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
       event_type: "status_changed", previous_value: { status: previousStatus }, new_value: { status },
       details: `Statut modifié : ${previousStatus} → ${status}`,
