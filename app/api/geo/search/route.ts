@@ -45,12 +45,15 @@ export async function GET(req: Request) {
     }[];
     const results = hits.map((hit) => {
       const name = hit.name || hit.address?.shop || hit.address?.amenity || hit.address?.office || hit.address?.industrial || "";
-      const detail = [hit.address?.road, hit.address?.house_number, hit.address?.postcode, hit.address?.city || hit.address?.town || hit.address?.village]
+      const detail = [hit.address?.house_number, hit.address?.road, hit.address?.postcode, hit.address?.city || hit.address?.town || hit.address?.village]
         .filter(Boolean)
         .join(" ");
+      // Affiche le nom de l'entreprise en premier, comme un résultat de recherche,
+      // puis l'adresse pour distinguer les établissements homonymes.
+      const label = name && detail ? `${name} — ${detail}` : hit.display_name ?? name;
       return {
-        label: hit.display_name ?? name,
-        ...(name && name !== hit.display_name ? { detail: `${name}${detail ? ` · ${detail}` : ""}` } : {}),
+        label,
+        ...(hit.display_name && hit.display_name !== label ? { detail: hit.display_name } : {}),
       };
     }).filter((item) => item.label);
     return NextResponse.json({ results });
