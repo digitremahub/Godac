@@ -807,10 +807,10 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           </div>
           {prochain.phone && (
             <div className="grid grid-cols-2 gap-2">
-              <a href={lienTel(prochain.phone)} className="btn-secondary justify-center border-teal/70 !py-3 text-teal-ink">
+              <a href={lienTel(prochain.phone)} onClick={() => { void api(`/api/colis/arrets/${prochain.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="btn-secondary justify-center border-teal/70 !py-3 text-teal-ink">
                 <IconPhone className="h-4 w-4" /> Appeler
               </a>
-              <a href={lienSms(prochain.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !py-3">
+              <a href={lienSms(prochain.phone, SMS_ARRIVEE)} onClick={() => { void api(`/api/colis/arrets/${prochain.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "sms_prepared" }) }); }} className="btn-secondary justify-center !py-3">
                 <IconMessage className="h-4 w-4" /> Prévenir (SMS)
               </a>
             </div>
@@ -1040,7 +1040,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           )}
                         </div>
                         {s.phone && s.status === "pending" && (
-                          <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                          <a href={lienTel(s.phone)} onClick={() => { void api(`/api/colis/arrets/${s.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                             <IconPhone className="h-4 w-4" />
                           </a>
                         )}
