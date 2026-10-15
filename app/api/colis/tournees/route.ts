@@ -23,8 +23,10 @@ export async function POST(req: Request) {
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
+  let runCreee: Awaited<ReturnType<typeof creerTournee>> | null = null;
   try {
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
+    runCreee = run;
     const pays = await codePays(appUser.organization_id);
     let position = 0;
     const adressesAjoutees = new Set<string>();
@@ -128,6 +130,21 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ run });
   } catch (e) {
+    // La tournée est créée avant l'ajout facultatif des ramasses. Une erreur
+    // sur le planning, les migrations ou une ramasse ne doit pas faire croire
+    // que la création de la tournée elle-même a échoué (ni provoquer un doublon
+    // lorsque le chauffeur réessaie). On renvoie la tournée créée et on journalise
+    // l'échec des compléments pour faciliter le diagnostic serveur.
+    if (runCreee) {
+      console.error("[colis/tournees] Tournée créée, mais ajout des ramasses incomplet", {
+        runId: runCreee.id,
+        error: e instanceof Error ? e.message : e,
+      });
+      return NextResponse.json({
+        run: runCreee,
+        warning: "Tournée créée, mais certaines ramasses n’ont pas pu être ajoutées. Vérifiez les migrations Supabase et le planning.",
+      });
+    }
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création impossible" }, { status: 500 });
   }
 }
