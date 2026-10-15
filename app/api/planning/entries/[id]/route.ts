@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { synchroniserTourneeColis } from "@/lib/colis/synchronisation";
 
 const patchSchema = z.object({
   start_at: z.string().datetime().optional(),
@@ -32,7 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update(parsed.data)
     .eq("id", id)
     .eq("status", "planned")
-    .select("id, driver_id, start_at")
+    .select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at")
     .maybeSingle();
 
   if (error) {
@@ -45,6 +46,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
+
+  try {
+    await synchroniserTourneeColis(supabase, data as { id: string; organization_id: string; service_id: string; driver_id: string; vehicle_id: string; tour_number: string; start_at: string });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Synchronisation de la tournée colis impossible." }, { status: 500 });
+  }
 
   const warning = data.driver_id
     ? await warnIfDriverDoubleBooked(supabase, {
