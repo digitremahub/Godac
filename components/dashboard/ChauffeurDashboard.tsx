@@ -21,7 +21,10 @@ async function loadTodayRoute(supabase: Supabase, tourNumber: string) {
   const villages = "tour_route_villages(name, postal_code, notes, pickup_addresses, position)";
   const withRenfort = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
   if (!withRenfort.error) return withRenfort;
-  return supabase.from("tour_routes").select(`id, tour_number, notes, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
+  const legacyVillages = "tour_route_villages(name, postal_code, notes, position)";
+  const legacy = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${legacyVillages}`).eq("tour_number", tourNumber).maybeSingle();
+  if (!legacy.error) return legacy;
+  return supabase.from("tour_routes").select(`id, tour_number, notes, ${legacyVillages}`).eq("tour_number", tourNumber).maybeSingle();
 }
 
 /** Villages couverts par un renfort pour ce passage (choix du jour, sinon couverture par défaut). */
