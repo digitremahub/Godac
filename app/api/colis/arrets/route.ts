@@ -31,7 +31,7 @@ const bodySchema = z.object({
   destinataire: z.string().trim().max(120).nullable().optional(),
   telephone: z.string().trim().max(40).nullable().optional(),
   /** Livraison (par défaut) ou ramasse. */
-  type: z.enum(["livraison", "ramasse"]).optional(),
+  type: z.enum(["livraison", "ramasse", "point_relais"]).optional(),
   /** Poids du colis en kg (lu sur l'étiquette ou saisi). */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
 });
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
       run_id: run.id,
       ...(listId ? { list_id: listId } : {}),
       position,
-      ...(kind === "ramasse" ? { kind } : {}),
+      ...(kind !== "livraison" ? { kind } : {}),
       parcel_code: code,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
