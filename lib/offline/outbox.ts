@@ -133,8 +133,10 @@ export async function flushOfflineMutations(): Promise<{ synced: number; pending
         for (const fileId of [...new Set(matches)]) {
           const storagePath = await uploadOfflineFile(fileId);
           body = body.split("offline://" + fileId).join(storagePath);
+          // Persist each resolved reference before uploading the next file,
+          // so a later network failure never loses an already-uploaded path.
+          await updateOfflineMutation(item.id, { body });
         }
-        await updateOfflineMutation(item.id, { body });
       }
       const response = await fetch(item.url, {
         method: item.method,
