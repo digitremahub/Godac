@@ -60,11 +60,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (stop.list_id === list_id) return NextResponse.json({ ok: true });
     if (!(await listeDeLaTournee(supabase, stop.run_id, list_id))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
     const { data: dernier } = await supabase.from("delivery_stops").select("position").eq("run_id", stop.run_id).order("position", { ascending: false }).limit(1).maybeSingle();
-    const { error } = await supabase
+    const { data: moved, error } = await supabase
       .from("delivery_stops")
       .update({ list_id, position: (dernier?.position ?? 0) + 1 })
-      .eq("id", id);
+      .eq("id", id).select("id, run_id, organization_id, list_id, position").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await supabase.from("delivery_stop_events").insert({
+      organization_id: appUser.organization_id, run_id: moved.run_id, stop_id: moved.id, actor_id: appUser.id,
+      event_type: "list_changed", new_value: { list_id: moved.list_id, position: moved.position }, details: "Arrêt déplacé dans une autre liste de la tournée",
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -82,6 +86,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const autre = liste[j]!;
     await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id);
     await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id);
+    const { data: eventStop } = await supabase.from("delivery_stops").select("organization_id").eq("id", id).maybeSingle();
+    await supabase.from("delivery_stop_events").insert({
+      organization_id: appUser.organization_id, run_id: stop.run_id, stop_id: id, actor_id: appUser.id,
+      event_type: "reordered", previous_value: { position: stop.position }, new_value: { position: autre.position },
+      details: `Ordre de tournée modifié (${deplacer === "haut" ? "remonté" : "descendu"} d'un rang)`,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -94,6 +104,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
     update.phone = tel;
   }
+  let previousStatus: string | null = null;
   if (status) {
     // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
     let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id);
@@ -102,6 +113,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
     const refus = refusCloture(actuel.status, status);
     if (refus) return NextResponse.json({ error: refus }, { status: 409 });
+    previousStatus = actuel.status;
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
     if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
@@ -127,6 +139,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { data, error } = await maj.select(STOP_FIELDS).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: status ? "Arrêt déjà clôturé ou modifié entre-temps : actualisez." : "Arrêt introuvable." }, { status: status ? 409 : 404 });
+  const events: Record<string, unknown>[] = [];
+  if (status && previousStatus !== null && previousStatus !== status) {
+    const typeEvenement = status === "delivered" ? "delivered" : status === "failed" ? "failed" : "reopened";
+    events.push({
+      organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+      event_type: typeEvenement,
+      previous_value: { status: previousStatus }, new_value: { status },
+      details: status === "delivered" ? "Livraison / ramasse effectuée" : status === "failed" ? `Échec de livraison : ${data.failure_reason ?? "motif non précisé"}` : "Arrêt rouvert",
+    });
+    if (status !== "pending") events.push({
+      organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+      event_type: "status_changed", previous_value: { status: previousStatus }, new_value: { status },
+      details: `Statut modifié : ${previousStatus} → ${status}`,
+    });
+  }
+  if (packages_picked_up !== undefined) events.push({
+    organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+    event_type: "pickup_count_recorded", new_value: { packages_picked_up },
+    details: `Nombre réel de colis ramassés enregistré : ${packages_picked_up ?? "inconnu"}`,
+  });
+  if (events.length) await supabase.from("delivery_stop_events").insert(events);
   return NextResponse.json({ stop: data });
 }
 
