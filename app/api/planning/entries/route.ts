@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { isModuleEnabled } from "@/lib/organization/modules";
+import { parisCalendarDate } from "@/lib/planning/dates";
 import { synchroniserTourneeColis } from "@/lib/colis/synchronisation";
 
 const bodySchema = z.object({
@@ -63,6 +65,40 @@ export async function POST(req: Request) {
   } catch (e) {
     await supabase.from("planning_entries").delete().eq("id", data.id).eq("status", "planned");
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création de la tournée colis impossible." }, { status: 500 });
+  }
+
+  // Keep the parcel-scanning view in sync with this planning assignment.
+  // The run is created only when the parcel module is enabled; existing runs
+  // with the same driver/date/tour number are reused rather than duplicated.
+  if (await isModuleEnabled(supabase, appUser.organization_id, "route_optimizer")) {
+    const runDate = parisCalendarDate(parsed.data.start_at);
+    const runName = `Tournée ${parsed.data.tour_number}`;
+    const { data: existingRun } = await supabase
+      .from("delivery_runs")
+      .select("id")
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", parsed.data.driver_id)
+      .eq("run_date", runDate)
+      .eq("name", runName)
+      .maybeSingle();
+    if (!existingRun) {
+      const timeParts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).format(new Date(parsed.data.start_at));
+      const { error: runError } = await supabase.from("delivery_runs").insert({
+        organization_id: appUser.organization_id,
+        driver_id: parsed.data.driver_id,
+        vehicle_id: parsed.data.vehicle_id,
+        service_id: parsed.data.service_id,
+        run_date: runDate,
+        name: runName,
+        planned_start: timeParts,
+      });
+      if (runError) {
+        await supabase.from("planning_entries").delete().eq("id", data.id).eq("status", "planned");
+        return NextResponse.json({ error: `Affectation annulée : création de la tournée colis impossible (${runError.message}).` }, { status: 500 });
+      }
+    }
   }
 
   const warning = await warnIfDriverDoubleBooked(supabase, {
