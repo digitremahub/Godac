@@ -4,7 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
-import { creerTournee, listerTournees, moduleActif } from "@/lib/colis/serveur";
+import { cleAdresse, creerTournee, listerTournees, moduleActif } from "@/lib/colis/serveur";
 
 /** Tournées colis du chauffeur connecté (jour en cours + non clôturées de la semaine). */
 export async function GET() {
@@ -28,7 +28,6 @@ export async function POST(req: Request) {
     const pays = await codePays(appUser.organization_id);
     let position = 0;
     const adressesAjoutees = new Set<string>();
-    const cle = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("fr-FR").replace(/[^a-z0-9]+/g, " ").trim();
 
     // 1) Ramasses saisies par la Direction dans la fiche de chaque village.
     // On récupère la tournée affectée à ce chauffeur pour la date de la tournée colis.
@@ -67,7 +66,7 @@ export async function POST(req: Request) {
         if (erreurVillages) throw erreurVillages;
         for (const village of villages ?? []) {
           const adresses = Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [];
-          const adressesUniques = adresses.map((a: string) => a.trim()).filter((a: string) => a.length >= 5 && !adressesAjoutees.has(cle(a)));
+          const adressesUniques = adresses.map((a: string) => a.trim()).filter((a: string) => a.length >= 5 && !adressesAjoutees.has(cleAdresse(a)));
           if (!adressesUniques.length) continue;
           const { data: liste, error: erreurListe } = await supabase
             .from("delivery_lists")
@@ -91,7 +90,7 @@ export async function POST(req: Request) {
               lng: geo?.lng ?? null,
             });
             if (error) throw new Error(`Tournée créée, mais la ramasse « ${address} » n’a pas pu être ajoutée : ${error.message}`);
-            adressesAjoutees.add(cle(address));
+            adressesAjoutees.add(cleAdresse(address));
             position += 1;
           }
         }
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
       .order("created_at");
     if (erreurHabitudes && erreurHabitudes.code !== "42P01") throw erreurHabitudes;
     for (const habitude of habitudes ?? []) {
-      if (adressesAjoutees.has(cle(habitude.address))) continue;
+      if (adressesAjoutees.has(cleAdresse(habitude.address))) continue;
       const geo = await geocodeAddress(habitude.address, pays).catch(() => null);
       const { error } = await supabase.from("delivery_stops").insert({
         organization_id: appUser.organization_id,
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
         lng: geo?.lng ?? null,
       });
       if (error) throw new Error(`Tournée créée, mais une ramasse habituelle n’a pas pu être ajoutée : ${error.message}`);
-      adressesAjoutees.add(cle(habitude.address));
+      adressesAjoutees.add(cleAdresse(habitude.address));
       position += 1;
     }
     return NextResponse.json({ run });
