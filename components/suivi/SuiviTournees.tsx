@@ -96,7 +96,11 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
       const couleur = couleurDe(t.id);
       const attenue = focus !== null && focus !== t.id;
       t.arrets.forEach((a) => {
-        const el = document.createElement("div");
+        if (a.lat === null || a.lng === null) return;
+        const el = document.createElement("button");
+        el.type = "button";
+        el.setAttribute("aria-label", `${t.chauffeur} — arrêt ${a.ordre} — ${a.adresse}`);
+        el.style.cursor = "pointer";
         const fait = a.status !== "pending";
         // Ramasse : carré à bordure dorée (même encoche que la liste des arrêts).
         Object.assign(el.style, {
@@ -108,6 +112,26 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
           opacity: attenue ? "0.25" : fait ? "0.7" : "1",
         });
         el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const contenu = document.createElement("div");
+          contenu.style.cssText = "min-width:210px;max-width:280px;font:13px system-ui,sans-serif;color:#0A0F1E";
+          const titre = document.createElement("strong");
+          titre.textContent = `${a.ordre}. ${a.ramasse ? "Ramasse" : "Livraison"} · ${t.chauffeur}`;
+          titre.style.cssText = "display:block;margin-bottom:6px;font-size:14px";
+          const adresse = document.createElement("div");
+          adresse.textContent = a.adresse;
+          adresse.style.cssText = "margin-bottom:5px;white-space:normal";
+          contenu.append(titre, adresse);
+          if (a.destinataire) { const el = document.createElement("div"); el.textContent = `Destinataire : ${a.destinataire}`; contenu.append(el); }
+          if (a.telephone) { const el = document.createElement("div"); el.textContent = `Téléphone : ${a.telephone}`; contenu.append(el); }
+          const infos = document.createElement("div");
+          infos.textContent = `${a.colis} colis · ${fait ? "Arrêt effectué" : "À faire"}`;
+          infos.style.cssText = "margin-top:5px;font-weight:600";
+          contenu.append(infos);
+          new maplibregl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" }).setLngLat([a.lng!, a.lat!]).setDOMContent(contenu).addTo(m);
+          setFocus(t.id);
+        });
         marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([a.lng, a.lat]).addTo(m));
         if (!attenue) pts.push([a.lng, a.lat]);
       });
