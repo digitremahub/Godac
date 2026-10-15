@@ -15,6 +15,8 @@ const bodySchema = z.object({
   image: z.string().max(7_000_000).nullable().optional(),
   /** Livraison avec QR code : valeur lue sur le QR code (ou code de retrait) du destinataire. */
   code_qr: z.string().max(CODE_QR_MAX * 2).nullable().optional(),
+  message_laisse: z.boolean().optional(),
+  reserve: z.string().trim().max(500).nullable().optional(),
 });
 
 /**
@@ -30,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { lieu, precision, image } = parsed.data;
+  const { lieu, precision, image, message_laisse, reserve } = parsed.data;
   if (photoObligatoire(lieu as never) && !image) {
     return NextResponse.json({ error: `Photo obligatoire pour une livraison « ${libelleLieu(lieu)} ».` }, { status: 400 });
   }
@@ -58,7 +60,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (stop.proof_photo_path) await admin.storage.from(BUCKET).remove([stop.proof_photo_path]);
   }
 
-  const note = precision ? `${libelleLieu(lieu)} : ${precision}` : null;
+  const notesAjoutees = [
+    precision ? `${libelleLieu(lieu)} : ${precision}` : null,
+    message_laisse ? "M — Message laissé / avis de passage" : null,
+    reserve ? `Réserve : ${reserve}` : null,
+  ].filter(Boolean) as string[];
   const { data, error } = await supabase
     .from("delivery_stops")
     .update({
@@ -68,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       proof_photo_path: path,
       proof_code: codeQr,
       failure_reason: null,
-      ...(note ? { notes: [stop.notes, note].filter(Boolean).join(" · ").slice(0, 500) } : {}),
+      ...(notesAjoutees.length ? { notes: [stop.notes, ...notesAjoutees].filter(Boolean).join(" · ").slice(0, 500) } : {}),
     })
     .eq("id", id)
     .eq("status", "pending")
