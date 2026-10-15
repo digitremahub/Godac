@@ -477,7 +477,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     <IconNavigation className="h-4 w-4" /> Y aller
                   </a>
                   {arretCarte.phone ? (
-                    <a href={lienTel(arretCarte.phone)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
+                    <a href={lienTel(arretCarte.phone)} onClick={() => { void api(`/api/colis/arrets/${arretCarte.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
                       <IconPhone className="h-4 w-4" /> Appeler
                     </a>
                   ) : (
@@ -581,10 +581,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
             {prochain.phone ? (
               <div className="grid grid-cols-[1fr_auto] gap-2">
-                <a href={lienTel(prochain.phone)} className="btn-secondary justify-center border-teal/70 !py-3.5 text-base text-teal-ink">
+                <a href={lienTel(prochain.phone)} onClick={() => { void api(`/api/colis/arrets/${prochain.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="btn-secondary justify-center border-teal/70 !py-3.5 text-base text-teal-ink">
                   <IconPhone className="h-5 w-5" /> Appeler · {prochain.phone}
                 </a>
-                <a href={lienSms(prochain.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !px-4 !py-3.5" aria-label="Envoyer un SMS « j'arrive »">
+                <a href={lienSms(prochain.phone, SMS_ARRIVEE)} onClick={() => { void api(`/api/colis/arrets/${prochain.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "sms_prepared" }) }); }} className="btn-secondary justify-center !px-4 !py-3.5" aria-label="Envoyer un SMS « j'arrive »">
                   <IconMessage className="h-5 w-5" />
                 </a>
               </div>
@@ -683,7 +683,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       🕘
                     </button>
                     {s.phone ? (
-                      <a href={lienTel(s.phone)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                      <a href={lienTel(s.phone)} onClick={() => { void api(`/api/colis/arrets/${s.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                         <IconPhone className="h-5 w-5" />
                       </a>
                     ) : (
@@ -735,7 +735,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       </a>
                     )}
                     {s.phone && (
-                      <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Rappeler ${s.recipient ?? s.address}`}>
+                      <a href={lienTel(s.phone)} onClick={() => { void api(`/api/colis/arrets/${s.id}/historique`, { method: "POST", body: JSON.stringify({ event_type: "call_started" }) }); }} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Rappeler ${s.recipient ?? s.address}`}>
                         <IconPhone className="h-4 w-4" />
                       </a>
                     )}
