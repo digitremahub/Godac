@@ -18,7 +18,7 @@ const patchSchema = z.object({
   /** Tournée attendue : l'arrêt doit lui appartenir (clôture depuis la liste). */
   run_id: z.string().uuid().optional(),
   /** Livraison ou ramasse (enlèvement chez un expéditeur). */
-  type: z.enum(["livraison", "ramasse"]).optional(),
+  type: z.enum(["livraison", "ramasse", "point_relais"]).optional(),
   /** Poids des colis de l'arrêt en kg ; null : poids inconnu. */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
@@ -43,7 +43,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-/** Livré / échec / type (livraison ou ramasse) / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
+/** Livré / échec / type (livraison, ramasse ou point relais) / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
