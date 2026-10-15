@@ -21,9 +21,11 @@ import { IconFileText, IconPaperclip } from "@/components/layout/icons";
 export function TourReportPhotoCapture({
   label,
   onCaptured,
+  onUploadBusyChange,
 }: {
   label: string;
   onCaptured: (result: { photoPath: string; fields: TourReportFields | null }) => void;
+  onUploadBusyChange?: (busy: boolean) => void;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [status, setStatus] = useState<"idle" | "uploading" | "extracting" | "done" | "error">("idle");
@@ -38,6 +40,7 @@ export function TourReportPhotoCapture({
     setFileName(file.name);
     setError(null);
     setStatus("uploading");
+    onUploadBusyChange?.(true);
     let uploadedPath: string | null = null;
     try {
       const initRes = await fetch("/api/ocr/tour-report/init", {
@@ -57,6 +60,7 @@ export function TourReportPhotoCapture({
       // the upload. OCR is a separate best-effort step and must never make the
       // uploaded document disappear from the tour report if processing fails.
       onCaptured({ photoPath: storagePath, fields: null });
+      onUploadBusyChange?.(false);
       setStatus("extracting");
       try {
         const processRes = await fetch("/api/ocr/tour-report/process", {
@@ -86,6 +90,8 @@ export function TourReportPhotoCapture({
         setStatus("done");
         onCaptured({ photoPath: uploadedPath, fields: null });
       }
+    } finally {
+      onUploadBusyChange?.(false);
     }
   }
 
