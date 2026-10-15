@@ -258,9 +258,17 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     try {
       const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
       const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids) };
-      if (d.adresse.trim().length >= 5) { await ajouter(d); return true; }
-      setDraft(d); setScanner(false);
-      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " lu, mais adresse non reconnue. Complétez les champs." });
+      const manquants = [
+        !d.code && "numéro de colis",
+        d.adresse.trim().length < 5 && "adresse",
+        !d.destinataire.trim() && "destinataire",
+        !normaliserTelephone(d.telephone, pays) && "téléphone",
+        !lirePoids(d.poids) && "poids",
+      ].filter(Boolean);
+      if (manquants.length === 0) { await ajouter(d); return true; }
+      setDraft(d);
+      setScanner(false);
+      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " : complétez uniquement " + manquants.join(", ") + "." });
       return false;
     } catch (e) {
       setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
@@ -287,9 +295,23 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
-      void ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      setScanStatus("Adresse détectée · " + (lu.code ?? "colis"));
-      return true;
+      const d: Draft = { adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      const complet = Boolean(d.code && d.adresse.trim().length >= 5 && d.destinataire.trim() && normaliserTelephone(d.telephone, pays) && lirePoids(d.poids));
+      if (complet) {
+        void ajouter(d);
+        setScanStatus("Colis complet détecté · " + d.code);
+        return true;
+      }
+      if (lectureEtiquette && image) {
+        scanQueue.current.push({ image, code: d.code, telephone: d.telephone || null });
+        setScanStatus("Colis " + (d.code ?? "détecté") + " · recherche des informations manquantes…");
+        void traiterFileScans();
+        return true;
+      }
+      setScanner(false);
+      setDraft(d);
+      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " : complétez les informations manquantes." });
+      return false;
     }
     if (lectureEtiquette && image) {
       scanQueue.current.push({ image, code: lu.code, telephone: lu.telephone ?? null });
