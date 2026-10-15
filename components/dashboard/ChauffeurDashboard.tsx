@@ -210,14 +210,22 @@ export async function ChauffeurDashboard({
               </div>
               <ol className="flex flex-wrap gap-1.5">
                 {todayVillages.map((v, i) => (
-                  <li key={i} className="flex items-center gap-1.5 rounded-full bg-navy/[0.045] py-1 pl-1 pr-3 text-sm">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
-                    <span>{v.name}</span>
-                    {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
-                    {(v.pickup_addresses ?? []).length > 0 && <span className="ml-1 text-xs font-semibold text-orange-ink">· {(v.pickup_addresses ?? []).length} ramasse(s)</span>}
+                  <li key={i} className="flex flex-col gap-1 rounded-xl bg-navy/[0.045] p-2.5 text-sm">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
+                      <span className="font-semibold">{v.name}</span>
+                      {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
+                    </div>
+                    {(v.pickup_addresses ?? []).length > 0 && (
+                      <div className="ml-7">
+                        <p className="text-xs font-bold uppercase tracking-wide text-orange-ink">Ramasses à effectuer</p>
+                        <ul className="mt-1 list-inside list-disc text-sm">
+                          {(v.pickup_addresses ?? []).map((address, j) => <li key={j}>{address}</li>)}
+                        </ul>
+                      </div>
+                    )}
                   </li>
-                ))}
-              </ol>
+                ))}              </ol>
               {(todayRoute as any)?.notes && <p className="mt-3 whitespace-pre-line text-sm text-navy/70">{(todayRoute as any).notes}</p>}
             </Card>
           )}
