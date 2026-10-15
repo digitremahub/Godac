@@ -19,7 +19,7 @@ const bodySchema = z.object({
   driver_id: z.string().uuid().optional(),
   vehicle_id: z.string().uuid().optional(),
   date: z.string().date().optional(),
-  time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).optional(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   tour_number: z.string().trim().min(1).max(40).optional(),
 }).superRefine((body, ctx) => {
   const assignment = [body.service_id, body.driver_id, body.vehicle_id, body.date, body.time, body.tour_number];
