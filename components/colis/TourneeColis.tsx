@@ -33,6 +33,7 @@ interface Draft {
   type: TypeArret;
   /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
   poids: string;
+  exceptionnelle?: boolean;
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
@@ -219,6 +220,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           telephone: d.telephone.trim() || null,
           type: d.type,
           poids: lirePoids(d.poids),
+          exceptionnelle: d.exceptionnelle === true,
         }),
       });
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
@@ -918,6 +920,12 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
           <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
+          {draft.type === "ramasse" && (
+            <label className="flex items-center gap-2 rounded-lg border border-gold/40 p-3 text-sm">
+              <input type="checkbox" checked={draft.exceptionnelle === true} onChange={(e) => setDraft({ ...draft, exceptionnelle: e.target.checked })} />
+              <span><strong>Ramasse exceptionnelle</strong><span className="block text-xs text-navy/60">Ne pas enregistrer cette adresse dans mes ramasses habituelles.</span></span>
+            </label>
+          )}
           <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
@@ -1012,6 +1020,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                               s.phone,
                               s.parcel_count > 1 && `${s.parcel_count} colis`,
                               formatPoids(s.weight_kg),
+                              estRamasse(s) && s.packages_picked_up != null && `${s.packages_picked_up} colis ramassé(s)`,
+                              estRamasse(s) && s.exceptional_pickup && "Ramasse exceptionnelle",
                               estRamasse(s) && s.status !== "pending" && libelleStatut(s),
                               s.status === "delivered" && libellePreuve(s),
                               s.status === "failed" && libelleMotif(s.failure_reason),
