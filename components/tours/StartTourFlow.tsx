@@ -173,6 +173,7 @@ export function StartTourFlow({
         if (problemPhotoFile) throw new Error("La photo du problème doit être envoyée en ligne avant de valider le départ. Retirez-la temporairement ou reconnectez-vous.");
         await enqueueOfflineMutation("/api/tours", {
           method: "POST",
+          headers: tourHeaders,
           body: JSON.stringify({
             vehicle_id: vehicleId, service_id: polyvalentServices ? serviceId : undefined,
             tour_number: tourNumber || undefined, planned_entry_id: plannedToday?.id, start_km: Number(startKm),
@@ -223,6 +224,7 @@ export function StartTourFlow({
         try {
           await enqueueOfflineMutation("/api/tours", {
             method: "POST",
+            headers: tourHeaders,
             body: JSON.stringify({
               vehicle_id: vehicleId,
               service_id: polyvalentServices ? serviceId : undefined,
