@@ -20,12 +20,14 @@ export function CounterPhotoCapture({
   initUrl,
   processUrl,
   bucket,
+  offlineSupported = false,
   onCaptured,
 }: {
   label: string;
   initUrl: string;
   processUrl: string;
   bucket: string;
+  offlineSupported?: boolean;
   onCaptured: (result: { photoPath: string; reading: number | null }) => void;
 }) {
   const supabase = createBrowserSupabaseClient();
@@ -60,7 +62,7 @@ export function CounterPhotoCapture({
       setStatus("done");
       onCaptured({ photoPath: storagePath, reading });
     } catch (e) {
-      if (isNetworkFailure(e)) {
+      if (isNetworkFailure(e) && offlineSupported) {
         try {
           const photoPath = await enqueueOfflineFile(file, { initUrl, processUrl, bucket });
           setStatus("done");
