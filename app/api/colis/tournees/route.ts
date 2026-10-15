@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         const { data: villages, error: erreurVillages } = await supabase
           .from("tour_route_villages")
           .select("id, name, pickup_addresses, position")
-          .eq("tour_route_id", route.id)
+          .eq("route_id", route.id)
           .order("position");
         if (erreurVillages) throw erreurVillages;
         for (const village of villages ?? []) {
