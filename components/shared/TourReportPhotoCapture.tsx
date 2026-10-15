@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineFile, isNetworkFailure } from "@/lib/offline/outbox";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
 import { IconFileText, IconPaperclip } from "@/components/layout/icons";
 
@@ -84,11 +85,23 @@ export function TourReportPhotoCapture({
         onCaptured({ photoPath: storagePath, fields: null });
       }
     } catch (e) {
-      setStatus("error");
-      setError(networkErrorMessage(e));
-      if (uploadedPath) {
-        setStatus("done");
-        onCaptured({ photoPath: uploadedPath, fields: null });
+      if (!uploadedPath && isNetworkFailure(e)) {
+        try {
+          const localPath = await enqueueOfflineFile(file, { initUrl: "/api/ocr/tour-report/init", processUrl: "/api/ocr/tour-report/process", bucket: "tour-photos" });
+          setStatus("done");
+          setError("Document conservé sur le téléphone ; il sera envoyé avec le départ/retour dès que le réseau revient.");
+          onCaptured({ photoPath: localPath, fields: null });
+        } catch (queueError) {
+          setStatus("error");
+          setError(networkErrorMessage(queueError));
+        }
+      } else {
+        setStatus("error");
+        setError(networkErrorMessage(e));
+        if (uploadedPath) {
+          setStatus("done");
+          onCaptured({ photoPath: uploadedPath, fields: null });
+        }
       }
     } finally {
       onUploadBusyChange?.(false);
