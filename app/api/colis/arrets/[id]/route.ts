@@ -26,6 +26,7 @@ const patchSchema = z.object({
   destinataire: z.string().trim().max(120).nullable().optional(),
   telephone: z.string().trim().max(40).nullable().optional(),
   parcel_count: z.number().int().min(1).max(500).optional(),
+  packages_picked_up: z.number().int().min(0).max(500).nullable().optional(),
   /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
   deplacer: z.enum(["haut", "bas"]).optional(),
   /** Range l'arrêt dans une autre liste de la même tournée (en fin de liste). */
@@ -51,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
@@ -87,11 +88,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const update: Record<string, unknown> = {};
   if (destinataire !== undefined) update.recipient = destinataire || null;
   if (parcel_count !== undefined) update.parcel_count = parcel_count;
+  if (packages_picked_up !== undefined) update.packages_picked_up = packages_picked_up;
   if (telephone !== undefined) {
     const tel = normaliserTelephone(telephone, await codePays(appUser.organization_id));
     if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
     update.phone = tel;
   }
+  let previousStatus: string | null = null;
   if (status) {
     // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
     let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id);
@@ -100,6 +103,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
     const refus = refusCloture(actuel.status, status);
     if (refus) return NextResponse.json({ error: refus }, { status: 409 });
+    previousStatus = actuel.status;
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
     if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
@@ -125,6 +129,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { data, error } = await maj.select(STOP_FIELDS).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: status ? "Arrêt déjà clôturé ou modifié entre-temps : actualisez." : "Arrêt introuvable." }, { status: status ? 409 : 404 });
+  const events: Record<string, unknown>[] = [];
+  if (status && previousStatus !== null && previousStatus !== status) {
+    const eventType = status === "delivered" ? "delivered" : status === "failed" ? "failed" : "reopened";
+    events.push({
+      organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+      event_type: eventType, previous_value: { status: previousStatus }, new_value: { status },
+      details: status === "delivered" ? "Livraison / ramasse effectuée" : status === "failed" ? "Échec de livraison" : "Arrêt rouvert",
+    });
+    events.push({
+      organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+      event_type: "status_changed", previous_value: { status: previousStatus }, new_value: { status },
+      details: `Statut modifié : ${previousStatus} → ${status}`,
+    });
+  }
+  if (packages_picked_up !== undefined) events.push({
+    organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+    event_type: "pickup_count_recorded", new_value: { packages_picked_up },
+    details: `Nombre réel de colis ramassés enregistré : ${packages_picked_up ?? "inconnu"}`,
+  });
+  if (events.length) {
+    const { error: eventError } = await supabase.from("delivery_stop_events").insert(events);
+    if (eventError) return NextResponse.json({ error: "Arrêt enregistré, mais historique indisponible." }, { status: 500 });
+  }
   return NextResponse.json({ stop: data });
 }
 

@@ -22,6 +22,7 @@ import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
+import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
@@ -1191,6 +1192,27 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           )}
                         </div>
                       )}
+                      {s.status === "pending" && run.status !== "done" && estRamasse(s) && (
+                        <div className="mt-1 pl-9">
+                          <button type="button" className="btn-secondary !px-3 !py-1 text-xs" onClick={async () => {
+                            const valeur = prompt("Nombre de colis réellement ramassés", String(s.packages_picked_up ?? ""));
+                            if (valeur === null || !valeur.trim()) return;
+                            const nombre = Number(valeur);
+                            if (!Number.isInteger(nombre) || nombre < 0 || nombre > 500) {
+                              setToast({ ok: false, text: "Saisissez un nombre entier entre 0 et 500." });
+                              return;
+                            }
+                            try {
+                              await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ packages_picked_up: nombre }) });
+                              await recharger(run.id);
+                              setToast({ ok: true, text: `${nombre} colis ramassé(s) enregistré(s).` });
+                            } catch (e) {
+                              setToast({ ok: false, text: networkErrorMessage(e) });
+                            }
+                          }}>📦 Saisir les colis ramassés{s.packages_picked_up != null ? ` (${s.packages_picked_up})` : ""}</button>
+                        </div>
+                      )}
+                      <HistoriqueArret stop={s} />
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
