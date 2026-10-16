@@ -320,6 +320,14 @@ export function PlanningGrid({
     const tourNumbers = Array.from(new Set(selectedTourNumbers));
     if (!formService || !formDriverId || !formVehicleId || tourNumbers.length === 0 || !formTime) return;
     if (formWholeWeek && formDays.size === 0) return;
+    const todayParis = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const datesToCreate = formWholeWeek ? Array.from(formDays).map((offset) => addDays(weekStart, offset)) : [formDay];
+    const pastDates = datesToCreate.filter((date) => date < todayParis);
+    if (pastDates.length > 0) {
+      const datesLabel = pastDates.join(", ");
+      if (!window.confirm(`Attention : ${pastDates.length} date(s) sélectionnée(s) sont dans le passé (${datesLabel}). Voulez-vous vraiment créer ces affectations rétroactivement ?`)) return;
+      if (!window.confirm("Deuxième confirmation : ces affectations seront enregistrées à une date passée et pourront apparaître comme doublons dans le planning. Confirmer l'ajout rétroactif ?")) return;
+    }
     setFormBusy(true);
     setError(null);
     setWarning(null);
