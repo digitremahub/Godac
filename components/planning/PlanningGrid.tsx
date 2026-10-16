@@ -84,6 +84,7 @@ export function PlanningGrid({
   prevWeek: string;
   nextWeek: string;
   selectedService: string;
+  availableTours?: { tourNumber: string; serviceId: string | null }[];
   /** Each driver's most recent tour (any week) — pre-fills the form below so re-typing the same weekly route isn't needed every time. */
   lastTourByDriver?: Record<string, { vehicleId: string; tourNumber: string }>;
   /** Only manager/direction get "Valider et envoyer" — see app/api/planning/validate. */
