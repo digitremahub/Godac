@@ -200,6 +200,18 @@ function PassageRenfort({
   const router = useRouter();
   const [choix, setChoix] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
+  async function searchVillages(query: string) {
+    setVillageSearch(query);
+    if (query.trim().length < 3) { setVillageSuggestions([]); return; }
+    setSearchingVillages(true);
+    try {
+      const res = await fetch(`/api/tour-routes/villages/search?q=${encodeURIComponent(query.trim())}`);
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.results)) setVillageSuggestions(json.results);
+      else setVillageSuggestions([]);
+    } catch { setVillageSuggestions([]); }
+    finally { setSearchingVillages(false); }
+  }
   const [error, setError] = useState<string | null>(null);
 
   async function enregistrer(ids: string[]) {
@@ -284,6 +296,9 @@ function RouteCard({
   const [villages, setVillages] = useState<Village[]>(route.villages);
   const [notes, setNotes] = useState(route.notes ?? "");
   const [serviceId, setServiceId] = useState(route.serviceId ?? "");
+  const [villageSearch, setVillageSearch] = useState("");
+  const [villageSuggestions, setVillageSuggestions] = useState<Array<{name:string; postal_code:string|null}>>([]);
+  const [searchingVillages, setSearchingVillages] = useState(false);
   const [isRenfort, setIsRenfort] = useState(route.isRenfort);
   const [couverture, setCouverture] = useState<Set<string>>(new Set(route.renfortVillageIds));
   const [busy, setBusy] = useState(false);
@@ -594,9 +609,15 @@ function RouteCard({
                   </div>
                 </div>
               ))}
-              <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [], planned_stops: [] }])}>
-                + Ajouter un village
-              </button>
+              <div className="flex flex-col gap-2">
+                <label className="block max-w-xl">
+                  <span className="label">Rechercher un village ou une adresse</span>
+                  <input className="input" value={villageSearch} onChange={(e) => void searchVillages(e.target.value)} placeholder="Nom de ville, code postal, rue ou adresse…" />
+                </label>
+                {searchingVillages && <p className="text-xs text-navy/60">Recherche…</p>}
+                {villageSuggestions.length > 0 && <div className="max-w-xl overflow-hidden rounded-lg border border-navy/15 bg-white">{villageSuggestions.map((item, index) => <button type="button" key={`${item.name}-${item.postal_code}-${index}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { setVillages([...villages, { name: item.name, postal_code: item.postal_code, notes: null, pickup_addresses: [], planned_stops: [] }]); setVillageSearch(""); setVillageSuggestions([]); }}>{item.name}{item.postal_code ? ` · ${item.postal_code}` : ""}</button>)}</div>}
+                <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [], planned_stops: [] }])}>+ Ajouter un village manuellement</button>
+              </div>
             </>
           )}
 
