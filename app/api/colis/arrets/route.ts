@@ -131,21 +131,8 @@ export async function POST(req: Request) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Toute ramasse non exceptionnelle devient une habitude de ce chauffeur.
-  // Elle sera recréée comme arrêt dans ses prochaines tournées.
-  if (kind === "ramasse" && parsed.data.exceptionnelle !== true) {
-    const { error: erreurHabitude } = await supabase.from("driver_pickup_templates").upsert({
-      organization_id: appUser.organization_id,
-      driver_id: appUser.id,
-      address: parsed.data.adresse,
-      recipient: parsed.data.destinataire || null,
-      phone: telephone,
-      active: true,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "driver_id,address" });
-    if (erreurHabitude && erreurHabitude.code !== "42P01") {
-      return NextResponse.json({ error: `Ramasse ajoutée, mais mémorisation quotidienne impossible : ${erreurHabitude.message}` }, { status: 500 });
-    }
-  }
+  // Une ramasse ajoutée par le chauffeur reste limitée à cette tournée.
+  // Les ramasses récurrentes sont gérées par la direction sur la fiche du village,
+  // afin qu’elles soient communes à tous les chauffeurs qui desservent ce village.
   return NextResponse.json({ stop: data, geocoded: Boolean(geo) });
 }
