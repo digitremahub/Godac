@@ -365,6 +365,34 @@ function RouteCard({
     finally { setSearchingVillages(false); }
   }
 
+  function addVillageFromSearch(item: { name: string; postal_code: string | null }) {
+    const name = item.name.trim();
+    const postalCode = item.postal_code ?? null;
+    const sameVillage = (v: Village) =>
+      v.name.trim().toLocaleLowerCase("fr") === name.toLocaleLowerCase("fr") &&
+      (v.postal_code ?? "") === (postalCode ?? "");
+    if (villages.some(sameVillage)) {
+      setError(`Le village ${name} est déjà présent dans cette tournée.`);
+      return;
+    }
+    const otherRoutes = allRoutes.filter((r) => r.id !== route.id && !r.isRenfort && r.villages.some(sameVillage));
+    if (otherRoutes.length > 0) {
+      const tours = otherRoutes.map((r) => r.tourNumber).join(", ");
+      if (!window.confirm(`Attention : ${name} est déjà présent dans la/les tournée(s) ${tours}. Voulez-vous vraiment l'ajouter aussi à la tournée ${route.tourNumber} ?`)) return;
+      if (!window.confirm(`Deuxième confirmation : le village ${name} sera affecté à plusieurs tournées. Confirmez-vous l'ajout à la tournée ${route.tourNumber} ?`)) return;
+    }
+    setError(null);
+    setVillages((current) => [...current, {
+      name,
+      postal_code: postalCode,
+      notes: null,
+      pickup_addresses: [],
+      planned_stops: [],
+    }]);
+    setVillageSearch("");
+    setVillageSuggestions([]);
+  }
+
   async function save() {
     setBusy(true);
     setError(null);
@@ -614,7 +642,7 @@ function RouteCard({
                   <input className="input" value={villageSearch} onChange={(e) => void searchVillages(e.target.value)} placeholder="Nom de ville, code postal, rue ou adresse…" />
                 </label>
                 {searchingVillages && <p className="text-xs text-navy/60">Recherche…</p>}
-                {villageSuggestions.length > 0 && <div className="max-w-xl overflow-hidden rounded-lg border border-navy/15 bg-white">{villageSuggestions.map((item, index) => <button type="button" key={`${item.name}-${item.postal_code}-${index}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { setVillages([...villages, { name: item.name, postal_code: item.postal_code, notes: null, pickup_addresses: [], planned_stops: [] }]); setVillageSearch(""); setVillageSuggestions([]); }}>{item.name}{item.postal_code ? ` · ${item.postal_code}` : ""}</button>)}</div>}
+                {villageSuggestions.length > 0 && <div className="max-w-xl overflow-hidden rounded-lg border border-navy/15 bg-white">{villageSuggestions.map((item, index) => <button type="button" key={`${item.name}-${item.postal_code}-${index}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => addVillageFromSearch(item)}>{item.name}{item.postal_code ? ` · ${item.postal_code}` : ""}</button>)}</div>}
                 <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [], planned_stops: [] }])}>+ Ajouter un village manuellement</button>
               </div>
             </>
