@@ -267,7 +267,9 @@ function RouteCard({
   refs,
   jour,
   today,
+  onVillageDrop,
 }: {
+  onVillageDrop: (sourceRouteId: string, village: Village, targetRouteId: string, duplicate: boolean) => Promise<void>;
   route: TourRoute;
   allRoutes: TourRoute[];
   canEdit: boolean;
@@ -288,6 +290,7 @@ function RouteCard({
   const [error, setError] = useState<string | null>(null);
   const [copyTargetRouteId, setCopyTargetRouteId] = useState("");
   const [copyingVillageIndex, setCopyingVillageIndex] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const candidates = useMemo(() => renfortCandidates(allRoutes, { id: route.id, serviceId: (editing ? serviceId : route.serviceId) || null }), [allRoutes, route.id, route.serviceId, serviceId, editing]);
   const quand = jour === today ? "aujourd'hui" : `le ${jourLong(jour)}`;
@@ -388,7 +391,7 @@ function RouteCard({
   const nbCouverts = route.renfortVillageIds.length;
 
   return (
-    <Card className={`flex flex-col gap-3 ${route.isRenfort ? "border border-dashed border-navy/25" : ""}`}>
+    <Card className={`flex flex-col gap-3 transition-colors ${dragOver ? "border-2 border-teal-ink bg-teal/5" : ""} ${route.isRenfort ? "border border-dashed border-navy/25" : ""}`} onDragOver={(e) => { if (canEdit && !route.isRenfort) { e.preventDefault(); setDragOver(true); } }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false); }} onDrop={async (e) => { e.preventDefault(); setDragOver(false); if (!canEdit || route.isRenfort) return; try { const data = JSON.parse(e.dataTransfer.getData("application/x-godac-village")); if (data.routeId !== route.id && data.village) await onVillageDrop(data.routeId, data.village as Village, route.id, e.altKey); } catch { setError("Impossible de lire le village déplacé."); } }}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="flex flex-wrap items-center gap-2 text-lg tabular-nums">
@@ -411,6 +414,7 @@ function RouteCard({
 
       {!editing ? (
         <>
+          {canEdit && !route.isRenfort && <p className={`rounded-lg border border-dashed px-3 py-2 text-xs ${dragOver ? "border-teal-ink bg-teal/10 text-navy" : "border-navy/20 text-navy/60"}`}>{dragOver ? "Déposez pour déplacer le village ici · Alt + dépôt pour le dupliquer" : "Astuce : faites glisser un village vers une autre tournée. Maintenez Alt pour le dupliquer."}</p>}
           {route.notes && <p className="whitespace-pre-line rounded-lg bg-navy/[0.035] px-3 py-2 text-sm text-navy/75">{route.notes}</p>}
 
           {route.isRenfort && (
@@ -438,8 +442,8 @@ function RouteCard({
               {route.isRenfort && <h3 className="text-sm font-semibold">Villages propres à la fiche</h3>}
               <ol className="flex flex-col divide-y divide-navy/[0.07]">
                 {route.villages.map((v, i) => (
-                  <li key={v.id ?? i} className="flex gap-3 py-2.5">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">
+                  <li key={v.id ?? i} draggable={canEdit && !route.isRenfort} onDragStart={(e) => { e.dataTransfer.setData("application/x-godac-village", JSON.stringify({ routeId: route.id, village: v })); e.dataTransfer.effectAllowed = "copyMove"; }} className={`flex gap-3 py-2.5 ${canEdit && !route.isRenfort ? "cursor-grab active:cursor-grabbing" : ""}`}>
+                    <span title={canEdit && !route.isRenfort ? "Glissez ce village vers une autre tournée" : undefined} className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">
                       {i + 1}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -684,6 +688,30 @@ export function TourRoutesBoard({
     : routes;
   // Tournées fixes d'abord, renforts ensuite.
   const ordered = [...visible.filter((r) => !r.isRenfort), ...visible.filter((r) => r.isRenfort)];
+  async function handleVillageDrop(sourceRouteId: string, village: Village, targetRouteId: string, duplicate: boolean) {
+    const source = routes.find((r) => r.id === sourceRouteId);
+    const target = routes.find((r) => r.id === targetRouteId);
+    if (!source || !target || source.id === target.id || target.isRenfort || source.isRenfort) return;
+    if (target.villages.some((v) => v.name.trim().toLocaleLowerCase("fr") === village.name.trim().toLocaleLowerCase("fr") && (v.postal_code ?? "") === (village.postal_code ?? ""))) {
+      throw new Error("Ce village existe déjà dans la tournée de destination.");
+    }
+    const toPayload = (v: Village, includeId = true) => ({
+      ...(includeId && v.id ? { id: v.id } : {}),
+      name: v.name, postal_code: v.postal_code, notes: v.notes,
+      pickup_addresses: v.pickup_addresses ?? [], planned_stops: v.planned_stops ?? [],
+    });
+    await send(`/api/tour-routes/${target.id}/villages`, "PUT", { villages: [...target.villages.map((v) => toPayload(v)), toPayload(village, false)] });
+    if (!duplicate && village.id) {
+      try {
+        await send(`/api/tour-routes/${source.id}/villages`, "PUT", { villages: source.villages.filter((v) => v.id !== village.id).map((v) => toPayload(v)) });
+      } catch (e) {
+        router.refresh();
+        throw new Error("Le village a été copié dans la tournée cible, mais son retrait de la tournée d'origine a échoué. Vérifiez les deux tournées avant de recommencer.");
+      }
+    }
+    router.refresh();
+  }
+
   const montreCarte = canSeeMap && onglet === "carte";
   const avecRenfort = renfortReady && routes.some((r) => r.isRenfort);
 
@@ -789,6 +817,7 @@ export function TourRoutesBoard({
                   refs={villageRefs}
                   jour={jour}
                   today={today}
+                  onVillageDrop={handleVillageDrop}
                 />
               ))}
             </div>
