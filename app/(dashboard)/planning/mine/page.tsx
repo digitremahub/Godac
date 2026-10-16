@@ -129,7 +129,15 @@ export default async function MyPlanningPage({
     .lt("start_at", `${queryEnd}T00:00:00`)
     .order("start_at");
 
-  const selectedEntry = params.entry ? ((entries ?? []) as any[]).find((e) => e.id === params.entry) ?? null : null;
+  const selectedEntryInRange = params.entry ? ((entries ?? []) as any[]).find((e) => e.id === params.entry) ?? null : null;
+  const { data: selectedEntryOutsideRange } = params.entry && !selectedEntryInRange
+    ? await supabase.from("planning_entries")
+        .select("id, service_id, tour_number, start_at, end_at, status, vehicles(registration), services(name, depot_address)")
+        .eq("id", params.entry)
+        .eq("driver_id", appUser.id)
+        .maybeSingle()
+    : { data: null };
+  const selectedEntry = selectedEntryInRange ?? selectedEntryOutsideRange;
   const { data: routeDetails } = selectedEntry
     ? await supabase.from("tour_routes").select("id, notes, tour_route_villages(name, postal_code, notes, position)").eq("organization_id", appUser.organization_id).eq("tour_number", selectedEntry.tour_number).maybeSingle()
     : { data: null };
