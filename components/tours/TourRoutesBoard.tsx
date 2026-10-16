@@ -291,6 +291,7 @@ function RouteCard({
   const [copyTargetRouteId, setCopyTargetRouteId] = useState("");
   const [copyingVillageIndex, setCopyingVillageIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const candidates = useMemo(() => renfortCandidates(allRoutes, { id: route.id, serviceId: (editing ? serviceId : route.serviceId) || null }), [allRoutes, route.id, route.serviceId, serviceId, editing]);
   const quand = jour === today ? "aujourd'hui" : `le ${jourLong(jour)}`;
@@ -415,6 +416,7 @@ function RouteCard({
       {!editing ? (
         <>
           {canEdit && !route.isRenfort && <p className={`rounded-lg border border-dashed px-3 py-2 text-xs ${dragOver ? "border-teal-ink bg-teal/10 text-navy" : "border-navy/20 text-navy/60"}`}>{dragOver ? "Déposez pour déplacer le village ici · Alt + dépôt pour le dupliquer" : "Astuce : faites glisser un village vers une autre tournée. Maintenez Alt pour le dupliquer."}</p>}
+          {canEdit && !route.isRenfort && <p className={`rounded-lg border border-dashed px-3 py-2 text-xs ${dragOver ? "border-teal-ink bg-teal/10 text-navy" : "border-navy/20 text-navy/60"}`}>{dragOver ? "Déposez ici pour déplacer · maintenez Alt pour dupliquer" : "Glissez un village vers une autre tournée. Maintenez Alt pendant le dépôt pour le dupliquer."}</p>}
           {route.notes && <p className="whitespace-pre-line rounded-lg bg-navy/[0.035] px-3 py-2 text-sm text-navy/75">{route.notes}</p>}
 
           {route.isRenfort && (
@@ -707,6 +709,26 @@ export function TourRoutesBoard({
       } catch (e) {
         router.refresh();
         throw new Error("Le village a été copié dans la tournée cible, mais son retrait de la tournée d'origine a échoué. Vérifiez les deux tournées avant de recommencer.");
+      }
+    }
+    router.refresh();
+  }
+
+  async function handleVillageDrop(sourceRouteId: string, village: Village, targetRouteId: string, duplicate: boolean) {
+    const source = routes.find((r) => r.id === sourceRouteId);
+    const target = routes.find((r) => r.id === targetRouteId);
+    if (!source || !target || source.id === target.id || target.isRenfort || source.isRenfort) return;
+    if (target.villages.some((v) => v.name.trim().toLocaleLowerCase("fr") === village.name.trim().toLocaleLowerCase("fr") && (v.postal_code ?? "") === (village.postal_code ?? ""))) {
+      throw new Error("Ce village existe déjà dans la tournée de destination.");
+    }
+    const payload = (v: Village) => ({ ...(v.id ? { id: v.id } : {}), name: v.name, postal_code: v.postal_code, notes: v.notes, pickup_addresses: v.pickup_addresses ?? [], planned_stops: v.planned_stops ?? [] });
+    await send(`/api/tour-routes/${target.id}/villages`, "PUT", { villages: [...target.villages.map(payload), { ...payload(village), id: undefined }] });
+    if (!duplicate && village.id) {
+      try {
+        await send(`/api/tour-routes/${source.id}/villages`, "PUT", { villages: source.villages.filter((v) => v.id !== village.id).map(payload) });
+      } catch {
+        router.refresh();
+        throw new Error("Village copié dans la tournée cible, mais le retrait de l'original a échoué. Vérifiez les deux tournées.");
       }
     }
     router.refresh();
