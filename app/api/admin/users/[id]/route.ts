@@ -13,7 +13,9 @@ const bodySchema = z.object({
   role_title: z.string().nullable().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
-  phone: z.string().trim().max(40).nullable().optional(),\n  address: z.string().trim().max(300).nullable().optional(),\n  contact_email: z.string().trim().email().max(254).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  contact_email: z.string().trim().email().max(254).nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
   // Richer replacement for service_id above — several qualified
   // services per driver, each with its own status (titulaire/
