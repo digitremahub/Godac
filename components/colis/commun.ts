@@ -19,6 +19,10 @@ export interface Stop {
   position: number;
   parcel_code: string | null;
   parcel_count: number;
+  /** Nombre réellement ramassé, renseigné après l’enlèvement. */
+  packages_picked_up?: number | null;
+  /** Ramasse ponctuelle qui ne doit pas devenir une habitude. */
+  exceptional_pickup?: boolean;
   address: string;
   lat: number | null;
   lng: number | null;
