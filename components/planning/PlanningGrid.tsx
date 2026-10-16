@@ -315,52 +315,44 @@ export function PlanningGrid({
   }
 
   async function createEntry() {
-    if (!formService || !formDriverId || !formVehicleId || !formTourNumber || !formTime) return;
+    const tourNumbers = Array.from(new Set(formTourNumber.split(/[;,\\n]+/).map((n) => n.trim()).filter(Boolean)));
+    if (!formService || !formDriverId || !formVehicleId || tourNumbers.length === 0 || !formTime) return;
     if (formWholeWeek && formDays.size === 0) return;
     setFormBusy(true);
     setError(null);
     setWarning(null);
     setBulkSummary(null);
     try {
-      if (formWholeWeek) {
-        const res = await fetch("/api/planning/entries/bulk-week", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: formService,
-            driver_id: formDriverId,
-            vehicle_id: formVehicleId,
-            tour_number: formTourNumber,
-            week_start: weekStart,
-            time: formTime,
-            days: Array.from(formDays),
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-        if (json.warning) setWarning(json.warning);
-        setBulkSummary(
-          json.created > 0
-            ? `${json.created} jour(s) affecté(s)${json.skipped > 0 ? ` (${json.skipped} déjà occupé(s), ignoré(s))` : ""}.`
-            : "Rien à créer (tous les jours sélectionnés ont déjà une affectation).",
-        );
-      } else {
-        const start = new Date(`${formDay}T${formTime}:00`);
-        const res = await fetch("/api/planning/entries", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: formService,
-            driver_id: formDriverId,
-            vehicle_id: formVehicleId,
-            tour_number: formTourNumber,
-            start_at: start.toISOString(),
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-        if (json.warning) setWarning(json.warning);
+      let created = 0;
+      let skipped = 0;
+      const warnings: string[] = [];
+      for (const tourNumber of tourNumbers) {
+        if (formWholeWeek) {
+          const res = await fetch("/api/planning/entries/bulk-week", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ service_id: formService, driver_id: formDriverId, vehicle_id: formVehicleId, tour_number: tourNumber, week_start: weekStart, time: formTime, days: Array.from(formDays) }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : `Erreur pour ${tourNumber}`);
+          created += Number(json.created ?? 0);
+          skipped += Number(json.skipped ?? 0);
+          if (json.warning) warnings.push(json.warning);
+        } else {
+          const start = new Date(`${formDay}T${formTime}:00`);
+          const res = await fetch("/api/planning/entries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ service_id: formService, driver_id: formDriverId, vehicle_id: formVehicleId, tour_number: tourNumber, start_at: start.toISOString() }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : `Erreur pour ${tourNumber}`);
+          if (json.warning) warnings.push(json.warning);
+          created += 1;
+        }
       }
+      if (warnings.length) setWarning(Array.from(new Set(warnings)).join(" "));
+      setBulkSummary(`${created} affectation(s) créée(s) pour ${tourNumbers.length} tournée(s)${skipped ? ` ; ${skipped} créneau(x) déjà occupé(s), ignoré(s)` : ""}.`);
       setFormOpen(false);
       setFormTourNumber("");
       setFormDriverId("");
@@ -368,6 +360,7 @@ export function PlanningGrid({
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
+      router.refresh();
     } finally {
       setFormBusy(false);
     }
@@ -467,12 +460,12 @@ export function PlanningGrid({
             <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} /></label>
           </div>
           <div>
-            <label className="block"><span className="label">N° de tournée</span>
+            <label className="block"><span className="label">N° de tournée(s)</span>
             <input
               className="input !w-auto"
               value={formTourNumber}
               onChange={(e) => setFormTourNumber(e.target.value)}
-              placeholder="ex: T-042"
+              placeholder="Ex. T105, T106 (séparés par virgule)"
             /></label>
           </div>
           <div>
