@@ -20,13 +20,36 @@ const PLAIN_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup
  * passée, on relit sans les colonnes manquantes : la page reste
  * utilisable, la carte ou les renforts l'indiquent.
  */
-async function loadRoutes(supabase: Supabase) {
-  const full = await supabase.from("tour_routes").select(`${ROUTE_FIELDS}, is_renfort, ${GEO_VILLAGES}`).order("tour_number");
-  if (!full.error) return { data: full.data as unknown[] | null, geoReady: true, renfortReady: true };
-  const withGeo = await supabase.from("tour_routes").select(`${ROUTE_FIELDS}, ${GEO_VILLAGES}`).order("tour_number");
-  if (!withGeo.error) return { data: withGeo.data as unknown[] | null, geoReady: true, renfortReady: false };
-  const plain = await supabase.from("tour_routes").select(`${ROUTE_FIELDS}, ${PLAIN_VILLAGES}`).order("tour_number");
-  return { data: plain.data as unknown[] | null, geoReady: false, renfortReady: false };
+async function loadRoutes(supabase: Supabase, organizationId: string, useAdminReader: boolean) {
+  // Direction reads through the server-only admin client, but every parent
+  // query is explicitly scoped to the active organization. This prevents a
+  // broken/stale RLS context from making existing route sheets disappear.
+  let reader: Supabase = supabase;
+  if (useAdminReader) {
+    try {
+      reader = createAdminSupabaseClient() as unknown as Supabase;
+    } catch {
+      // Keep the authenticated client as a safe fallback if admin env is absent.
+    }
+  }
+
+  const query = (fields: string) =>
+    reader.from("tour_routes").select(fields).eq("organization_id", organizationId).order("tour_number");
+
+  const full = await query(`${ROUTE_FIELDS}, is_renfort, ${GEO_VILLAGES}`);
+  if (!full.error) return { data: full.data as unknown[] | null, geoReady: true, renfortReady: true, error: null as string | null };
+  const withGeo = await query(`${ROUTE_FIELDS}, ${GEO_VILLAGES}`);
+  if (!withGeo.error) return { data: withGeo.data as unknown[] | null, geoReady: true, renfortReady: false, error: null as string | null };
+  const plain = await query(`${ROUTE_FIELDS}, ${PLAIN_VILLAGES}`);
+  if (!plain.error) return { data: plain.data as unknown[] | null, geoReady: false, renfortReady: false, error: null as string | null };
+
+  // Do not silently present a database/query failure as an empty route list.
+  return {
+    data: null as unknown[] | null,
+    geoReady: false,
+    renfortReady: false,
+    error: `Impossible de charger les tournées : ${plain.error.message}`,
+  };
 }
 
 /**
@@ -99,8 +122,8 @@ export default async function TourRoutesPage({ searchParams }: { searchParams: P
   const jour = /^\d{4}-\d{2}-\d{2}$/.test(params.jour ?? "") ? params.jour! : today;
 
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
-  const [{ data: routes, geoReady, renfortReady }, { data: services }, { data: myServices }, { data: recentTours }, { data: myPlanned }] = await Promise.all([
-    loadRoutes(supabase),
+  const [{ data: routes, geoReady, renfortReady, error: routeLoadError }, { data: services }, { data: myServices }, { data: recentTours }, { data: myPlanned }] = await Promise.all([
+    loadRoutes(supabase, appUser.organization_id, appUser.role === "direction"),
     supabase.from("services").select("id, name").order("name"),
     supabase.from("user_services").select("service_id").eq("user_id", appUser.id),
     gestion
@@ -190,6 +213,11 @@ export default async function TourRoutesPage({ searchParams }: { searchParams: P
         }
       />
       <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
+      {routeLoadError ? (
+        <div role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          {routeLoadError}. Les fiches existantes n'ont pas été supprimées par cette page. Contactez le support avant de recréer une tournée.
+        </div>
+      ) : null}
       <TourRoutesBoard
         routes={visible}
         canEdit={gestion}
