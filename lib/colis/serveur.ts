@@ -5,7 +5,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { LISTE_PRINCIPALE, type Liste } from "@/lib/colis/listes";
 import { normaliserSemaine, type FicheHoraires } from "@/lib/colis/horaires";
 
-export const RUN_FIELDS = "id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start";
+export const RUN_FIELDS = "id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start, service_id";
 export const STOP_FIELDS = "id, list_id, position, parcel_code, parcel_count, address, lat, lng, recipient, phone, notes, status, done_at, delivered_place, proof_photo_path, window_start, window_end, kind, proof_code, weight_kg, failure_reason";
 export const LIST_FIELDS = "id, name, position";
 
