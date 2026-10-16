@@ -11,8 +11,8 @@ import { TourneesTabs } from "@/components/colis/TourneesTabs";
 type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 const ROUTE_FIELDS = "id, tour_number, service_id, notes, services(name)";
-const GEO_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup_addresses, position, lat, lng, insee_code, geocode_status)";
-const PLAIN_VILLAGES = "tour_route_villages(id, name, postal_code, notes, position)";
+const GEO_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup_addresses, planned_stops, position, lat, lng, insee_code, geocode_status)";
+const PLAIN_VILLAGES = "tour_route_villages(id, name, postal_code, notes, pickup_addresses, position)";
 
 /**
  * Les tournées et leurs villages, avec les coordonnées mises en cache pour
@@ -134,6 +134,7 @@ export default async function TourRoutesPage({ searchParams }: { searchParams: P
         postal_code: v.postal_code,
         notes: v.notes,
         pickup_addresses: Array.isArray(v.pickup_addresses) ? v.pickup_addresses : [],
+        planned_stops: Array.isArray(v.planned_stops) ? v.planned_stops : [],
         // Coordonnées : seulement pour ceux qui voient la carte.
         ...(carte ? { lat: v.lat ?? null, lng: v.lng ?? null, insee_code: v.insee_code ?? null, geocode_status: v.geocode_status ?? null } : {}),
       })),
