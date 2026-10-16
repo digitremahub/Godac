@@ -200,18 +200,6 @@ function PassageRenfort({
   const router = useRouter();
   const [choix, setChoix] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
-  async function searchVillages(query: string) {
-    setVillageSearch(query);
-    if (query.trim().length < 3) { setVillageSuggestions([]); return; }
-    setSearchingVillages(true);
-    try {
-      const res = await fetch(`/api/tour-routes/villages/search?q=${encodeURIComponent(query.trim())}`);
-      const json = await res.json();
-      if (res.ok && Array.isArray(json.results)) setVillageSuggestions(json.results);
-      else setVillageSuggestions([]);
-    } catch { setVillageSuggestions([]); }
-    finally { setSearchingVillages(false); }
-  }
   const [error, setError] = useState<string | null>(null);
 
   async function enregistrer(ids: string[]) {
@@ -306,7 +294,6 @@ function RouteCard({
   const [copyTargetRouteId, setCopyTargetRouteId] = useState("");
   const [copyingVillageIndex, setCopyingVillageIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
 
   const candidates = useMemo(() => renfortCandidates(allRoutes, { id: route.id, serviceId: (editing ? serviceId : route.serviceId) || null }), [allRoutes, route.id, route.serviceId, serviceId, editing]);
   const quand = jour === today ? "aujourd'hui" : `le ${jourLong(jour)}`;
@@ -363,6 +350,19 @@ function RouteCard({
       setBusy(false);
       setCopyingVillageIndex(null);
     }
+  }
+
+  async function searchVillages(query: string) {
+    setVillageSearch(query);
+    if (query.trim().length < 3) { setVillageSuggestions([]); return; }
+    setSearchingVillages(true);
+    try {
+      const res = await fetch(`/api/tour-routes/villages/search?q=${encodeURIComponent(query.trim())}`);
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.results)) setVillageSuggestions(json.results);
+      else setVillageSuggestions([]);
+    } catch { setVillageSuggestions([]); }
+    finally { setSearchingVillages(false); }
   }
 
   async function save() {
@@ -735,25 +735,6 @@ export function TourRoutesBoard({
     router.refresh();
   }
 
-  async function handleVillageDrop(sourceRouteId: string, village: Village, targetRouteId: string, duplicate: boolean) {
-    const source = routes.find((r) => r.id === sourceRouteId);
-    const target = routes.find((r) => r.id === targetRouteId);
-    if (!source || !target || source.id === target.id || target.isRenfort || source.isRenfort) return;
-    if (target.villages.some((v) => v.name.trim().toLocaleLowerCase("fr") === village.name.trim().toLocaleLowerCase("fr") && (v.postal_code ?? "") === (village.postal_code ?? ""))) {
-      throw new Error("Ce village existe déjà dans la tournée de destination.");
-    }
-    const payload = (v: Village) => ({ ...(v.id ? { id: v.id } : {}), name: v.name, postal_code: v.postal_code, notes: v.notes, pickup_addresses: v.pickup_addresses ?? [], planned_stops: v.planned_stops ?? [] });
-    await send(`/api/tour-routes/${target.id}/villages`, "PUT", { villages: [...target.villages.map(payload), { ...payload(village), id: undefined }] });
-    if (!duplicate && village.id) {
-      try {
-        await send(`/api/tour-routes/${source.id}/villages`, "PUT", { villages: source.villages.filter((v) => v.id !== village.id).map(payload) });
-      } catch {
-        router.refresh();
-        throw new Error("Village copié dans la tournée cible, mais le retrait de l'original a échoué. Vérifiez les deux tournées.");
-      }
-    }
-    router.refresh();
-  }
 
   const montreCarte = canSeeMap && onglet === "carte";
   const avecRenfort = renfortReady && routes.some((r) => r.isRenfort);
