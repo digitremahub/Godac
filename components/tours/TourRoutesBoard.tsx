@@ -14,6 +14,11 @@ const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").t
   loading: () => <p className="text-sm text-navy/60">Chargement de la carte…</p>,
 });
 
+export interface PlannedStop {
+  type: "ramasse" | "point_relais";
+  address: string;
+}
+
 export interface Village {
   id?: string;
   name: string;
@@ -21,6 +26,8 @@ export interface Village {
   notes: string | null;
   /** Adresses de ramasse planifiées par la direction, une par ligne. */
   pickup_addresses?: string[];
+  /** Ramasses et points relais configurés pour cette affectation de village. */
+  planned_stops?: PlannedStop[];
   /** Coordonnées de la commune, mises en cache pour la carte (gestion seulement). */
   lat?: number | null;
   lng?: number | null;
@@ -275,6 +282,8 @@ function RouteCard({
   const [couverture, setCouverture] = useState<Set<string>>(new Set(route.renfortVillageIds));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copyTargetRouteId, setCopyTargetRouteId] = useState("");
+  const [copyingVillageIndex, setCopyingVillageIndex] = useState<number | null>(null);
 
   const candidates = useMemo(() => renfortCandidates(allRoutes, { id: route.id, serviceId: (editing ? serviceId : route.serviceId) || null }), [allRoutes, route.id, route.serviceId, serviceId, editing]);
   const quand = jour === today ? "aujourd'hui" : `le ${jourLong(jour)}`;
@@ -289,6 +298,48 @@ function RouteCard({
     const [moved] = next.splice(i, 1);
     if (moved) next.splice(j, 0, moved);
     setVillages(next);
+  }
+
+  async function copyVillageToRoute(village: Village, index: number) {
+    if (!copyTargetRouteId) {
+      setError("Choisissez d'abord la tournée de destination.");
+      return;
+    }
+    const target = allRoutes.find((r) => r.id === copyTargetRouteId);
+    if (!target || target.isRenfort) {
+      setError("Choisissez une tournée classique de destination.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setCopyingVillageIndex(index);
+    try {
+      await send(`/api/tour-routes/${target.id}/villages`, "PUT", {
+        villages: [
+          ...target.villages.map((v) => ({
+            ...(v.id ? { id: v.id } : {}),
+            name: v.name,
+            postal_code: v.postal_code,
+            notes: v.notes,
+            pickup_addresses: v.pickup_addresses ?? [],
+            planned_stops: v.planned_stops ?? [],
+          })),
+          {
+            name: village.name.trim(),
+            postal_code: village.postal_code?.trim() || null,
+            notes: village.notes?.trim() || null,
+            pickup_addresses: village.pickup_addresses ?? [],
+            planned_stops: village.planned_stops ?? [],
+          },
+        ],
+      });
+      router.refresh();
+    } catch (e) {
+      setError(networkErrorMessage(e));
+    } finally {
+      setBusy(false);
+      setCopyingVillageIndex(null);
+    }
   }
 
   async function save() {
@@ -306,7 +357,7 @@ function RouteCard({
         await send(`/api/tour-routes/${route.id}/villages`, "PUT", {
           villages: villages
             .filter((v) => v.name.trim())
-            .map((v) => ({ ...(v.id ? { id: v.id } : {}), name: v.name.trim(), postal_code: v.postal_code?.trim() || null, notes: v.notes?.trim() || null, pickup_addresses: v.pickup_addresses ?? [] })),
+            .map((v) => ({ ...(v.id ? { id: v.id } : {}), name: v.name.trim(), postal_code: v.postal_code?.trim() || null, notes: v.notes?.trim() || null, pickup_addresses: v.pickup_addresses ?? [], planned_stops: v.planned_stops ?? [] })),
         });
       }
       setEditing(false);
@@ -398,11 +449,12 @@ function RouteCard({
                         </p>
                       ) : null}
                       {v.notes && <p className="mt-0.5 whitespace-pre-line text-sm text-navy/70">{v.notes}</p>}
-                      {(v.pickup_addresses ?? []).length > 0 && (
+                      {((v.planned_stops ?? []).length > 0 || (v.pickup_addresses ?? []).length > 0) && (
                         <div className="mt-2 rounded-lg border border-gold/40 bg-gold/10 p-2">
-                          <p className="text-xs font-bold uppercase tracking-wide">Ramasses prévues</p>
+                          <p className="text-xs font-bold uppercase tracking-wide">Arrêts professionnels prévus</p>
                           <ul className="mt-1 list-inside list-disc text-sm">
-                            {(v.pickup_addresses ?? []).map((address, j) => <li key={j}>{address}</li>)}
+                            {(v.planned_stops ?? []).map((stop, j) => <li key={j}><span className="font-semibold">{stop.type === "point_relais" ? "Point relais" : "Ramasse"} :</span> {stop.address}</li>)}
+                            {(v.pickup_addresses ?? []).map((address, j) => <li key={`legacy-${j}`}><span className="font-semibold">Ramasse :</span> {address}</li>)}
                           </ul>
                         </div>
                       )}
@@ -477,16 +529,49 @@ function RouteCard({
                     aria-label={`Infos du village ${i + 1}`}
                   />
                   <label className="block">
-                    <span className="label">Ramasses prévues dans ce village (une adresse par ligne)</span>
+                    <span className="label">Ramasses historiques (une adresse par ligne)</span>
                     <textarea
-                      className="input min-h-[72px] !py-1.5 text-sm"
+                      className="input min-h-[56px] !py-1.5 text-sm"
                       placeholder="Une adresse de ramasse par ligne"
                       value={(v.pickup_addresses ?? []).join("\n")}
                       onChange={(e) => update(i, { pickup_addresses: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
                       aria-label={`Adresses de ramasse du village ${i + 1}`}
                     />
                   </label>
-                  <div className="flex gap-1.5 text-xs">
+                  <label className="block">
+                    <span className="label">Ramasses configurées par la direction (une adresse par ligne)</span>
+                    <textarea
+                      className="input min-h-[56px] !py-1.5 text-sm"
+                      placeholder="Nom du professionnel et adresse, une ligne par ramasse"
+                      value={(v.planned_stops ?? []).filter((s) => s.type === "ramasse").map((s) => s.address).join("\n")}
+                      onChange={(e) => update(i, { planned_stops: [
+                        ...(v.planned_stops ?? []).filter((s) => s.type !== "ramasse"),
+                        ...e.target.value.split("\n").map((x) => x.trim()).filter(Boolean).map((address) => ({ type: "ramasse" as const, address })),
+                      ] })}
+                      aria-label={`Ramasses configurées du village ${i + 1}`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">Points relais (une adresse par ligne)</span>
+                    <textarea
+                      className="input min-h-[56px] !py-1.5 text-sm"
+                      placeholder="Nom du point relais et adresse, une ligne par point relais"
+                      value={(v.planned_stops ?? []).filter((s) => s.type === "point_relais").map((s) => s.address).join("\n")}
+                      onChange={(e) => update(i, { planned_stops: [
+                        ...(v.planned_stops ?? []).filter((s) => s.type !== "point_relais"),
+                        ...e.target.value.split("\n").map((x) => x.trim()).filter(Boolean).map((address) => ({ type: "point_relais" as const, address })),
+                      ] })}
+                      aria-label={`Points relais du village ${i + 1}`}
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <select className="input min-w-0 flex-1 !py-1 text-xs" value={copyTargetRouteId} onChange={(e) => setCopyTargetRouteId(e.target.value)} aria-label={`Tournée de destination pour ${v.name || `village ${i + 1}`}`}>
+                      <option value="">Copier vers une autre tournée…</option>
+                      {allRoutes.filter((r) => r.id !== route.id && !r.isRenfort).map((r) => <option key={r.id} value={r.id}>Tournée {r.tourNumber} · {r.serviceName ?? "Tous services"}</option>)}
+                    </select>
+                    <button type="button" className="btn-secondary !px-2 !py-1" disabled={busy || !v.name.trim() || !copyTargetRouteId} onClick={() => copyVillageToRoute(v, i)}>
+                      {copyingVillageIndex === i ? "Copie…" : "Dupliquer le village"}
+                    </button>
                     <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Monter">
                       ↑
                     </button>
@@ -499,7 +584,7 @@ function RouteCard({
                   </div>
                 </div>
               ))}
-              <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [] }])}>
+              <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [], planned_stops: [] }])}>
                 + Ajouter un village
               </button>
             </>
