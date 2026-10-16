@@ -99,35 +99,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2) Ramasses habituelles du chauffeur, en complément des ramasses de village.
-    const { data: habitudes, error: erreurHabitudes } = await supabase
-      .from("driver_pickup_templates")
-      .select("address, recipient, phone")
-      .eq("driver_id", appUser.id)
-      .eq("organization_id", appUser.organization_id)
-      .eq("active", true)
-      .order("created_at");
-    if (erreurHabitudes && erreurHabitudes.code !== "42P01") throw erreurHabitudes;
-    for (const habitude of habitudes ?? []) {
-      if (adressesAjoutees.has(cleAdresse(habitude.address))) continue;
-      const geo = await geocodeAddress(habitude.address, pays).catch(() => null);
-      const { error } = await supabase.from("delivery_stops").insert({
-        organization_id: appUser.organization_id,
-        run_id: run.id,
-        position,
-        kind: "ramasse",
-        address: habitude.address,
-        recipient: habitude.recipient,
-        phone: habitude.phone,
-        parcel_count: 1,
-        status: "pending",
-        lat: geo?.lat ?? null,
-        lng: geo?.lng ?? null,
-      });
-      if (error) throw new Error(`Tournée créée, mais une ramasse habituelle n’a pas pu être ajoutée : ${error.message}`);
-      adressesAjoutees.add(cleAdresse(habitude.address));
-      position += 1;
-    }
+    // Aucune ramasse n’est liée au chauffeur : seules les ramasses configurées
+    // par la direction sur les villages de sa tournée sont ajoutées ici.
     return NextResponse.json({ run });
   } catch (e) {
     // La tournée est créée avant l'ajout facultatif des ramasses. Une erreur
