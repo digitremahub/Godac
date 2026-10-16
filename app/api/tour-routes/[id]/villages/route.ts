@@ -16,8 +16,12 @@ const bodySchema = z.object({
         notes: z.string().trim().max(2000).nullable().optional(),
         pickup_addresses: z.array(z.string().trim().min(1).max(300)).max(100).optional(),
         planned_stops: z.array(z.object({
+          id: z.string().optional(),
           type: z.enum(["ramasse", "point_relais"]),
-          address: z.string().trim().min(1).max(300),
+          name: z.string().trim().max(200).optional(),
+          address: z.string().trim().max(300),
+          time_window: z.string().trim().max(40).optional(),
+          notes: z.string().trim().max(1000).optional(),
         })).max(200).optional(),
       }),
     )

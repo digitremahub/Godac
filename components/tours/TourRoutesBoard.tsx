@@ -15,8 +15,12 @@ const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").t
 });
 
 export interface PlannedStop {
+  id?: string;
   type: "ramasse" | "point_relais";
+  name?: string;
   address: string;
+  time_window?: string;
+  notes?: string;
 }
 
 export interface Village {
@@ -453,7 +457,7 @@ function RouteCard({
                         <div className="mt-2 rounded-lg border border-gold/40 bg-gold/10 p-2">
                           <p className="text-xs font-bold uppercase tracking-wide">Arrêts professionnels prévus</p>
                           <ul className="mt-1 list-inside list-disc text-sm">
-                            {(v.planned_stops ?? []).map((stop, j) => <li key={j}><span className="font-semibold">{stop.type === "point_relais" ? "Point relais" : "Ramasse"} :</span> {stop.address}</li>)}
+                            {(v.planned_stops ?? []).map((stop, j) => <li key={stop.id ?? j}><span className="font-semibold">{stop.type === "point_relais" ? "Point relais" : "Ramasse"}{stop.name ? ` · ${stop.name}` : ""} :</span> {stop.address}{stop.time_window ? ` · ${stop.time_window}` : ""}{stop.notes ? ` — ${stop.notes}` : ""}</li>)}
                             {(v.pickup_addresses ?? []).map((address, j) => <li key={`legacy-${j}`}><span className="font-semibold">Ramasse :</span> {address}</li>)}
                           </ul>
                         </div>
@@ -528,42 +532,41 @@ function RouteCard({
                     onChange={(e) => update(i, { notes: e.target.value })}
                     aria-label={`Infos du village ${i + 1}`}
                   />
-                  <label className="block">
-                    <span className="label">Ramasses historiques (une adresse par ligne)</span>
-                    <textarea
-                      className="input min-h-[56px] !py-1.5 text-sm"
-                      placeholder="Une adresse de ramasse par ligne"
-                      value={(v.pickup_addresses ?? []).join("\n")}
-                      onChange={(e) => update(i, { pickup_addresses: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
-                      aria-label={`Adresses de ramasse du village ${i + 1}`}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="label">Ramasses configurées par la direction (une adresse par ligne)</span>
-                    <textarea
-                      className="input min-h-[56px] !py-1.5 text-sm"
-                      placeholder="Nom du professionnel et adresse, une ligne par ramasse"
-                      value={(v.planned_stops ?? []).filter((s) => s.type === "ramasse").map((s) => s.address).join("\n")}
-                      onChange={(e) => update(i, { planned_stops: [
-                        ...(v.planned_stops ?? []).filter((s) => s.type !== "ramasse"),
-                        ...e.target.value.split("\n").map((x) => x.trim()).filter(Boolean).map((address) => ({ type: "ramasse" as const, address })),
-                      ] })}
-                      aria-label={`Ramasses configurées du village ${i + 1}`}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="label">Points relais (une adresse par ligne)</span>
-                    <textarea
-                      className="input min-h-[56px] !py-1.5 text-sm"
-                      placeholder="Nom du point relais et adresse, une ligne par point relais"
-                      value={(v.planned_stops ?? []).filter((s) => s.type === "point_relais").map((s) => s.address).join("\n")}
-                      onChange={(e) => update(i, { planned_stops: [
-                        ...(v.planned_stops ?? []).filter((s) => s.type !== "point_relais"),
-                        ...e.target.value.split("\n").map((x) => x.trim()).filter(Boolean).map((address) => ({ type: "point_relais" as const, address })),
-                      ] })}
-                      aria-label={`Points relais du village ${i + 1}`}
-                    />
-                  </label>
+                  <section className="flex flex-col gap-2 rounded-lg bg-navy/[0.025] p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div><h3 className="text-sm font-semibold">Ramasses et points relais</h3><p className="text-xs text-navy/60">Chaque arrêt possède sa propre fiche.</p></div>
+                      <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold">{(v.planned_stops ?? []).length} arrêt(s)</span>
+                    </div>
+                    {(v.planned_stops ?? []).map((stop, stopIndex) => (
+                      <div key={stop.id ?? stopIndex} className="flex flex-col gap-2 rounded-lg border border-navy/10 bg-white p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{stopIndex + 1}</span>
+                          <select className="input flex-1 !py-1.5 text-sm" value={stop.type} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, type: e.target.value as PlannedStop["type"] } : s) })} aria-label={`Type de l'arrêt ${stopIndex + 1}`}>
+                            <option value="ramasse">Ramasse</option><option value="point_relais">Point relais</option>
+                          </select>
+                          <button type="button" className="btn-ghost !px-2 !py-1 text-sm text-orange-ink" onClick={() => update(i, { planned_stops: (v.planned_stops ?? []).filter((_, j) => j !== stopIndex) })}>Supprimer</button>
+                        </div>
+                        <label className="block"><span className="label">Nom du professionnel / point relais</span>
+                          <input className="input !py-1.5 text-sm" value={stop.name ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, name: e.target.value } : s) })} placeholder="Ex. Boulangerie Martin" />
+                        </label>
+                        <label className="block"><span className="label">Adresse complète</span>
+                          <input className="input !py-1.5 text-sm" value={stop.address} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: e.target.value } : s) })} placeholder="Numéro, rue, code postal, ville" />
+                        </label>
+                        <label className="block"><span className="label">Créneau horaire</span>
+                          <select className="input !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })}>
+                            <option value="">Aucun créneau défini</option><option value="08:00-11:00">08:00 – 11:00</option><option value="10:00-13:00">10:00 – 13:00</option><option value="12:00-15:00">12:00 – 15:00</option><option value="14:00-17:00">14:00 – 17:00</option>
+                          </select>
+                        </label>
+                        <label className="block"><span className="label">Consignes (facultatif)</span>
+                          <textarea className="input min-h-[48px] !py-1.5 text-sm" value={stop.notes ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, notes: e.target.value } : s) })} placeholder="Contact, accès, code portail, nombre de colis…" />
+                        </label>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="btn-secondary !py-1.5 text-sm" onClick={() => update(i, { planned_stops: [...(v.planned_stops ?? []), { type: "ramasse", address: "" }] })}>+ Ajouter une ramasse</button>
+                      <button type="button" className="btn-secondary !py-1.5 text-sm" onClick={() => update(i, { planned_stops: [...(v.planned_stops ?? []), { type: "point_relais", address: "" }] })}>+ Ajouter un point relais</button>
+                    </div>
+                  </section>
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <select className="input min-w-0 flex-1 !py-1 text-xs" value={copyTargetRouteId} onChange={(e) => setCopyTargetRouteId(e.target.value)} aria-label={`Tournée de destination pour ${v.name || `village ${i + 1}`}`}>
                       <option value="">Copier vers une autre tournée…</option>
