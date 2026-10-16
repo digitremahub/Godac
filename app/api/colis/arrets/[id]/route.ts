@@ -126,7 +126,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let maj = supabase.from("delivery_stops").update(update).eq("id", id);
   // Garde contre deux clôtures simultanées (deux téléphones, double appui).
   if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
-  const { data, error } = await maj.select(STOP_FIELDS).maybeSingle();
+  const { data, error } = await maj.select(`${STOP_FIELDS}, run_id`).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: status ? "Arrêt déjà clôturé ou modifié entre-temps : actualisez." : "Arrêt introuvable." }, { status: status ? 409 : 404 });
   const events: Record<string, unknown>[] = [];
