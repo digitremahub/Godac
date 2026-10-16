@@ -29,6 +29,7 @@ const RESOLVE_URL: Record<string, string> = {
 // no other alert type has needed a per-row link yet.
 const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) => string)> = {
   planning_validated: "/planning/mine",
+  planning_assignment: (relatedId) => (relatedId ? `/planning/mine?entry=${relatedId}` : "/planning/mine"),
   new_message: (relatedId) => (relatedId ? `/messenger?with=${relatedId}` : "/messenger"),
   // Groupe d'équipe du Messenger (mention @prénom ou Info équipe) :
   // related_id est l'id du groupe (message_groups.id).
