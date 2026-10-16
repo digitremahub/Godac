@@ -574,10 +574,9 @@ function RouteCard({
                         <label className="block"><span className="label">Adresse complète</span>
                           <input className="input !py-1.5 text-sm" value={stop.address} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: e.target.value } : s) })} placeholder="Numéro, rue, code postal, ville" />
                         </label>
-                        <label className="block"><span className="label">Créneau horaire</span>
-                          <select className="input !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })}>
-                            <option value="">Aucun créneau défini</option><option value="08:00-11:00">08:00 – 11:00</option><option value="10:00-13:00">10:00 – 13:00</option><option value="12:00-15:00">12:00 – 15:00</option><option value="14:00-17:00">14:00 – 17:00</option>
-                          </select>
+                        <label className="block"><span className="label">{stop.type === "ramasse" ? "Tranche horaire prévue au contrat" : "Horaires d'ouverture du point relais"}</span>
+                          <input className="input !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })} placeholder={stop.type === "ramasse" ? "Ex. 09:30-10:00 ou selon contrat" : "Ex. lun-ven 09:00-12:00, 14:00-18:00"} />
+                          <span className="mt-1 block text-xs text-navy/55">{stop.type === "ramasse" ? "Saisissez la tranche prévue dans le contrat de ramasse." : "Saisissez les horaires réels d'ouverture du relais."}</span>
                         </label>
                         <label className="block"><span className="label">Consignes (facultatif)</span>
                           <textarea className="input min-h-[48px] !py-1.5 text-sm" value={stop.notes ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, notes: e.target.value } : s) })} placeholder="Contact, accès, code portail, nombre de colis…" />
