@@ -287,6 +287,9 @@ function RouteCard({
   const [villageSearch, setVillageSearch] = useState("");
   const [villageSuggestions, setVillageSuggestions] = useState<Array<{name:string; postal_code:string|null}>>([]);
   const [searchingVillages, setSearchingVillages] = useState(false);
+  const [stopAddressQuery, setStopAddressQuery] = useState<{ key: string; value: string } | null>(null);
+  const [stopAddressSuggestions, setStopAddressSuggestions] = useState<Array<{ label: string; name: string; postal_code: string | null }>>([]);
+  const [searchingStopAddress, setSearchingStopAddress] = useState(false);
   const [isRenfort, setIsRenfort] = useState(route.isRenfort);
   const [couverture, setCouverture] = useState<Set<string>>(new Set(route.renfortVillageIds));
   const [busy, setBusy] = useState(false);
@@ -350,6 +353,22 @@ function RouteCard({
       setBusy(false);
       setCopyingVillageIndex(null);
     }
+  }
+
+  async function searchStopAddress(key: string, query: string) {
+    setStopAddressQuery({ key, value: query });
+    if (query.trim().length < 3) { setStopAddressSuggestions([]); return; }
+    setSearchingStopAddress(true);
+    try {
+      const res = await fetch(`/api/tour-routes/villages/search?q=${encodeURIComponent(query.trim())}`);
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.results)) {
+        setStopAddressSuggestions(json.results.filter((item: any) => item.label).map((item: any) => ({
+          label: String(item.label), name: String(item.name ?? item.label), postal_code: item.postal_code ? String(item.postal_code) : null,
+        })));
+      } else setStopAddressSuggestions([]);
+    } catch { setStopAddressSuggestions([]); }
+    finally { setSearchingStopAddress(false); }
   }
 
   async function searchVillages(query: string) {
@@ -599,9 +618,14 @@ function RouteCard({
                         <label className="block"><span className="label">Nom du professionnel / point relais</span>
                           <input className="input !py-1.5 text-sm" value={stop.name ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, name: e.target.value } : s) })} placeholder="Ex. Boulangerie Martin" />
                         </label>
-                        <label className="block"><span className="label">Adresse complète</span>
-                          <input className="input !py-1.5 text-sm" value={stop.address} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: e.target.value } : s) })} placeholder="Numéro, rue, code postal, ville" />
-                        </label>
+                        <div className="relative">
+                          <label className="block"><span className="label">Rechercher une adresse</span>
+                            <input className="input !py-1.5 text-sm" value={stopAddressQuery?.key === `${i}-${stopIndex}` ? stopAddressQuery.value : stop.address} onChange={(e) => void searchStopAddress(`${i}-${stopIndex}`, e.target.value)} placeholder="Tapez une rue, une entreprise ou une adresse…" autoComplete="off" />
+                          </label>
+                          {searchingStopAddress && stopAddressQuery?.key === `${i}-${stopIndex}` && <p className="mt-1 text-xs text-navy/60">Recherche d’adresses…</p>}
+                          {stopAddressQuery?.key === `${i}-${stopIndex}` && stopAddressSuggestions.length > 0 && <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-navy/15 bg-white shadow-lg">{stopAddressSuggestions.map((item, suggestionIndex) => <button type="button" key={`${item.label}-${suggestionIndex}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: item.label } : s) }); setStopAddressQuery(null); setStopAddressSuggestions([]); }}>{item.label}</button>)}</div>}
+                          <p className="mt-1 text-xs text-navy/55">Sélectionnez une suggestion pour remplir l’adresse complète.</p>
+                        </div>
                         <label className="block"><span className="label">{stop.type === "ramasse" ? "Tranche horaire prévue au contrat" : "Horaires d'ouverture du point relais"}</span>
                           <input className="input !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })} placeholder={stop.type === "ramasse" ? "Ex. 09:30-10:00 ou selon contrat" : "Ex. lun-ven 09:00-12:00, 14:00-18:00"} />
                           <span className="mt-1 block text-xs text-navy/55">{stop.type === "ramasse" ? "Saisissez la tranche prévue dans le contrat de ramasse." : "Saisissez les horaires réels d'ouverture du relais."}</span>
