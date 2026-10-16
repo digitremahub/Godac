@@ -13,7 +13,7 @@ const bodySchema = z.object({
   role_title: z.string().nullable().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
-  phone: z.string().nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),\n  address: z.string().trim().max(300).nullable().optional(),\n  contact_email: z.string().trim().email().max(254).nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
   // Richer replacement for service_id above — several qualified
   // services per driver, each with its own status (titulaire/
@@ -78,7 +78,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // accounts, demoting or deactivating the last `direction` account
   // (including your own) would leave nobody able to undo it from the UI.
   const demotesOrDeactivates = (parsed.data.role && parsed.data.role !== "direction") || parsed.data.active === false;
-  if (demotesOrDeactivates) {
+  if (appUser.role === "direction" && demotesOrDeactivates) {
     const { data: target } = await supabase.from("users").select("role").eq("id", id).single();
     if (target?.role === "direction") {
       const { count } = await supabase
