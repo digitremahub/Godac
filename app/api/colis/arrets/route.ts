@@ -142,7 +142,7 @@ export async function POST(req: Request) {
       phone: telephone,
       active: true,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "organization_id,driver_id,address" });
+    }, { onConflict: "driver_id,address" });
     if (erreurHabitude && erreurHabitude.code !== "42P01") {
       return NextResponse.json({ error: `Ramasse ajoutée, mais mémorisation quotidienne impossible : ${erreurHabitude.message}` }, { status: 500 });
     }
