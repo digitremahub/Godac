@@ -70,6 +70,7 @@ export function PlanningGrid({
   prevWeek,
   nextWeek,
   selectedService,
+  availableTours = [],
   lastTourByDriver = {},
   canValidate = false,
   validatedByService = {},
@@ -102,6 +103,7 @@ export function PlanningGrid({
   const [formDay, setFormDay] = useState(weekStart);
   const [formTime, setFormTime] = useState("07:00");
   const [formTourNumber, setFormTourNumber] = useState("");
+  const [selectedTourNumbers, setSelectedTourNumbers] = useState<string[]>([]);
   const [formDriverId, setFormDriverId] = useState("");
   const [formVehicleId, setFormVehicleId] = useState("");
   const [formBusy, setFormBusy] = useState(false);
@@ -315,7 +317,7 @@ export function PlanningGrid({
   }
 
   async function createEntry() {
-    const tourNumbers = Array.from(new Set(formTourNumber.split(/[;,\\n]+/).map((n) => n.trim()).filter(Boolean)));
+    const tourNumbers = Array.from(new Set(selectedTourNumbers));
     if (!formService || !formDriverId || !formVehicleId || tourNumbers.length === 0 || !formTime) return;
     if (formWholeWeek && formDays.size === 0) return;
     setFormBusy(true);
@@ -355,6 +357,7 @@ export function PlanningGrid({
       setBulkSummary(`${created} affectation(s) créée(s) pour ${tourNumbers.length} tournée(s)${skipped ? ` ; ${skipped} créneau(x) déjà occupé(s), ignoré(s)` : ""}.`);
       setFormOpen(false);
       setFormTourNumber("");
+      setSelectedTourNumbers([]);
       setFormDriverId("");
       setFormVehicleId("");
       router.refresh();
@@ -459,14 +462,18 @@ export function PlanningGrid({
             <label className="block"><span className="label">Heure</span>
             <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} /></label>
           </div>
-          <div>
-            <label className="block"><span className="label">N° de tournée(s)</span>
-            <input
-              className="input !w-auto"
-              value={formTourNumber}
-              onChange={(e) => setFormTourNumber(e.target.value)}
-              placeholder="Ex. T105, T106 (séparés par virgule)"
-            /></label>
+          <div className="min-w-[220px] max-w-sm">
+            <span className="label">Tournées à attribuer</span>
+            <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-navy/15 bg-white p-2">
+              {availableTours.filter((t) => !formService || !t.serviceId || t.serviceId === formService).map((tour) => (
+                <label key={tour.tourNumber} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-navy/[0.04]">
+                  <input type="checkbox" checked={selectedTourNumbers.includes(tour.tourNumber)} onChange={(e) => setSelectedTourNumbers((current) => e.target.checked ? Array.from(new Set([...current, tour.tourNumber])) : current.filter((n) => n !== tour.tourNumber))} />
+                  <span>{tour.tourNumber}</span>
+                </label>
+              ))}
+              {availableTours.filter((t) => !formService || !t.serviceId || t.serviceId === formService).length === 0 && <p className="px-2 py-1 text-xs text-navy/60">Aucune fiche de tournée permanente pour ce service.</p>}
+            </div>
+            <p className="mt-1 text-xs text-navy/60">{selectedTourNumbers.length} tournée(s) sélectionnée(s).</p>
           </div>
           <div>
             <label className="block"><span className="label">Chauffeur</span>
@@ -503,7 +510,7 @@ export function PlanningGrid({
               !formService ||
               !formDriverId ||
               !formVehicleId ||
-              !formTourNumber ||
+              selectedTourNumbers.length === 0 ||
               (formWholeWeek && formDays.size === 0)
             }
             onClick={createEntry}
