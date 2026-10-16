@@ -22,6 +22,7 @@ import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
+import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
@@ -1191,6 +1192,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           )}
                         </div>
                       )}
+                      <HistoriqueArret stop={s} />
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
