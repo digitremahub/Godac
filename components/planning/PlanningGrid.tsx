@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
 import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
@@ -120,6 +120,13 @@ export function PlanningGrid({
   const [editVehicleId, setEditVehicleId] = useState("");
   const [editTime, setEditTime] = useState("07:00");
   const [jumpDate, setJumpDate] = useState(weekStart);
+
+  // Keep form dates synchronized when navigation changes the displayed week.
+  // Otherwise the grid can show 19/10 while the form silently keeps 12/10.
+  useEffect(() => {
+    setFormDay(weekStart);
+    setJumpDate(weekStart);
+  }, [weekStart]);
 
   function toggleFormDay(offset: number) {
     setFormDays((prev) => {
