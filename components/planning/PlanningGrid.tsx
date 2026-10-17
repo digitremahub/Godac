@@ -119,6 +119,7 @@ export function PlanningGrid({
   const [editDriverId, setEditDriverId] = useState("");
   const [editVehicleId, setEditVehicleId] = useState("");
   const [editTime, setEditTime] = useState("07:00");
+  const [jumpDate, setJumpDate] = useState(weekStart);
 
   function toggleFormDay(offset: number) {
     setFormDays((prev) => {
@@ -199,6 +200,15 @@ export function PlanningGrid({
     qs.set("week", week);
     if (service) qs.set("service", service);
     router.push(`/planning?${qs.toString()}`);
+  }
+
+  function jumpToDate(value: string) {
+    setJumpDate(value);
+    if (!value) return;
+    const date = new Date(`${value}T12:00:00`);
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    const monday = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    navTo(monday, selectedService);
   }
 
   async function moveEntry(entryId: string, targetServiceId: string, targetDay: string) {
@@ -386,6 +396,10 @@ export function PlanningGrid({
             ← Semaine préc.
           </button>
           <span className="text-sm text-navy/70">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+          <label className="flex items-center gap-2 text-xs text-navy/65">
+            Aller à une date
+            <input className="input !w-auto !py-1.5 text-sm" type="date" value={jumpDate} onChange={(e) => jumpToDate(e.target.value)} aria-label="Afficher la semaine contenant cette date" />
+          </label>
           <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(nextWeek, selectedService)}>
             Semaine suiv. →
           </button>
@@ -393,7 +407,7 @@ export function PlanningGrid({
         <button className="btn-secondary ml-auto !px-3 !py-1.5 text-sm" disabled={duplicating} onClick={duplicatePreviousWeek}>
           {duplicating ? "Copie…" : <><IconCopy className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Dupliquer la semaine préc.</>}
         </button>
-        <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
+        <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => { setFormDay(weekStart); setFormOpen((v) => !v); }}>
           + Nouvelle affectation
         </button>
         {canValidate &&
@@ -458,13 +472,7 @@ export function PlanningGrid({
           ) : (
             <div>
               <label className="block"><span className="label">Jour</span>
-              <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
-                {days.map((d, i) => (
-                  <option key={d} value={d}>
-                    {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
-                  </option>
-                ))}
-              </select></label>
+              <input className="input !w-auto" type="date" value={formDay} onChange={(e) => setFormDay(e.target.value)} required /></label>
             </div>
           )}
           <div>
