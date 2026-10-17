@@ -79,7 +79,7 @@ const FEATURES = [
   },
   {
     title: "Planning & tournées",
-    description: "Planning par service, départs et retours de tournée, rapports et kilométrages au même endroit.",
+    description: "Planning par service, navigation vers la date souhaitée, affectations de chauffeurs et véhicules, départs et retours de tournée.",
     icon: IconClock,
   },
   {
@@ -94,7 +94,7 @@ const FEATURES = [
   },
   {
     title: "Tournée colis & app Livreur",
-    description: "Scan des colis, ordre de passage optimisé, photo de livraison et suivi des tournées en direct.",
+    description: "Préparez les tournées, gérez ramasses et points relais, scannez les colis et suivez les livraisons avec preuve photo et avancement en direct.",
     icon: IconFileText,
   },
 ];
@@ -134,9 +134,9 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 Votre carburant, <span className="text-teal">enfin sous contrôle</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                GODAC trace chaque litre, détecte les pleins anormaux et les dérives de consommation, et récupère votre
-                TICPE. Flotte, planning, tournées et paie s&apos;ajoutent dans le même outil&nbsp;: un seul abonnement au lieu
-                d&apos;en payer plusieurs.
+                GODAC centralise la gestion de flotte, le carburant, le planning des chauffeurs et les tournées colis.
+                Suivez les véhicules et les consommations, organisez les affectations par date, et retrouvez ramasses,
+                points relais et livraisons dans un seul outil conçu pour les entreprises de transport.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
