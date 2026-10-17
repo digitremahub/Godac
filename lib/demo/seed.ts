@@ -116,7 +116,17 @@ export async function ensureDemo(): Promise<string> {
   const { data: existing } = await admin.from("organizations").select("id").eq("is_demo", true).maybeSingle();
   if (existing) {
     const { count } = await admin.from("users").select("id", { count: "exact", head: true }).eq("organization_id", existing.id);
-    if ((count ?? 0) >= PEOPLE.length) return existing.id;
+    if ((count ?? 0) >= PEOPLE.length) {
+      // Keep the parcel-tour module visible even for an already-created demo organization.
+      await must(
+        admin.from("organization_modules").upsert(
+          { organization_id: existing.id, module_key: "route_optimizer", enabled: true },
+          { onConflict: "organization_id,module_key" },
+        ),
+        "activation du module Tournée colis dans la démo",
+      );
+      return existing.id;
+    }
     await teardownDemo(admin); // half-built (interrupted) — start over
   }
   return seedDemo(admin);
