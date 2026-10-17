@@ -7,6 +7,7 @@ import { Card } from "@/components/ui";
 import { IconMapPin } from "@/components/layout/icons";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { renfortCandidates, renfortLabel } from "@/lib/tours/renfort";
+import { AddressQrScanner } from "@/components/tours/AddressQrScanner";
 
 // La carte (MapLibre) n'est chargée que si l'on ouvre l'onglet.
 const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").then((m) => m.CarteVillages), {
@@ -290,6 +291,7 @@ function RouteCard({
   const [stopAddressQuery, setStopAddressQuery] = useState<{ key: string; value: string } | null>(null);
   const [stopAddressSuggestions, setStopAddressSuggestions] = useState<Array<{ label: string; name: string; postal_code: string | null }>>([]);
   const [searchingStopAddress, setSearchingStopAddress] = useState(false);
+  const [scanAddressKey, setScanAddressKey] = useState<string | null>(null);
   const [isRenfort, setIsRenfort] = useState(route.isRenfort);
   const [couverture, setCouverture] = useState<Set<string>>(new Set(route.renfortVillageIds));
   const [busy, setBusy] = useState(false);
@@ -624,10 +626,22 @@ function RouteCard({
                           </label>
                           {searchingStopAddress && stopAddressQuery?.key === `${i}-${stopIndex}` && <p className="mt-1 text-xs text-navy/60">Recherche d’adresses…</p>}
                           {stopAddressQuery?.key === `${i}-${stopIndex}` && stopAddressSuggestions.length > 0 && <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-navy/15 bg-white shadow-lg">{stopAddressSuggestions.map((item, suggestionIndex) => <button type="button" key={`${item.label}-${suggestionIndex}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: item.label } : s) }); setStopAddressQuery(null); setStopAddressSuggestions([]); }}>{item.label}</button>)}</div>}
-                          <p className="mt-1 text-xs text-navy/55">Sélectionnez une suggestion pour remplir l’adresse complète.</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <p className="text-xs text-navy/55">Sélectionnez une suggestion pour remplir l’adresse complète.</p>
+                            <button type="button" className="btn-secondary !px-2 !py-1 text-xs" onClick={() => setScanAddressKey(scanAddressKey === `${i}-${stopIndex}` ? null : `${i}-${stopIndex}`)}>Scanner un QR code</button>
+                          </div>
+                          {scanAddressKey === `${i}-${stopIndex}` && <AddressQrScanner onClose={() => setScanAddressKey(null)} onScan={(value) => { update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: value } : s) }); setStopAddressQuery({ key: `${i}-${stopIndex}`, value }); setStopAddressSuggestions([]); setScanAddressKey(null); }} />}
                         </div>
                         <label className="block"><span className="label">{stop.type === "ramasse" ? "Tranche horaire prévue au contrat" : "Horaires d'ouverture du point relais"}</span>
-                          <input className="input !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })} placeholder={stop.type === "ramasse" ? "Ex. 09:30-10:00 ou selon contrat" : "Ex. lun-ven 09:00-12:00, 14:00-18:00"} />
+                          <select className="input !py-1.5 text-sm" value={["08:00-11:00","10:00-13:00","12:00-15:00","14:00-17:00"].includes(stop.time_window ?? "") ? stop.time_window : stop.time_window ? "custom" : ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value === "custom" ? s.time_window ?? "" : e.target.value } : s) })}>
+                            <option value="">Choisir un créneau…</option>
+                            <option value="08:00-11:00">08:00–11:00</option>
+                            <option value="10:00-13:00">10:00–13:00</option>
+                            <option value="12:00-15:00">12:00–15:00</option>
+                            <option value="14:00-17:00">14:00–17:00</option>
+                            <option value="custom">Autre créneau / horaires détaillés</option>
+                          </select>
+                          {(!stop.time_window || !["08:00-11:00","10:00-13:00","12:00-15:00","14:00-17:00"].includes(stop.time_window)) && <input className="input mt-1 !py-1.5 text-sm" value={stop.time_window ?? ""} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, time_window: e.target.value } : s) })} placeholder={stop.type === "ramasse" ? "Ex. 09:30-10:00" : "Ex. lun-ven 09:00-12:00, 14:00-18:00"} />}
                           <span className="mt-1 block text-xs text-navy/55">{stop.type === "ramasse" ? "Saisissez la tranche prévue dans le contrat de ramasse." : "Saisissez les horaires réels d'ouverture du relais."}</span>
                         </label>
                         <label className="block"><span className="label">Consignes (facultatif)</span>
