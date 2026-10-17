@@ -8,6 +8,8 @@ export function AddressQrScanner({ onScan, onClose }: { onScan: (value: string) 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const onScanRef = useRef(onScan);
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -40,7 +42,7 @@ export function AddressQrScanner({ onScan, onClose }: { onScan: (value: string) 
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(frame.data, frame.width, frame.height);
       if (code?.data.trim()) {
-        onScan(code.data.trim());
+        onScanRef.current(code.data.trim());
         return;
       }
       rafId = requestAnimationFrame(tick);
@@ -51,7 +53,7 @@ export function AddressQrScanner({ onScan, onClose }: { onScan: (value: string) 
       cancelAnimationFrame(rafId);
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, [onScan]);
+  }, []);
 
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-lg border border-teal/30 p-3">
