@@ -13,6 +13,7 @@ const bodySchema = z.object({
   role_title: z.string().nullable().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
+  email: z.string().trim().email().optional(),
   phone: z.string().nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
   // Richer replacement for service_id above — several qualified
@@ -114,7 +115,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     classification,
     ...userFields
   } = parsed.data;
-  const updateFields: Record<string, unknown> = { ...userFields };
+  const { email, ...ordinaryUserFields } = userFields;
+  const updateFields: Record<string, unknown> = { ...ordinaryUserFields };
+
+  if (email !== undefined) {
+    const { data: target, error: targetError } = await supabase
+      .from("users")
+      .select("id, organization_id, email, auth_method")
+      .eq("id", id)
+      .single();
+    if (targetError || !target || target.organization_id !== appUser.organization_id) {
+      return NextResponse.json({ error: "Utilisateur introuvable dans votre organisation." }, { status: 404 });
+    }
+    if (target.auth_method === "pin") {
+      return NextResponse.json({ error: "Ce compte utilise un badge + PIN ; l'email de connexion ne se modifie pas depuis cette fiche." }, { status: 409 });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== String(target.email ?? "").toLowerCase()) {
+      const admin = createAdminSupabaseClient();
+      const { error: authError } = await admin.auth.admin.updateUserById(id, { email: normalizedEmail, email_confirm: false });
+      if (authError) return NextResponse.json({ error: `Mise à jour de l'email de connexion impossible : ${authError.message}` }, { status: 400 });
+      updateFields.email = normalizedEmail;
+    }
+  }
 
   if (reset_pin) {
     const { data: target } = await supabase.from("users").select("auth_method").eq("id", id).single();
