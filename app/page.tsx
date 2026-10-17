@@ -83,8 +83,8 @@ const FEATURES = [
     icon: IconClock,
   },
   {
-    title: "App chauffeur",
-    description: "Badge QR et code PIN, plein, photo du compteur et signalement depuis le téléphone, sans formation.",
+    title: "Application chauffeur incluse dans l’écosystème",
+    description: "Un outil mobile complémentaire pour simplifier les tournées, les ramasses, les points relais, le scan QR et les preuves de livraison. Accessible au grand public, avec des tarifs préférentiels pour les entreprises clientes de GODAC.",
     icon: IconQrCode,
   },
   {
@@ -93,8 +93,8 @@ const FEATURES = [
     icon: IconCalendar,
   },
   {
-    title: "Tournée colis & app Livreur",
-    description: "Préparez les tournées, gérez ramasses et points relais, scannez les colis et suivez les livraisons avec preuve photo et avancement en direct.",
+    title: "Tournées colis & livraisons",
+    description: "Préparez les tournées depuis GODAC : ramasses, points relais, adresses recherchées, créneaux professionnels et suivi des livraisons. L’application GO prolonge cette gestion sur le terrain.",
     icon: IconFileText,
   },
 ];
@@ -134,9 +134,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 Votre carburant, <span className="text-teal">enfin sous contrôle</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                GODAC centralise la gestion de flotte, le carburant, le planning des chauffeurs et les tournées colis.
-                Suivez les véhicules et les consommations, organisez les affectations par date, et retrouvez ramasses,
-                points relais et livraisons dans un seul outil conçu pour les entreprises de transport.
+                GODAC centralise la gestion de flotte, du carburant, du planning et des tournées colis. Pour prolonger cette gestion sur le terrain, l’application GO facilite le suivi des tournées, des ramasses, des points relais et des livraisons. GO est accessible au grand public, avec des tarifs préférentiels pour les entreprises clientes de GODAC.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
@@ -233,7 +231,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <p className="kicker !text-teal-ink">Démo en accès libre</p>
             <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Essayez GODAC tout de suite, sans compte.</h2>
             <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-              Une entreprise de transport fictive, avec ses camions, ses chauffeurs, ses pleins et ses tournées. Cliquez, vous y êtes.
+              Explorez la gestion GODAC côté direction et son complément mobile pour les opérations terrain : planning, flotte, carburant, tournées colis, ramasses, points relais et suivi des livraisons dans une entreprise fictive.
             </p>
             {searchParams.demo === "indisponible" && (
               <p role="alert" className="mt-4 text-sm font-semibold text-orange-ink">
@@ -244,7 +242,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
             {[
               { href: "/demo?as=direction", title: "Côté direction", text: "Tableau de bord, flotte, carburant, planning, alertes et salaires.", icon: IconChartBar },
-              { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Tournée du jour, pleins, présences et papiers du camion, sur mobile.", icon: IconTruck },
+              { href: "/demo?as=chauffeur", title: "Application mobile terrain", text: "Un complément à la gestion GODAC pour consulter la tournée, gérer les adresses, scanner les colis et suivre les livraisons.", icon: IconTruck },
             ].map((d) => (
               <a key={d.href} href={d.href} className="card-hover group flex flex-col gap-4">
                 <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
