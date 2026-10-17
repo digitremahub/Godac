@@ -44,6 +44,7 @@ const MODULES = [
   "fuel_tracking",
   "ocr",
   "planning",
+  "route_optimizer",
   "maintenance_requests",
   "leave_management",
   "intranet",
