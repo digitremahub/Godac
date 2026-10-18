@@ -20,6 +20,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [driverPin, setDriverPin] = useState("");
+  const [driverPinMode, setDriverPinMode] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -52,6 +54,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     setBusy(true);
     setError(null);
     try {
+      if (driverPinMode) {
+        const res = await fetch("/api/auth/driver-pin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, pin: driverPin }) });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(typeof payload?.error === "string" ? payload.error : `Erreur de connexion (${res.status}).`);
+        window.location.href = postLoginPath();
+        return;
+      }
       if (usePassword) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -97,9 +106,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <div>
         <h1 className="text-2xl sm:text-[28px]">{mode === "sign-in" ? "Connexion" : "Créer votre compte"}</h1>
         <p className="mt-2 text-sm text-navy/65 sm:text-[15px]">
-          {usePassword
-            ? "Connectez-vous avec le mot de passe défini depuis votre compte."
-            : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
+          {driverPinMode
+            ? "Les anciens comptes chauffeur peuvent se connecter avec leur e-mail et leur PIN, sans scanner le badge."
+            : usePassword
+              ? "Connectez-vous avec le mot de passe défini depuis votre compte."
+              : "Pas de mot de passe — on vous envoie un lien de connexion par email."}
         </p>
       </div>
       {mode === "sign-up" && (
@@ -131,7 +142,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           placeholder="vous@entreprise.fr"
         /></label>
       </div>
-      {mode === "sign-in" && usePassword && (
+      {mode === "sign-in" && driverPinMode && (
+        <div><label className="block"><span className="label">Code PIN chauffeur</span><input type="password" inputMode="numeric" autoComplete="current-password" required className="input" value={driverPin} onChange={(e) => setDriverPin(e.target.value)} placeholder="Votre PIN" /></label></div>
+      )}
+      {mode === "sign-in" && usePassword && !driverPinMode && (
         <div>
           <label className="block"><span className="label">Mot de passe</span>
           <input
@@ -152,12 +166,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <button
         type="submit"
         className="btn-primary"
-        disabled={busy || !email || (usePassword && !password) || (mode === "sign-up" && !fullName)}
+        disabled={busy || !email || (driverPinMode ? !driverPin : usePassword && !password) || (mode === "sign-up" && !fullName)}
       >
-        {busy ? "Connexion…" : usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
+        {busy ? "Connexion…" : driverPinMode || usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
       {mode === "sign-in" && (
-        <button type="button" className="btn-secondary" disabled={passkeyBusy || !email} onClick={usePasskey}>
+        <button type="button" className="btn-secondary" disabled={passkeyBusy || !email || driverPinMode} onClick={usePasskey}>
           <IconFingerprint className="h-[18px] w-[18px]" />
           {passkeyBusy ? "Vérification…" : "Face ID / empreinte"}
         </button>
@@ -168,11 +182,16 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </p>
       )}
       {mode === "sign-in" && (
+        <button type="button" className="text-sm text-navy/65 hover:text-navy hover:underline" onClick={() => { setDriverPinMode((v) => !v); setUsePassword(false); setDriverPin(""); setError(null); }}>
+          {driverPinMode ? "Autre méthode de connexion" : "Ancien compte chauffeur ? E-mail + PIN"}
+        </button>
+      )}
+      {mode === "sign-in" && (
         <div className="flex items-center justify-between">
           <button
             type="button"
             className="text-sm text-navy/65 hover:text-navy hover:underline"
-            onClick={() => setUsePassword((v) => !v)}
+            onClick={() => { setUsePassword((v) => !v); setDriverPinMode(false); setError(null); }}
           >
             {usePassword ? "Utiliser le lien magique à la place" : "Se connecter avec un mot de passe"}
           </button>
