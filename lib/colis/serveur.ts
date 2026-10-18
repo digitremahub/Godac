@@ -36,13 +36,19 @@ async function depotDuChauffeur(supabase: SupabaseClient, appUser: AppUser) {
 export async function listerTournees(supabase: SupabaseClient, appUser: AppUser) {
   const today = aujourdhuiParis();
   const semaine = new Date(Date.parse(`${today}T12:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10);
-  const { data } = await supabase
+  let query = supabase
     .from("delivery_runs")
-    .select(`${RUN_FIELDS}, delivery_stops(parcel_count, status)`)
-    .eq("driver_id", appUser.id)
+    .select(`${RUN_FIELDS}, delivery_stops(parcel_count, status), users!delivery_runs_driver_id_fkey(full_name)`)
     .gte("run_date", semaine)
     .order("run_date")
     .order("created_at");
+  // L'encadrement doit pouvoir consulter les fiches créées pour les chauffeurs.
+  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
+    query = query.eq("driver_id", appUser.id) as typeof query;
+  } else {
+    query = query.eq("organization_id", appUser.organization_id) as typeof query;
+  }
+  const { data } = await query;
   return ((data ?? []) as any[])
     .filter((r) => r.run_date === today || r.status !== "done")
     .map(({ delivery_stops, ...r }) => ({
@@ -104,7 +110,11 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
 
 /** Une tournée du chauffeur connecté (jamais celle d'un autre). */
 export async function tourneeParId(supabase: SupabaseClient, appUser: AppUser, id: string) {
-  const { data } = await supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("driver_id", appUser.id).maybeSingle();
+  let query = supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("organization_id", appUser.organization_id);
+  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
+    query = query.eq("driver_id", appUser.id) as typeof query;
+  }
+  const { data } = await query.maybeSingle();
   return data;
 }
 
