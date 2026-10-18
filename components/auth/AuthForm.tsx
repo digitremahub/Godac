@@ -41,8 +41,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       }
       setPasskeyUnavailable(true);
     } catch (e) {
-      if (!(e instanceof Error) || e.name !== "NotAllowedError") {
-        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      if (e instanceof Error && e.name === "NotAllowedError") {
+        setError("La demande Face ID / empreinte a été annulée, a expiré ou n’a pas abouti. Réessayez en validant la demande biométrique, ou utilisez le lien de connexion par e-mail.");
+      } else {
+        setError(e instanceof Error ? e.message : "Connexion biométrique impossible. Réessayez ou utilisez le lien de connexion par e-mail.");
       }
     } finally {
       setPasskeyBusy(false);
