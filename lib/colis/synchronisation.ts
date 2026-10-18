@@ -52,10 +52,24 @@ export async function synchroniserTourneeColis(supabase: SupabaseClient, entry: 
         .maybeSingle();
   if (lookupError) throw new Error(lookupError.message);
 
+  const { data: service, error: serviceError } = await supabase
+    .from("services")
+    .select("name, depot_address, depot_lat, depot_lng")
+    .eq("organization_id", entry.organization_id)
+    .eq("id", entry.service_id)
+    .maybeSingle();
+  if (serviceError) throw new Error(serviceError.message);
+  const depotFields = {
+    start_label: service?.depot_address ?? (service?.name ? `Dépôt ${service.name}` : null),
+    start_lat: service?.depot_lat ?? null,
+    start_lng: service?.depot_lng ?? null,
+  };
+
   if (existing) {
     const { error } = await supabase
       .from("delivery_runs")
-      .update({ vehicle_id: entry.vehicle_id, service_id: entry.service_id, planned_start: plannedStart, planning_entry_id: entry.id })
+      .update({ vehicle_id: entry.vehicle_id, service_id: entry.service_id, planned_start: plannedStart, planning_entry_id: entry.id, ...depotFields })
+      .eq("organization_id", entry.organization_id)
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
     return existing.id;
@@ -72,6 +86,7 @@ export async function synchroniserTourneeColis(supabase: SupabaseClient, entry: 
       run_date: runDate,
       name: runName,
       planned_start: plannedStart,
+      ...depotFields,
     })
     .select("id")
     .single();
