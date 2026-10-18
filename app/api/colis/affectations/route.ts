@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       for (const village of villages ?? []) {
         const addresses = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
           .filter((a): a is string => typeof a === "string")
-          .map((a) => a.trim()).filter((a) => a.length >= 5 && !seen.has(cleAdresse(a)));
+          .map((a) => a.trim()).filter((a) => { const key = cleAdresse(a); if (a.length < 5 || seen.has(key)) return false; seen.add(key); return true; });
         if (!addresses.length) continue;
         const { data: list, error: listError } = await supabase.from("delivery_lists").insert({
           organization_id: user.organization_id, run_id: run.id, name: village.name.slice(0, 60), position: listPosition++,
