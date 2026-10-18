@@ -4,6 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { synchroniserTourneeColis } from "@/lib/colis/synchronisation";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0, skipped });
   }
 
-  const { data: inserted, error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" }).select("id, start_at");
+  const { data: inserted, error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" }).select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at");
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json(
@@ -80,6 +81,13 @@ export async function POST(req: Request) {
       );
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  try {
+    for (const row of inserted ?? []) await synchroniserTourneeColis(supabase, row);
+  } catch (e) {
+    await supabase.from("planning_entries").delete().in("id", (inserted ?? []).map((row) => row.id)).eq("status", "planned");
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Création des tournées colis impossible." }, { status: 500 });
   }
 
   const warnings = (

@@ -55,21 +55,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
-    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id").eq("id", id).maybeSingle();
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, organization_id").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
     if (stop.list_id === list_id) return NextResponse.json({ ok: true });
     if (!(await listeDeLaTournee(supabase, stop.run_id, list_id))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
     const { data: dernier } = await supabase.from("delivery_stops").select("position").eq("run_id", stop.run_id).order("position", { ascending: false }).limit(1).maybeSingle();
-    const { error } = await supabase
+    const { data: moved, error } = await supabase
       .from("delivery_stops")
       .update({ list_id, position: (dernier?.position ?? 0) + 1 })
-      .eq("id", id);
+      .eq("id", id).eq("organization_id", appUser.organization_id)
+      .select("id, run_id, list_id, position").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const { error: eventError } = await supabase.from("delivery_stop_events").insert({
+      organization_id: appUser.organization_id, run_id: moved.run_id, stop_id: moved.id, actor_id: appUser.id,
+      event_type: "list_changed", new_value: { list_id: moved.list_id, position: moved.position },
+      details: "Arrêt déplacé dans une autre liste de la tournée",
+    });
+    if (eventError) return NextResponse.json({ error: "Arrêt déplacé, mais historique indisponible." }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
   if (deplacer) {
-    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).maybeSingle();
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
     // Voisin encore à livrer dans la même liste.
     let q = supabase.from("delivery_stops").select("id, position").eq("run_id", stop.run_id).eq("status", "pending");
@@ -80,8 +87,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const j = deplacer === "haut" ? i - 1 : i + 1;
     if (i < 0 || j < 0 || j >= liste.length) return NextResponse.json({ ok: true });
     const autre = liste[j]!;
-    await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id);
-    await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id);
+    const { error: firstError } = await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id).eq("organization_id", appUser.organization_id);
+    const { error: secondError } = await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id).eq("organization_id", appUser.organization_id);
+    if (firstError || secondError) return NextResponse.json({ error: "Réorganisation impossible." }, { status: 500 });
+    const { error: eventError } = await supabase.from("delivery_stop_events").insert({
+      organization_id: appUser.organization_id, run_id: stop.run_id, stop_id: id, actor_id: appUser.id,
+      event_type: "reordered", previous_value: { position: stop.position }, new_value: { position: autre.position },
+      details: `Ordre de tournée modifié (${deplacer === "haut" ? "remonté" : "descendu"} d'un rang)`,
+    });
+    if (eventError) return NextResponse.json({ error: "Ordre modifié, mais historique indisponible." }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
@@ -97,7 +111,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let previousStatus: string | null = null;
   if (status) {
     // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
-    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id);
+    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id).eq("organization_id", appUser.organization_id);
     if (run_id) q = q.eq("run_id", run_id);
     const { data: actuel } = await q.maybeSingle();
     if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
@@ -123,7 +137,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
   }
-  let maj = supabase.from("delivery_stops").update(update).eq("id", id);
+  let maj = supabase.from("delivery_stops").update(update).eq("id", id).eq("organization_id", appUser.organization_id);
   // Garde contre deux clôtures simultanées (deux téléphones, double appui).
   if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
   const { data, error } = await maj.select(`${STOP_FIELDS}, run_id`).maybeSingle();
@@ -160,7 +174,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const { id } = await params;
-  const { error } = await supabase.from("delivery_stops").delete().eq("id", id);
+  const { data: stop } = await supabase.from("delivery_stops")
+    .select("id, run_id").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+  if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  const { data: run } = await supabase.from("delivery_runs")
+    .select("id, status").eq("id", stop.run_id).eq("organization_id", appUser.organization_id).maybeSingle();
+  if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
+  if (run.status === "done") return NextResponse.json({ error: "Une tournée clôturée est conservée dans l'historique." }, { status: 409 });
+  const { error } = await supabase.from("delivery_stops").delete().eq("id", id).eq("organization_id", appUser.organization_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

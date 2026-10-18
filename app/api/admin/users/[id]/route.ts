@@ -14,7 +14,9 @@ const bodySchema = z.object({
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
   email: z.string().trim().email().optional(),
-  phone: z.string().nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  contact_email: z.string().trim().email().max(254).nullable().optional(),
   service_id: z.string().uuid().nullable().optional(),
   // Richer replacement for service_id above — several qualified
   // services per driver, each with its own status (titulaire/
@@ -63,16 +65,33 @@ const bodySchema = z.object({
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Seule la direction peut modifier les rôles" }, { status: 403 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const contactOnly = ["phone", "address", "contact_email"].some((key) => Object.prototype.hasOwnProperty.call(parsed.data, key))
+    && Object.keys(parsed.data).every((key) => ["phone", "address", "contact_email"].includes(key));
+  if (appUser.role !== "direction" && !contactOnly) {
+    return NextResponse.json({ error: "Seule la direction peut modifier les rôles et les données administratives." }, { status: 403 });
+  }
 
   const supabase = await createServerSupabaseClient();
+  if (appUser.role !== "direction") {
+    const { data: target, error: targetError } = await supabase
+      .from("users").select("id, organization_id, role").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (targetError || !target) return NextResponse.json({ error: "Utilisateur introuvable dans votre organisation." }, { status: 404 });
+    if (!["chauffeur", "manager_chauffeur"].includes(target.role)) return NextResponse.json({ error: "Modification réservée aux chauffeurs." }, { status: 403 });
+    const { data: managedServices, error: servicesError } = await supabase
+      .from("user_services").select("service_id").eq("user_id", appUser.id);
+    if (servicesError) return NextResponse.json({ error: servicesError.message }, { status: 500 });
+    const { data: targetServices, error: targetServicesError } = await supabase
+      .from("user_services").select("service_id").eq("user_id", id);
+    if (targetServicesError) return NextResponse.json({ error: targetServicesError.message }, { status: 500 });
+    const scopes = new Set((managedServices ?? []).map((row) => row.service_id));
+    if (!(targetServices ?? []).some((row) => scopes.has(row.service_id))) {
+      return NextResponse.json({ error: "Ce chauffeur n'appartient pas à vos services." }, { status: 403 });
+    }
+  }
 
   // Guard against locking an organisation out of its own admin
   // panel: since only `direction` can change roles or deactivate

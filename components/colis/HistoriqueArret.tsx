@@ -91,8 +91,8 @@ export function HistoriqueArret({ stop }: { stop: Stop }) {
 
   return (
     <div className="mt-2 pl-9">
-      <button type="button" className="btn-secondary !px-3 !py-2 text-sm font-semibold" onClick={ouvrirHistorique} aria-expanded={ouvert}>
-        {ouvert ? "Masquer l’historique des actions" : "📋 Voir l’historique des actions"}
+      <button type="button" className="btn-ghost !px-2 !py-1 text-xs underline" onClick={ouvrirHistorique} aria-expanded={ouvert}>
+        {ouvert ? "Masquer l'historique" : "Historique & contacts"}
       </button>
       {ouvert && (
         <div className="mt-2 rounded-xl border border-navy/10 bg-surface p-3">
