@@ -33,6 +33,8 @@ export interface Stop {
   done_at?: string | null;
   delivered_place: string | null;
   proof_photo_path: string | null;
+  /** Chemins de 1 à 3 photos de preuve ; proof_photo_path reste la compatibilité historique. */
+  proof_photo_paths?: string[] | null;
   /** Livraison (par défaut) ou ramasse ; absent avant la migration 170. */
   kind?: "livraison" | "ramasse" | "point_relais" | null;
   /** Livraison avec QR code : valeur scannée (preuve de remise). */
