@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { synchroniserTourneeColis } from "@/lib/colis/synchronisation";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -57,6 +58,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  try {
+    await synchroniserTourneeColis(supabase, data);
+  } catch (e) {
+    await supabase.from("planning_entries").delete().eq("id", data.id).eq("status", "planned");
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Création de la tournée colis impossible." }, { status: 500 });
+  }
 
   const warning = await warnIfDriverDoubleBooked(supabase, {
     organizationId: appUser.organization_id,
