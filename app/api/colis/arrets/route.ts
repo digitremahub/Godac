@@ -36,6 +36,9 @@ const bodySchema = z.object({
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   /** Une ramasse exceptionnelle ne devient pas une habitude quotidienne. */
   exceptionnelle: z.boolean().optional(),
+  /** Créneau suggéré/confirmé avant l’ajout de l’adresse. */
+  window_start: z.string().regex(/^(?:[01]\\d|2[0-3]):[0-5]\\d$/).nullable().optional(),
+  window_end: z.string().regex(/^(?:[01]\\d|2[0-3]):[0-5]\\d$/).nullable().optional(),
 });
 
 /**
@@ -101,6 +104,8 @@ export async function POST(req: Request) {
         ...(telephone && !memeAdresse.phone ? { phone: telephone } : {}),
         // Poids de l'arrêt = somme des colis dont le poids est connu.
         ...(poids ? { weight_kg: lirePoids(Number(memeAdresse.weight_kg ?? 0) + poids) } : {}),
+        ...(parsed.data.window_start ? { window_start: parsed.data.window_start } : {}),
+        ...(parsed.data.window_end ? { window_end: parsed.data.window_end } : {}),
       })
       .eq("id", memeAdresse.id)
       .select(STOP_FIELDS)
@@ -124,6 +129,8 @@ export async function POST(req: Request) {
       recipient: parsed.data.destinataire || null,
       phone: telephone,
       ...(poids ? { weight_kg: poids } : {}),
+      window_start: parsed.data.window_start ?? null,
+      window_end: parsed.data.window_end ?? null,
       lat: geo?.lat ?? null,
       lng: geo?.lng ?? null,
     })
