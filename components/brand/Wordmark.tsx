@@ -1,6 +1,6 @@
 /**
  * GODAC logo (brand board, oct. 2026): the road-and-drop « G » symbol
- * plus the GODAC wordmark with its teal C. Vector files in
+ * plus the GODAC wordmark with GO in teal and DAC in orange. Vector files in
  * public/brand/ — the wordmark exists in white (on navy) and ink (on
  * light) versions; without `inverted` it follows the light/dark theme
  * (see .brand-ink / .brand-white in app/globals.css).
