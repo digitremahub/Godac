@@ -34,7 +34,7 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
   const avecQr = qrObligatoire(lieu);
   const codeLu = normaliserCodeQr(codeQr);
 
-  useEffect(() => () => photos.forEach((photo) => URL.revokeObjectURL(photo.apercu)), [photos]);
+  useEffect(() => () => { photos.forEach((photo) => URL.revokeObjectURL(photo.apercu)); }, []);
 
   async function prendre(files: FileList | File[]) {
     const selection = Array.from(files).slice(0, 3 - photos.length);
@@ -99,7 +99,7 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
         try {
           await enqueueOfflineMutation(`/api/colis/arrets/${stop.id}/livraison`, {
             method: "POST",
-            body: JSON.stringify({ lieu, precision: precision.trim() || null, image: photo?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
+            body: JSON.stringify({ lieu, precision: precision.trim() || null, images: photos.map((photo) => photo.base64), image: photos[0]?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
           });
           onLivre({
             ...stop,
