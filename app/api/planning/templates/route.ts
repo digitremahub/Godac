@@ -12,6 +12,7 @@ const createSchema = z.object({
   departure_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("07:00"),
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).default([1, 2, 3, 4, 5]),
   default_vehicle_id: z.string().uuid().nullable().optional(),
+  default_driver_id: z.string().uuid().nullable().optional(),
 });
 
 /** Liste les modèles de tournées du service (ou de tous les services pour la Direction). */
@@ -63,11 +64,14 @@ export async function POST(req: Request) {
   const input = parsed.data;
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: service }, { data: route }, { data: vehicle }] = await Promise.all([
+  const [{ data: service }, { data: route }, { data: vehicle }, { data: driver }] = await Promise.all([
     supabase.from("services").select("id").eq("id", input.service_id).eq("organization_id", appUser.organization_id).maybeSingle(),
-    supabase.from("tour_routes").select("id, service_id, tour_number").eq("id", input.route_id).eq("organization_id", appUser.organization_id).maybeSingle(),
+    supabase.from("tour_routes").select("id, service_id, tour_number, default_driver_id").eq("id", input.route_id).eq("organization_id", appUser.organization_id).maybeSingle(),
     input.default_vehicle_id
       ? supabase.from("vehicles").select("id, service_id").eq("id", input.default_vehicle_id).eq("organization_id", appUser.organization_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    input.default_driver_id
+      ? supabase.from("users").select("id, role, active").eq("id", input.default_driver_id).eq("organization_id", appUser.organization_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -75,8 +79,16 @@ export async function POST(req: Request) {
   if (!route || route.service_id !== input.service_id) {
     return NextResponse.json({ error: "La fiche tournée doit appartenir au service sélectionné." }, { status: 400 });
   }
+  if (input.default_driver_id && (!driver || !driver.active || !["chauffeur", "manager_chauffeur"].includes(driver.role))) {
+    return NextResponse.json({ error: "Le chauffeur sélectionné est introuvable ou inactif." }, { status: 400 });
+  }
   if (input.default_vehicle_id && (!vehicle || (vehicle.service_id && vehicle.service_id !== input.service_id))) {
     return NextResponse.json({ error: "Le véhicule sélectionné n'est pas compatible avec ce service." }, { status: 400 });
+  }
+
+  if (input.default_driver_id !== undefined) {
+    const { error: driverUpdateError } = await supabase.from("tour_routes").update({ default_driver_id: input.default_driver_id }).eq("id", input.route_id).eq("organization_id", appUser.organization_id);
+    if (driverUpdateError) return NextResponse.json({ error: "Impossible d'enregistrer le chauffeur habituel. Vérifiez la migration dédiée." }, { status: 500 });
   }
 
   const { data, error } = await supabase.from("planning_tour_templates").insert({
