@@ -49,7 +49,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       .from("delivery_runs")
       .select("id, name, run_date, started_at, driver_id, service_id, vehicle_id")
       .eq("organization_id", appUser.organization_id)
-      .eq("status", "in_progress")
+      // Une fiche peut déjà être visible dans le suivi en direct pendant
+      // le chargement, avant que le chauffeur ne démarre officiellement.
+      .in("status", ["loading", "in_progress"])
       .order("started_at", { ascending: false }),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase
