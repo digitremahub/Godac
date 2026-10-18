@@ -8,12 +8,13 @@ const ONGLETS = [
   { href: "/suivi", label: "Suivi en direct" },
   { href: "/tours/routes", label: "Tournées villages" },
   { href: "/tours/history", label: "Historique planning" },
+  { href: "/colis/affectations", label: "Affectations" },
 ] as const;
 
 /** Navigation unifiée entre les vues opérationnelles de tournée. */
-export function TourneesTabs({ canTrack = true }: { canTrack?: boolean }) {
+export function TourneesTabs({ canTrack = true, canAssign = false }: { canTrack?: boolean; canAssign?: boolean }) {
   const pathname = usePathname() ?? "";
-  const ongletsVisibles = canTrack ? ONGLETS : ONGLETS.filter((onglet) => onglet.href !== "/suivi");
+  const ongletsVisibles = (canTrack ? ONGLETS : ONGLETS.filter((onglet) => onglet.href !== "/suivi")).filter((onglet) => onglet.href !== "/colis/affectations" || canAssign);
   return (
     <nav aria-label="Tournées colis" className="mb-5 overflow-x-auto border-b border-navy/10">
       <div className="flex min-w-max gap-1" role="tablist" aria-label="Vues des tournées">
