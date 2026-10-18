@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
+import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
@@ -114,6 +115,7 @@ function AdresseInput({ value, onChange, autoFocus, france }: { value: string; o
 
 export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
+  const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -226,17 +228,17 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   async function nouvelleTournee() {
-    if (encadrement) { router.push("/planning"); return; }
+    if (encadrement) { setAffectationOuverte(true); return; }
     setBusy("nouvelle");
     try {
-      const { run: cree, warning } = await api<{ run: Run; warning?: string }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
+      const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
       try {
         localStorage.setItem("godac-tournee-colis", cree.id);
       } catch {
         /* stockage indisponible */
       }
       await recharger(cree.id);
-      setToast({ ok: !warning, text: warning ? `${cree.name ?? "Tournée"} ouverte, mais certains arrêts restent à vérifier : ${warning}` : `${cree.name ?? "Tournée"} prête : scannez vos colis.` });
+      setToast({ ok: true, text: `${cree.name ?? "Tournée"} créée : scannez vos colis.` });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -669,15 +671,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         </button>
       ))}
       <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy !== null} onClick={nouvelleTournee}>
-        {encadrement ? "Ouvrir le Planning" : "+ Nouvelle tournée"}
+        + Nouvelle tournée
       </button>
     </div>
   );
 
-  if (!runs) return <p className="text-sm text-navy/60">Chargement des tournées…</p>;
+  const modalAffectation = affectationOuverte ? <AffecterTournee onClose={() => setAffectationOuverte(false)} onCreated={async (runId) => { setAffectationOuverte(false); try { localStorage.setItem("godac-tournee-colis", runId); } catch { /* stockage indisponible */ } await recharger(runId); setToast({ ok: true, text: "Tournée créée : vous pouvez scanner les colis." }); }} /> : null;
+
+  if (!runs) return <>{modalAffectation}<p className="text-sm text-navy/60">Chargement des tournées…</p></>;
   if (!run) {
     return (
       <div className="flex flex-col gap-4">
+        {modalAffectation}
         {toast && (
           <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
             {toast.text}
@@ -685,9 +690,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         )}
         <Card className="flex flex-col items-start gap-3">
           <h2 className="text-lg">Aucune tournée colis en cours</h2>
-          <p className="text-sm text-navy/65">Le chauffeur crée sa fiche depuis son espace après avoir consulté les tournées affectées au Planning.</p>
+          <p className="text-sm text-navy/65">Créez une tournée, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            {encadrement ? "Ouvrir le Planning" : "Créer une tournée"}
+            Créer une tournée
           </button>
         </Card>
       </div>
@@ -964,7 +969,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
             Tournée clôturée : {livres} arrêt(s) livré(s) sur {stops.length}.
           </p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            {encadrement ? "Ouvrir le Planning" : "+ Nouvelle tournée"}
+            + Nouvelle tournée
           </button>
         </Card>
       ) : (
