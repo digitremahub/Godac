@@ -32,14 +32,6 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   const historiqueVisible = encadrement || appUser.role === "chauffeur";
   const onglet = historiqueVisible && params.onglet === "historique" ? "historique" : "jour";
 
-  const [{ data: services }, { data: drivers }, { data: vehicles }] = encadrement
-    ? await Promise.all([
-        supabase.from("services").select("id, name").eq("organization_id", appUser.organization_id).order("name"),
-        supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
-        supabase.from("vehicles").select("id, registration, service_id").eq("organization_id", appUser.organization_id).order("registration"),
-      ])
-    : [{ data: null }, { data: null }, { data: null }];
-
   const onglets = historiqueVisible && (
     <div className="mb-5 flex gap-1 border-b border-navy/10" role="tablist" aria-label="Tournée colis">
       {(
