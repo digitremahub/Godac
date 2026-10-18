@@ -38,6 +38,7 @@ export async function POST(req: Request) {
   let sourceQuery = supabase
     .from("planning_entries")
     .select("service_id, tour_number, driver_id, vehicle_id, start_at")
+    .eq("organization_id", appUser.organization_id)
     .gte("start_at", `${parsed.data.source_week_start}T00:00:00`)
     .lt("start_at", `${sourceEnd}T00:00:00`);
   if (parsed.data.service_id) sourceQuery = sourceQuery.eq("service_id", parsed.data.service_id);
@@ -54,11 +55,15 @@ export async function POST(req: Request) {
   // through to the DB (raw 409) and silently dropped a same-driver
   // entry that used a *different* tour number on a day that already
   // had something else of theirs.
-  const { data: existingTarget } = await supabase
+  const { data: existingTarget, error: targetError } = await supabase
     .from("planning_entries")
     .select("service_id, tour_number, start_at")
+    .eq("organization_id", appUser.organization_id)
     .gte("start_at", `${parsed.data.target_week_start}T00:00:00`)
     .lt("start_at", `${targetEnd}T00:00:00`);
+  if (targetError) {
+    return NextResponse.json({ error: targetError.message }, { status: 500 });
+  }
   const existingSlots = new Set((existingTarget ?? []).map((e) => `${e.service_id}:${e.tour_number}:${e.start_at}`));
 
   const toInsert = sourceEntries
