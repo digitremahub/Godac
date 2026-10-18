@@ -140,9 +140,29 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   const [rechercheAdresse, setRechercheAdresse] = useState("");
   const [suggestionHoraires, setSuggestionHoraires] = useState<{ adresse: string; label: string | null; weekly_schedule: Record<string, { open: string; close: string }[]> } | null>(null);
   const [chargementSuggestionHoraires, setChargementSuggestionHoraires] = useState(false);
+  const [creneauxService, setCreneauxService] = useState<{ label: string; start: string; end: string }[]>([
+    { label: "8 h – 11 h", start: "08:00", end: "11:00" },
+    { label: "10 h – 13 h", start: "10:00", end: "13:00" },
+    { label: "12 h – 15 h", start: "12:00", end: "15:00" },
+    { label: "14 h – 17 h", start: "14:00", end: "17:00" },
+  ]);
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    let actif = true;
+    fetch("/api/colis/creneaux-service").then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) return;
+      let windows = Array.isArray(data.windows) ? data.windows : [];
+      if (!windows.length && Array.isArray(data.services)) windows = data.services.flatMap((s: any) => Array.isArray(s.windows) ? s.windows : []);
+      const uniques = new Map<string, { label: string; start: string; end: string }>();
+      for (const w of windows) if (w && typeof w.label === "string" && typeof w.start === "string" && typeof w.end === "string") uniques.set(w.start + "-" + w.end, w);
+      if (actif && uniques.size) setCreneauxService([...uniques.values()]);
+    }).catch(() => undefined);
+    return () => { actif = false; };
+  }, []);
 
   // Recherche les horaires habituels connus dès que l’adresse est saisie,
   // avant que le colis soit ajouté à la tournée.
@@ -1051,16 +1071,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                     : "Aucun horaire habituel connu : vous pouvez tout de même définir le créneau souhaité pour aujourd'hui."}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {[
-                  ["8 h – 11 h", "08:00", "11:00"],
-                  ["10 h – 13 h", "10:00", "13:00"],
-                  ["12 h – 15 h", "12:00", "15:00"],
-                  ["14 h – 17 h", "14:00", "17:00"],
-                ].map(([label, open, close]) => {
-                  const selected = draft.window_start === open && draft.window_end === close;
+                {creneauxService.map(({ label, start, end }) => {
+                  const selected = draft.window_start === start && draft.window_end === end;
                   return (
-                    <button key={label} type="button" className={selected ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"}
-                      onClick={() => setDraft({ ...draft, window_start: open, window_end: close })}>
+                    <button key={start + "-" + end} type="button" className={selected ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"}
+                      onClick={() => setDraft({ ...draft, window_start: start, window_end: end })}>
                       {label}{selected ? " ✓" : ""}
                     </button>
                   );
