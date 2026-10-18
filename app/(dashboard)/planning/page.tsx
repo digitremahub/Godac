@@ -10,7 +10,6 @@ import { PlanningDayView } from "@/components/planning/PlanningDayView";
 import { PlanningMonthView } from "@/components/planning/PlanningMonthView";
 import { PlanningKanbanView } from "@/components/planning/PlanningKanbanView";
 import { PlanningListView } from "@/components/planning/PlanningListView";
-import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
 import { PresencePlanning } from "@/components/planning/PresencePlanning";
 import { PRESENCE_STATUS, estPoleBureau } from "@/lib/organization/poles";
 import { parisCalendarDate } from "@/lib/planning/dates";
@@ -218,9 +217,6 @@ export default async function PlanningPage({
       />
       {duplicates.length > 0 && <PlanningDuplicatesBanner duplicates={duplicates} />}
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
-      {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
-        <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
-      )}
       {view === "week" && (
         <PlanningGrid
           {...commonProps}
