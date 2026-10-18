@@ -71,14 +71,15 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  let affectation: { services: { id: string; name: string }[]; drivers: { id: string; full_name: string }[]; vehicles: { id: string; registration: string; service_id: string | null }[] } | null = null;
+  let affectation: { services: { id: string; name: string }[]; drivers: { id: string; full_name: string }[]; vehicles: { id: string; registration: string; service_id: string | null }[]; tours: { id: string; tour_number: string; service_id: string }[] } | null = null;
   if (encadrement) {
-    const [{ data: services }, { data: drivers }, { data: vehicles }] = await Promise.all([
+    const [{ data: services }, { data: drivers }, { data: vehicles }, { data: tours }] = await Promise.all([
       supabase.from("services").select("id,name").eq("organization_id", appUser.organization_id).order("name"),
       supabase.from("users").select("id,full_name").eq("organization_id", appUser.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
       supabase.from("vehicles").select("id,registration,service_id").eq("organization_id", appUser.organization_id).order("registration"),
+      supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", appUser.organization_id).order("tour_number"),
     ]);
-    affectation = { services: services ?? [], drivers: drivers ?? [], vehicles: vehicles ?? [] };
+    affectation = { services: services ?? [], drivers: drivers ?? [], vehicles: vehicles ?? [], tours: tours ?? [] };
   }
 
   return (
@@ -92,7 +93,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
           <p className="mt-1 text-sm text-navy/65">Créez d'abord le modèle avec son numéro, ses villages, ramasses et points relais, puis affectez-le ci-dessous.</p>
           <Link href="/tours/routes" className="btn-secondary mt-3 inline-flex">Créer / modifier les tournées et villages</Link>
           <div className="mt-4">
-            <AffecterTourneeColis services={affectation.services} drivers={affectation.drivers} vehicles={affectation.vehicles} />
+            <AffecterTourneeColis services={affectation.services} drivers={affectation.drivers} vehicles={affectation.vehicles} tours={affectation.tours} />
           </div>
         </section>
       )}

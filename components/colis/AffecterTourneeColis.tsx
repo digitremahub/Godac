@@ -6,18 +6,20 @@ import { useRouter } from "next/navigation";
 type Option = { id: string; name: string };
 type Driver = { id: string; full_name: string };
 type Vehicle = { id: string; registration: string; service_id: string | null };
+type Tour = { id: string; tour_number: string; service_id: string };
 
-export function AffecterTourneeColis({ services, drivers, vehicles }: { services: Option[]; drivers: Driver[]; vehicles: Vehicle[] }) {
+export function AffecterTourneeColis({ services, drivers, vehicles, tours }: { services: Option[]; drivers: Driver[]; vehicles: Vehicle[]; tours: Tour[] }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [driverId, setDriverId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [date, setDate] = useState(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
   const [time, setTime] = useState("07:00");
-  const [tourNumber, setTourNumber] = useState("1");
+  const [tourNumber, setTourNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const filteredVehicles = vehicles.filter(v => !v.service_id || v.service_id === serviceId);
+  const filteredTours = tours.filter(t => t.service_id === serviceId);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +57,7 @@ export function AffecterTourneeColis({ services, drivers, vehicles }: { services
       </select></label>
       <label className="text-sm font-medium">Date<input className="input mt-1 w-full" type="date" value={date} onChange={e => setDate(e.target.value)} required /></label>
       <label className="text-sm font-medium">Heure de départ<input className="input mt-1 w-full" type="time" value={time} onChange={e => setTime(e.target.value)} required /></label>
-      <label className="text-sm font-medium">Numéro de tournée<input className="input mt-1 w-full" value={tourNumber} onChange={e => setTourNumber(e.target.value)} required maxLength={40} /></label>
+      <label className="text-sm font-medium">Tournée existante<select className="input mt-1 w-full" value={tourNumber} onChange={e => setTourNumber(e.target.value)} required disabled={filteredTours.length === 0}><option value="">Choisir une tournée</option>{filteredTours.map(t => <option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}</select>{filteredTours.length === 0 && <span className="mt-1 block text-xs font-normal text-navy/60">Aucune tournée enregistrée pour ce service. Créez d’abord un modèle dans « Tournées villages ».</span>}</label>
       <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3">
         <button className="btn-primary" type="submit" disabled={busy || !serviceId || !driverId || !vehicleId || !tourNumber.trim()}>{busy ? "Affectation…" : "Créer et affecter la tournée"}</button>
         {message && <p role="status" className={message.ok ? "text-sm text-teal-700" : "text-sm text-red-700"}>{message.text}</p>}

@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planning/PlanningDuplicatesBanner";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
+import { DriverCreatedRuns } from "@/components/planning/DriverCreatedRuns";
 import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
@@ -164,6 +165,31 @@ export default async function PlanningPage({
   const transportServices = services.filter((s: any) => !estPoleBureau(s.pole));
   const filteredServices = params.service ? transportServices.filter((s: any) => s.id === params.service) : transportServices;
 
+  // A driver's daily Colis sheet is distinct from a Planning assignment.
+  // Surface sheets created for the displayed date range without inventing a vehicle or time.
+  const canSeeDriverCreatedRuns = ["direction", "manager", "manager_chauffeur"].includes(appUser.role);
+  let driverCreatedRuns: { id: string; name: string | null; run_date: string; status: string; driver_id: string }[] = [];
+  let driverNames: Record<string, string> = {};
+  if (canSeeDriverCreatedRuns) {
+    const { data: runs } = await supabase
+      .from("delivery_runs")
+      .select("id, name, run_date, status, driver_id")
+      .eq("organization_id", appUser.organization_id)
+      .gte("run_date", rangeStart)
+      .lt("run_date", rangeEnd)
+      .order("run_date", { ascending: false });
+    driverCreatedRuns = (runs ?? []) as typeof driverCreatedRuns;
+    const driverIds = Array.from(new Set(driverCreatedRuns.map((run) => run.driver_id)));
+    if (driverIds.length) {
+      const { data: runDrivers } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .eq("organization_id", appUser.organization_id)
+        .in("id", driverIds);
+      driverNames = Object.fromEntries((runDrivers ?? []).map((driver: any) => [driver.id, driver.full_name]));
+    }
+  }
+
   const lastTourByDriver = new Map<string, { vehicleId: string; tourNumber: string }>();
   for (const row of (lastTours ?? []) as any[]) {
     if (!lastTourByDriver.has(row.driver_id) && row.vehicle_id) {
@@ -221,6 +247,7 @@ export default async function PlanningPage({
       {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
         <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
       )}
+      {canSeeDriverCreatedRuns && <DriverCreatedRuns runs={driverCreatedRuns} driverNames={driverNames} />}
       {view === "week" && (
         <PlanningGrid
           {...commonProps}

@@ -77,7 +77,11 @@ export function DriverPinFlow({
       if (attempted) { window.location.href = postLoginPath(); return; }
       setError("Aucune clé biométrique n'est enregistrée pour ce compte. Utilisez votre PIN.");
     } catch (e) {
-      if (!(e instanceof Error) || e.name !== "NotAllowedError") setError(e instanceof Error ? e.message : "Connexion biométrique impossible. Utilisez votre PIN.");
+      if (e instanceof Error && e.name === "NotAllowedError") {
+        setError("La demande Face ID / empreinte a été annulée, a expiré ou n’a pas abouti. Réessayez en validant la demande biométrique, ou utilisez votre PIN.");
+      } else {
+        setError(e instanceof Error ? e.message : "Connexion biométrique impossible. Utilisez votre PIN.");
+      }
     } finally { setBusy(false); }
   }
 
