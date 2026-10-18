@@ -4,6 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const roles = ["direction", "manager", "manager_chauffeur"];
 const schema = z.object({
@@ -41,7 +42,8 @@ export async function POST(req: Request) {
     supabase.from("users").select("id,full_name,organization_id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).maybeSingle(),
     supabase.from("vehicles").select("id,service_id,organization_id").eq("id", vehicle_id).eq("organization_id", user.organization_id).maybeSingle(),
   ]);
-  if (!driver || !vehicle || vehicle.service_id !== service_id) return NextResponse.json({ error: "Chauffeur ou véhicule invalide pour ce service." }, { status: 400 });
+  const { data: serviceCheck } = await supabase.from("services").select("id,organization_id").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle();
+  if (!driver || !vehicle || !serviceCheck || vehicle.service_id !== service_id) return NextResponse.json({ error: "Chauffeur, service ou véhicule invalide pour cette organisation." }, { status: 400 });
   const { data: entry, error: entryError } = await supabase.from("planning_entries").insert({
     organization_id: user.organization_id, service_id, driver_id, vehicle_id, tour_number, start_at, status: "planned",
   }).select("id").single();
@@ -58,5 +60,6 @@ export async function POST(req: Request) {
     await supabase.from("planning_entries").delete().eq("id", entry.id).eq("status", "planned");
     return NextResponse.json({ error: `Affectation non finalisée : ${runError.message}` }, { status: 500 });
   }
-  return NextResponse.json({ planning_entry_id: entry.id, run }, { status: 201 });
+  const warning = await warnIfDriverDoubleBooked(supabase, { organizationId: user.organization_id, driverId: driver_id, startAt: start_at, excludeEntryId: entry.id });
+  return NextResponse.json({ planning_entry_id: entry.id, run, warning }, { status: 201 });
 }
