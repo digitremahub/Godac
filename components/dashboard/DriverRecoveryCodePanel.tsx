@@ -9,6 +9,8 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   const [error, setError] = useState<string | null>(null);
   const [generated, setGenerated] = useState<{ id: string; name: string; code: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   async function generate(driver: Driver) {
     const confirmed = window.confirm(
@@ -31,6 +33,26 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
     } finally {
       setLoadingId(null);
+    }
+  }
+
+  async function resetAllAccess() {
+    const confirmed = window.confirm(
+      "Réinitialiser les accès de TOUS les chauffeurs de votre organisation ? Leurs clés Face ID/empreinte et codes existants seront révoqués. Les comptes, tournées et historiques seront conservés. Chaque chauffeur devra réenregistrer son accès."
+    );
+    if (!confirmed) return;
+    setResettingAll(true);
+    setError(null);
+    setResetMessage(null);
+    try {
+      const response = await fetch("/api/admin/drivers/reset-access", { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error ?? "Impossible de réinitialiser les accès.");
+      setResetMessage(`Accès réinitialisés pour ${payload.resetCount} chauffeur(s). Les comptes et historiques sont conservés.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+    } finally {
+      setResettingAll(false);
     }
   }
 
@@ -57,6 +79,11 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
       </div>
 
       {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {resetMessage && <p role="status" className="mb-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-900">{resetMessage}</p>}
+      <div className="mb-4 rounded-xl border border-orange-300 bg-orange-50 p-3">
+        <p className="text-sm text-orange-950">La réinitialisation révoque les clés biométriques et les codes de connexion des chauffeurs, mais conserve leurs comptes et l’historique des tournées.</p>
+        <button type="button" disabled={resettingAll} onClick={resetAllAccess} className="mt-3 rounded-lg border border-orange-500 px-3 py-2 text-sm font-semibold text-orange-950 disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Réinitialiser tous les accès chauffeurs"}</button>
+      </div>
 
       {generated && (
         <div className="mb-4 rounded-xl border border-teal-600/30 bg-teal-50 p-4">
