@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planning/PlanningDuplicatesBanner";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
+import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
 import { PlanningMonthView } from "@/components/planning/PlanningMonthView";
@@ -217,6 +218,9 @@ export default async function PlanningPage({
       />
       {duplicates.length > 0 && <PlanningDuplicatesBanner duplicates={duplicates} />}
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
+      {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
+        <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
+      )}
       {view === "week" && (
         <PlanningGrid
           {...commonProps}
