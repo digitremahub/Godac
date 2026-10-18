@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "predev": "node scripts/prepare-local-env.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
