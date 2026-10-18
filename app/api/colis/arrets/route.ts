@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     const { data } = await supabase
       .from("delivery_stops")
       .update({
-        parcel_count: memeAdresse.parcel_count + 1,
+        ...(kind === "livraison" ? { parcel_count: memeAdresse.parcel_count + 1 } : {}),
         parcel_code: codes,
         ...(telephone && !memeAdresse.phone ? { phone: telephone } : {}),
         // Poids de l'arrêt = somme des colis dont le poids est connu.
@@ -128,6 +128,9 @@ export async function POST(req: Request) {
       ...(kind !== "livraison" ? { kind } : {}),
       ...(kind === "ramasse" ? { exceptional_pickup: parsed.data.exceptionnelle === true } : {}),
       parcel_code: code,
+      // Une ramasse ou un point relais est un arrêt, pas un colis.
+      // Le compteur de colis est renseigné seulement pour les livraisons réelles.
+      parcel_count: kind === "livraison" ? 1 : 0,
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
       phone: telephone,

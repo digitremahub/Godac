@@ -173,7 +173,9 @@ export async function POST(req: Request) {
               position: positionArret++,
               kind: stop.kind,
               address,
-              parcel_count: 1,
+              // Les ramasses et points relais comptent comme des arrêts uniquement.
+              // Le nombre de colis réels sera renseigné lors du traitement de l'arrêt.
+              parcel_count: 0,
               status: "pending",
               lat: geo?.lat ?? null,
               lng: geo?.lng ?? null,
