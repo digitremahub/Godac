@@ -1,0 +1,2 @@
+alter table public.users add column if not exists driver_recovery_code_hash text;
+comment on column public.users.driver_recovery_code_hash is 'HMAC du code de récupération aléatoire remis une seule fois au chauffeur; jamais stocké en clair.';
