@@ -23,7 +23,14 @@ const bodySchema = z.object({
  */
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
-  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {\n    return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut générer une semaine de planning." }, { status: 403 });\n  }\n\n  const parsed = bodySchema.safeParse(await req.json());
+  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
+    return NextResponse.json(
+      { error: "Seule la Direction ou un responsable autorisé peut générer une semaine de planning." },
+      { status: 403 },
+    );
+  }
+
+  const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
