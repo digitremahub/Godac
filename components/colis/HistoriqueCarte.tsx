@@ -23,7 +23,6 @@ export default function HistoriqueCarte({ stops, depot }: Props) {
       container: container.current,
       center: [2.2, 46.5],
       zoom: 5,
-      attributionControl: true,
       style: {
         version: 8,
         sources: {
