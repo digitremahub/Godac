@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { cleAdresse, moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
-import { codePays } from "@/lib/pays/serveur";
-import { geocodeAddress } from "@/lib/geo/geocode";
+import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
+import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
 const roles = ["direction", "manager", "manager_chauffeur"];
 const schema = z.object({
@@ -14,9 +13,14 @@ const schema = z.object({
   vehicle_id: z.string().uuid(),
   tour_number: z.string().trim().min(1).max(60),
   date: z.string().date(),
-  time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+  time: z.string().regex(/^(?:[01]\\d|2[0-3]):[0-5]\\d$/),
 });
 
+/**
+ * Affecter une tournée signifie créer une entrée de planning, pas une fiche
+ * Tournée colis. La fiche quotidienne est créée par le chauffeur et regroupe
+ * ensuite toutes ses affectations de la journée.
+ */
 export async function GET() {
   const user = await requireAppUser();
   if (!roles.includes(user.role)) return NextResponse.json({ error: "Accès réservé à l'encadrement." }, { status: 403 });
@@ -41,97 +45,43 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
-  const { service_id, driver_id, vehicle_id, tour_number, date, time } = parsed.data;
-  const plannedStart = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).format(new Date(parisWallTimeToUtcISOString(date, time)));
 
-  const [{ data: driver }, { data: vehicle }, { data: service }, { data: routes }] = await Promise.all([
-    supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).maybeSingle(),
+  const { service_id, driver_id, vehicle_id, tour_number, date, time } = parsed.data;
+  const [{ data: driver }, { data: vehicle }, { data: service }, { data: route }] = await Promise.all([
+    supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).maybeSingle(),
     supabase.from("vehicles").select("id,service_id").eq("id", vehicle_id).eq("organization_id", user.organization_id).maybeSingle(),
-    supabase.from("services").select("id,name,depot_address,depot_lat,depot_lng").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle(),
-    supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", user.organization_id).eq("tour_number", tour_number),
+    supabase.from("services").select("id").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle(),
+    supabase.from("tour_routes").select("id").eq("organization_id", user.organization_id).eq("service_id", service_id).eq("tour_number", tour_number).maybeSingle(),
   ]);
-  const route = (routes ?? []).find((r: any) => r.service_id === service_id);
-  if (!driver || !vehicle || !service || !route || vehicle.service_id !== service_id) {
-    return NextResponse.json({ error: "Choisissez une tournée existante et un chauffeur, service et véhicule valides pour cette organisation." }, { status: 400 });
+
+  if (!driver || !vehicle || !service || !route || (vehicle.service_id && vehicle.service_id !== service_id)) {
+    return NextResponse.json({ error: "Choisissez une tournée modèle existante et un chauffeur, service et véhicule valides pour cette organisation." }, { status: 400 });
   }
 
-  // Évite de créer deux instances identiques si l'utilisateur double-clique
-  // ou relance la demande après un délai réseau.
-  const runName = `Tournée n°${tour_number}`;
-  const { data: existingRun, error: existingRunError } = await supabase.from("delivery_runs")
-    .select("id,status")
-    .eq("organization_id", user.organization_id)
-    .eq("driver_id", driver_id)
-    .eq("run_date", date)
-    .eq("name", runName)
-    .maybeSingle();
-  if (existingRunError) return NextResponse.json({ error: existingRunError.message }, { status: 500 });
-  if (existingRun) return NextResponse.json({ error: existingRun.status === "done" ? "Cette tournée est déjà clôturée pour ce chauffeur à cette date." : "Cette tournée est déjà affectée à ce chauffeur à cette date." }, { status: 409 });
-
-  // Affectation ponctuelle distincte du Planning : on crée une instance datée
-  // de la tournée modèle, sans créer/modifier de planning_entry ni le modèle.
-  const { data: run, error: runError } = await supabase.from("delivery_runs").insert({
+  const start_at = parisWallTimeToUtcISOString(date, time);
+  const { data: assignment, error } = await supabase.from("planning_entries").insert({
     organization_id: user.organization_id,
+    service_id,
     driver_id,
     vehicle_id,
-    service_id,
-    run_date: date,
-    name: runName,
-    planned_start: plannedStart,
-    start_label: service.depot_address ?? (service.name ? `Dépôt ${service.name}` : null),
-    start_lat: service.depot_lat ?? null,
-    start_lng: service.depot_lng ?? null,
-  }).select("id,name,run_date,driver_id,service_id,vehicle_id,planned_start").single();
-  if (runError) return NextResponse.json({ error: runError.message }, { status: 500 });
+    tour_number,
+    start_at,
+    status: "planned",
+  }).select("id,organization_id,service_id,driver_id,vehicle_id,tour_number,start_at,status").single();
 
-  let pickupWarning: string | null = null;
-  try {
-    const { data: villages, error: villagesError } = await supabase.from("tour_route_villages")
-      .select("name,pickup_addresses,planned_stops,position").eq("route_id", route.id).order("position");
-    if (villagesError) throw villagesError;
-    const pays = await codePays(user.organization_id);
-    const seen = new Set<string>();
-    let listPosition = 0;
-    let stopPosition = 0;
-    for (const village of villages ?? []) {
-      const planned = Array.isArray(village.planned_stops) ? village.planned_stops : [];
-      const stops: { address: string; kind: "ramasse" | "point_relais" }[] = planned
-        .filter((s: any) => s && typeof s.address === "string")
-        .map((s: any) => ({
-          address: s.address.trim(),
-          kind: s.type === "point_relais" ? "point_relais" as const : "ramasse" as const,
-        }));
-      // Compatibilité avec les anciens modèles qui stockaient uniquement
-      // les adresses de ramasse dans pickup_addresses.
-      for (const address of (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])) {
-        if (typeof address === "string") stops.push({ address: address.trim(), kind: "ramasse" });
-      }
-      const uniqueStops = stops.filter((stop) => {
-        if (stop.address.length < 5) return false;
-        const key = `${stop.kind}:${cleAdresse(stop.address)}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      if (!uniqueStops.length) continue;
-      const { data: list, error: listError } = await supabase.from("delivery_lists").insert({
-        organization_id: user.organization_id, run_id: run.id, name: village.name.slice(0, 60), position: listPosition++,
-      }).select("id").single();
-      if (listError) throw listError;
-      for (const stop of uniqueStops) {
-        const geo = await geocodeAddress(stop.address, pays).catch(() => null);
-        const { error: stopError } = await supabase.from("delivery_stops").insert({
-          organization_id: user.organization_id, run_id: run.id, list_id: list.id, position: stopPosition++,
-          kind: stop.kind, address: stop.address, parcel_count: 1, status: "pending", lat: geo?.lat ?? null, lng: geo?.lng ?? null,
-        });
-        if (stopError) throw stopError;
-      }
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "Cette tournée est déjà affectée à ce créneau pour ce service." }, { status: 409 });
     }
-  } catch (error) {
-    console.error("[colis/affectations] Ramasses incomplètes", { runId: run.id, error });
-    pickupWarning = "Tournée affectée, mais certaines ramasses n'ont pas pu être préchargées. Vérifiez la fiche de tournée.";
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ run, pickupWarning }, { status: 201 });
+
+  const warning = await warnIfDriverDoubleBooked(supabase, {
+    organizationId: user.organization_id,
+    driverId: driver_id,
+    startAt: start_at,
+    excludeEntryId: assignment.id,
+  });
+
+  return NextResponse.json({ assignment, warning }, { status: 201 });
 }
