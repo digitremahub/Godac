@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
+import { cleAdresse, moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
+import { codePays } from "@/lib/pays/serveur";
+import { geocodeAddress } from "@/lib/geo/geocode";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
@@ -22,7 +24,7 @@ export async function GET() {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const [{ data: services }, { data: drivers }, { data: vehicles }] = await Promise.all([
-    supabase.from("services").select("id,name").order("name"),
+    supabase.from("services").select("id,name").eq("organization_id", user.organization_id).order("name"),
     supabase.from("users").select("id,full_name").eq("organization_id", user.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
     supabase.from("vehicles").select("id,registration,service_id").eq("organization_id", user.organization_id).order("registration"),
   ]);
@@ -60,6 +62,46 @@ export async function POST(req: Request) {
     await supabase.from("planning_entries").delete().eq("id", entry.id).eq("status", "planned");
     return NextResponse.json({ error: `Affectation non finalisée : ${runError.message}` }, { status: 500 });
   }
+  // Charger les ramasses configurées sur la fiche de tournée/villages dès
+  // l'affectation, sans attendre que le chauffeur crée manuellement une tournée.
+  let pickupWarning: string | null = null;
+  try {
+    const { data: route, error: routeError } = await supabase.from("tour_routes")
+      .select("id").eq("organization_id", user.organization_id).eq("tour_number", tour_number).maybeSingle();
+    if (routeError) throw routeError;
+    if (route) {
+      const { data: villages, error: villagesError } = await supabase.from("tour_route_villages")
+        .select("name,pickup_addresses,position").eq("route_id", route.id).order("position");
+      if (villagesError) throw villagesError;
+      const pays = await codePays(user.organization_id);
+      const seen = new Set<string>();
+      let listPosition = 0;
+      let stopPosition = 0;
+      for (const village of villages ?? []) {
+        const addresses = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
+          .filter((a): a is string => typeof a === "string")
+          .map((a) => a.trim()).filter((a) => a.length >= 5 && !seen.has(cleAdresse(a)));
+        if (!addresses.length) continue;
+        const { data: list, error: listError } = await supabase.from("delivery_lists").insert({
+          organization_id: user.organization_id, run_id: run.id, name: village.name.slice(0, 60), position: listPosition++,
+        }).select("id").single();
+        if (listError) throw listError;
+        for (const address of addresses) {
+          const key = cleAdresse(address);
+          seen.add(key);
+          const geo = await geocodeAddress(address, pays).catch(() => null);
+          const { error: stopError } = await supabase.from("delivery_stops").insert({
+            organization_id: user.organization_id, run_id: run.id, list_id: list.id, position: stopPosition++,
+            kind: "ramasse", address, parcel_count: 1, status: "pending", lat: geo?.lat ?? null, lng: geo?.lng ?? null,
+          });
+          if (stopError) throw stopError;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[colis/affectations] Tournée créée, ramasses incomplètes", { runId: run.id, error });
+    pickupWarning = "Tournée créée, mais certaines ramasses n'ont pas pu être ajoutées. Vérifiez la fiche de tournée et les migrations Supabase.";
+  }
   const warning = await warnIfDriverDoubleBooked(supabase, { organizationId: user.organization_id, driverId: driver_id, startAt: start_at, excludeEntryId: entry.id });
-  return NextResponse.json({ planning_entry_id: entry.id, run, warning }, { status: 201 });
+  return NextResponse.json({ planning_entry_id: entry.id, run, warning, pickupWarning }, { status: 201 });
 }
