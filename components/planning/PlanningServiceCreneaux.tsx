@@ -33,7 +33,7 @@ export function PlanningServiceCreneaux({ services, selectedService = "" }: { se
         if (!cancelled) {
           const next = (data.services ?? []) as ServiceConfig[];
           setConfigs(next);
-          const first = next.find((s) => s.id === serviceId) ?? next.find((s) => services.some((p) => p.id === s.id)) ?? next[0];
+          const first = next.find((s) => s.id === serviceId && services.some((p) => p.id === s.id)) ?? next.find((s) => services.some((p) => p.id === s.id));
           if (first) {
             setServiceId(first.id);
             setWindows(first.windows?.length ? first.windows : []);
