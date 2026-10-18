@@ -34,7 +34,7 @@ drop policy if exists driver_pickup_templates_insert_own on public.driver_pickup
 create policy driver_pickup_templates_insert_org on public.driver_pickup_templates
   for insert with check (
     organization_id = (select organization_id from public.users where id = auth.uid())
-    and exists (select 1 from public.users u where u.id = driver_id and u.organization_id = organization_id)
+    and exists (select 1 from public.users u where u.id = driver_id and u.organization_id = driver_pickup_templates.organization_id)
   );
 
 drop policy if exists driver_pickup_templates_update_own on public.driver_pickup_templates;
