@@ -45,7 +45,7 @@ export function AffecterTournee() {
       <label className="text-sm">Véhicule<select className="input mt-1" value={vehicle} onChange={e=>setVehicle(e.target.value)}><option value="">Choisir…</option>{data.vehicles.filter(v=>!service||v.service_id===service).map(v=><option key={v.id} value={v.id}>{v.registration}</option>)}</select></label>
       <label className="text-sm">Date<input className="input mt-1" type="date" value={date} onChange={e=>setDate(e.target.value)} /></label>
       <label className="text-sm">Heure de départ<input className="input mt-1" type="time" value={time} onChange={e=>setTime(e.target.value)} /></label>
-      <label className="text-sm">Tournée existante<select className="input mt-1" value={number} onChange={e=>setNumber(e.target.value)}><option value="">Choisir une tournée…</option>{data.tours.filter(t=>!t.service_id||!service||t.service_id===service).map(t=><option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}</select></label>
+      <label className="text-sm">Tournée existante<select className="input mt-1" value={number} onChange={e=>setNumber(e.target.value)}><option value="">Choisir une tournée…</option>{data.tours.filter(t=>Boolean(service) && t.service_id===service).map(t=><option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}</select></label>
     </div>
     <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" className="btn-primary" disabled={busy||!service||!driver||!vehicle||!date||!time||!number.trim()} onClick={submit}>{busy?"Affectation…":"Affecter la tournée"}</button>{message&&<p className="text-sm" role="status">{message}</p>}</div>
   </section>;
