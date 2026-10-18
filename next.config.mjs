@@ -23,7 +23,8 @@ const nextConfig = {
   // string literal at the fs.readFileSync call site) — Next's static
   // file tracing can't follow that, so the directory is force-included
   // for the one route that needs it at runtime (Vercel).
-  outputFileTracingIncludes: {
+  experimental: {
+    outputFileTracingIncludes: {
     "/api/assistant/message": ["./content/help/**"],
     // @react-pdf/renderer ALWAYS touches pdfkit's built-in "Helvetica"
     // standard font, no matter what font our own styles request:
@@ -47,6 +48,7 @@ const nextConfig = {
     "/api/payslips/generate": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
     "/api/ticpe/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
     "/api/ticpe/export-lines/[id]": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+    },
   },
   images: {
     remotePatterns: [
