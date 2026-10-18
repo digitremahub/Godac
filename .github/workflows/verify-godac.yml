@@ -1,8 +1,11 @@
-name: Verify GODAC feature branch
+name: Verify GODAC integration
 on:
   push:
     branches:
-      - feature/optimisation-tournees
+      - integration/colis-planning-chauffeurs
+  pull_request:
+    branches:
+      - main
 permissions:
   contents: read
 jobs:
@@ -20,5 +23,7 @@ jobs:
         run: npm ci
       - name: TypeScript check
         run: npm run typecheck
+      - name: Unit tests
+        run: npm test
       - name: Production build
         run: npm run build
