@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     );
     if (passages.length) {
       // La première affectation fournit l'heure et le service par défaut.
-      const premiere = passages[0];
+      const premiere = passages[0]!;
       const plannedStart = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date(premiere.start_at));
