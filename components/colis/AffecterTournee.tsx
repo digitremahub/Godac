@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 type Option = { id: string; name?: string; full_name?: string; registration?: string; service_id?: string };
 type TourOption = { id: string; tour_number: string; service_id: string | null };
 type Data = { services: Option[]; drivers: Option[]; vehicles: Option[]; tours: TourOption[]; today: string };
-export function AffecterTournee() {
-  const router = useRouter();
+
+export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; onCreated: (runId: string) => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [service, setService] = useState("");
   const [driver, setDriver] = useState("");
@@ -17,36 +16,78 @@ export function AffecterTournee() {
   const [number, setNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+
   useEffect(() => {
-    fetch("/api/colis/affectations").then(async r => {
+    let active = true;
+    fetch("/api/colis/affectations").then(async (r) => {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Chargement impossible");
-      setData(d); setDate(d.today);
-    }).catch(e => setMessage(e instanceof Error ? e.message : "Chargement impossible"));
+      if (active) { setData(d); setDate(d.today); }
+    }).catch((e) => { if (active) setMessage(e instanceof Error ? e.message : "Chargement impossible"); });
+    return () => { active = false; };
   }, []);
+
   async function submit() {
     setBusy(true); setMessage("");
     try {
-      const r = await fetch("/api/colis/affectations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_id: service, driver_id: driver, vehicle_id: vehicle, tour_number: number, date, time }) });
+      const r = await fetch("/api/colis/affectations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_id: service, driver_id: driver, vehicle_id: vehicle, tour_number: number, date, time }),
+      });
       const d = await r.json();
-      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Affectation impossible");
-      setMessage(d.pickupWarning || d.warning || "Tournée affectée : elle apparaît chez le chauffeur dans Tournée colis. Le Planning reste inchangé.");
-      setNumber(""); router.refresh();
-    } catch (e) { setMessage(e instanceof Error ? e.message : "Affectation impossible"); }
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Création impossible");
+      if (!d.run?.id) throw new Error(d.pickupWarning || "La tournée a été créée, mais son identifiant est manquant. Rechargez la page.");
+      onCreated(d.run.id);
+      if (d.pickupWarning) setMessage(d.pickupWarning);
+    } catch (e) { setMessage(e instanceof Error ? e.message : "Création impossible"); }
     finally { setBusy(false); }
   }
-  if (!data) return message ? <p className="mb-4 text-sm text-orange-ink">{message}</p> : null;
-  return <section className="mb-5 rounded-xl border border-teal/25 bg-surface p-4">
-    <h2 className="font-semibold">Affecter une tournée</h2>
-    <p className="mb-3 mt-1 text-sm text-navy/65">Sélectionnez une tournée existante. L’affectation datée relie le chauffeur à cette tournée sans modifier son modèle.</p>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label className="text-sm">Service<select className="input mt-1" value={service} onChange={e => { setService(e.target.value); setVehicle(""); }}><option value="">Choisir…</option>{data.services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      <label className="text-sm">Chauffeur<select className="input mt-1" value={driver} onChange={e=>setDriver(e.target.value)}><option value="">Choisir…</option>{data.drivers.map(d=><option key={d.id} value={d.id}>{d.full_name}</option>)}</select></label>
-      <label className="text-sm">Véhicule<select className="input mt-1" value={vehicle} onChange={e=>setVehicle(e.target.value)}><option value="">Choisir…</option>{data.vehicles.filter(v=>!service||v.service_id===service).map(v=><option key={v.id} value={v.id}>{v.registration}</option>)}</select></label>
-      <label className="text-sm">Date<input className="input mt-1" type="date" value={date} onChange={e=>setDate(e.target.value)} /></label>
-      <label className="text-sm">Heure de départ<input className="input mt-1" type="time" value={time} onChange={e=>setTime(e.target.value)} /></label>
-      <label className="text-sm">Tournée existante<select className="input mt-1" value={number} onChange={e=>setNumber(e.target.value)}><option value="">Choisir une tournée…</option>{data.tours.filter(t=>Boolean(service) && t.service_id===service).map(t=><option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}</select></label>
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-navy/55 p-3 sm:p-6" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="creer-tournee-direction" className="my-auto w-full max-w-3xl rounded-2xl border border-teal/30 bg-white p-5 shadow-2xl">
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <div>
+            <h2 id="creer-tournee-direction" className="text-lg font-semibold">Créer une tournée colis</h2>
+            <p className="mt-1 text-sm text-navy/65">Choisissez le service, la tournée habituelle, le chauffeur et le véhicule. Cette affectation ponctuelle ne modifie pas le Planning.</p>
+          </div>
+          <button type="button" className="btn-ghost !px-2 !py-1" disabled={busy} onClick={onClose} aria-label="Fermer">✕</button>
+        </div>
+        {!data ? <p className="py-6 text-sm text-navy/60">{message || "Chargement des services et tournées…"}</p> : (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="text-sm">Service
+                <select className="input mt-1" value={service} onChange={(e) => { setService(e.target.value); setVehicle(""); setNumber(""); }}>
+                  <option value="">Choisir…</option>{data.services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">Tournée existante
+                <select className="input mt-1" value={number} onChange={(e) => setNumber(e.target.value)}>
+                  <option value="">Choisir une tournée…</option>{data.tours.filter((t) => Boolean(service) && t.service_id === service).map((t) => <option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">Chauffeur
+                <select className="input mt-1" value={driver} onChange={(e) => setDriver(e.target.value)}>
+                  <option value="">Choisir…</option>{data.drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">Véhicule
+                <select className="input mt-1" value={vehicle} onChange={(e) => setVehicle(e.target.value)}>
+                  <option value="">Choisir…</option>{data.vehicles.filter((v) => !service || v.service_id === service).map((v) => <option key={v.id} value={v.id}>{v.registration}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">Date<input className="input mt-1" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+              <label className="text-sm">Heure de départ<input className="input mt-1" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+            </div>
+            {message && <p role="status" className="mt-3 rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">{message}</p>}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Annuler</button>
+              <button type="button" className="btn-primary" disabled={busy || !service || !number || !driver || !vehicle || !date || !time} onClick={submit}>{busy ? "Création…" : "Créer et charger la tournée"}</button>
+            </div>
+          </>
+        )}
+      </section>
     </div>
-    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" className="btn-primary" disabled={busy||!service||!driver||!vehicle||!date||!time||!number.trim()} onClick={submit}>{busy?"Affectation…":"Affecter la tournée"}</button>{message&&<p className="text-sm" role="status">{message}</p>}</div>
-  </section>;
+  );
 }
