@@ -13,7 +13,7 @@ const schema = z.object({
   vehicle_id: z.string().uuid(),
   tour_number: z.string().trim().min(1).max(60),
   date: z.string().date(),
-  time: z.string().regex(/^\\d{2}:\\d{2}$/),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
 });
 
 export async function GET() {
