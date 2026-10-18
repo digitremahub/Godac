@@ -4,6 +4,8 @@ import { useState } from "react";
 
 type Driver = { id: string; full_name: string; phone: string | null };
 
+const RESET_CONFIRMATION = "REINITIALISER LES ACCES";
+
 export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -11,6 +13,8 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   const [copied, setCopied] = useState(false);
   const [resettingAll, setResettingAll] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
 
   async function generate(driver: Driver) {
     const confirmed = window.confirm(
@@ -37,18 +41,29 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   }
 
   async function resetAllAccess() {
-    const confirmed = window.confirm(
-      "Réinitialiser les accès de TOUS les chauffeurs de votre organisation ? Leurs clés Face ID/empreinte et codes existants seront révoqués. Les comptes, tournées et historiques seront conservés. Chaque chauffeur devra réenregistrer son accès."
-    );
-    if (!confirmed) return;
+    if (confirmation !== RESET_CONFIRMATION) {
+      setError(`Saisissez exactement : ${RESET_CONFIRMATION}`);
+      return;
+    }
     setResettingAll(true);
     setError(null);
     setResetMessage(null);
     try {
-      const response = await fetch("/api/admin/drivers/reset-access", { method: "POST" });
+      const response = await fetch("/api/admin/drivers/reset-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation }),
+      });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error ?? "Impossible de réinitialiser les accès.");
+      if (!response.ok) {
+        if (payload.failedCount > 0) {
+          throw new Error(`${payload.message ?? "Réinitialisation partielle."} ${payload.resetCount ?? 0} réussi(s), ${payload.failedCount} en échec. Identifiants concernés : ${(payload.failures ?? []).map((item: { driverId: string; step: string }) => `${item.driverId} (${item.step})`).join(", ")}`);
+        }
+        throw new Error(payload.error ?? payload.message ?? "Impossible de réinitialiser les accès.");
+      }
       setResetMessage(`Accès réinitialisés pour ${payload.resetCount} chauffeur(s). Les comptes et historiques sont conservés.`);
+      setShowResetConfirmation(false);
+      setConfirmation("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
     } finally {
@@ -81,8 +96,25 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
       {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {resetMessage && <p role="status" className="mb-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-900">{resetMessage}</p>}
       <div className="mb-4 rounded-xl border border-orange-300 bg-orange-50 p-3">
-        <p className="text-sm text-orange-950">La réinitialisation révoque les clés biométriques et les codes de connexion des chauffeurs, mais conserve leurs comptes et l’historique des tournées.</p>
-        <button type="button" disabled={resettingAll} onClick={resetAllAccess} className="mt-3 rounded-lg border border-orange-500 px-3 py-2 text-sm font-semibold text-orange-950 disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Réinitialiser tous les accès chauffeurs"}</button>
+        <p className="text-sm text-orange-950">La réinitialisation révoque les clés biométriques et les codes de connexion des chauffeurs, mais conserve leurs comptes et l’historique des tournées. Chaque chauffeur devra réenregistrer son accès. Cette opération peut interrompre leur connexion.</p>
+        {!showResetConfirmation ? (
+          <button type="button" disabled={resettingAll} onClick={() => { setError(null); setShowResetConfirmation(true); }} className="mt-3 rounded-lg border border-orange-500 px-3 py-2 text-sm font-semibold text-orange-950 disabled:opacity-50">
+            Préparer la réinitialisation globale
+          </button>
+        ) : (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm font-semibold text-orange-950">Pour confirmer, saisis exactement : <span className="font-mono">{RESET_CONFIRMATION}</span></p>
+            <input aria-label="Phrase de confirmation de réinitialisation" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" className="w-full rounded-lg border border-orange-400 bg-white px-3 py-2 text-sm" />
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={resettingAll || confirmation !== RESET_CONFIRMATION} onClick={resetAllAccess} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                {resettingAll ? "Réinitialisation…" : "Confirmer la réinitialisation"}
+              </button>
+              <button type="button" disabled={resettingAll} onClick={() => { setShowResetConfirmation(false); setConfirmation(""); }} className="rounded-lg border border-navy/20 px-3 py-2 text-sm">
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {generated && (
@@ -110,7 +142,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
             </div>
             <button
               type="button"
-              disabled={loadingId !== null}
+              disabled={loadingId !== null || resettingAll}
               onClick={() => generate(driver)}
               className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
