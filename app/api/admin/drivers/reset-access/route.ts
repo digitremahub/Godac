@@ -1,18 +1,47 @@
 import { randomBytes } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
+const CONFIRMATION_PHRASE = "REINITIALISER LES ACCES";
+
+function isSameOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Réinitialise les moyens d'authentification des chauffeurs de l'organisation
- * courante, sans supprimer les comptes ni les données métier/historiques.
- * Le nouvel enrôlement PIN et passkey doit être effectué après confirmation
- * par la Direction. Cette opération révoque toutes les passkeys des chauffeurs.
+ * courante. Les opérations Supabase Auth et Postgres ne partagent pas de
+ * transaction : chaque chauffeur est donc traité séparément et les erreurs
+ * partielles sont explicitement renvoyées.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Origine de requête non autorisée." }, { status: 403 });
+  }
+
+  let body: { confirmation?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Confirmation manquante." }, { status: 400 });
+  }
+  if (body.confirmation !== CONFIRMATION_PHRASE) {
+    return NextResponse.json({ error: "Saisissez la phrase de confirmation exacte pour continuer." }, { status: 400 });
+  }
+
   const appUser = await requireAppUser();
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut réinitialiser les accès chauffeurs." }, { status: 403 });
+  }
+  if (!appUser.organization_id) {
+    return NextResponse.json({ error: "Organisation introuvable pour ce compte." }, { status: 400 });
   }
 
   const admin = createAdminSupabaseClient();
@@ -27,43 +56,56 @@ export async function POST() {
   }
 
   const ids = (drivers ?? []).map((driver) => driver.id);
-  if (ids.length === 0) return NextResponse.json({ ok: true, resetCount: 0 });
+  if (ids.length === 0) return NextResponse.json({ ok: true, resetCount: 0, failedCount: 0, failures: [] });
 
-  // Invalider les clés biométriques avant de réinitialiser les identifiants.
-  const { error: passkeyError } = await admin.from("webauthn_credentials").delete().in("user_id", ids);
-  if (passkeyError) {
-    return NextResponse.json({ error: "Impossible de révoquer les clés biométriques. Aucun compte n'a été réinitialisé." }, { status: 500 });
-  }
+  const succeeded: string[] = [];
+  const failures: { driverId: string; step: string; error: string }[] = [];
 
-  // Les mots de passe sont remplacés par des secrets aléatoires inconnus du chauffeur.
-  // L'historique et les identifiants users.id ne changent pas.
   for (const id of ids) {
     const { error: passwordError } = await admin.auth.admin.updateUserById(id, {
       password: randomBytes(48).toString("base64url"),
     });
     if (passwordError) {
-      return NextResponse.json({
-        error: "La révocation des passkeys est faite, mais certains mots de passe n'ont pas pu être réinitialisés. Relancez l'opération après vérification.",
-        resetCount: 0,
-      }, { status: 500 });
+      failures.push({ driverId: id, step: "password", error: passwordError.message });
+      continue;
     }
+
+    const { error: profileError } = await admin
+      .from("users")
+      .update({ auth_method: "pin", pin_set_at: null, driver_recovery_code_hash: null })
+      .eq("id", id)
+      .eq("organization_id", appUser.organization_id)
+      .eq("role", "chauffeur");
+
+    if (profileError) {
+      failures.push({ driverId: id, step: "profile", error: profileError.message });
+      continue;
+    }
+
+    const { error: passkeyError } = await admin.from("webauthn_credentials").delete().eq("user_id", id);
+    if (passkeyError) {
+      failures.push({ driverId: id, step: "passkeys", error: passkeyError.message });
+      continue;
+    }
+
+    const { error: attemptsError } = await admin.from("pin_login_attempts").delete().eq("user_id", id);
+    if (attemptsError) {
+      failures.push({ driverId: id, step: "pin_attempts", error: attemptsError.message });
+      continue;
+    }
+
+    succeeded.push(id);
   }
 
-  const { error: profileError } = await admin
-    .from("users")
-    .update({
-      auth_method: "pin",
-      pin_set_at: null,
-      driver_recovery_code_hash: null,
-    })
-    .eq("organization_id", appUser.organization_id)
-    .eq("role", "chauffeur");
-
-  if (profileError) {
-    return NextResponse.json({ error: "Les secrets ont été révoqués, mais le profil n'a pas pu être réinitialisé. Contactez le support." }, { status: 500 });
+  if (failures.length > 0) {
+    return NextResponse.json({
+      ok: false,
+      message: "Réinitialisation partielle. Consultez les étapes en échec avant de relancer l'opération.",
+      resetCount: succeeded.length,
+      failedCount: failures.length,
+      failures,
+    }, { status: 207 });
   }
 
-  await admin.from("pin_login_attempts").delete().in("user_id", ids);
-
-  return NextResponse.json({ ok: true, resetCount: ids.length });
+  return NextResponse.json({ ok: true, resetCount: succeeded.length, failedCount: 0, failures: [] });
 }
