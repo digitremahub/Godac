@@ -16,8 +16,14 @@ export async function tryPasskeyLogin(identify: { user_id?: string; email?: stri
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(identify),
   });
-  const optionsJson = await optionsRes.json();
-  if (!optionsRes.ok || !optionsJson.available) {
+  const optionsJson = await optionsRes.json().catch(() => null);
+  if (!optionsRes.ok) {
+    const message = typeof optionsJson?.error === "string"
+      ? optionsJson.error
+      : `Le serveur de connexion a répondu avec une erreur (${optionsRes.status}). Réessayez ou utilisez votre badge + PIN.`;
+    throw new Error(message);
+  }
+  if (!optionsJson || !optionsJson.available) {
     return { attempted: false };
   }
 
@@ -28,8 +34,16 @@ export async function tryPasskeyLogin(identify: { user_id?: string; email?: stri
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response: assertion }),
   });
-  const verifyJson = await verifyRes.json();
-  if (!verifyRes.ok) throw new Error(typeof verifyJson.error === "string" ? verifyJson.error : "Connexion impossible");
+  const verifyJson = await verifyRes.json().catch(() => null);
+  if (!verifyRes.ok) {
+    const message = typeof verifyJson?.error === "string"
+      ? verifyJson.error
+      : `La vérification Face ID a échoué (réponse serveur ${verifyRes.status}). Utilisez votre badge + PIN.`;
+    throw new Error(message);
+  }
+  if (!verifyJson?.email || !verifyJson?.token) {
+    throw new Error("Réponse de connexion incomplète. Utilisez votre badge + PIN ou réessayez.");
+  }
 
   const supabase = createBrowserSupabaseClient();
   const { error } = await supabase.auth.verifyOtp({ email: verifyJson.email, token: verifyJson.token, type: "magiclink" });
