@@ -163,6 +163,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </button>
       )}
       {mode === "sign-in" && (
+        <p className="text-xs text-navy/60">
+          Chauffeur sans adresse e-mail ? Scannez le QR code de votre badge pour ouvrir la connexion chauffeur par PIN ou biométrie.
+        </p>
+      )}
+      {mode === "sign-in" && (
         <div className="flex items-center justify-between">
           <button
             type="button"
