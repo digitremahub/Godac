@@ -88,7 +88,23 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
   ]);
   const vehicule = jour.vehicleId;
   const service = jour.serviceId ?? ((liens ?? []) as { service_id: string }[])[0]?.service_id ?? null;
-  const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("driver_id", appUser.id).eq("run_date", date);
+  // Une seule fiche quotidienne active par chauffeur : un nouvel appel (ou
+  // une répétition après une erreur réseau) reprend la fiche existante au lieu
+  // d'en créer une seconde. Les anciennes tournées clôturées restent intactes.
+  const { data: existante, error: erreurExistante } = await supabase
+    .from("delivery_runs")
+    .select(RUN_FIELDS)
+    .eq("organization_id", appUser.organization_id)
+    .eq("driver_id", appUser.id)
+    .eq("run_date", date)
+    .neq("status", "done")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (erreurExistante) throw new Error(erreurExistante.message);
+  if (existante) return existante;
+
+  const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("driver_id", appUser.id).eq("run_date", date);
   const { data, error } = await supabase
     .from("delivery_runs")
     .insert({
