@@ -52,6 +52,9 @@ export async function POST(req: Request) {
     if (passages.length) {
       // La première affectation fournit l'heure et le service par défaut.
       const premiere = passages[0];
+      if (!premiere) {
+        throw new Error("Aucune affectation de tournée exploitable pour cette date.");
+      }
       const plannedStart = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date(premiere.start_at));
