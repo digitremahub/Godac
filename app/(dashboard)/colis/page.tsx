@@ -34,9 +34,9 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
 
   const [{ data: services }, { data: drivers }, { data: vehicles }] = encadrement
     ? await Promise.all([
-        supabase.from("services").select("id, name").order("name"),
-        supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
-        supabase.from("vehicles").select("id, registration, service_id").order("registration"),
+        supabase.from("services").select("id, name").eq("organization_id", appUser.organization_id).order("name"),
+        supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+        supabase.from("vehicles").select("id, registration, service_id").eq("organization_id", appUser.organization_id).order("registration"),
       ])
     : [{ data: null }, { data: null }, { data: null }];
 
