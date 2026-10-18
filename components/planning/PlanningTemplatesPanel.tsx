@@ -94,6 +94,28 @@ export function PlanningTemplatesPanel({
     return () => { cancelled = true; };
   }, [serviceId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOptions() {
+      if (!serviceId) { setRoutes([]); setDrivers([]); setVehicles([]); return; }
+      try {
+        const response = await fetch(`/api/planning/templates/options?service_id=${encodeURIComponent(serviceId)}`);
+        const json = await response.json();
+        if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Impossible de charger les options.");
+        if (cancelled) return;
+        const nextRoutes = Array.isArray(json.routes) ? json.routes as RouteOption[] : [];
+        setRoutes(nextRoutes);
+        setDrivers(Array.isArray(json.drivers) ? json.drivers as DriverOption[] : []);
+        setVehicles(Array.isArray(json.vehicles) ? json.vehicles as VehicleOption[] : []);
+        setRouteId((current) => nextRoutes.some((route) => route.id === current) ? current : (nextRoutes[0]?.id ?? ""));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Impossible de charger les options.");
+      }
+    }
+    void loadOptions();
+    return () => { cancelled = true; };
+  }, [serviceId]);
+
   const weekLabel = useMemo(() => {
     const end = new Date(`${weekStart}T00:00:00Z`);
     end.setUTCDate(end.getUTCDate() + 6);
