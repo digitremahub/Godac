@@ -145,6 +145,7 @@ export interface ArretHistorique {
   lat: number | string | null;
   lng: number | string | null;
   position: number;
+  done_at: string | null;
   list_id?: string | null;
 }
 
@@ -349,14 +350,14 @@ export interface ArretDetail {
 /** Détail en lecture seule d'une tournée de l'historique (null si inaccessible). */
 export async function detailTournee(supabase: SupabaseClient, userId: string, toutes: boolean, id: string) {
   if (!UUID.test(id)) return null;
-  let q = supabase.from("delivery_runs").select("id, name, run_date, status, driver_id, started_at, start_label").eq("id", id);
+  let q = supabase.from("delivery_runs").select("id, name, run_date, status, driver_id, started_at, start_label, start_lat, start_lng").eq("id", id);
   if (!toutes) q = q.eq("driver_id", userId);
   const { data: run } = await q.maybeSingle();
   if (!run) return null;
   const [{ data: stops }, { data: listes }, { data: chauffeur }] = await Promise.all([
     supabase
       .from("delivery_stops")
-      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason")
+      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng")
       .eq("run_id", id)
       .order("position")
       .order("created_at"),
@@ -365,6 +366,17 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
   ]);
   const ls = (listes ?? []) as Liste[];
   const nom = new Map(ls.map((l) => [l.id, l.name]));
-  const arrets = ordonnerParListe((stops ?? []) as ArretDetail[], ls).map((s) => ({ ...s, liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE }));
-  return { run: run as { id: string; name: string | null; run_date: string; status: string; started_at: string | null; start_label: string | null }, chauffeur: chauffeur?.full_name ?? "—", arrets, listes: ls.length };
+  const arretsOrdonnes = ordonnerParListe((stops ?? []) as ArretDetail[], ls).map((s) => ({ ...s, liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE }));
+  // L’historique reflète l’ordre réel de passage : heure de clôture de l’arrêt,
+  // puis position prévue en secours. Les arrêts non clôturés restent à la fin.
+  const arrets = arretsOrdonnes.sort((a, b) => {
+    const aFait = a.status !== "pending";
+    const bFait = b.status !== "pending";
+    if (aFait !== bFait) return aFait ? -1 : 1;
+    if (aFait && bFait && a.done_at && b.done_at && a.done_at !== b.done_at) return a.done_at.localeCompare(b.done_at);
+    if (aFait && !a.done_at && b.done_at) return 1;
+    if (aFait && a.done_at && !b.done_at) return -1;
+    return a.position - b.position;
+  });
+  return { run: run as { id: string; name: string | null; run_date: string; status: string; started_at: string | null; start_label: string | null; start_lat: number | null; start_lng: number | null }, chauffeur: chauffeur?.full_name ?? "—", arrets, listes: ls.length };
 }
