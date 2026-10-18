@@ -222,9 +222,53 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
-  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
-  function terminer(s: Stop) {
-    if (estRamasse(s)) return statut(s, "delivered");
+  /** Valide les quantités physiques avant de clôturer une ramasse ou un point relais. */
+  async function terminer(s: Stop) {
+    if (estRamasse(s)) {
+      const valeur = prompt(`Nombre de colis récupérés — ${s.recipient ?? s.address}`, String(s.packages_picked_up ?? s.parcel_count ?? 1));
+      if (valeur === null) return;
+      const quantite = Number(valeur);
+      if (!Number.isInteger(quantite) || quantite < 0 || quantite > 500) {
+        setToast({ ok: false, text: "Saisissez un nombre entier de colis entre 0 et 500." });
+        return;
+      }
+      try {
+        const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${s.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ run_id: run?.id, packages_picked_up: quantite, status: "delivered" }),
+        });
+        setStops((all) => all.map((x) => x.id === s.id ? maj : x));
+        setToast({ ok: true, text: `${quantite} colis récupéré(s) enregistré(s).` });
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+        await charger(run?.id);
+      }
+      return;
+    }
+    if (estPointRelais(s)) {
+      const depose = prompt(`Nombre de colis déposés au point relais — ${s.address}`, String(s.parcel_count ?? 0));
+      if (depose === null) return;
+      const recuperes = prompt(`Nombre de colis récupérés au point relais — ${s.address}`, String(s.packages_picked_up ?? 0));
+      if (recuperes === null) return;
+      const deposeN = Number(depose);
+      const recuperesN = Number(recuperes);
+      if (![deposeN, recuperesN].every((n) => Number.isInteger(n) && n >= 0 && n <= 500)) {
+        setToast({ ok: false, text: "Saisissez des nombres entiers entre 0 et 500." });
+        return;
+      }
+      try {
+        const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${s.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ run_id: run?.id, parcel_count: Math.max(1, deposeN), packages_picked_up: recuperesN }),
+        });
+        setStops((all) => all.map((x) => x.id === s.id ? maj : x));
+        setLivraison(maj);
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+        await charger(run?.id);
+      }
+      return;
+    }
     setLivraison(s);
   }
 
