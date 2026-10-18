@@ -27,6 +27,8 @@ const patchSchema = z.object({
   telephone: z.string().trim().max(40).nullable().optional(),
   parcel_count: z.number().int().min(1).max(500).optional(),
   packages_picked_up: z.number().int().min(0).max(500).nullable().optional(),
+  /** Nombre effectivement déposé au point relais (0 à 500). */
+  packages_delivered: z.number().int().min(0).max(500).nullable().optional(),
   /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
   deplacer: z.enum(["haut", "bas"]).optional(),
   /** Range l'arrêt dans une autre liste de la même tournée (en fin de liste). */
@@ -52,7 +54,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, organization_id").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
@@ -103,6 +105,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (destinataire !== undefined) update.recipient = destinataire || null;
   if (parcel_count !== undefined) update.parcel_count = parcel_count;
   if (packages_picked_up !== undefined) update.packages_picked_up = packages_picked_up;
+  if (packages_delivered !== undefined) update.packages_delivered = packages_delivered;
   if (telephone !== undefined) {
     const tel = normaliserTelephone(telephone, await codePays(appUser.organization_id));
     if (telephone && !tel) return NextResponse.json({ error: "Numéro de téléphone non reconnu." }, { status: 400 });
@@ -157,6 +160,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       details: `Statut modifié : ${previousStatus} → ${status}`,
     });
   }
+  if (packages_delivered !== undefined) events.push({
+    organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+    event_type: "delivery_count_recorded", new_value: { packages_delivered },
+    details: `Nombre réel de colis déposés enregistré : ${packages_delivered ?? "inconnu"}`,
+  });
   if (packages_picked_up !== undefined) events.push({
     organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
     event_type: "pickup_count_recorded", new_value: { packages_picked_up },
