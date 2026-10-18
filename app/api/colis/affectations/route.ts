@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     supabase.from("services").select("id,name,depot_address,depot_lat,depot_lng").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle(),
     supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", user.organization_id).eq("tour_number", tour_number),
   ]);
-  const route = (routes ?? []).find((r: any) => !r.service_id || r.service_id === service_id);
+  const route = (routes ?? []).find((r: any) => r.service_id === service_id);
   if (!driver || !vehicle || !service || !route || vehicle.service_id !== service_id) {
     return NextResponse.json({ error: "Choisissez une tournée existante et un chauffeur, service et véhicule valides pour cette organisation." }, { status: 400 });
   }
