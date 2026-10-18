@@ -24,6 +24,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
   let runCreee: Awaited<ReturnType<typeof creerTournee>> | null = null;
+  const avertissements: string[] = [];
   try {
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
     runCreee = run;
@@ -52,23 +53,36 @@ export async function POST(req: Request) {
     if (passages.length) {
       // La première affectation fournit l'heure et le service par défaut.
       const premiere = passages[0];
-      if (!premiere) {
-        throw new Error("Aucune affectation de tournée exploitable pour cette date.");
-      }
       const plannedStart = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date(premiere.start_at));
       const { error: runUpdateError } = await supabase.from("delivery_runs")
         .update({ planned_start: plannedStart, ...(premiere.service_id ? { service_id: premiere.service_id } : {}) })
-        .eq("id", run.id);
+        .eq("id", run.id)
+        .eq("organization_id", appUser.organization_id);
       if (runUpdateError) throw runUpdateError;
 
-      const pays = await codePays(appUser.organization_id);
+      const listesResult = await supabase.from("delivery_lists")
+        .select("id, name, position")
+        .eq("run_id", run.id)
+        .order("position");
+      if (listesResult.error) throw listesResult.error;
       const listesParVillage = new Map<string, { id: string; position: number }>();
-      const arretsAjoutes = new Set<string>();
-      let positionListe = 0;
-      let positionArret = 0;
+      for (const liste of listesResult.data ?? []) {
+        listesParVillage.set(cleAdresse(liste.name), { id: liste.id, position: liste.position });
+      }
+      let positionListe = Math.max(-1, ...(listesResult.data ?? []).map((l) => l.position)) + 1;
 
+      const arretsResult = await supabase.from("delivery_stops")
+        .select("address, kind, list_id")
+        .eq("run_id", run.id);
+      if (arretsResult.error) throw arretsResult.error;
+      const arretsExistants = new Set(
+        (arretsResult.data ?? []).map((s) => `${s.kind}:${cleAdresse(s.address ?? "")}`)
+      );
+      let positionArret = (arretsResult.data ?? []).length;
+
+      const pays = await codePays(appUser.organization_id);
       for (const passage of passages) {
         let routeQuery = supabase.from("tour_routes")
           .select("id, tour_number, service_id")
@@ -79,7 +93,7 @@ export async function POST(req: Request) {
         if (erreurRoute) throw erreurRoute;
         const route = (routes ?? [])[0];
         if (!route) {
-          console.warn("[colis/tournees] Modèle de tournée introuvable", { tourNumber: passage.tour_number, serviceId: passage.service_id });
+          avertissements.push(`Modèle introuvable pour la tournée ${passage.tour_number}.`);
           continue;
         }
 
@@ -98,15 +112,16 @@ export async function POST(req: Request) {
               organization_id: appUser.organization_id,
               run_id: run.id,
               name: village.name.slice(0, 60),
-              position: positionListe++,
+              position: positionListe,
             }).select("id").single();
             if (erreurListe) throw new Error(`Impossible de créer la liste du village « ${village.name} » : ${erreurListe.message}`);
-            liste = { id: creee.id, position: positionListe - 1 };
+            liste = { id: creee.id, position: positionListe++ };
             listesParVillage.set(villageKey, liste);
           }
 
           // planned_stops distingue les ramasses et points relais. pickup_addresses
-          // est conservé comme compatibilité pour les anciennes fiches de tournée.
+          // reste supporté pour les anciens modèles. La déduplication s'appuie sur
+          // le type et l'adresse normalisée, y compris après un échec partiel.
           const planned = Array.isArray(village.planned_stops) ? village.planned_stops : [];
           const plannedStops = planned
             .filter((s: any) => s && typeof s.address === "string")
@@ -117,20 +132,17 @@ export async function POST(req: Request) {
           const pickups = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
             .filter((a: unknown): a is string => typeof a === "string")
             .map((address: string) => ({ address: address.trim(), kind: "ramasse" }));
-          const allStops = [...plannedStops, ...pickups];
-
-          for (const stop of allStops) {
+          for (const stop of [...plannedStops, ...pickups]) {
             const address = stop.address;
             if (address.length < 5) continue;
             const stopKey = `${stop.kind}:${cleAdresse(address)}`;
-            if (arretsAjoutes.has(stopKey)) continue;
-            arretsAjoutes.add(stopKey);
+            if (arretsExistants.has(stopKey)) continue;
             const geo = await geocodeAddress(address, pays).catch(() => null);
             const { error: erreurArret } = await supabase.from("delivery_stops").insert({
               organization_id: appUser.organization_id,
               run_id: run.id,
               list_id: liste.id,
-              position: positionArret++,
+              position: positionArret,
               kind: stop.kind,
               address,
               parcel_count: 1,
@@ -139,12 +151,14 @@ export async function POST(req: Request) {
               lng: geo?.lng ?? null,
             });
             if (erreurArret) throw new Error(`Impossible d’ajouter l’arrêt « ${address} » : ${erreurArret.message}`);
+            arretsExistants.add(stopKey);
+            positionArret++;
           }
         }
       }
     }
 
-    return NextResponse.json({ run });
+    return NextResponse.json({ run, ...(avertissements.length ? { warning: avertissements.join(" ") } : {}) });
   } catch (e) {
     // La tournée est créée avant l'ajout facultatif des ramasses. Une erreur
     // sur le planning, les migrations ou une ramasse ne doit pas faire croire
@@ -158,7 +172,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         run: runCreee,
-        warning: "Tournée créée, mais certaines ramasses n’ont pas pu être ajoutées. Vérifiez les migrations Supabase et le planning.",
+        warning: "La fiche est conservée, mais son chargement est incomplet. Réessayez : les arrêts déjà ajoutés ne seront pas dupliqués. " + (e instanceof Error ? e.message : "Erreur inconnue"),
       });
     }
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création impossible" }, { status: 500 });
