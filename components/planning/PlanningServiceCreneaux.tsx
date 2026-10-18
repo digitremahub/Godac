@@ -26,7 +26,7 @@ export function PlanningServiceCreneaux({ services, selectedService = "" }: { se
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/colis/creneaux-service")
+    fetch("/api/colis/creneaux-service?mode=admin")
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error ?? "Impossible de charger les créneaux.");
