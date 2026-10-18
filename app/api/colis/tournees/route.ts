@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const dateDuJour = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
     const { data: ficheExistante, error: erreurFiche } = await supabase
       .from("delivery_runs")
-      .select("id, organization_id, driver_id, run_date, name, status, planned_start, started_at, completed_at, created_at, updated_at, vehicle_id, service_id, start_label, start_lat, start_lng, optimized_at")
+      .select("id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start, service_id")
       .eq("organization_id", appUser.organization_id)
       .eq("driver_id", appUser.id)
       .eq("run_date", dateDuJour)
