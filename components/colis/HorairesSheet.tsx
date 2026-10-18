@@ -189,26 +189,6 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
   const [notes, setNotes] = useState(stop.horaire?.notes ?? "");
   const [semaine, setSemaine] = useState<Semaine>(() => normaliserSemaine(stop.horaire?.weekly_schedule));
   const [busy, setBusy] = useState(false);
-  const [creneauxService, setCreneauxService] = useState<{ label: string; start: string; end: string }[]>([
-    { label: "8 h – 11 h", start: "08:00", end: "11:00" },
-    { label: "10 h – 13 h", start: "10:00", end: "13:00" },
-    { label: "12 h – 15 h", start: "12:00", end: "15:00" },
-    { label: "14 h – 17 h", start: "14:00", end: "17:00" },
-  ]);
-  useEffect(() => {
-    let actif = true;
-    fetch("/api/colis/creneaux-service").then(async (r) => {
-      const data = await r.json();
-      if (!r.ok) return;
-      let windows = Array.isArray(data.windows) ? data.windows : [];
-      if (!windows.length && Array.isArray(data.services)) windows = data.services.flatMap((s: any) => Array.isArray(s.windows) ? s.windows : []);
-      const uniques = new Map<string, { label: string; start: string; end: string }>();
-      for (const w of windows) if (w && typeof w.label === "string" && typeof w.start === "string" && typeof w.end === "string") uniques.set(w.start + "-" + w.end, w);
-      if (actif && uniques.size) setCreneauxService([...uniques.values()]);
-    }).catch(() => undefined);
-    return () => { actif = false; };
-  }, []);
-
   const [erreur, setErreur] = useState<string | null>(null);
   const jourTournee = jourIso(jour);
 
@@ -275,9 +255,14 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
           <p className="text-xs text-navy/60">Ex. « avant 10 h » demandé par le client. Prioritaire sur les horaires d&apos;ouverture.</p>
           <p className="text-xs font-medium text-navy/70">Créneaux DPD</p>
           <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-            {creneauxService.map(({ label, start, end }) => (
-              <button key={start + "-" + end} type="button" className={debut === start && fin === end ? "btn-primary !px-2 !py-2 text-xs" : "btn-ghost !px-2 !py-2 text-xs"} onClick={() => (setDebut(start), setFin(end))}>
-                {label}
+            {[
+              ["8 h – 11 h", "08:00", "11:00"],
+              ["10 h – 13 h", "10:00", "13:00"],
+              ["12 h – 15 h", "12:00", "15:00"],
+              ["14 h – 17 h", "14:00", "17:00"],
+            ].map(([l, d, f]) => (
+              <button key={l} type="button" className={debut === d && fin === f ? "btn-primary !px-2 !py-2 text-xs" : "btn-ghost !px-2 !py-2 text-xs"} onClick={() => (setDebut(d!), setFin(f!))}>
+                {l}
               </button>
             ))}
           </div>
