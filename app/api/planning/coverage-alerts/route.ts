@@ -70,7 +70,7 @@ export async function GET(req: Request) {
     if (!route?.tour_number) continue;
     for (let cursor = new Date(start + "T12:00:00Z"); cursor < new Date(end + "T12:00:00Z"); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
       const date = cursor.toISOString().slice(0, 10);
-      const weekday = (cursor.getUTCDay() + 6) % 7;
+      const weekday = cursor.getUTCDay();
       if (!(template.weekdays ?? []).includes(weekday)) continue;
       if (routeKeys.has(template.service_id + ":" + route.tour_number + ":" + date)) continue;
       alerts.push({ type: "missing_tour", severity: "warning", date, service: serviceName.get(template.service_id) ?? "Service", tour_number: route.tour_number, message: "Tournée habituelle non planifiée.", entry_id: "" });
