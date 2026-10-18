@@ -131,7 +131,7 @@ export function ResumeOptimisationCarte({ resume, stops, onFermer }: { resume: R
         </button>
       </div>
       <p className="text-xs text-navy/65">
-        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)}
+        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)} · 3 min moyennes par livraison
         {resume.avecHoraires > 0 && ` · ${resume.avecHoraires} adresse${resume.avecHoraires > 1 ? "s" : ""} avec horaires`}
         {resume.sansGps > 0 && ` · ${resume.sansGps} adresse(s) à vérifier en fin de liste`}
       </p>
