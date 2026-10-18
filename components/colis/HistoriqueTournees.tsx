@@ -125,6 +125,10 @@ export function HistoriqueTournees({
 function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnType<typeof detailTournee>>>; fermer: string }) {
   const { run, arrets, chauffeur, listes } = detail;
   const plusieursListes = listes > 1;
+  const pointsCarte = arrets.filter((s) => s.lat !== null && s.lng !== null);
+  const urlTrajet = pointsCarte.length
+    ? `https://www.google.com/maps/dir/?api=1${run.start_lat !== null && run.start_lng !== null ? `&origin=${encodeURIComponent(`${run.start_lat},${run.start_lng}`)}` : ""}&destination=${encodeURIComponent(`${pointsCarte[pointsCarte.length - 1]!.lat},${pointsCarte[pointsCarte.length - 1]!.lng}`)}${pointsCarte.length > 1 ? `&waypoints=${encodeURIComponent(pointsCarte.slice(0, -1).map((s) => `${s.lat},${s.lng}`).join("|"))}` : ""}&travelmode=driving`
+    : null;
   return (
     <Card className="flex flex-col gap-3 border-2 border-teal/40">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -136,9 +140,12 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
             {run.start_label && ` · départ : ${run.start_label}`}
           </p>
         </div>
-        <Link href={fermer} className="btn-secondary !py-1.5 text-sm" scroll={false}>
-          Fermer
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {urlTrajet && <a href={urlTrajet} target="_blank" rel="noreferrer" className="btn-primary !py-1.5 text-sm">Voir le trajet sur la carte ↗</a>}
+          <Link href={fermer} className="btn-secondary !py-1.5 text-sm" scroll={false}>
+            Fermer
+          </Link>
+        </div>
       </div>
       {arrets.length === 0 ? (
         <p className="text-sm text-navy/60">Aucun arrêt dans cette tournée.</p>
