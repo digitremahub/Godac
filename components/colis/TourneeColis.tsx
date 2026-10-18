@@ -341,10 +341,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         !d.code && "numéro de colis",
         d.adresse.trim().length < 5 && "adresse",
       ].filter(Boolean);
-      if (manquants.length === 0) { await ajouter(d); return true; }
+      // Une lecture OCR peut confondre des lignes d'étiquette : toujours faire valider le brouillon.
       setDraft(d);
       setScanner(false);
-      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " : complétez uniquement " + manquants.join(", ") + "." });
+      setToast({
+        ok: manquants.length === 0,
+        text: manquants.length === 0
+          ? "Étiquette lue : vérifiez les informations avant d'ajouter le colis."
+          : "Lecture partielle : complétez " + manquants.join(", ") + " avant l'ajout.",
+      });
       return false;
     } catch (e) {
       setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
@@ -372,21 +377,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
       const d: Draft = { adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) };
-      const complet = Boolean(d.code && d.adresse.trim().length >= 5);
-      if (complet) {
-        void ajouter(d);
-        setScanStatus("Colis complet détecté · " + d.code);
-        return true;
-      }
-      if (lectureEtiquette && image) {
-        scanQueue.current.push({ image, code: d.code, telephone: d.telephone || null });
-        setScanStatus("Colis " + (d.code ?? "détecté") + " · recherche des informations manquantes…");
-        void traiterFileScans();
-        return true;
-      }
+      // Toujours demander confirmation : les champs d'un QR ne sont pas normalisés.
       setScanner(false);
       setDraft(d);
-      setToast({ ok: false, text: "Colis " + (d.code ?? "") + " : complétez les informations manquantes." });
+      setToast({
+        ok: Boolean(d.code && d.adresse.trim().length >= 5),
+        text: d.code && d.adresse.trim().length >= 5
+          ? "QR lu : vérifiez l'adresse et le numéro avant d'ajouter le colis."
+          : "QR lu partiellement : vérifiez et complétez les informations avant l'ajout.",
+      });
       return false;
     }
     if (lectureEtiquette && image) {
@@ -1048,28 +1047,45 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse, window_start: undefined, window_end: undefined })} autoFocus={!lectureEtiquette} />
           {draft.type === "livraison" && (
             <div className="rounded-xl border border-teal/25 bg-teal/5 p-3" aria-live="polite">
-              {chargementSuggestionHoraires ? (
-                <p className="text-xs text-navy/60">Recherche des horaires habituels connus…</p>
-              ) : suggestionHoraires && suggestionHoraires.adresse.toLocaleLowerCase("fr-FR") === draft.adresse.trim().toLocaleLowerCase("fr-FR") ? (() => {
-                const jour = new Date(`${run?.run_date ?? today}T12:00:00Z`).getUTCDay() || 7;
-                const creneaux = suggestionHoraires.weekly_schedule[String(jour)] ?? [];
-                return (
-                  <>
-                    <p className="text-sm font-semibold">Créneau de livraison suggéré{suggestionHoraires.label ? ` · ${suggestionHoraires.label}` : ""}</p>
-                    {creneaux.length ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {creneaux.map((c) => {
-                          const selectionne = draft.window_start === c.open && draft.window_end === c.close;
-                          return <button key={`${c.open}-${c.close}`} type="button" className={selectionne ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"} onClick={() => setDraft({ ...draft, window_start: c.open, window_end: c.close })}>{c.open}–{c.close}{selectionne ? " ✓" : ""}</button>;
-                        })}
-                      </div>
-                    ) : <p className="mt-1 text-xs text-navy/65">Aucun créneau habituel enregistré pour ce jour. Vous pouvez ajouter l’adresse sans contrainte horaire.</p>}
-                    <p className="mt-2 text-xs text-navy/55">Basé sur l’annuaire des horaires GODAC. Le créneau choisi sera enregistré avec l’arrêt.</p>
-                  </>
-                );
-              })() : (
-                <p className="text-xs text-navy/60">Aucun horaire habituel enregistré pour cette adresse. Ajoutez l’adresse, puis enregistrez ses horaires si nécessaire.</p>
+              <p className="text-sm font-semibold">Créneau de livraison pour aujourd'hui</p>
+              <p className="mt-1 text-xs text-navy/65">
+                {chargementSuggestionHoraires
+                  ? "Recherche des horaires habituels connus…"
+                  : suggestionHoraires && suggestionHoraires.adresse.toLocaleLowerCase("fr-FR") === draft.adresse.trim().toLocaleLowerCase("fr-FR")
+                    ? "Horaires habituels" + (suggestionHoraires.label ? " · " + suggestionHoraires.label : "") + " — choisissez un créneau pour cette livraison."
+                    : "Aucun horaire habituel connu : vous pouvez tout de même définir le créneau souhaité pour aujourd'hui."}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  ["8 h – 11 h", "08:00", "11:00"],
+                  ["10 h – 13 h", "10:00", "13:00"],
+                  ["12 h – 15 h", "12:00", "15:00"],
+                  ["14 h – 17 h", "14:00", "17:00"],
+                ].map(([label, open, close]) => {
+                  const selected = draft.window_start === open && draft.window_end === close;
+                  return (
+                    <button key={label} type="button" className={selected ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"}
+                      onClick={() => setDraft({ ...draft, window_start: open, window_end: close })}>
+                      {label}{selected ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label className="flex items-center gap-1.5">De
+                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_start ?? ""} onChange={(e) => setDraft({ ...draft, window_start: e.target.value || undefined })} aria-label="Début du créneau du jour" />
+                </label>
+                <label className="flex items-center gap-1.5">À
+                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_end ?? ""} onChange={(e) => setDraft({ ...draft, window_end: e.target.value || undefined })} aria-label="Fin du créneau du jour" />
+                </label>
+                {(draft.window_start || draft.window_end) && (
+                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => setDraft({ ...draft, window_start: undefined, window_end: undefined })}>Retirer le créneau</button>
+                )}
+              </div>
+              {draft.window_start && draft.window_end && draft.window_start >= draft.window_end && (
+                <p role="alert" className="mt-1 text-xs font-semibold text-orange-ink">L'heure de fin doit être après l'heure de début.</p>
               )}
+              <p className="mt-2 text-xs text-navy/55">Ce créneau est enregistré uniquement pour cette livraison. Les horaires habituels restent inchangés.</p>
             </div>
           )}
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
