@@ -32,18 +32,14 @@ export async function GET(req: Request) {
       .select("id, driver_id, service_id, start_date, end_date, status")
       .eq("organization_id", user.organization_id)
       .eq("status", "approved")
-      .lte("start_date", end)
+      .lt("start_date", end)
       .gte("end_date", start),
   ]);
   if (entriesError || leavesError) {
     return NextResponse.json({ error: "Impossible de vérifier les affectations et congés." }, { status: 500 });
   }
 
-  const serviceIds = Array.from(new Set((entries ?? []).map((e) => e.service_id)));
-  const [{ data: services }, { data: routes }] = await Promise.all([
-    supabase.from("services").select("id, name").in("id", serviceIds.length ? serviceIds : ["00000000-0000-0000-0000-000000000000"]),
-    supabase.from("tour_routes").select("tour_number, service_id, default_driver_id").eq("organization_id", user.organization_id),
-  ]);
+  const { data: services } = await supabase.from("services").select("id, name").eq("organization_id", user.organization_id);
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const alerts: Array<{ type: string; severity: string; date: string; service: string; tour_number: string; message: string; entry_id: string }> = [];
 
