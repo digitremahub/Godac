@@ -150,6 +150,52 @@ export function PlanningTemplatesPanel({
     }
   }
 
+  async function createTemplate() {
+    if (!serviceId || !routeId || newName.trim().length < 2 || weekdays.length === 0) {
+      setError("Renseignez le nom, la tournée et au moins un jour.");
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/planning/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: serviceId,
+          route_id: routeId,
+          name: newName.trim(),
+          departure_time: departureTime,
+          weekdays,
+          default_driver_id: defaultDriverId || null,
+          default_vehicle_id: defaultVehicleId || null,
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        const detail = typeof json.error === "string"
+          ? json.error
+          : "Impossible de créer le modèle.";
+        throw new Error(detail);
+      }
+
+      const template = json.template as Template;
+      setTemplates((current) => [...current, template]);
+      setSelectedIds((current) => [...new Set([...current, template.id])]);
+      setNewName("");
+      setMessage("Modèle créé avec succès.");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la création du modèle.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <section className="mb-5 rounded-xl border border-navy/10 bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
