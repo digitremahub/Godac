@@ -65,9 +65,13 @@ export async function POST(req: Request) {
     const passages = (planning ?? []).filter((entry: any) =>
       jourParis(entry.start_at) === date && Boolean(entry.tour_number)
     );
-    if (passages.length) {
-      // La première affectation fournit l'heure et le service par défaut.
-      const premiere = passages[0];
+    if (passages.length > 0) {
+  // La première affectation fournit l'heure et le service par défaut.
+  const premiere = passages[0];
+
+  if (!premiere) {
+    throw new Error("Impossible de récupérer la première tournée planifiée.");
+  }
       const plannedStart = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date(premiere.start_at));
