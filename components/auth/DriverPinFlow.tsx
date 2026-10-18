@@ -171,12 +171,12 @@ export function DriverPinFlow({
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
         <h1 className="text-2xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1>
-        <p className="mt-1 text-sm text-navy/65">Entrez votre code PIN pour vous connecter.</p>
+        <p className="mt-1 text-sm text-navy/65">Votre badge QR identifie votre compte. Sur un appareil déjà associé, utilisez Face ID ou l’empreinte ; sinon, connectez-vous avec votre code PIN.</p>
       </div>
       {hasPasskey && (
         <>
           <button type="button" className="btn-primary" disabled={busy} onClick={unlockWithPasskey}>
-            {busy ? "Vérification…" : "Face ID / empreinte"}
+            {busy ? "Vérification…" : "Face ID / empreinte sur cet appareil"}
           </button>
           <div className="flex items-center gap-2 text-xs text-navy/60">
             <div className="h-px flex-1 bg-navy/10" />
