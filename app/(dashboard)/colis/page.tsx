@@ -7,15 +7,13 @@ import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
+import { AffecterTourneeColis } from "@/components/colis/AffecterTourneeColis";
 import { detailTournee, historiqueTournees, lireFiltres } from "@/lib/colis/historique";
 import { parisDay } from "@/lib/utils/paris-time";
 
 /**
- * Tournée colis : onglet « Tournée du jour » (scan des colis, ordre
- * optimisé, livraison arrêt par arrêt) et onglet « Historique » (tournées
- * passées filtrées par date, service, chauffeur, camion — filtres dans
- * l'URL). Historique : l'encadrement voit toutes les tournées de
- * l'entreprise, un chauffeur les siennes.
+ * Tournée colis : préparation/affectation pour l'encadrement, fiche quotidienne
+ * et scan pour le chauffeur, plus historique des tournées.
  */
 export default async function ColisPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -73,11 +71,31 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
     );
   }
 
+  let affectation: { services: { id: string; name: string }[]; drivers: { id: string; full_name: string }[]; vehicles: { id: string; registration: string; service_id: string | null }[] } | null = null;
+  if (encadrement) {
+    const [{ data: services }, { data: drivers }, { data: vehicles }] = await Promise.all([
+      supabase.from("services").select("id,name").eq("organization_id", appUser.organization_id).order("name"),
+      supabase.from("users").select("id,full_name").eq("organization_id", appUser.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+      supabase.from("vehicles").select("id,registration,service_id").eq("organization_id", appUser.organization_id).order("registration"),
+    ]);
+    affectation = { services: services ?? [], drivers: drivers ?? [], vehicles: vehicles ?? [] };
+  }
+
   return (
     <div>
-      <PageHeader title="Tournée colis" description="Scannez vos colis, GODAC place les adresses dans le meilleur ordre de passage." />
+      <PageHeader title="Tournée colis" description={encadrement ? "Préparez les tournées, affectez-les aux chauffeurs et suivez les colis." : "Retrouvez votre tournée quotidienne, scannez les colis et suivez votre parcours."} />
       <TourneesTabs canTrack={encadrement} />
       {onglets}
+      {encadrement && affectation && (
+        <section className="mb-5 rounded-2xl border border-navy/10 bg-surface p-4">
+          <h2 className="text-base font-semibold text-navy">Préparer et affecter une tournée</h2>
+          <p className="mt-1 text-sm text-navy/65">Créez d'abord le modèle avec son numéro, ses villages, ramasses et points relais, puis affectez-le ci-dessous.</p>
+          <Link href="/tours/routes" className="btn-secondary mt-3 inline-flex">Créer / modifier les tournées et villages</Link>
+          <div className="mt-4">
+            <AffecterTourneeColis services={affectation.services} drivers={affectation.drivers} vehicles={affectation.vehicles} />
+          </div>
+        </section>
+      )}
       <TourneeColis lectureEtiquette pays={pays.code} encadrement={encadrement} />
     </div>
   );

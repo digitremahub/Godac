@@ -89,31 +89,42 @@ export async function POST(req: Request) {
   let pickupWarning: string | null = null;
   try {
     const { data: villages, error: villagesError } = await supabase.from("tour_route_villages")
-      .select("name,pickup_addresses,position").eq("route_id", route.id).order("position");
+      .select("name,pickup_addresses,planned_stops,position").eq("route_id", route.id).order("position");
     if (villagesError) throw villagesError;
     const pays = await codePays(user.organization_id);
     const seen = new Set<string>();
     let listPosition = 0;
     let stopPosition = 0;
     for (const village of villages ?? []) {
-      const addresses = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
-        .filter((a): a is string => typeof a === "string")
-        .map((a) => a.trim()).filter((a) => {
-          const key = cleAdresse(a);
-          if (a.length < 5 || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      if (!addresses.length) continue;
+      const planned = Array.isArray(village.planned_stops) ? village.planned_stops : [];
+      const stops: { address: string; kind: "ramasse" | "point_relais" }[] = planned
+        .filter((s: any) => s && typeof s.address === "string")
+        .map((s: any) => ({
+          address: s.address.trim(),
+          kind: s.type === "point_relais" ? "point_relais" as const : "ramasse" as const,
+        }));
+      // Compatibilité avec les anciens modèles qui stockaient uniquement
+      // les adresses de ramasse dans pickup_addresses.
+      for (const address of (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])) {
+        if (typeof address === "string") stops.push({ address: address.trim(), kind: "ramasse" });
+      }
+      const uniqueStops = stops.filter((stop) => {
+        if (stop.address.length < 5) return false;
+        const key = `${stop.kind}:${cleAdresse(stop.address)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (!uniqueStops.length) continue;
       const { data: list, error: listError } = await supabase.from("delivery_lists").insert({
         organization_id: user.organization_id, run_id: run.id, name: village.name.slice(0, 60), position: listPosition++,
       }).select("id").single();
       if (listError) throw listError;
-      for (const address of addresses) {
-        const geo = await geocodeAddress(address, pays).catch(() => null);
+      for (const stop of uniqueStops) {
+        const geo = await geocodeAddress(stop.address, pays).catch(() => null);
         const { error: stopError } = await supabase.from("delivery_stops").insert({
           organization_id: user.organization_id, run_id: run.id, list_id: list.id, position: stopPosition++,
-          kind: "ramasse", address, parcel_count: 1, status: "pending", lat: geo?.lat ?? null, lng: geo?.lng ?? null,
+          kind: stop.kind, address: stop.address, parcel_count: 1, status: "pending", lat: geo?.lat ?? null, lng: geo?.lng ?? null,
         });
         if (stopError) throw stopError;
       }
