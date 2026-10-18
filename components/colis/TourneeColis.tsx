@@ -246,7 +246,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   async function nouvelleTournee() {
-    // La création de tournée reste accessible directement depuis Tournée colis, y compris pour l’encadrement.
+    if (encadrement) { router.push("/planning"); return; }
     setBusy("nouvelle");
     try {
       const { run: cree, reused } = await api<{ run: Run; reused?: boolean }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
