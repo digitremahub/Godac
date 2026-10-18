@@ -415,6 +415,7 @@ function RouteCard({
   }
 
   async function save() {
+    if (!serviceId) { setError("Affectez d'abord cette tournée à un service."); return; }
     setBusy(true);
     setError(null);
     try {
@@ -548,7 +549,7 @@ function RouteCard({
           <label className="block">
             <span className="label">Service</span>
             <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-              <option value="">Tous services</option>
+              <option value="">Choisir un service…</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -750,13 +751,15 @@ export function TourRoutesBoard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
   const [onglet, setOnglet] = useState<"fiches" | "carte">("fiches");
 
   async function create(number: string, service: string | null) {
     setBusy(true);
     setError(null);
     try {
-      await send("/api/tour-routes", "POST", { tour_number: number.trim(), service_id: service || null });
+      if (!service) throw new Error("Choisissez un service pour cette tournée.");
+      await send("/api/tour-routes", "POST", { tour_number: number.trim(), service_id: service });
       setTourNumber("");
       router.refresh();
     } catch (e) {
@@ -767,14 +770,11 @@ export function TourRoutesBoard({
   }
 
   const q = query.trim().toLowerCase();
-  const visible = q
-    ? routes.filter(
-        (r) =>
-          r.tourNumber.toLowerCase().includes(q) ||
-          r.villages.some((v) => v.name.toLowerCase().includes(q) || (v.postal_code ?? "").includes(q)) ||
-          r.renfortVillageIds.some((id) => villageRefs[id]?.name.toLowerCase().includes(q)),
-      )
-    : routes;
+  const visible = routes.filter((r) => (!serviceFilter || (serviceFilter === "__unassigned" ? !r.serviceId : r.serviceId === serviceFilter)) && (!q ||
+    r.tourNumber.toLowerCase().includes(q) ||
+    r.villages.some((v) => v.name.toLowerCase().includes(q) || (v.postal_code ?? "").includes(q)) ||
+    r.renfortVillageIds.some((id) => villageRefs[id]?.name.toLowerCase().includes(q))
+  ));
   // Tournées fixes d'abord, renforts ensuite.
   const ordered = [...visible.filter((r) => !r.isRenfort), ...visible.filter((r) => r.isRenfort)];
   async function handleVillageDrop(sourceRouteId: string, village: Village, targetRouteId: string, duplicate: boolean) {
@@ -817,7 +817,7 @@ export function TourRoutesBoard({
             <label className="block sm:w-56">
               <span className="label">Service</span>
               <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-                <option value="">Tous services</option>
+                <option value="">Choisir un service…</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -825,7 +825,7 @@ export function TourRoutesBoard({
                 ))}
               </select>
             </label>
-            <button type="button" className="btn-primary shrink-0" disabled={busy || !tourNumber.trim()} onClick={() => create(tourNumber, serviceId)}>
+            <button type="button" className="btn-primary shrink-0" disabled={busy || !tourNumber.trim() || !serviceId} onClick={() => create(tourNumber, serviceId)}>
               Créer
             </button>
           </div>
@@ -833,7 +833,7 @@ export function TourRoutesBoard({
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-navy/60">Tournées du planning sans fiche :</span>
               {missingTourNumbers.map((n) => (
-                <button key={n} type="button" className="btn-secondary !px-2.5 !py-1 text-xs" disabled={busy} onClick={() => create(n, serviceId)}>
+                <button key={n} type="button" className="btn-secondary !px-2.5 !py-1 text-xs" disabled={busy || !serviceId} onClick={() => create(n, serviceId)}>
                   + {n}
                 </button>
               ))}
@@ -844,8 +844,18 @@ export function TourRoutesBoard({
         </Card>
       )}
 
-      {routes.length > 0 && (canSeeMap || avecRenfort) && (
+      {routes.length > 0 && (canSeeMap || avecRenfort || canEdit) && (
         <div className="flex flex-wrap items-end gap-2">
+          {canEdit && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-navy/60">Service</span>
+              <select className="input !w-auto !py-1.5" value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} aria-label="Filtrer les tournées par service">
+                <option value="">Tous les services</option>
+                <option value="__unassigned">À affecter</option>
+                {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+          )}
           {canSeeMap && (
             <div role="tablist" aria-label="Affichage" className="flex flex-wrap gap-2">
               {(
