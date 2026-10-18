@@ -51,7 +51,10 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Adresse manquante ou trop courte." }, { status: 400 });
+  if (!parsed.success) {
+    const champs = parsed.error.issues.map((issue) => `${issue.path.join(".") || "requête"} : ${issue.message}`).join(" · ");
+    return NextResponse.json({ error: `Impossible d’ajouter cet arrêt. Vérifiez les champs requis. ${champs}` }, { status: 400 });
+  }
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
   let listId = parsed.data.list_id ?? null;
