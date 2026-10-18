@@ -9,6 +9,7 @@ import { TRUSTED_FUEL_STATUSES } from "@/lib/fuel/totals";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/paris-time";
 import type { AppUser } from "@/lib/auth/session";
+import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
 
 /**
  * Direction sees the whole organization: fleet + headcount KPIs,
@@ -92,6 +93,14 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   ]);
 
   const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const { data: pinDrivers } = await supabase
+    .from("users")
+    .select("id, full_name, phone")
+    .eq("organization_id", appUser.organization_id)
+    .eq("auth_method", "pin")
+    .eq("active", true)
+    .eq("pending_approval", false)
+    .order("full_name");
 
   const consumptionRanking = (
     await Promise.all(
@@ -152,6 +161,8 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
           <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         </Link>
       </div>
+
+      <DriverRecoveryCodePanel drivers={(pinDrivers ?? []) as { id: string; full_name: string; phone: string | null }[]} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {pendingTiles.map((t) => (
