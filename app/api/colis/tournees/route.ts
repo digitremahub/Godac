@@ -28,9 +28,6 @@ export async function POST(req: Request) {
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
     runCreee = run;
     const pays = await codePays(appUser.organization_id);
-    let position = 0;
-    const adressesAjoutees = new Set<string>();
-
     // Au clic du chauffeur, charger toutes les tournées qui lui sont planifiées
     // pour cette date dans UNE seule fiche Tournée colis.
     const date = run.run_date;
