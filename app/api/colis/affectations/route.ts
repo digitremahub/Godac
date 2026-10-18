@@ -32,8 +32,7 @@ export async function GET() {
   ]);
   const error = servicesError ?? driversError ?? vehiclesError ?? routesError;
   if (error) return NextResponse.json({ error: "Impossible de charger les services, chauffeurs, véhicules ou tournées existantes." }, { status: 500 });
-  const tours = Array.from(new Map((routes ?? []).map((r: any) => [r.tour_number, r])).values())
-    .map((r: any) => ({ id: r.id, tour_number: r.tour_number, service_id: r.service_id }));
+  const tours = (routes ?? []).map((r: any) => ({ id: r.id, tour_number: r.tour_number, service_id: r.service_id }));
   return NextResponse.json({ services: services ?? [], drivers: drivers ?? [], vehicles: vehicles ?? [], tours, today: aujourdhuiParis() });
 }
 
@@ -47,13 +46,14 @@ export async function POST(req: Request) {
   const { service_id, driver_id, vehicle_id, tour_number, date, time } = parsed.data;
   const start_at = parisWallTimeToUtcISOString(date, time);
 
-  const [{ data: driver }, { data: vehicle }, { data: service }, { data: route }] = await Promise.all([
+  const [{ data: driver }, { data: vehicle }, { data: service }, { data: routes }] = await Promise.all([
     supabase.from("users").select("id,organization_id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).maybeSingle(),
     supabase.from("vehicles").select("id,service_id,organization_id").eq("id", vehicle_id).eq("organization_id", user.organization_id).maybeSingle(),
     supabase.from("services").select("id,organization_id").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle(),
-    supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", user.organization_id).eq("tour_number", tour_number).maybeSingle(),
+    supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", user.organization_id).eq("tour_number", tour_number),
   ]);
-  if (!driver || !vehicle || !service || !route || vehicle.service_id !== service_id || (route.service_id && route.service_id !== service_id)) {
+  const route = (routes ?? []).find((r: any) => !r.service_id || r.service_id === service_id);
+  if (!driver || !vehicle || !service || !route || vehicle.service_id !== service_id) {
     return NextResponse.json({ error: "Choisissez une tournée existante et un chauffeur, service et véhicule valides pour cette organisation." }, { status: 400 });
   }
 
