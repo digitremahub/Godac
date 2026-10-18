@@ -145,7 +145,6 @@ export interface ArretHistorique {
   lat: number | string | null;
   lng: number | string | null;
   position: number;
-  done_at: string | null;
   list_id?: string | null;
 }
 
@@ -345,6 +344,8 @@ export interface ArretDetail {
   proof_code?: string | null;
   weight_kg?: number | string | null;
   failure_reason?: string | null;
+  lat: number | string | null;
+  lng: number | string | null;
 }
 
 /** Détail en lecture seule d'une tournée de l'historique (null si inaccessible). */
