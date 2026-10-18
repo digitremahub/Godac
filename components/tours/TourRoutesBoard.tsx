@@ -817,7 +817,7 @@ export function TourRoutesBoard({
             <label className="block sm:w-56">
               <span className="label">Service</span>
               <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-                <option value="">Tous services</option>
+                <option value="">Choisir un service…</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
