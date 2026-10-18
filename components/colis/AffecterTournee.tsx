@@ -30,7 +30,7 @@ export function AffecterTournee() {
       const r = await fetch("/api/colis/affectations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service_id: service, driver_id: driver, vehicle_id: vehicle, tour_number: number, date, time }) });
       const d = await r.json();
       if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Affectation impossible");
-      setMessage(d.pickupWarning || d.warning || "Tournée existante affectée : elle apparaît dans le Planning et chez le chauffeur dans Tournée colis.");
+      setMessage(d.pickupWarning || d.warning || "Tournée affectée : elle apparaît chez le chauffeur dans Tournée colis. Le Planning reste inchangé.");
       setNumber(""); router.refresh();
     } catch (e) { setMessage(e instanceof Error ? e.message : "Affectation impossible"); }
     finally { setBusy(false); }
