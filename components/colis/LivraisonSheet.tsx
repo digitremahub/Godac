@@ -21,7 +21,7 @@ const ParcelScanner = dynamic(() => import("@/components/colis/ParcelScanner").t
 export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose: () => void; onLivre: (s: Stop) => void }) {
   const [lieu, setLieu] = useState<LieuLivraison>("main_propre");
   const [precision, setPrecision] = useState("");
-  const [photo, setPhoto] = useState<{ base64: string; apercu: string } | null>(null);
+  const [photos, setPhotos] = useState<{ base64: string; apercu: string }[]>([]);
   const [codeQr, setCodeQr] = useState("");
   const [messageLaisse, setMessageLaisse] = useState(false);
   const [reserveOuverte, setReserveOuverte] = useState(false);
@@ -34,13 +34,16 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
   const avecQr = qrObligatoire(lieu);
   const codeLu = normaliserCodeQr(codeQr);
 
-  useEffect(() => () => void (photo && URL.revokeObjectURL(photo.apercu)), [photo]);
+  useEffect(() => () => photos.forEach((photo) => URL.revokeObjectURL(photo.apercu)), [photos]);
 
-  async function prendre(file: File) {
+  async function prendre(files: FileList | File[]) {
+    const selection = Array.from(files).slice(0, 3 - photos.length);
+    if (!selection.length) return;
     setBusy("photo");
     setErreur(null);
     try {
-      setPhoto({ base64: await imageEnBase64(file), apercu: URL.createObjectURL(file) });
+      const nouvelles = await Promise.all(selection.map(async (file) => ({ base64: await imageEnBase64(file), apercu: URL.createObjectURL(file) })));
+      setPhotos((actuelles) => [...actuelles, ...nouvelles].slice(0, 3));
     } catch {
       setErreur("Photo illisible, reprenez-la.");
     } finally {
@@ -80,14 +83,14 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
   }
 
   async function valider() {
-    if (obligatoire && !photo) return setErreur("Prenez la photo du colis déposé.");
+    if (obligatoire && !photos.length) return setErreur("Prenez au moins une photo du colis déposé.");
     if (avecQr && !codeLu) return setErreur("Scannez le QR code du destinataire (ou saisissez son code de retrait).");
     setBusy("envoi");
     setErreur(null);
     try {
       const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${stop.id}/livraison`, {
         method: "POST",
-        body: JSON.stringify({ lieu, precision: precision.trim() || null, image: photo?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
+        body: JSON.stringify({ lieu, precision: precision.trim() || null, images: photos.map((photo) => photo.base64), image: photos[0]?.base64 ?? null, code_qr: avecQr ? codeLu : null, message_laisse: messageLaisse, reserve: reserve.trim() || null }),
       });
       navigator.vibrate?.(40);
       onLivre(maj);
@@ -212,25 +215,26 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
           </div>
         )}
 
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && prendre(e.target.files[0])} />
-        {photo ? (
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.apercu} alt="Photo du colis livré" className="h-20 w-20 rounded-xl object-cover" />
-            <button type="button" className="btn-secondary !py-2 text-sm" onClick={() => fileRef.current?.click()}>
-              <IconCamera className="h-4 w-4" /> Reprendre
-            </button>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(e) => e.target.files?.length && prendre(e.target.files)} />
+        <div className="flex flex-col gap-2 rounded-xl border border-navy/10 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Photos de preuve</p>
+            <span className="text-xs text-navy/60">{photos.length}/3</span>
           </div>
-        ) : (
-          <button
-            type="button"
-            className={`justify-center !py-3 ${obligatoire ? "btn-primary" : "btn-secondary"}`}
-            disabled={busy !== null}
-            onClick={() => fileRef.current?.click()}
-          >
-            <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Préparation…" : obligatoire ? "Prendre la photo (obligatoire)" : "Prendre une photo (facultatif)"}
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((photo, index) => (
+              <div key={photo.apercu} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.apercu} alt={"Preuve de livraison " + (index + 1)} className="h-24 w-full rounded-lg object-cover" />
+                <button type="button" className="absolute right-1 top-1 rounded-full bg-navy/80 px-2 py-1 text-xs text-white" aria-label={"Supprimer la photo " + (index + 1)} onClick={() => setPhotos((actuelles) => actuelles.filter((_, i) => i !== index))}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className={"justify-center !py-3 " + (obligatoire && !photos.length ? "btn-primary" : "btn-secondary")} disabled={busy !== null || photos.length >= 3} onClick={() => fileRef.current?.click()}>
+            <IconCamera className="h-5 w-5" /> {busy === "photo" ? "Préparation…" : photos.length >= 3 ? "3 photos ajoutées" : photos.length ? "Ajouter une photo" : obligatoire ? "Prendre une photo (obligatoire)" : "Ajouter une photo (facultatif)"}
           </button>
-        )}
+          <p className="text-xs text-navy/55">Jusqu’à 3 photos. {obligatoire ? "Au moins une photo est obligatoire pour ce lieu de dépôt." : "Les photos sont facultatives."}</p>
+        </div>
 
         {erreur && (
           <p role="alert" className="rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">
@@ -238,7 +242,7 @@ export function LivraisonSheet({ stop, onClose, onLivre }: { stop: Stop; onClose
           </p>
         )}
 
-        <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={busy !== null || (obligatoire && !photo) || (avecQr && !codeLu)} onClick={valider}>
+        <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={busy !== null || (obligatoire && !photos.length) || (avecQr && !codeLu)} onClick={valider}>
           <IconCheck className="h-5 w-5" /> {busy === "envoi" ? "Envoi…" : "Valider la livraison"}
         </button>
       </div>
