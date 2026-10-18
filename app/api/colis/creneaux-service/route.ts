@@ -33,7 +33,7 @@ function dayBounds(date: string) {
 
 /** Créneaux par service. Gestionnaires : configuration de tous les services.
  * Chauffeurs : union des créneaux des services qui leur sont affectés aujourd'hui. */
-export async function GET() {
+export async function GET(req: Request) {
   const user = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const { data: services, error } = await supabase
@@ -47,7 +47,7 @@ export async function GET() {
     name: s.name,
     windows: Array.isArray(s.delivery_time_windows) ? s.delivery_time_windows : DEFAUT,
   }));
-  if (ROLES_GESTION.includes(user.role)) return NextResponse.json({ services: normalized });
+  if (ROLES_GESTION.includes(user.role) && new URL(req.url).searchParams.get("mode") === "admin") return NextResponse.json({ services: normalized });
 
   const bounds = dayBounds(todayParis());
   const { data: entries, error: planningError } = await supabase
