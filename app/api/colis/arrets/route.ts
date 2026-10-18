@@ -37,8 +37,8 @@ const bodySchema = z.object({
   /** Une ramasse exceptionnelle ne devient pas une habitude quotidienne. */
   exceptionnelle: z.boolean().optional(),
   /** Créneau suggéré/confirmé avant l’ajout de l’adresse. */
-  window_start: z.string().regex(/^(?:[01]\\d|2[0-3]):[0-5]\\d$/).nullable().optional(),
-  window_end: z.string().regex(/^(?:[01]\\d|2[0-3]):[0-5]\\d$/).nullable().optional(),
+  window_start: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  window_end: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
 });
 
 /**
