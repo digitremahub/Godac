@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
   const { data: templates, error: templateError } = await supabase
     .from("planning_tour_templates")
-    .select("id, service_id, route_id, departure_time, weekdays, default_vehicle_id, tour_routes(tour_number)")
+    .select("id, service_id, route_id, departure_time, weekdays, default_vehicle_id, tour_routes(tour_number, default_driver_id)")
     .eq("organization_id", appUser.organization_id)
     .eq("service_id", service_id)
     .eq("active", true);
@@ -57,6 +57,12 @@ export async function POST(req: Request) {
     .lt("start_at", `${addDays(week_start, 7)}T00:00:00Z`);
   if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
 
+  const { data: approvedLeaves, error: leavesError } = await supabase
+    .from("leave_requests").select("driver_id, start_date, end_date")
+    .eq("organization_id", appUser.organization_id).eq("status", "approved")
+    .lte("start_date", addDays(week_start, 6)).gte("end_date", week_start);
+  if (leavesError) return NextResponse.json({ error: "Impossible de vérifier les congés approuvés." }, { status: 500 });
+
   const occupied = new Set((existing ?? []).map((e) => `${e.service_id}|${e.tour_number}|${e.start_at}`));
   const rows: any[] = [];
   let skipped = 0;
@@ -76,11 +82,14 @@ export async function POST(req: Request) {
         continue;
       }
       occupied.add(key);
+      const driverOnLeave = route.default_driver_id && (approvedLeaves ?? []).some((leave) =>
+        leave.driver_id === route.default_driver_id && leave.start_date <= day && leave.end_date >= day
+      );
       rows.push({
         organization_id: appUser.organization_id,
         service_id,
         tour_number: route.tour_number,
-        driver_id: null,
+        driver_id: driverOnLeave ? null : (route.default_driver_id ?? null),
         vehicle_id: template.default_vehicle_id ?? null,
         start_at,
         status: "planned",

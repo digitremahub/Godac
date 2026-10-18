@@ -249,14 +249,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     if (encadrement) { router.push("/planning"); return; }
     setBusy("nouvelle");
     try {
-      const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
+      const { run: cree, reused } = await api<{ run: Run; reused?: boolean }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
       try {
         localStorage.setItem("godac-tournee-colis", cree.id);
       } catch {
         /* stockage indisponible */
       }
       await recharger(cree.id);
-      setToast({ ok: true, text: `${cree.name ?? "Tournée"} créée : scannez vos colis.` });
+      setToast({ ok: true, text: reused ? `${cree.name ?? "Fiche du jour"} réouverte : vos tournées du jour restent regroupées ici.` : `${cree.name ?? "Tournée"} créée : scannez vos colis.` });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {

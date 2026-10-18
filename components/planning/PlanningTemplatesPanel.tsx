@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ServiceOption = { id: string; name: string };
+type RouteOption = { id: string; tour_number: string; default_driver_id: string | null };
+type DriverOption = { id: string; full_name: string };
+type VehicleOption = { id: string; registration: string };
 type Template = {
   id: string;
   service_id: string;
@@ -47,6 +50,16 @@ export function PlanningTemplatesPanel({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<RouteOption[]>([]);
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
+  const [newName, setNewName] = useState("");
+  const [routeId, setRouteId] = useState("");
+  const [departureTime, setDepartureTime] = useState("07:00");
+  const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [defaultDriverId, setDefaultDriverId] = useState("");
+  const [defaultVehicleId, setDefaultVehicleId] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     setServiceId(selectedService || services[0]?.id || "");
@@ -78,6 +91,28 @@ export function PlanningTemplatesPanel({
       }
     }
     void load();
+    return () => { cancelled = true; };
+  }, [serviceId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOptions() {
+      if (!serviceId) { setRoutes([]); setDrivers([]); setVehicles([]); return; }
+      try {
+        const response = await fetch(`/api/planning/templates/options?service_id=${encodeURIComponent(serviceId)}`);
+        const json = await response.json();
+        if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Impossible de charger les options.");
+        if (cancelled) return;
+        const nextRoutes = Array.isArray(json.routes) ? json.routes as RouteOption[] : [];
+        setRoutes(nextRoutes);
+        setDrivers(Array.isArray(json.drivers) ? json.drivers as DriverOption[] : []);
+        setVehicles(Array.isArray(json.vehicles) ? json.vehicles as VehicleOption[] : []);
+        setRouteId((current) => nextRoutes.some((route) => route.id === current) ? current : (nextRoutes[0]?.id ?? ""));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Impossible de charger les options.");
+      }
+    }
+    void loadOptions();
     return () => { cancelled = true; };
   }, [serviceId]);
 
@@ -160,6 +195,46 @@ export function PlanningTemplatesPanel({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-teal/20 p-4">
+        <h3 className="font-semibold">Créer un modèle directement dans Planning</h3>
+        <p className="mt-1 text-sm text-navy/65">Choisissez une tournée, ses jours habituels, son chauffeur et son véhicule par défaut. La génération de la semaine reste indépendante.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="text-sm font-medium">Nom du modèle
+            <input className="input mt-1 w-full" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex. Tournée centre-ville" maxLength={80} />
+          </label>
+          <label className="text-sm font-medium">Tournée
+            <select className="input mt-1 w-full" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+              {routes.map((r) => <option key={r.id} value={r.id}>Tournée {r.tour_number}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Heure de départ
+            <input className="input mt-1 w-full" type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} />
+          </label>
+          <label className="text-sm font-medium">Chauffeur habituel
+            <select className="input mt-1 w-full" value={defaultDriverId} onChange={(e) => setDefaultDriverId(e.target.value)}>
+              <option value="">Aucun chauffeur par défaut</option>
+              {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Véhicule par défaut
+            <select className="input mt-1 w-full" value={defaultVehicleId} onChange={(e) => setDefaultVehicleId(e.target.value)}>
+              <option value="">Aucun véhicule par défaut</option>
+              {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registration}</option>)}
+            </select>
+          </label>
+          <div className="text-sm font-medium">Jours habituels
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DAYS.map((day) => <label key={day.value} className="flex items-center gap-1 rounded-md bg-navy/[0.04] px-2 py-1 text-xs">
+                <input type="checkbox" checked={weekdays.includes(day.value)} onChange={() => setWeekdays((current) => current.includes(day.value) ? current.filter((d) => d !== day.value) : [...current, day.value])} />{day.label}
+              </label>)}
+            </div>
+          </div>
+        </div>
+        <button type="button" className="btn-primary mt-3" onClick={createTemplate} disabled={creating || !serviceId || !routeId || newName.trim().length < 2 || weekdays.length === 0}>
+          {creating ? "Création…" : "Créer le modèle"}
+        </button>
       </div>
 
       {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
