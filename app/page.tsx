@@ -128,13 +128,13 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-28 lg:pt-16">
             <div className="flex flex-col gap-7">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
-                Carburant cher&nbsp;? Contrôlez-le.
+                Une plateforme de gestion, pensée pour évoluer.
               </p>
               <h1 className="text-[34px] leading-[1.1] tracking-tight sm:text-5xl lg:text-[52px]">
-                Votre carburant, <span className="text-teal">enfin sous contrôle</span>.
+                Vos opérations, <span className="text-teal">mieux organisées</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                GODAC centralise la gestion de flotte, du carburant, du planning et des tournées colis. Pour prolonger cette gestion sur le terrain, l’application GO facilite le suivi des tournées, des ramasses, des points relais et des livraisons. GO est accessible au grand public, avec des tarifs préférentiels pour les entreprises clientes de GODAC.
+                GODAC réunit les outils essentiels pour organiser vos ressources, planifier les opérations, suivre leur exécution et piloter votre activité. La première spécialisation est le transport, avec la flotte, le carburant et les tournées. Le socle est conçu pour accueillir progressivement d’autres métiers et leurs besoins spécifiques.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
@@ -184,7 +184,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       {/* ── What GODAC replaces ── */}
       <section className="border-b border-navy/[0.08] bg-surface">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-8 text-center sm:px-6 lg:flex-row lg:justify-between lg:text-left">
-          <p className="font-display text-lg font-bold">Le transport mérite mieux qu&apos;Excel.</p>
+          <p className="font-display text-lg font-bold">La gestion quotidienne mérite mieux que des outils dispersés.</p>
           <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             {REPLACES.map((r) => (
               <li key={r} className="flex items-center gap-2 text-sm text-navy/65">
@@ -231,7 +231,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <p className="kicker !text-teal-ink">Démo en accès libre</p>
             <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Essayez GODAC tout de suite, sans compte.</h2>
             <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-              Explorez la gestion GODAC côté direction et son complément mobile pour les opérations terrain : planning, flotte, carburant, tournées colis, ramasses, points relais et suivi des livraisons dans une entreprise fictive.
+              Découvrez les fonctionnalités actuellement disponibles à travers une entreprise de transport fictive. D’autres configurations métier seront développées progressivement.
             </p>
             {searchParams.demo === "indisponible" && (
               <p role="alert" className="mt-4 text-sm font-semibold text-orange-ink">
@@ -242,7 +242,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
             {[
               { href: "/demo?as=direction", title: "Côté direction", text: "Tableau de bord, flotte, carburant, planning, alertes et salaires.", icon: IconChartBar },
-              { href: "/demo?as=chauffeur", title: "Application mobile terrain", text: "Un complément à la gestion GODAC pour consulter la tournée, gérer les adresses, scanner les colis et suivre les livraisons.", icon: IconTruck },
+              { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Tournée du jour, pleins, présences et papiers du camion, sur mobile.", icon: IconTruck },
             ].map((d) => (
               <a key={d.href} href={d.href} className="card-hover group flex flex-col gap-4">
                 <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
@@ -268,7 +268,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           <p className="kicker !text-teal-ink">Comment ça marche</p>
           <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
           <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-            De la pompe à la comptabilité, tout ce qu&apos;une PME de transport gère au quotidien, réuni dans un seul outil.
+            Des ressources au suivi opérationnel, retrouvez les fonctionnalités disponibles dans un environnement de gestion unifié.
           </p>
         </div>
         <ImageCarousel slides={HOME_SLIDES} />
@@ -324,8 +324,8 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-marine px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
           <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-teal/20 blur-3xl" />
           <div className="relative">
-            <h2 className="text-[28px] leading-tight sm:text-4xl">Reprenez la main sur le carburant.</h2>
-            <p className="mt-3 text-white/70">Puis ajoutez flotte, planning, tournées et paie dans le même outil.</p>
+            <h2 className="text-[28px] leading-tight sm:text-4xl">Centralisez votre gestion. Optimisez vos opérations.</h2>
+            <p className="mt-3 text-white/70">Commencez avec les fonctionnalités disponibles, puis faites évoluer votre environnement selon vos besoins.</p>
           </div>
           <Link href={primaryCta.href} className="btn-primary relative shrink-0 !px-7 !py-3.5 text-base">
             {primaryCta.label}

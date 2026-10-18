@@ -40,22 +40,12 @@ function rng(seed: number) {
 }
 
 const MODULES = [
+  // Public demo deliberately exposes only a small representative subset.
+  // Detailed operational workflows remain reserved for sales meetings.
   "fleet",
   "fuel_tracking",
-  "ocr",
   "planning",
-  "maintenance_requests",
-  "leave_management",
-  "intranet",
-  "messenger",
-  "time_clock",
-  "washes",
-  "alerts",
   "ticpe_export",
-  "bi_reporting",
-  "fines",
-  "employee_files",
-  "hr_status",
 ];
 
 const PEOPLE = [
@@ -115,7 +105,24 @@ export async function ensureDemo(): Promise<string> {
   const { data: existing } = await admin.from("organizations").select("id").eq("is_demo", true).maybeSingle();
   if (existing) {
     const { count } = await admin.from("users").select("id", { count: "exact", head: true }).eq("organization_id", existing.id);
-    if ((count ?? 0) >= PEOPLE.length) return existing.id;
+    if ((count ?? 0) >= PEOPLE.length) {
+      // Public demo intentionally exposes only a limited representative subset.
+      // Disable modules outside the allow-list for existing demo organizations too.
+      const { error: disableError } = await admin
+        .from("organization_modules")
+        .update({ enabled: false })
+        .eq("organization_id", existing.id)
+        .not("module_key", "in", `(${MODULES.join(",")})`);
+      if (disableError) throw new Error(`Démo — limitation des modules : ${disableError.message}`);
+      const { error: enableError } = await admin
+        .from("organization_modules")
+        .upsert(
+          MODULES.map((module_key) => ({ organization_id: existing.id, module_key, enabled: true })),
+          { onConflict: "organization_id,module_key" },
+        );
+      if (enableError) throw new Error(`Démo — activation des modules autorisés : ${enableError.message}`);
+      return existing.id;
+    }
     await teardownDemo(admin); // half-built (interrupted) — start over
   }
   return seedDemo(admin);
