@@ -5,7 +5,6 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
-import { AffecterTourneeColis } from "@/components/colis/AffecterTourneeColis";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
@@ -89,7 +88,6 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
       <TourneesTabs canTrack={encadrement} />
       {onglets}
       {encadrement && <AffecterTournee />}
-      {encadrement && <AffecterTourneeColis services={(services ?? []) as { id: string; name: string }[]} drivers={(drivers ?? []) as { id: string; full_name: string }[]} vehicles={(vehicles ?? []) as { id: string; registration: string; service_id: string | null }[]} />}
       <TourneeColis lectureEtiquette pays={pays.code} />
     </div>
   );
