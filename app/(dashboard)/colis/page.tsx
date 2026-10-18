@@ -5,7 +5,6 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
-import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
 import { detailTournee, historiqueTournees, lireFiltres } from "@/lib/colis/historique";
@@ -79,8 +78,7 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Tournée colis" description="Scannez vos colis, GODAC place les adresses dans le meilleur ordre de passage." />
       <TourneesTabs canTrack={encadrement} />
       {onglets}
-      {encadrement && <AffecterTournee />}
-      <TourneeColis lectureEtiquette pays={pays.code} />
+      <TourneeColis lectureEtiquette pays={pays.code} encadrement={encadrement} />
     </div>
   );
 }

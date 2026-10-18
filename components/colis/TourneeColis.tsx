@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
+import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
@@ -35,6 +36,9 @@ interface Draft {
   type: TypeArret;
   /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
   poids: string;
+  /** Créneau confirmé avant l’ajout du colis. */
+  window_start?: string;
+  window_end?: string;
   /** Ne pas mémoriser cette ramasse dans les tournées futures. */
   exceptionnelle?: boolean;
 }
@@ -109,8 +113,9 @@ function AdresseInput({ value, onChange, autoFocus, france }: { value: string; o
   );
 }
 
-export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquette: boolean; pays?: string }) {
+export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
+  const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -135,9 +140,42 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
   const [rechercheAdresse, setRechercheAdresse] = useState("");
+  const [suggestionHoraires, setSuggestionHoraires] = useState<{ adresse: string; label: string | null; weekly_schedule: Record<string, { open: string; close: string }[]> } | null>(null);
+  const [chargementSuggestionHoraires, setChargementSuggestionHoraires] = useState(false);
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Recherche les horaires habituels connus dès que l’adresse est saisie,
+  // avant que le colis soit ajouté à la tournée.
+  useEffect(() => {
+    const adresse = draft?.adresse.trim() ?? "";
+    if (adresse.length < 5 || draft?.type !== "livraison") {
+      setSuggestionHoraires(null);
+      setChargementSuggestionHoraires(false);
+      return;
+    }
+    let actif = true;
+    const timer = setTimeout(async () => {
+      setChargementSuggestionHoraires(true);
+      try {
+        const response = await fetch(`/api/colis/horaires?adresse=${encodeURIComponent(adresse)}`);
+        const data = await response.json();
+        if (!actif) return;
+        const fiche = data?.fiche;
+        if (fiche?.weekly_schedule && typeof fiche.weekly_schedule === "object") {
+          setSuggestionHoraires({ adresse, label: fiche.label ?? null, weekly_schedule: fiche.weekly_schedule });
+        } else {
+          setSuggestionHoraires(null);
+        }
+      } catch {
+        if (actif) setSuggestionHoraires(null);
+      } finally {
+        if (actif) setChargementSuggestionHoraires(false);
+      }
+    }, 450);
+    return () => { actif = false; clearTimeout(timer); };
+  }, [draft?.adresse, draft?.type]);
 
   const chargerTournee = useCallback(async (id: string) => {
     try {
@@ -190,6 +228,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   async function nouvelleTournee() {
+    if (encadrement) { setAffectationOuverte(true); return; }
     setBusy("nouvelle");
     try {
       const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
@@ -258,6 +297,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           type: d.type,
           poids: lirePoids(d.poids),
           exceptionnelle: d.exceptionnelle === true,
+          window_start: d.window_start ?? null,
+          window_end: d.window_end ?? null,
         }),
       });
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
@@ -636,10 +677,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     </div>
   );
 
-  if (!runs) return <p className="text-sm text-navy/60">Chargement des tournées…</p>;
+  const modalAffectation = affectationOuverte ? <AffecterTournee onClose={() => setAffectationOuverte(false)} onCreated={async (runId) => { setAffectationOuverte(false); try { localStorage.setItem("godac-tournee-colis", runId); } catch { /* stockage indisponible */ } await recharger(runId); setToast({ ok: true, text: "Tournée créée : vous pouvez scanner les colis." }); }} /> : null;
+
+  if (!runs) return <>{modalAffectation}<p className="text-sm text-navy/60">Chargement des tournées…</p></>;
   if (!run) {
     return (
       <div className="flex flex-col gap-4">
+        {modalAffectation}
         {toast && (
           <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
             {toast.text}
@@ -1001,7 +1045,33 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
               <span><strong>Ramasse exceptionnelle</strong><span className="block text-xs text-navy/65">Ne pas ajouter cette adresse aux ramasses quotidiennes des prochaines tournées.</span></span>
             </label>
           )}
-          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
+          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse, window_start: undefined, window_end: undefined })} autoFocus={!lectureEtiquette} />
+          {draft.type === "livraison" && (
+            <div className="rounded-xl border border-teal/25 bg-teal/5 p-3" aria-live="polite">
+              {chargementSuggestionHoraires ? (
+                <p className="text-xs text-navy/60">Recherche des horaires habituels connus…</p>
+              ) : suggestionHoraires && suggestionHoraires.adresse.toLocaleLowerCase("fr-FR") === draft.adresse.trim().toLocaleLowerCase("fr-FR") ? (() => {
+                const jour = new Date(`${run?.run_date ?? today}T12:00:00Z`).getUTCDay() || 7;
+                const creneaux = suggestionHoraires.weekly_schedule[String(jour)] ?? [];
+                return (
+                  <>
+                    <p className="text-sm font-semibold">Créneau de livraison suggéré{suggestionHoraires.label ? ` · ${suggestionHoraires.label}` : ""}</p>
+                    {creneaux.length ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {creneaux.map((c) => {
+                          const selectionne = draft.window_start === c.open && draft.window_end === c.close;
+                          return <button key={`${c.open}-${c.close}`} type="button" className={selectionne ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"} onClick={() => setDraft({ ...draft, window_start: c.open, window_end: c.close })}>{c.open}–{c.close}{selectionne ? " ✓" : ""}</button>;
+                        })}
+                      </div>
+                    ) : <p className="mt-1 text-xs text-navy/65">Aucun créneau habituel enregistré pour ce jour. Vous pouvez ajouter l’adresse sans contrainte horaire.</p>}
+                    <p className="mt-2 text-xs text-navy/55">Basé sur l’annuaire des horaires GODAC. Le créneau choisi sera enregistré avec l’arrêt.</p>
+                  </>
+                );
+              })() : (
+                <p className="text-xs text-navy/60">Aucun horaire habituel enregistré pour cette adresse. Ajoutez l’adresse, puis enregistrez ses horaires si nécessaire.</p>
+              )}
+            </div>
+          )}
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
             className={`input ${normaliserTelephone(draft.telephone, pays) ? "" : "!border-orange ring-2 ring-orange/30"}`}
