@@ -9,6 +9,24 @@ full-stack propre (Next.js + Supabase + Stripe + Resend + Anthropic), à
 côté du site vitrine Digitrema existant à la racine du repo — les deux
 sont des projets indépendants dans le même repository.
 
+
+## Démarrage local (Windows / PowerShell)
+
+Le ZIP contient le code et le modèle de configuration, mais ne doit pas contenir les secrets de connexion personnels. Pour lancer l'application en local :
+
+1. Installer une version LTS de Node.js, puis ouvrir PowerShell dans le dossier qui contient `package.json`.
+2. Installer les dépendances avec `npm install`.
+3. Créer le fichier local à partir du modèle : `Copy-Item .env.example .env.local`.
+4. Ouvrir `.env.local` dans un éditeur et renseigner au minimum les deux variables Supabase ci-dessous avec les valeurs du **projet Supabase utilisé par cette instance de GODAC** :
+   - `NEXT_PUBLIC_SUPABASE_URL` : URL du projet Supabase.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` : clé publique `anon` historique du projet (ou clé publishable uniquement si le code de l'application a été adapté pour l'utiliser).
+5. Démarrer le serveur avec `npm run dev`, puis ouvrir [http://localhost:3000](http://localhost:3000).
+
+Les valeurs sont disponibles dans le tableau de bord Supabase, dans les paramètres/API du projet. Ne remplacez pas ces valeurs par des exemples et ne copiez jamais une clé `service_role` ou `secret` dans une variable `NEXT_PUBLIC_*`. Ne publiez pas le fichier `.env.local` : il est exclu de Git par `.gitignore`.
+
+Si le fichier `.env.local` existe déjà, vérifiez que les variables portent exactement les noms ci-dessus et qu'elles ont des valeurs non vides. La présence du fichier seule ne garantit pas que la configuration Supabase est complète. Les autres intégrations listées dans `.env.example` sont nécessaires uniquement aux fonctionnalités correspondantes ; ne partagez pas les valeurs de ces variables dans une issue ou une conversation.
+
+
 ---
 
 ## Stack
