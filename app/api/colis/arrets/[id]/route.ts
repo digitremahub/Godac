@@ -76,7 +76,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (deplacer) {
-    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).maybeSingle();
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
     // Voisin encore à livrer dans la même liste.
     let q = supabase.from("delivery_stops").select("id, position").eq("run_id", stop.run_id).eq("status", "pending");
@@ -111,7 +111,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let previousStatus: string | null = null;
   if (status) {
     // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
-    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id);
+    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id).eq("organization_id", appUser.organization_id);
     if (run_id) q = q.eq("run_id", run_id);
     const { data: actuel } = await q.maybeSingle();
     if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
@@ -137,7 +137,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
   }
-  let maj = supabase.from("delivery_stops").update(update).eq("id", id);
+  let maj = supabase.from("delivery_stops").update(update).eq("id", id).eq("organization_id", appUser.organization_id);
   // Garde contre deux clôtures simultanées (deux téléphones, double appui).
   if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
   const { data, error } = await maj.select(`${STOP_FIELDS}, run_id`).maybeSingle();
