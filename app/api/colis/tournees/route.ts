@@ -25,22 +25,6 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
   let runCreee: Awaited<ReturnType<typeof creerTournee>> | null = null;
   try {
-    // Une seule fiche active par chauffeur et par jour : un second clic
-    // rouvre la fiche existante au lieu de dupliquer les tournées planifiées.
-    const dateDuJour = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
-    const { data: ficheExistante, error: erreurFiche } = await supabase
-      .from("delivery_runs")
-      .select("id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start, service_id")
-      .eq("organization_id", appUser.organization_id)
-      .eq("driver_id", appUser.id)
-      .eq("run_date", dateDuJour)
-      .neq("status", "done")
-      .order("created_at")
-      .limit(1)
-      .maybeSingle();
-    if (erreurFiche) throw erreurFiche;
-    if (ficheExistante) return NextResponse.json({ run: ficheExistante, reused: true });
-
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
     runCreee = run;
     const pays = await codePays(appUser.organization_id);
@@ -65,13 +49,9 @@ export async function POST(req: Request) {
     const passages = (planning ?? []).filter((entry: any) =>
       jourParis(entry.start_at) === date && Boolean(entry.tour_number)
     );
-    if (passages.length > 0) {
-  // La première affectation fournit l'heure et le service par défaut.
-  const premiere = passages[0];
-
-  if (!premiere) {
-    throw new Error("Impossible de récupérer la première tournée planifiée.");
-  }
+    if (passages.length) {
+      // La première affectation fournit l'heure et le service par défaut.
+      const premiere = passages[0];
       const plannedStart = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date(premiere.start_at));

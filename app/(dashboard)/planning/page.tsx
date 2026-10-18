@@ -6,7 +6,6 @@ import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planni
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
 import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
-import { PlanningCoverageAlerts } from "@/components/planning/PlanningCoverageAlerts";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
 import { PlanningMonthView } from "@/components/planning/PlanningMonthView";
@@ -218,9 +217,6 @@ export default async function PlanningPage({
         description="Tous les services, véhicules et chauffeurs — glissez une affectation vers un autre jour pour la déplacer."
       />
       {duplicates.length > 0 && <PlanningDuplicatesBanner duplicates={duplicates} />}
-      {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && (
-        <PlanningCoverageAlerts start={weekStart} end={addDays(weekStart, 7)} />
-      )}
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
       {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
         <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
