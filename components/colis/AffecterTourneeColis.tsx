@@ -31,7 +31,7 @@ export function AffecterTourneeColis({ services, drivers, vehicles }: { services
       });
       const json = await res.json();
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Affectation impossible.");
-      setMessage({ ok: true, text: typeof json.pickupWarning === "string" ? json.pickupWarning : "Tournée affectée. Le chauffeur la retrouvera dans Tournée colis avec ses villages, ramasses et points relais." });
+      setMessage({ ok: true, text: typeof json.warning === "string" ? json.warning : "Tournée ajoutée au planning. Le chauffeur retrouvera les tournées planifiées dans sa fiche quotidienne Tournée colis." });
       router.refresh();
     } catch (err) {
       setMessage({ ok: false, text: err instanceof Error ? err.message : "Erreur inattendue." });
@@ -42,7 +42,7 @@ export function AffecterTourneeColis({ services, drivers, vehicles }: { services
 
   return <section className="mb-5 rounded-2xl border border-navy/10 bg-surface p-4">
     <h2 className="text-base font-semibold text-navy">Affecter une tournée existante</h2>
-    <p className="mt-1 text-sm text-navy/65">Le numéro doit correspondre à un modèle enregistré dans « Tournées villages ». Cette action crée la fiche quotidienne du chauffeur avec les arrêts du modèle.</p>
+    <p className="mt-1 text-sm text-navy/65">Le numéro doit correspondre à un modèle enregistré dans « Tournées villages ». Cette action inscrit la tournée au planning. Le chauffeur crée ensuite sa fiche quotidienne, qui regroupe ses tournées planifiées et leurs arrêts.</p>
     <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="text-sm font-medium">Service<select className="input mt-1 w-full" value={serviceId} onChange={e => { setServiceId(e.target.value); setVehicleId(""); }} required>
         {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
