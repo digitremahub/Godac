@@ -24,141 +24,84 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Nom invalide." }, { status: 400 });
   let runCreee: Awaited<ReturnType<typeof creerTournee>> | null = null;
-  const avertissements: string[] = [];
   try {
     const run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
     runCreee = run;
     const pays = await codePays(appUser.organization_id);
-    // Au clic du chauffeur, charger toutes les tournées qui lui sont planifiées
-    // pour cette date dans UNE seule fiche Tournée colis.
+    let position = 0;
+    const adressesAjoutees = new Set<string>();
+
+    // 1) Ramasses saisies par la Direction dans la fiche de chaque village.
+    // On récupère la tournée affectée à ce chauffeur pour la date de la tournée colis.
     const date = run.run_date;
     const veille = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString();
     const lendemain = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString();
     const { data: planning, error: erreurPlanning } = await supabase
       .from("planning_entries")
-      .select("id, tour_number, service_id, start_at, status")
+      .select("tour_number, service_id, start_at")
       .eq("organization_id", appUser.organization_id)
       .eq("driver_id", appUser.id)
-      .in("status", ["planned", "in_progress"])
       .gte("start_at", veille)
       .lt("start_at", lendemain)
       .order("start_at");
     if (erreurPlanning) throw erreurPlanning;
-
-    const jourParis = (value: string) =>
-      new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(value));
-    const passages = (planning ?? []).filter((entry: any) =>
-      jourParis(entry.start_at) === date && Boolean(entry.tour_number)
+    const passage = (planning ?? []).find((entry: any) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(entry.start_at)) === date
+      && entry.tour_number
+      && (!run.service_id || !entry.service_id || entry.service_id === run.service_id)
     );
-    if (passages.length) {
-      // La première affectation fournit l'heure et le service par défaut.
-      const premiere = passages[0];
-      const plannedStart = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-      }).format(new Date(premiere.start_at));
-      const { error: runUpdateError } = await supabase.from("delivery_runs")
-        .update({ planned_start: plannedStart, ...(premiere.service_id ? { service_id: premiere.service_id } : {}) })
-        .eq("id", run.id)
-        .eq("organization_id", appUser.organization_id);
-      if (runUpdateError) throw runUpdateError;
 
-      const listesResult = await supabase.from("delivery_lists")
-        .select("id, name, position")
-        .eq("run_id", run.id)
-        .order("position");
-      if (listesResult.error) throw listesResult.error;
-      const listesParVillage = new Map<string, { id: string; position: number }>();
-      for (const liste of listesResult.data ?? []) {
-        listesParVillage.set(cleAdresse(liste.name), { id: liste.id, position: liste.position });
-      }
-      let positionListe = Math.max(-1, ...(listesResult.data ?? []).map((l) => l.position)) + 1;
-
-      const arretsResult = await supabase.from("delivery_stops")
-        .select("address, kind, list_id")
-        .eq("run_id", run.id);
-      if (arretsResult.error) throw arretsResult.error;
-      const arretsExistants = new Set(
-        (arretsResult.data ?? []).map((s) => `${s.kind}:${cleAdresse(s.address ?? "")}`)
-      );
-      let positionArret = (arretsResult.data ?? []).length;
-
-      const pays = await codePays(appUser.organization_id);
-      for (const passage of passages) {
-        let routeQuery = supabase.from("tour_routes")
-          .select("id, tour_number, service_id")
-          .eq("organization_id", appUser.organization_id)
-          .eq("tour_number", passage.tour_number);
-        if (passage.service_id) routeQuery = routeQuery.eq("service_id", passage.service_id);
-        const { data: routes, error: erreurRoute } = await routeQuery;
-        if (erreurRoute) throw erreurRoute;
-        const route = (routes ?? [])[0];
-        if (!route) {
-          avertissements.push(`Modèle introuvable pour la tournée ${passage.tour_number}.`);
-          continue;
-        }
-
+    if (passage?.tour_number) {
+      const { data: route, error: erreurRoute } = await supabase
+        .from("tour_routes")
+        .select("id")
+        .eq("organization_id", appUser.organization_id)
+        .eq("tour_number", passage.tour_number)
+        .maybeSingle();
+      if (erreurRoute) throw erreurRoute;
+      if (route) {
         const { data: villages, error: erreurVillages } = await supabase
           .from("tour_route_villages")
-          .select("id, name, pickup_addresses, planned_stops, position")
+          .select("id, name, pickup_addresses, position")
           .eq("route_id", route.id)
           .order("position");
         if (erreurVillages) throw erreurVillages;
-
         for (const village of villages ?? []) {
-          const villageKey = cleAdresse(village.name);
-          let liste = listesParVillage.get(villageKey);
-          if (!liste) {
-            const { data: creee, error: erreurListe } = await supabase.from("delivery_lists").insert({
-              organization_id: appUser.organization_id,
-              run_id: run.id,
-              name: village.name.slice(0, 60),
-              position: positionListe,
-            }).select("id").single();
-            if (erreurListe) throw new Error(`Impossible de créer la liste du village « ${village.name} » : ${erreurListe.message}`);
-            liste = { id: creee.id, position: positionListe++ };
-            listesParVillage.set(villageKey, liste);
-          }
-
-          // planned_stops distingue les ramasses et points relais. pickup_addresses
-          // reste supporté pour les anciens modèles. La déduplication s'appuie sur
-          // le type et l'adresse normalisée, y compris après un échec partiel.
-          const planned = Array.isArray(village.planned_stops) ? village.planned_stops : [];
-          const plannedStops = planned
-            .filter((s: any) => s && typeof s.address === "string")
-            .map((s: any) => ({
-              address: s.address.trim(),
-              kind: s.type === "point_relais" ? "point_relais" : "ramasse",
-            }));
-          const pickups = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
-            .filter((a: unknown): a is string => typeof a === "string")
-            .map((address: string) => ({ address: address.trim(), kind: "ramasse" }));
-          for (const stop of [...plannedStops, ...pickups]) {
-            const address = stop.address;
-            if (address.length < 5) continue;
-            const stopKey = `${stop.kind}:${cleAdresse(address)}`;
-            if (arretsExistants.has(stopKey)) continue;
+          const adresses = Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [];
+          const adressesUniques = adresses.map((a: string) => a.trim()).filter((a: string) => a.length >= 5 && !adressesAjoutees.has(cleAdresse(a)));
+          if (!adressesUniques.length) continue;
+          const { data: liste, error: erreurListe } = await supabase
+            .from("delivery_lists")
+            .insert({ organization_id: appUser.organization_id, run_id: run.id, name: village.name.slice(0, 60), position })
+            .select("id")
+            .single();
+          if (erreurListe) throw new Error(`Tournée créée, mais la liste du village « ${village.name} » n’a pas pu être créée : ${erreurListe.message}`);
+          position += 1;
+          for (const address of adressesUniques) {
             const geo = await geocodeAddress(address, pays).catch(() => null);
-            const { error: erreurArret } = await supabase.from("delivery_stops").insert({
+            const { error } = await supabase.from("delivery_stops").insert({
               organization_id: appUser.organization_id,
               run_id: run.id,
               list_id: liste.id,
-              position: positionArret,
-              kind: stop.kind,
+              position,
+              kind: "ramasse",
               address,
               parcel_count: 1,
               status: "pending",
               lat: geo?.lat ?? null,
               lng: geo?.lng ?? null,
             });
-            if (erreurArret) throw new Error(`Impossible d’ajouter l’arrêt « ${address} » : ${erreurArret.message}`);
-            arretsExistants.add(stopKey);
-            positionArret++;
+            if (error) throw new Error(`Tournée créée, mais la ramasse « ${address} » n’a pas pu être ajoutée : ${error.message}`);
+            adressesAjoutees.add(cleAdresse(address));
+            position += 1;
           }
         }
       }
     }
 
-    return NextResponse.json({ run, ...(avertissements.length ? { warning: avertissements.join(" ") } : {}) });
+    // Aucune ramasse n’est liée au chauffeur : seules les ramasses configurées
+    // par la direction sur les villages de sa tournée sont ajoutées ici.
+    return NextResponse.json({ run });
   } catch (e) {
     // La tournée est créée avant l'ajout facultatif des ramasses. Une erreur
     // sur le planning, les migrations ou une ramasse ne doit pas faire croire
@@ -172,7 +115,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         run: runCreee,
-        warning: "La fiche est conservée, mais son chargement est incomplet. Réessayez : les arrêts déjà ajoutés ne seront pas dupliqués. " + (e instanceof Error ? e.message : "Erreur inconnue"),
+        warning: "Tournée créée, mais certaines ramasses n’ont pas pu être ajoutées. Vérifiez les migrations Supabase et le planning.",
       });
     }
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création impossible" }, { status: 500 });
