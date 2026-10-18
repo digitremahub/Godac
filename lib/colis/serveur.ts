@@ -36,19 +36,13 @@ async function depotDuChauffeur(supabase: SupabaseClient, appUser: AppUser) {
 export async function listerTournees(supabase: SupabaseClient, appUser: AppUser) {
   const today = aujourdhuiParis();
   const semaine = new Date(Date.parse(`${today}T12:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10);
-  let query = supabase
+  const { data } = await supabase
     .from("delivery_runs")
-    .select(`${RUN_FIELDS}, delivery_stops(parcel_count, status), users!delivery_runs_driver_id_fkey(full_name)`)
+    .select(`${RUN_FIELDS}, delivery_stops(parcel_count, status)`)
+    .eq("driver_id", appUser.id)
     .gte("run_date", semaine)
     .order("run_date")
     .order("created_at");
-  // L'encadrement doit pouvoir consulter les fiches créées pour les chauffeurs.
-  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
-    query = query.eq("driver_id", appUser.id) as typeof query;
-  } else {
-    query = query.eq("organization_id", appUser.organization_id) as typeof query;
-  }
-  const { data } = await query;
   return ((data ?? []) as any[])
     .filter((r) => r.run_date === today || r.status !== "done")
     .map(({ delivery_stops, ...r }) => ({
@@ -88,23 +82,7 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
   ]);
   const vehicule = jour.vehicleId;
   const service = jour.serviceId ?? ((liens ?? []) as { service_id: string }[])[0]?.service_id ?? null;
-  // Une seule fiche quotidienne active par chauffeur : un nouvel appel (ou
-  // une répétition après une erreur réseau) reprend la fiche existante au lieu
-  // d'en créer une seconde. Les anciennes tournées clôturées restent intactes.
-  const { data: existante, error: erreurExistante } = await supabase
-    .from("delivery_runs")
-    .select(RUN_FIELDS)
-    .eq("organization_id", appUser.organization_id)
-    .eq("driver_id", appUser.id)
-    .eq("run_date", date)
-    .neq("status", "done")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (erreurExistante) throw new Error(erreurExistante.message);
-  if (existante) return existante;
-
-  const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("driver_id", appUser.id).eq("run_date", date);
+  const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("driver_id", appUser.id).eq("run_date", date);
   const { data, error } = await supabase
     .from("delivery_runs")
     .insert({
@@ -126,11 +104,7 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
 
 /** Une tournée du chauffeur connecté (jamais celle d'un autre). */
 export async function tourneeParId(supabase: SupabaseClient, appUser: AppUser, id: string) {
-  let query = supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("organization_id", appUser.organization_id);
-  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
-    query = query.eq("driver_id", appUser.id) as typeof query;
-  }
-  const { data } = await query.maybeSingle();
+  const { data } = await supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("driver_id", appUser.id).maybeSingle();
   return data;
 }
 
