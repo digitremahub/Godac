@@ -100,6 +100,7 @@ const SECTIONS: NavSection[] = [
       { href: "/payroll", label: "Salaires", icon: IconCoins, allow: ["direction"], moduleKey: "planning", unlessModuleKey: "payslips" },
       { href: "/ticpe", label: "Export TICPE", icon: IconFileText, allow: ["comptable", "direction"], moduleKey: "ticpe_export" },
       { href: "/contestations", label: "Contestations clients", icon: IconFileText, allow: ["chauffeur", "manager", "manager_chauffeur", "direction"], moduleKey: "customer_disputes" },
+      { href: "/mes-amendes", label: "Mes amendes", icon: IconFileText, allow: ["chauffeur", "manager_chauffeur"], moduleKey: "fines" },
       { href: "/fines", label: "Amendes", icon: IconFileText, allow: ["direction"], moduleKey: "fines" },
       { href: "/my-fines", label: "Mes amendes", icon: IconFileText, allow: ["chauffeur", "manager_chauffeur"] },
       { href: "/support", label: "Demandes d'assistance", icon: IconLifeBuoy, allow: ["manager", "manager_chauffeur", "direction"], moduleKey: "assistant" },

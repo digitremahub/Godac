@@ -19,16 +19,38 @@ const bodySchema = z.object({
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
   const supabase = await createServerSupabaseClient();
+  if (appUser.role === "chauffeur" || appUser.role === "manager_chauffeur") {
+    if (parsed.data.status !== "contested" || parsed.data.confirm || parsed.data.notify) {
+      return NextResponse.json({ error: "Action non autorisée." }, { status: 403 });
+    }
+    const admin = createAdminSupabaseClient();
+    const { data: ownFine } = await admin.from("fines")
+      .select("id, organization_id, driver_id, status, reference, infraction_at")
+      .eq("id", id).eq("organization_id", appUser.organization_id).eq("driver_id", appUser.id).maybeSingle();
+    if (!ownFine) return NextResponse.json({ error: "Amende introuvable." }, { status: 404 });
+    if (ownFine.status !== "identified") return NextResponse.json({ error: "Cette amende ne peut plus être contestée depuis cet écran." }, { status: 409 });
+    const { error: updateError } = await admin.from("fines").update({ status: "contested" }).eq("id", id).eq("driver_id", appUser.id);
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    const { error: alertError } = await admin.from("alerts").insert({
+      organization_id: appUser.organization_id,
+      type: "fine_notification",
+      severity: "info",
+      message: `${appUser.full_name} signale une contestation pour une amende${ownFine.reference ? ` (réf. ${ownFine.reference})` : ""}.`,
+      related_table: "fines",
+      related_id: id,
+      recipient_roles: ["direction"],
+    });
+    if (alertError) return NextResponse.json({ error: alertError.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+  if (appUser.role !== "direction") return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+
   const { data: fine, error: fineError } = await supabase
     .from("fines")
     .select("id, organization_id, driver_id, matched_planning_entry_id, amount, infraction_at, reference, status")
