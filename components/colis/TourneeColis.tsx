@@ -246,7 +246,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   async function nouvelleTournee() {
-    if (encadrement) { router.push("/planning"); return; }
+    // La création de tournée reste accessible directement depuis Tournée colis, y compris pour l’encadrement.
     setBusy("nouvelle");
     try {
       const { run: cree, reused } = await api<{ run: Run; reused?: boolean }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
@@ -689,7 +689,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         </button>
       ))}
       <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy !== null} onClick={nouvelleTournee}>
-        {encadrement ? "Ouvrir le Planning" : "+ Nouvelle tournée"}
+        {busy === "nouvelle" ? "Création…" : "+ Nouvelle tournée"}
       </button>
     </div>
   );
@@ -707,7 +707,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           <h2 className="text-lg">Aucune tournée colis en cours</h2>
           <p className="text-sm text-navy/65">Le chauffeur crée sa fiche depuis son espace après avoir consulté les tournées affectées au Planning.</p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            {encadrement ? "Ouvrir le Planning" : "Créer une tournée"}
+            {busy === "nouvelle" ? "Création…" : "Créer une tournée"}
           </button>
         </Card>
       </div>

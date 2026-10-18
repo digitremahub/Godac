@@ -6,6 +6,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
+import { PlanningServiceCreneaux } from "@/components/planning/PlanningServiceCreneaux";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
 import { detailTournee, historiqueTournees, lireFiltres } from "@/lib/colis/historique";
 import { parisDay } from "@/lib/utils/paris-time";
@@ -28,6 +29,10 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
   if (!actif) return <EmptyState title="Module Tournée colis non activé" description="La direction peut l'activer depuis Modules & tarifs." />;
 
   const encadrement = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const { data: servicesConfig } = encadrement
+    ? await supabase.from("services").select("id, name").order("name")
+    : { data: null };
+  const servicesCreneaux = (servicesConfig ?? []).map((service: { id: string; name: string }) => ({ id: service.id, name: service.name }));
   const historiqueVisible = encadrement || appUser.role === "chauffeur";
   const onglet = historiqueVisible && params.onglet === "historique" ? "historique" : "jour";
 
@@ -79,6 +84,12 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
       <TourneesTabs canTrack={encadrement} />
       {onglets}
       <TourneeColis lectureEtiquette pays={pays.code} encadrement={encadrement} />
+      {encadrement && servicesCreneaux.length > 0 && (
+        <details className="mt-5 rounded-2xl border border-navy/10 bg-surface p-4">
+          <summary className="cursor-pointer font-semibold">Actions de tournée · Configurer les créneaux horaires</summary>
+          <div className="mt-4"><PlanningServiceCreneaux services={servicesCreneaux} /></div>
+        </details>
+      )}
     </div>
   );
 }

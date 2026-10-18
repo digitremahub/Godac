@@ -6,7 +6,6 @@ import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planni
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
 import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
-import { PlanningServiceCreneaux } from "@/components/planning/PlanningServiceCreneaux";
 import { PlanningCoverageAlerts } from "@/components/planning/PlanningCoverageAlerts";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
@@ -225,9 +224,6 @@ export default async function PlanningPage({
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
       {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
         <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
-      )}
-      {["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
-        <PlanningServiceCreneaux services={transportServices} selectedService={params.service ?? ""} />
       )}
       {view === "week" && (
         <PlanningGrid
