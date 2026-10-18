@@ -130,8 +130,8 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
                 Une plateforme de gestion, pensée pour évoluer.
               </p>
-              <h1 className="text-[34px] leading-[1.1] tracking-tight sm:text-5xl lg:text-[52px]">
-                Vos opérations, <span className="text-teal">mieux organisées</span>.
+              <h1 className="text-[36px] leading-[1.08] tracking-tight sm:text-5xl lg:text-[56px]">
+                Vos opérations, <span className="text-teal">mieux optimisées</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
                 GODAC réunit les outils essentiels pour organiser vos ressources, planifier les opérations, suivre leur exécution et piloter votre activité. La première spécialisation est le transport, avec la flotte, le carburant et les tournées. Le socle est conçu pour accueillir progressivement d’autres métiers et leurs besoins spécifiques.
@@ -159,12 +159,12 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <div className="relative">
               <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-pop ring-1 ring-white/10">
                 <Image
-                  src="/home/hero-crop.png"
-                  alt="Camion sur une route de montagne, avec un aperçu du tableau de bord GODAC"
+                  src="/home/scene-pilotage.png"
+                  alt="Aperçu du tableau de bord GODAC avec les indicateurs de gestion"
                   fill
                   priority
                   sizes="(min-width: 1024px) 560px, 100vw"
-                  className="object-cover object-[88%_center]"
+                  className="object-cover object-center"
                 />
               </div>
               <div aria-hidden="true" className="absolute -bottom-6 left-4 hidden items-center gap-3 rounded-2xl bg-surface p-4 pr-5 text-navy shadow-pop sm:flex lg:-left-8">
