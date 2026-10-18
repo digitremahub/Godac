@@ -14,6 +14,7 @@ export function DriverPinFlow({
 }) {
   const supabase = createBrowserSupabaseClient();
   const [pin, setPin] = useState("");
+  const [showFallback, setShowFallback] = useState(false);
   const [confirmPin, setConfirmPin] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -147,15 +148,30 @@ export function DriverPinFlow({
 
   return (
     <Card className="flex w-full max-w-sm flex-col gap-4">
-      <div><h1 className="text-2xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1><p className="mt-1 text-sm text-navy/65">Votre badge identifie votre compte. Utilisez la biométrie sur un appareil déjà associé ou votre PIN.</p></div>
-      {hasPasskey && <button type="button" className="btn-primary" disabled={busy} onClick={unlockWithPasskey}>{busy ? "Vérification…" : "Face ID / empreinte sur cet appareil"}</button>}
-      {hasPasskey && <div className="text-center text-xs text-navy/60">ou utilisez votre PIN</div>}
-      <form onSubmit={submitLogin} className="flex flex-col gap-3">
-        <label className="block"><span className="label">Code PIN</span><input className="input" type="password" inputMode="numeric" autoComplete="off" required autoFocus value={pin} onChange={e => setPin(e.target.value)} /></label>
-        {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-        <button type="submit" className="btn-primary" disabled={busy || !pin}>{busy ? "Connexion…" : "Me connecter"}</button>
-        <button type="button" className="text-sm text-navy/65 hover:underline" onClick={() => { setRecoveryMode(true); setPin(""); setConfirmPin(""); setError(null); }}>PIN oublié ? Utiliser mon code de secours</button>
-      </form>
+      <div>
+        <h1 className="text-2xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1>
+        <p className="mt-1 text-sm text-navy/65">Connectez-vous en un geste avec la biométrie de votre téléphone. Votre badge QR reste votre identifiant chauffeur.</p>
+      </div>
+      {hasPasskey ? (
+        <button type="button" className="btn-primary min-h-14 text-base" disabled={busy} onClick={unlockWithPasskey}>
+          {busy ? "Vérification biométrique…" : "Se connecter avec Face ID / empreinte"}
+        </button>
+      ) : (
+        <div className="rounded-xl border border-teal/20 bg-teal/5 p-3 text-sm text-navy/75">
+          Face ID / empreinte n’est pas encore associé à ce compte sur cet appareil. Utilisez la méthode de secours ci-dessous, puis associez la biométrie depuis les paramètres de connexion.
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      <button type="button" className="btn-secondary" onClick={() => { setShowFallback(v => !v); setError(null); }}>
+        {showFallback ? "Masquer les autres options" : "Autre méthode de connexion"}
+      </button>
+      {showFallback && (
+        <form onSubmit={submitLogin} className="flex flex-col gap-3">
+          <label className="block"><span className="label">Code PIN chauffeur</span><input className="input" type="password" inputMode="numeric" autoComplete="off" required value={pin} onChange={e => setPin(e.target.value)} /></label>
+          <button type="submit" className="btn-primary" disabled={busy || !pin}>{busy ? "Connexion…" : "Me connecter avec mon PIN"}</button>
+          <button type="button" className="text-sm text-navy/65 hover:underline" onClick={() => { setRecoveryMode(true); setPin(""); setConfirmPin(""); setError(null); }}>PIN oublié ? Utiliser mon code de secours</button>
+        </form>
+      )}
     </Card>
   );
 }

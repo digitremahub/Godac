@@ -32,7 +32,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const [
     activeVehiclesRes,
     activeDriversRes,
-    ongoingToursRes,
+    ongoingRunsRes,
     openAlertsCountRes,
     openAlertsRes,
     pendingSignupsRes,
@@ -45,7 +45,12 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   ] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active"),
     supabase.from("users").select("id", { count: "exact", head: true }).in("role", ["chauffeur", "manager_chauffeur"]).eq("active", true),
-    supabase.from("planning_entries").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+    supabase
+      .from("delivery_runs")
+      .select("id, name, run_date, started_at, driver_id, service_id, vehicle_id")
+      .eq("organization_id", appUser.organization_id)
+      .eq("status", "in_progress")
+      .order("started_at", { ascending: false }),
     supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase
       .from("alerts")
@@ -93,6 +98,21 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   ]);
 
   const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const ongoingRuns = (ongoingRunsRes.data ?? []) as {
+    id: string; name: string | null; run_date: string; started_at: string | null;
+    driver_id: string | null; service_id: string | null; vehicle_id: string | null;
+  }[];
+  const activeRunDriverIds = [...new Set(ongoingRuns.map((r) => r.driver_id).filter((id): id is string => Boolean(id)))];
+  const activeRunServiceIds = [...new Set(ongoingRuns.map((r) => r.service_id).filter((id): id is string => Boolean(id)))];
+  const activeRunVehicleIds = [...new Set(ongoingRuns.map((r) => r.vehicle_id).filter((id): id is string => Boolean(id)))];
+  const [{ data: activeRunDrivers }, { data: activeRunServices }, { data: activeRunVehicles }] = await Promise.all([
+    activeRunDriverIds.length ? supabase.from("users").select("id, full_name").in("id", activeRunDriverIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    activeRunServiceIds.length ? supabase.from("services").select("id, name").in("id", activeRunServiceIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    activeRunVehicleIds.length ? supabase.from("vehicles").select("id, registration").in("id", activeRunVehicleIds) : Promise.resolve({ data: [] as { id: string; registration: string }[] }),
+  ]);
+  const driverNameById = new Map((activeRunDrivers ?? []).map((r) => [r.id, r.full_name]));
+  const serviceNameById = new Map((activeRunServices ?? []).map((r) => [r.id, r.name]));
+  const vehicleById = new Map((activeRunVehicles ?? []).map((r) => [r.id, r.registration]));
   const { data: pinDrivers } = await supabase
     .from("users")
     .select("id, full_name, phone")
@@ -155,12 +175,40 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         <StatTile label="Véhicules actifs" value={String((activeVehiclesRes.data ?? []).length)} />
         <StatTile label="Chauffeurs actifs" value={String(activeDriversRes.count ?? 0)} accent="gold" />
         <Link href="/tours/history" className="block">
-          <StatTile label="Tournées en cours" value={String(ongoingToursRes.count ?? 0)} accent="teal" />
+          <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
         </Link>
         <Link href="/alerts" className="block">
           <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         </Link>
       </div>
+
+      <Card className="mb-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg">Tournées actuellement effectuées</h2>
+            <p className="text-sm text-navy/60">Suivi des fiches chauffeur réellement démarrées.</p>
+          </div>
+          <Link href="/tours/history" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
+        </div>
+        {ongoingRuns.length === 0 ? (
+          <p className="text-sm text-navy/60">Aucune fiche chauffeur en cours pour le moment.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {ongoingRuns.map((r) => (
+              <li key={r.id} className="flex flex-col gap-1 rounded-xl border border-navy/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold">{r.name ?? "Tournée du jour"}</p>
+                  <p className="text-sm text-navy/65">{driverNameById.get(r.driver_id ?? "") ?? "Chauffeur non renseigné"} · {serviceNameById.get(r.service_id ?? "") ?? "Service non renseigné"}</p>
+                </div>
+                <div className="text-sm text-navy/65 sm:text-right">
+                  <p>{vehicleById.get(r.vehicle_id ?? "") ?? "Véhicule non renseigné"}</p>
+                  <p>{r.started_at ? new Date(r.started_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) : "Heure de départ inconnue"}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <DriverRecoveryCodePanel drivers={(pinDrivers ?? []) as { id: string; full_name: string; phone: string | null }[]} />
 
