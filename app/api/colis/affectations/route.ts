@@ -57,6 +57,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Choisissez une tournée existante et un chauffeur, service et véhicule valides pour cette organisation." }, { status: 400 });
   }
 
+  // Évite de créer deux instances identiques si l'utilisateur double-clique
+  // ou relance la demande après un délai réseau.
+  const runName = `Tournée n°${tour_number}`;
+  const { data: existingRun, error: existingRunError } = await supabase.from("delivery_runs")
+    .select("id,status")
+    .eq("organization_id", user.organization_id)
+    .eq("driver_id", driver_id)
+    .eq("run_date", date)
+    .eq("name", runName)
+    .maybeSingle();
+  if (existingRunError) return NextResponse.json({ error: existingRunError.message }, { status: 500 });
+  if (existingRun) return NextResponse.json({ error: existingRun.status === "done" ? "Cette tournée est déjà clôturée pour ce chauffeur à cette date." : "Cette tournée est déjà affectée à ce chauffeur à cette date." }, { status: 409 });
+
   // Affectation ponctuelle distincte du Planning : on crée une instance datée
   // de la tournée modèle, sans créer/modifier de planning_entry ni le modèle.
   const { data: run, error: runError } = await supabase.from("delivery_runs").insert({
@@ -65,7 +78,7 @@ export async function POST(req: Request) {
     vehicle_id,
     service_id,
     run_date: date,
-    name: `Tournée n°${tour_number}`,
+    name: runName,
     planned_start: plannedStart,
     start_label: service.depot_address ?? (service.name ? `Dépôt ${service.name}` : null),
     start_lat: service.depot_lat ?? null,
