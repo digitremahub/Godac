@@ -68,12 +68,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .eq("id", id).eq("organization_id", appUser.organization_id)
       .select("id, run_id, list_id, position").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    const { error: eventError } = await supabase.from("delivery_stop_events").insert({
+    await journaliserArret(supabase, {
       organization_id: appUser.organization_id, run_id: moved.run_id, stop_id: moved.id, actor_id: appUser.id,
       event_type: "list_changed", new_value: { list_id: moved.list_id, position: moved.position },
       details: "Arrêt déplacé dans une autre liste de la tournée",
     });
-    if (eventError) return NextResponse.json({ error: "Arrêt déplacé, mais historique indisponible." }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
@@ -92,12 +91,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { error: firstError } = await supabase.from("delivery_stops").update({ position: autre.position }).eq("id", id).eq("organization_id", appUser.organization_id);
     const { error: secondError } = await supabase.from("delivery_stops").update({ position: stop.position }).eq("id", autre.id).eq("organization_id", appUser.organization_id);
     if (firstError || secondError) return NextResponse.json({ error: "Réorganisation impossible." }, { status: 500 });
-    const { error: eventError } = await supabase.from("delivery_stop_events").insert({
+    await journaliserArret(supabase, {
       organization_id: appUser.organization_id, run_id: stop.run_id, stop_id: id, actor_id: appUser.id,
       event_type: "reordered", previous_value: { position: stop.position }, new_value: { position: autre.position },
       details: `Ordre de tournée modifié (${deplacer === "haut" ? "remonté" : "descendu"} d'un rang)`,
     });
-    if (eventError) return NextResponse.json({ error: "Ordre modifié, mais historique indisponible." }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
@@ -170,10 +168,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     event_type: "pickup_count_recorded", new_value: { packages_picked_up },
     details: `Nombre réel de colis ramassés enregistré : ${packages_picked_up ?? "inconnu"}`,
   });
-  if (events.length) {
-    const { error: eventError } = await supabase.from("delivery_stop_events").insert(events);
-    if (eventError) return NextResponse.json({ error: "Arrêt enregistré, mais historique indisponible." }, { status: 500 });
-  }
+  if (events.length) await journaliserArret(supabase, events);
   return NextResponse.json({ stop: data });
 }
 
@@ -192,4 +187,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { error } = await supabase.from("delivery_stops").delete().eq("id", id).eq("organization_id", appUser.organization_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Historique d'arrêt (delivery_stop_events) : non bloquant. L'arrêt est
+ * déjà enregistré quand on écrit l'historique ; un échec (table absente,
+ * RLS…) est journalisé côté serveur sans faire échouer la requête, pour
+ * que le chauffeur ne retente pas une modification déjà faite (audit E7).
+ */
+async function journaliserArret(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, events: Record<string, unknown> | Record<string, unknown>[]) {
+  const { error } = await supabase.from("delivery_stop_events").insert(events);
+  if (error) console.error("delivery_stop_events (non bloquant)", error.message);
 }
