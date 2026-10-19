@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { chargerAccesGroupe } from "@/lib/messenger/groupes-serveur";
 import { REACTIONS, peutAdministrerGroupe, peutReagir, peutSupprimerMessage } from "@/lib/messenger/groupes";
@@ -13,7 +13,9 @@ const patchSchema = z.object({
 });
 
 async function charger(groupId: string, messageId: string) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["messenger"] });
+  if (!g.ok) return null;
+  const appUser = g.appUser;
   const ctx = await chargerAccesGroupe(appUser, groupId);
   if (!ctx) return null;
   const { data: message } = await ctx.admin

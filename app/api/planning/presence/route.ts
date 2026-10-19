@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
 import { lignesPresence } from "@/lib/planning/presence-bureau";
@@ -36,7 +37,9 @@ const bodySchema = z.discriminatedUnion("action", [
  * l'heure de départ (upsert sur la contrainte unique de la table).
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour planifier." }, { status: 403 });
   }

@@ -15,6 +15,9 @@ export const ACTIONS_AUDIT = {
   pin_bloque: "Code PIN bloqué (trop d'essais)",
   utilisateur_desactive: "Compte désactivé / réactivé",
   tournee_colis_supprimee: "Tournée colis supprimée",
+  paie_bulletin_genere: "Bulletin de paie généré (en attente de validation)",
+  paie_bulletin_valide: "Bulletin de paie validé par la direction",
+  paie_bulletin_refuse: "Bulletin de paie refusé par la direction",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
@@ -18,7 +18,9 @@ const bodySchema = z.object({ target_date: z.string().date().optional() });
  * done) — the clone itself is always a fresh 'planned' row.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {

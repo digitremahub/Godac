@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { generateTicpePdf } from "@/lib/ticpe/generate-pdf";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
@@ -28,7 +28,9 @@ const DAY_LABEL = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-d
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!["comptable", "direction"].includes(appUser.role)) {
     return NextResponse.json({ error: "Rôle non autorisé pour la vérification TICPE." }, { status: 403 });
   }

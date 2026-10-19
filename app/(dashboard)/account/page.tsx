@@ -54,6 +54,7 @@ export default async function AccountPage() {
           .from("payslips")
           .select("id, period_start, gross_amount, net_amount, file_path")
           .eq("user_id", appUser.id)
+          .eq("validation_status", "valide")
           .order("period_start", { ascending: false })
           .limit(5)
       ).data

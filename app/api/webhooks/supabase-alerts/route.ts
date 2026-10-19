@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
   // Shared by both channels so an alert always opens the same page
   // whether it's clicked from the email or from the push notification.
-  const linkPath = resolveAlertUrl(alert.related_table, alert.type, alert.related_id) ?? "/alerts";
+  const linkPath = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id }) ?? "/alerts";
 
   const { subject, html } = renderAlertEmail({
     type: alert.type,

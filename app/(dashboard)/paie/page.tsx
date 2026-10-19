@@ -1,7 +1,6 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { BadgeValidation, ValidationBulletins } from "@/components/paie/ValidationBulletins";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 import { bornesMois, moisValide } from "@/lib/paie/donnees";
@@ -10,14 +9,18 @@ import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
-/** Vue du mois : un bulletin à préparer par salarié, avec son état. Direction uniquement. */
+/**
+ * Vue du mois : un bulletin à préparer par salarié, avec son état.
+ * Direction et comptable (décision client Q1) : le comptable prépare et
+ * génère, la direction valide ou refuse.
+ */
 export default async function PaiePage({ searchParams }: { searchParams: Promise<{ mois?: string }> }) {
   const g = await garderPage("equipe.paie");
   if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  const planning = await isModuleEnabled(supabase, appUser.organization_id, "planning");
-  const onglets = <OngletsPaie actif="bulletins" paie planning={planning} />;
+  const { appUser, supabase, modules } = g;
+  const direction = appUser.role === "direction";
+  const planning = modules.has("planning");
+  const onglets = <OngletsPaie actif="bulletins" paie planning={planning} reglages={direction} />;
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur)
     return (
@@ -34,13 +37,18 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
   const [{ data: salaries }, { data: profils }, { data: bulletins }, { data: reglages }] = await Promise.all([
     supabase.from("users").select("id, full_name, role_title").eq("active", true).order("full_name"),
     supabase.from("payroll_profiles").select("user_id, hourly_rate, regime"),
-    supabase.from("payslips").select("user_id, gross_amount, net_amount, employer_cost, details").eq("period_start", debut).eq("period_end", fin),
+    supabase
+      .from("payslips")
+      .select("id, user_id, gross_amount, net_amount, employer_cost, details, validation_status, validation_comment")
+      .eq("period_start", debut)
+      .eq("period_end", fin),
     supabase.from("payroll_settings").select("organization_id").maybeSingle(),
   ]);
   const profilDe = new Map((profils ?? []).map((p) => [p.user_id, p]));
   const bulletinDe = new Map((bulletins ?? []).map((b) => [b.user_id, b]));
   const calcules = (bulletins ?? []).filter((b) => b.details);
   const total = (k: "gross_amount" | "net_amount" | "employer_cost") => calcules.reduce((t, b) => t + Number(b[k] ?? 0), 0);
+  const enAttente = (bulletins ?? []).filter((b) => b.validation_status === "en_attente");
   const label = new Date(`${debut}T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
@@ -50,7 +58,16 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
         description="Préparez et générez les bulletins du mois : heures des tournées, congés et frais sont préremplis, les cotisations calculées automatiquement."
       />
       {onglets}
-      {!reglages && (
+      {enAttente.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm">
+          <span>
+            <strong>{enAttente.length}</strong> bulletin{enAttente.length > 1 ? "s" : ""} en attente de validation par la direction. Tant qu&apos;ils ne sont pas
+            validés, les salariés ne les voient pas et rien n&apos;est envoyé ni reporté.
+          </span>
+          {direction && <ValidationBulletins ids={enAttente.map((b) => b.id)} libelleValider={`Valider les ${enAttente.length} bulletins`} compact />}
+        </div>
+      )}
+      {!reglages && direction && (
         <p className="mb-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm">
           Commencez par les <Link href="/paie/parametres" className="font-semibold underline">réglages de paie</Link> : effectif, taux accident du travail,
           prévoyance et mutuelle.
@@ -97,9 +114,10 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
                   <span className="flex items-center gap-2 text-sm">
                     {!p?.hourly_rate && <span className="rounded-full bg-gold/25 px-2 py-0.5 text-xs font-semibold">Profil à compléter</span>}
                     {b ? (
-                      <span className="rounded-full bg-teal/15 px-2 py-0.5 text-xs font-semibold text-teal-ink">
-                        Généré · net {eur(Number(b.net_amount ?? 0))}
-                      </span>
+                      <>
+                        <span className="text-navy/65">net {eur(Number(b.net_amount ?? 0))}</span>
+                        <BadgeValidation statut={b.validation_status ?? "en_attente"} />
+                      </>
                     ) : (
                       <span className="text-navy/55">À préparer →</span>
                     )}

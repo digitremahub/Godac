@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -31,7 +32,9 @@ const bodySchema = z.discriminatedUnion("action", [
  * notification à l'encadrement), l'encadrement clôture.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["customer_disputes"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "customer_disputes"))) return NextResponse.json({ error: "Module Contestations clients non activé." }, { status: 403 });
   const { id } = await params;

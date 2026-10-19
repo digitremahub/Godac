@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 
@@ -10,7 +10,9 @@ import { plannedDuplicates } from "@/lib/planning/duplicates";
  * deletable (plannedDuplicates only flags `planned` rows).
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
   }

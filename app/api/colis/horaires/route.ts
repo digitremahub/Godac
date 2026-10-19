@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { hasRole, requireAppUser } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleAdresse, horairesDesAdresses, moduleActif, HOURS_FIELDS } from "@/lib/colis/serveur";
 import { normaliserSemaine } from "@/lib/colis/horaires";
@@ -9,7 +10,9 @@ import { normaliserSemaine } from "@/lib/colis/horaires";
 const PEUVENT_ECRIRE = ["chauffeur", "manager_chauffeur", "manager", "direction"] as const;
 
 async function contexte(ecriture: boolean) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return { erreur: g.reponse };
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return { erreur: NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 }) };
   if (ecriture && !hasRole(appUser.role, [...PEUVENT_ECRIRE])) return { erreur: NextResponse.json({ error: "Réservé aux chauffeurs et à l'encadrement." }, { status: 403 }) };

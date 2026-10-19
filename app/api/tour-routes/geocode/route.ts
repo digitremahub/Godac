@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { peutVoirCarteTournees } from "@/lib/tours/acces-tournees";
 import { chooseCommune, postalCodeFromAddress, searchCommunes } from "@/lib/geo/communes";
@@ -32,7 +32,9 @@ const depotOf = (lat: unknown, lng: unknown): Depot => (lat != null && lng != nu
  * autres rôles n'ont qu'une liste, sans carte ni coordonnées.
  */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!peutVoirCarteTournees(appUser.role)) {
     return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
   }

@@ -1,8 +1,9 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
@@ -17,7 +18,9 @@ const bodySchema = z.object({
  * check here just gives a clearer error than a bare RLS rejection.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour gérer les services" }, { status: 403 });
   }

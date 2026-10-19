@@ -1,12 +1,14 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listesDeTournee, moduleActif, renumeroterListes, tourneeParId } from "@/lib/colis/serveur";
 
 /** La liste et sa tournée, seulement si la tournée est celle du chauffeur connecté. */
 async function contexte(id: string) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return { erreur: g.reponse };
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return { erreur: NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 }) };
   const { data: liste } = await supabase.from("delivery_lists").select("id, run_id, name, position").eq("id", id).maybeSingle();

@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { anonymizeQuestion, draftFaqEntries } from "@/lib/assistant/faq";
@@ -13,7 +13,9 @@ export const maxDuration = 60;
  * « suggested » — nothing reaches the assistants until published.
  */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!(await isPlatformAdmin(appUser.id))) return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
 
   const admin = createAdminSupabaseClient();

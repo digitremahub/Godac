@@ -1,5 +1,4 @@
 import { garderPage } from "@/lib/acces/garde-page";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { LeavePlanningCalendar } from "@/components/leaves/LeavePlanningCalendar";
 import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
@@ -19,15 +18,13 @@ export default async function LeavePlanningPage({
   const params = await searchParams;
   const g = await garderPage("equipe.conges_calendrier");
   if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-
-  const supabase = await createServerSupabaseClient();
+  const { appUser, supabase } = g;
 
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonth();
   const monthStart = firstOfMonth(month);
   const monthEnd = addDays(firstOfMonth(addMonths(month, 1)), -1);
 
-  const [{ data: leaves }, { data: drivers }] = await Promise.all([
+  const [{ data: leaves }, { data: tousChauffeurs }, { data: rattachements }] = await Promise.all([
     supabase
       .from("leave_requests")
       .select(
@@ -38,7 +35,13 @@ export default async function LeavePlanningPage({
       .gte("end_date", monthStart)
       .order("start_date"),
     supabase.from("users").select("id, full_name, role").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    supabase.from("user_services").select("user_id, service_id"),
   ]);
+  // Décision client Q4 : les managers voient le calendrier de leur service
+  // (la RLS de leave_requests filtre déjà les absences).
+  const mesServices = new Set((rattachements ?? []).filter((r) => r.user_id === appUser.id).map((r) => r.service_id));
+  const duService = new Set((rattachements ?? []).filter((r) => mesServices.has(r.service_id)).map((r) => r.user_id));
+  const drivers = appUser.role === "direction" ? tousChauffeurs : (tousChauffeurs ?? []).filter((d) => duService.has(d.id));
 
   return (
     <div>

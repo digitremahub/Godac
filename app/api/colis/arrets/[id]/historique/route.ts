@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif } from "@/lib/colis/serveur";
 
@@ -11,7 +11,9 @@ const schema = z.object({
 
 /** Historique chronologique d'un arrêt de livraison. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const user = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const { id } = await params;
@@ -31,7 +33,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 /** Journalise une action de contact confirmée par le chauffeur. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireAppUser();
+  const g2 = await garderApi({ modules: ["route_optimizer"] });
+  if (!g2.ok) return g2.reponse;
+  const user = g2.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = schema.safeParse(await req.json().catch(() => ({})));

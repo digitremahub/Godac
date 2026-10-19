@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -15,7 +16,9 @@ function forbidden() {
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { id, docId } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return forbidden();
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -33,7 +36,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /** Removes the row (RLS: manager-like, own organization) then its file. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { id, docId } = await params;
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ roles: "tous" });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return forbidden();
 
   const supabase = await createServerSupabaseClient();

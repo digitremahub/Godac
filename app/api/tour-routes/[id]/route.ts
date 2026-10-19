@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const patchSchema = z.object({
@@ -12,8 +13,9 @@ const patchSchema = z.object({
 });
 
 async function guard() {
-  const appUser = await requireAppUser();
-  return hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) ? appUser : null;
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return null;
+  return hasRole(g.appUser.role, ["manager", "manager_chauffeur", "direction"]) ? g.appUser : null;
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { dateNaissanceValide } from "@/lib/users/date-naissance";
@@ -14,7 +14,9 @@ const bodySchema = z.object({ birth_date: z.string() });
  * (dossier RH), pour qu'on ne change pas son code à volonté.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success || !dateNaissanceValide(parsed.data.birth_date)) {
     return NextResponse.json({ error: "Date de naissance invalide." }, { status: 400 });

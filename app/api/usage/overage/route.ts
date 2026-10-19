@@ -1,13 +1,15 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({ enabled: z.boolean() });
 
 /** « Autoriser le dépassement facturé » (page Abonnement › Consommation) — réservé à la direction. */
 export async function PATCH(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });

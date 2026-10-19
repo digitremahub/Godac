@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { chargerAccesGroupe } from "@/lib/messenger/groupes-serveur";
@@ -23,7 +23,9 @@ const patchSchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["messenger"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "messenger"))) {
     return NextResponse.json({ error: "Module Messenger non activé." }, { status: 403 });
@@ -135,7 +137,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /** Supprime un groupe ponctuel (et ses messages). Le groupe d'équipe, lui, vit avec le service. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["messenger"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const ctx = await chargerAccesGroupe(appUser, id);
   if (!ctx) return NextResponse.json({ error: "Groupe introuvable." }, { status: 404 });
   const { group, access, admin } = ctx;

@@ -1,10 +1,12 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { requireAppUser } from "@/lib/auth/session";
 
 /** Storage-path issuer for a fine notice photo — see app/api/ocr/fine/process. */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fines"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const storagePath = `${appUser.organization_id}/${randomUUID()}.jpg`;
   return NextResponse.json({ storagePath });
 }

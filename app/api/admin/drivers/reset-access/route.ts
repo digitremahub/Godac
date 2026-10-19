@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { journaliser } from "@/lib/audit/journal";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Saisissez la phrase de confirmation exacte pour continuer." }, { status: 400 });
   }
 
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut réinitialiser les accès chauffeurs." }, { status: 403 });
   }

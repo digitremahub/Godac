@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
@@ -37,7 +37,9 @@ const bodySchema = z.object({
  * (chauffeur de la tournée ou encadrement) avant tout envoi de fichier.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const { id } = await params;
@@ -121,7 +123,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 /** Lien temporaire (5 min) vers la photo de livraison. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["route_optimizer"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const supabase = await createServerSupabaseClient();
   const { id } = await params;
   // Audit M4 : proof_photo_paths (photos 2 et 3) doit être sélectionné.

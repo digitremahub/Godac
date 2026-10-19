@@ -1,8 +1,9 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 
 export async function GET(req: Request) {
-  await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
   const query = new URL(req.url).searchParams.get("q")?.trim() ?? "";
   if (query.length < 3) return NextResponse.json({ results: [] });
   try {

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderApi } from "@/lib/acces/garde-api";
 import { findFineMatchCandidate } from "@/lib/business/fine-match";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 
@@ -15,17 +14,17 @@ const bodySchema = z.object({
 });
 
 /**
- * Direction-only, like /payroll — attributing a fine to a specific
- * employee is HR-sensitive, same class of decision. Creates the fine
+ * Encadrement (décision client Q2) : direction, et managers sur les
+ * véhicules de leur service — la RLS (« fines: manager-like write »)
+ * refuse un véhicule hors de leur service. Module « fines » requis. Creates the fine
  * then immediately runs the match (lib/business/fine-match.ts) so the
  * list shows a suggested driver right away, without a separate round
  * trip; still just a suggestion until PATCH .../confirm.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fines"] });
+  if (!g.ok) return g.reponse;
+  const { appUser, supabase } = g;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -33,8 +32,6 @@ export async function POST(req: Request) {
   }
 
   const infractionAt = parisWallTimeToUtcISOString(parsed.data.infraction_date, parsed.data.infraction_time);
-  const supabase = await createServerSupabaseClient();
-
   const candidate = await findFineMatchCandidate(supabase, { vehicleId: parsed.data.vehicle_id, infractionAt });
 
   const { data, error } = await supabase

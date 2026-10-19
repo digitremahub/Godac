@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { peutGererTournees } from "@/lib/tours/acces-tournees";
 import { sanitizeRenfortVillageIds } from "@/lib/tours/renfort";
@@ -13,7 +13,9 @@ const bodySchema = z.object({ village_ids: z.array(z.string().uuid()).max(500) }
  * autres tournées du même service). Remplace toute la liste.
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!peutGererTournees(appUser.role)) {
     return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
   }

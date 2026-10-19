@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const specSourceEntrySchema = z.object({ origin: z.enum(["ia", "saisie", "import"]), confirmed: z.boolean() });
@@ -38,7 +38,8 @@ const bodySchema = z.object({
 /** Minimal lookup for flows that only have a vehicle_id (QR scan, tour start/end) and need its label. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("vehicles")
@@ -51,7 +52,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireAppUser();
+  const g2 = await garderApi({ roles: "tous" });
+  if (!g2.ok) return g2.reponse;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

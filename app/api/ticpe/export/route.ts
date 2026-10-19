@@ -1,8 +1,8 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { bornesPeriode, eligibiliteTicpe } from "@/lib/ticpe/export";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -29,7 +29,9 @@ const PAGE = 1000;
  * check the role up front so the error is immediate and clear.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!["comptable", "direction"].includes(appUser.role)) {
     return NextResponse.json({ error: "Rôle non autorisé pour l'export TICPE" }, { status: 403 });
   }

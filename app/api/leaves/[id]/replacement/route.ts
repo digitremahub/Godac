@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({ replacement_driver_id: z.string().uuid().nullable() });
@@ -8,7 +9,9 @@ const bodySchema = z.object({ replacement_driver_id: z.string().uuid().nullable(
 /** Assigning who covers an approved leave — direction's own "planning congés", separate from the work planning. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["leave_management"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Seuls les gestionnaires peuvent assigner un remplaçant." }, { status: 403 });
   }

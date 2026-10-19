@@ -140,6 +140,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             .from("payslips")
             .select("id, period_start, period_end, gross_amount, net_amount, file_path")
             .eq("user_id", id)
+            // Bulletins validés par la direction seulement (Q1).
+            .eq("validation_status", "valide")
             .order("period_start", { ascending: false })
             .limit(5)
         : Promise.resolve({ data: null }),

@@ -1,12 +1,14 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { assurerListesVillages, listesAvecVillages, planningEtVillages, villagesDeRoute, type VillageDuJour } from "@/lib/colis/villages-serveur";
 
 async function contexte(runId: string | null) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return { erreur: g.reponse };
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return { erreur: NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 }) };
   if (!runId || !z.string().uuid().safeParse(runId).success) return { erreur: NextResponse.json({ error: "Tournée invalide." }, { status: 400 }) };

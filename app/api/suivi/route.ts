@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { libellePreuve } from "@/lib/colis/livraison";
 import { NextResponse } from "next/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleAdresse, horairesDesAdresses, moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { estimerAvancement } from "@/lib/colis/estimation";
@@ -29,7 +30,9 @@ export interface TourneeSuivie {
  * facultatif par service (?service=). RLS : encadrement de l'entreprise.
  */
 export async function GET(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });

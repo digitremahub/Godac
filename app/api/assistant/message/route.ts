@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled, getEnabledModuleKeys } from "@/lib/organization/modules";
 import { getHelpSourcesForRole, type HelpSource } from "@/lib/assistant/help-content";
@@ -22,7 +22,9 @@ const bodySchema = z.object({ message: z.string().min(1).max(MAX_MESSAGE_LENGTH)
  * relay triggers — the other two are /escalate and /feedback).
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["assistant"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

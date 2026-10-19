@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { verifierPin } from "@/lib/auth/pin-securise";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { issueOnBehalfToken } from "@/lib/tours/on-behalf";
 
@@ -25,7 +25,9 @@ const DRIVER_ROLES = new Set(["chauffeur", "manager_chauffeur"]);
  * a tour to close or one to open.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!HELPER_ROLES.has(appUser.role)) {
     return NextResponse.json({ error: "Votre rôle ne permet pas de dépanner un collègue." }, { status: 403 });
   }

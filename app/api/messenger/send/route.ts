@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -14,7 +14,9 @@ const bodySchema = z
   .refine((data) => Boolean(data.body) || Boolean(data.photo_path), { message: "Message vide." });
 
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["messenger"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
   const messengerEnabled = await isModuleEnabled(supabase, appUser.organization_id, "messenger");

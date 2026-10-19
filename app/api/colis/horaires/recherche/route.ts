@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { hasRole, requireAppUser } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { codePays } from "@/lib/pays/serveur";
@@ -22,7 +23,9 @@ const bodySchema = z.object({
  * place d'une fiche saisie à la main.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur", "manager", "direction"])) return NextResponse.json({ error: "Réservé aux chauffeurs et à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });

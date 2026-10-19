@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
 import { motDePassePin } from "@/lib/auth/pin-securise";
@@ -22,7 +23,9 @@ const bodySchema = z.object({
  * but not the password change.
  */
 export async function PATCH(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur"])) {
     return NextResponse.json(
       { error: "Seuls les chauffeurs peuvent activer la connexion par badge." },

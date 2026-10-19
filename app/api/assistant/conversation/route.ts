@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
@@ -10,7 +10,9 @@ import { isModuleEnabled } from "@/lib/organization/modules";
  * for why a second user can never read into this.
  */
 export async function GET() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["assistant"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
   const assistantEnabled = await isModuleEnabled(supabase, appUser.organization_id, "assistant");

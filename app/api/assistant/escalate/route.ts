@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { createSupportRequest } from "@/lib/assistant/create-support-request";
@@ -8,7 +8,9 @@ import { MAX_HISTORY_MESSAGES } from "@/lib/assistant/rate-limit";
 
 /** The explicit "Parler à quelqu'un" button — one of the three relay triggers (see app/api/assistant/message's own comment for the other two). */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["assistant"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const assistantEnabled = await isModuleEnabled(supabase, appUser.organization_id, "assistant");
   if (!assistantEnabled) {

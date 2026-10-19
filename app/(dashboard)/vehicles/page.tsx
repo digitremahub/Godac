@@ -1,6 +1,7 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { JaugeQuota } from "@/components/acces/JaugeQuota";
+import { limiteVehicules } from "@/lib/acces/limites-serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { RoleGate } from "@/components/layout/RoleGate";
 import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
@@ -9,14 +10,13 @@ import { VehicleFleetTable } from "@/components/vehicles/VehicleFleetTable";
 export default async function VehiclesPage() {
   const g = await garderPage("flotte.vehicules");
   if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
+  const { appUser, supabase } = g;
+  const encadrement = appUser.role !== "comptable";
 
-
-  const { data: vehicles } = await supabase
-    .from("vehicles")
-    .select("id, registration, type, status, tank_capacity_liters, services(name)")
-    .order("registration");
+  const [{ data: vehicles }, limite] = await Promise.all([
+    supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, services(name)").order("registration"),
+    encadrement ? limiteVehicules(appUser.organization_id) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -31,6 +31,17 @@ export default async function VehiclesPage() {
           </RoleGate>
         }
       />
+
+      {limite && limite.inclus !== null && (
+        <div className="mb-4 max-w-md">
+          <JaugeQuota
+            libelle={`Véhicules inclus dans la formule ${limite.nomFormule ?? ""}`.trim()}
+            utilise={limite.utilise}
+            inclus={limite.inclus}
+            direction={appUser.role === "direction"}
+          />
+        </div>
+      )}
 
       <RoleGate role={appUser.role} allow={["direction"]}>
         <div className="mb-4">
