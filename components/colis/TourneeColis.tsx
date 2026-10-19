@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
-import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
+import { IconPointRelais, IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
@@ -13,8 +13,9 @@ import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
-import { estRamasse, estPointRelais, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
-import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
+import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { RESEAUX_RELAIS } from "@/lib/colis/relais";
+import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
@@ -41,6 +42,32 @@ interface Draft {
   window_end?: string;
   /** Ne pas mémoriser cette ramasse dans les tournées futures. */
   exceptionnelle?: boolean;
+  /** Point relais : nom du relais et nombre de colis à déposer. */
+  relais?: string;
+  colis?: number;
+}
+
+/** Nom du relais, avec les réseaux courants en suggestion. */
+function NomRelaisInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <>
+      <input
+        className="input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        list="reseaux-relais-arret"
+        maxLength={200}
+        placeholder="Nom du relais (ex. Relais Colis — Tabac de la Gare)"
+        aria-label="Nom du point relais"
+        autoComplete="off"
+      />
+      <datalist id="reseaux-relais-arret">
+        {RESEAUX_RELAIS.map((r) => (
+          <option key={r} value={r} />
+        ))}
+      </datalist>
+    </>
+  );
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
@@ -129,7 +156,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   const [scanStatus, setScanStatus] = useState("");
   const scanQueue = useRef<{ image: string; code: string | null; telephone: string | null }[]>([]);
   const scanProcessing = useRef(false);
-  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string; relais: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
@@ -285,7 +312,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   async function ajouter(d: Draft) {
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; horairesProfessionnel?: boolean }>("/api/colis/arrets", {
+      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; horairesProfessionnel?: boolean; relais?: boolean; horaires?: boolean }>("/api/colis/arrets", {
         method: "POST",
         body: JSON.stringify({
           run_id: run?.id,
@@ -299,6 +326,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           exceptionnelle: d.exceptionnelle === true,
           window_start: d.window_start ?? null,
           window_end: d.window_end ?? null,
+          ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
         }),
       });
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
@@ -307,17 +335,20 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         r.duplicate
           ? { ok: false, text: "Colis déjà scanné." }
           : r.grouped
-            ? { ok: true, text: "Ajouté à un arrêt existant (même adresse)." }
+            ? { ok: true, text: r.relais ? "Ajouté à l'arrêt point relais de cette adresse." : "Ajouté à un arrêt existant (même adresse)." }
             : r.geocoded === false
               ? { ok: false, text: "Ajouté, mais adresse introuvable sur la carte : vérifiez-la." }
               : {
                   ok: !sansTel,
                   text:
                     (run?.status === "in_progress"
-                      ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
+                      ? `${d.type === "ramasse" ? "Ramasse ajoutée" : d.type === "point_relais" ? "Point relais ajouté" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
                       : d.type === "ramasse"
                         ? "Ramasse ajoutée."
-                        : "Colis ajouté.") + (r.professionnel ? ` · Professionnel détecté : ${r.professionnel}${r.horairesProfessionnel ? " (horaires importés)" : " (horaires à vérifier)"}.` : "") + sansTel,
+                        : d.type === "point_relais"
+                          ? "Point relais ajouté."
+                          : "Colis ajouté.") +
+                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.professionnel ? ` · Professionnel détecté : ${r.professionnel}${r.horairesProfessionnel ? " (horaires importés)" : " (horaires à vérifier)"}.` : "") + sansTel,
                 },
       );
       setDraft(null);
@@ -518,6 +549,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           telephone: edition.telephone.trim() || null,
           parcel_count: Math.max(1, edition.colis),
           ...(avant && edition.type !== typeArret(avant.kind) ? { type: edition.type } : {}),
+          ...(avant && edition.type === "point_relais" && edition.relais.trim() !== (avant.relay_name ?? "") ? { relais: edition.relais.trim() || null } : {}),
           ...(avant && lirePoids(edition.poids) !== lirePoids(avant.weight_kg ?? null) ? { poids: lirePoids(edition.poids) } : {}),
         }),
       });
@@ -901,18 +933,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
       )}
 
       {enLivraison && prochain ? (
-        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${estRamasse(prochain) ? "border-gold/80" : "border-teal/50"}`}>
-          {estRamasse(prochain) && <EncocheRamasse large />}
+        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${bordureArret(prochain, "border-teal/50")}`}>
+          <EncocheArret stop={prochain} large />
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
-            {estRamasse(prochain) && <BadgeRamasse />}
-            {estPointRelais(prochain) && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
-                <IconMapPin className="h-3.5 w-3.5" /> Point relais
-              </span>
-            )}
+            <BadgeArret stop={prochain} />
             <span>
               Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : estPointRelais(prochain) ? " à déposer" : ""}`}
               {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
             </span>
           </p>
@@ -940,7 +967,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
             <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
-              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
+              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(prochain) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(prochain)}
             </button>
             <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
               <IconX className="h-5 w-5" /> Échec / absent
@@ -1038,6 +1065,22 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
           <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
+          {draft.type === "point_relais" && (
+            <div className="flex flex-col gap-2 rounded-xl border border-relais/50 bg-relais/10 p-3">
+              <NomRelaisInput value={draft.relais ?? ""} onChange={(relais) => setDraft({ ...draft, relais })} />
+              <div className="flex items-center gap-2 text-sm">
+                <span className="flex-1 text-navy/70">Colis à déposer</span>
+                <button type="button" className="btn-secondary !px-3 !py-1" onClick={() => setDraft({ ...draft, colis: Math.max(0, (draft.colis ?? 0) - 1) })} aria-label="Un colis de moins">
+                  −
+                </button>
+                <span className="w-8 text-center font-semibold tabular-nums">{draft.colis ?? 0}</span>
+                <button type="button" className="btn-secondary !px-3 !py-1" onClick={() => setDraft({ ...draft, colis: Math.min(500, (draft.colis ?? 0) + 1) })} aria-label="Un colis de plus">
+                  +
+                </button>
+              </div>
+              <p className="text-xs text-navy/60">Les colis scannés à l&apos;adresse du relais rejoignent cet arrêt.</p>
+            </div>
+          )}
           {draft.type === "ramasse" && (
             <label className="flex items-start gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm">
               <input type="checkbox" checked={draft.exceptionnelle === true} onChange={(e) => setDraft({ ...draft, exceptionnelle: e.target.checked })} className="mt-0.5" />
@@ -1157,8 +1200,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   return (
-                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estRamasse(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
-                      {estRamasse(s) && <EncocheRamasse />}
+                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                      <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
@@ -1168,14 +1211,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {(estRamasse(s) || estPointRelais(s) || (s.status === "pending" && !s.phone)) && (
+                          {(estMarque(s) || (s.status === "pending" && !s.phone)) && (
                             <div className="mb-1 flex flex-wrap gap-1">
-                              {estRamasse(s) && <BadgeRamasse />}
-                              {estPointRelais(s) && (
-                                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
-                                  <IconMapPin className="h-3.5 w-3.5" /> Point relais
-                                </span>
-                              )}
+                              <BadgeArret stop={s} />
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
                           )}
@@ -1248,6 +1286,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                                 colis: s.parcel_count,
                                 type: typeArret(s.kind),
                                 poids: champPoids(s.weight_kg),
+                                relais: s.relay_name ?? "",
                               })
                             }
                           >
@@ -1302,6 +1341,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
+                          {edition.type === "point_relais" && <NomRelaisInput value={edition.relais} onChange={(relais) => setEdition({ ...edition, relais })} />}
                           <AdresseInput france={pays === "FR"} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
                           <input
                             className="input"

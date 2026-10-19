@@ -3,8 +3,8 @@ import HistoriqueCarte from "@/components/colis/HistoriqueCarte";
 import { Card, EmptyState } from "@/components/ui";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
 import { versParams, type Historique, type detailTournee } from "@/lib/colis/historique";
-import { estRamasse, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
-import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
+import { estMarque, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
+import { BadgeArret, EncocheArret } from "@/components/colis/Ramasse";
 import { formatPoids } from "@/lib/colis/poids";
 import { libelleMotif } from "@/lib/colis/cloture";
 
@@ -149,8 +149,8 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
       ) : (
         <ol className="divide-y divide-navy/[0.07]">
           {arrets.map((s, i) => (
-            <li key={s.id} className={`relative py-2 ${estRamasse(s) ? "pl-3" : ""}`}>
-              {estRamasse(s) && <EncocheRamasse />}
+            <li key={s.id} className={`relative py-2 ${estMarque(s) ? "pl-3" : ""}`}>
+              <EncocheArret stop={s} />
               {plusieursListes && (i === 0 || arrets[i - 1]!.liste !== s.liste) && <p className="pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy/55">{s.liste}</p>}
               <div className="flex items-start gap-3">
                 <span
@@ -162,7 +162,7 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  {estRamasse(s) && <BadgeRamasse className="mb-1" />}
+                  <BadgeArret stop={s} className="mb-1" />
                   <p className="text-sm font-semibold leading-snug">{s.address}</p>
                   <p className="text-xs text-navy/60">
                     {[

@@ -454,3 +454,15 @@ export function IconRamasse(props: IconProps) {
     </Svg>
   );
 }
+
+/** Point relais : devanture de commerce avec store. */
+export function IconPointRelais(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 9l1.5-5h15L21 9" />
+      <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+      <path d="M5 12v8h14v-8" />
+      <path d="M10 20v-5h4v5" />
+    </Svg>
+  );
+}

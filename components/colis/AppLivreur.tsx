@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
+import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -14,8 +14,8 @@ import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
-import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
-import { estRamasse, estPointRelais, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
+import { BadgeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
+import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
@@ -223,7 +223,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
-  /** Valide les quantités physiques avant de clôturer une ramasse ou un point relais. */
+  /** Valide les quantités physiques d'une ramasse ; livraison et point relais passent par la feuille de livraison. */
   async function terminer(s: Stop) {
     if (estRamasse(s)) {
       const valeur = prompt(`Nombre de colis récupérés — ${s.recipient ?? s.address}`, String(s.packages_picked_up ?? s.parcel_count ?? 1));
@@ -246,30 +246,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
       }
       return;
     }
-    if (estPointRelais(s)) {
-      const depose = prompt(`Nombre de colis déposés au point relais — ${s.address}`, String(s.parcel_count ?? 0));
-      if (depose === null) return;
-      const recuperes = prompt(`Nombre de colis récupérés au point relais — ${s.address}`, String(s.packages_picked_up ?? 0));
-      if (recuperes === null) return;
-      const deposeN = Number(depose);
-      const recuperesN = Number(recuperes);
-      if (![deposeN, recuperesN].every((n) => Number.isInteger(n) && n >= 0 && n <= 500)) {
-        setToast({ ok: false, text: "Saisissez des nombres entiers entre 0 et 500." });
-        return;
-      }
-      try {
-        const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${s.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ run_id: run?.id, parcel_count: Math.max(1, deposeN), packages_delivered: deposeN, packages_picked_up: recuperesN }),
-        });
-        setStops((all) => all.map((x) => x.id === s.id ? maj : x));
-        setLivraison(maj);
-      } catch (e) {
-        setToast({ ok: false, text: networkErrorMessage(e) });
-        await charger(run?.id);
-      }
-      return;
-    }
+    // Point relais : la feuille de dépôt demande colis déposés, retours repris et preuve (photo ou code du relais).
     setLivraison(s);
   }
 
@@ -533,11 +510,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             )}
             {arretCarte ? (
               <div className="pointer-events-auto relative mx-auto flex max-w-xl flex-col gap-3 overflow-hidden rounded-2xl bg-surface p-4 shadow-pop">
-                {estRamasse(arretCarte) && <EncocheRamasse large />}
+                <EncocheArret stop={arretCarte} large />
                 <div>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
-                    {estRamasse(arretCarte) && <BadgeRamasse />}
-                    {estPointRelais(arretCarte) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
+                    <BadgeArret stop={arretCarte} />
                     <span>
                       Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
                       {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
@@ -564,7 +540,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                   )}
                   {arretCarte.status === "pending" ? (
                     <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => terminer(arretCarte)}>
-                      <IconCheck className="h-4 w-4" /> {estRamasse(arretCarte) ? "Ramassé" : "Livré"}
+                      <IconCheck className="h-4 w-4" /> {libelleFait(arretCarte)}
                     </button>
                   ) : (
                     <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
@@ -586,7 +562,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="fiche-arret-title" className="font-display text-xl font-bold">Fiche de livraison</h2>
-                <p className="mt-1 text-sm text-navy/60">{estRamasse(detailsStop) ? "Ramasse" : estPointRelais(detailsStop) ? "Point relais" : "Livraison"}</p>
+                <p className="mt-1 text-sm text-navy/60">{estRamasse(detailsStop) ? "Ramasse" : estPointRelais(detailsStop) ? `Point relais${detailsStop.relay_name ? ` · ${detailsStop.relay_name}` : ""}` : "Livraison"}</p>
               </div>
               <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDetailsStop(null)} aria-label="Fermer la fiche">✕</button>
             </div>
@@ -594,7 +570,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
             {detailsStop.phone && <p className="mt-1 text-sm">{detailsStop.phone}</p>}
             {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
-            <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · récupérés : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
+            <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
               <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Navigation</a>
@@ -657,17 +633,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
           </section>
         ) : prochain ? (
           <section
-            className={`relative flex flex-col gap-4 overflow-hidden rounded-2xl border-2 bg-surface p-5 shadow-card ${estRamasse(prochain) ? "border-gold/80" : "border-teal/60"}`}
-            aria-label={estRamasse(prochain) ? "Ramasse en cours" : "Arrêt en cours"}
+            className={`relative flex flex-col gap-4 overflow-hidden rounded-2xl border-2 bg-surface p-5 shadow-card ${bordureArret(prochain, "border-teal/60")}`}
+            aria-label={estRamasse(prochain) ? "Ramasse en cours" : estPointRelais(prochain) ? "Dépôt au point relais en cours" : "Arrêt en cours"}
           >
-            {estRamasse(prochain) && <EncocheRamasse large />}
+            <EncocheArret stop={prochain} large />
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
-              {estRamasse(prochain) && <BadgeRamasse />}
-              {estPointRelais(prochain) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
+              <BadgeArret stop={prochain} />
               <span>
                 Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-                {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+                {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : estPointRelais(prochain) ? " à déposer" : ""}`}
                 {formatPoids(prochain.weight_kg) && ` · ${formatPoids(prochain.weight_kg)}`}
               </span>
             </p>
@@ -714,7 +689,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             )}
             <div className="grid grid-cols-[2fr_1fr] gap-2">
               <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
-                {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
+                {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : estPointRelais(prochain) ? <IconPointRelais className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {libelleFait(prochain)}
               </button>
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
                 <IconX className="h-5 w-5" /> Absent
@@ -761,14 +736,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                     </li>
                   )}
-                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
-                    {estRamasse(s) && <EncocheRamasse />}
+                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
+                    <EncocheArret stop={s} />
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
                       {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                         <div className="mb-1 flex flex-wrap gap-1">
-                          {estRamasse(s) && <BadgeRamasse />}
-                          {estPointRelais(s) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
+                          <BadgeArret stop={s} />
                           {!s.phone && <BadgeSansTelephone />}
                         </div>
                       )}
@@ -825,8 +799,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             {voirTermines && (
               <ol className="mt-1 flex flex-col gap-1.5">
                 {termines.map((s) => (
-                  <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estRamasse(s) ? "pl-4" : "pl-3"}`}>
-                    {estRamasse(s) && <EncocheRamasse />}
+                  <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estMarque(s) ? "pl-4" : "pl-3"}`}>
+                    <EncocheArret stop={s} />
                     <span
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}
                       title={libelleStatut(s)}
@@ -834,12 +808,14 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
                     <p className="min-w-0 flex-1 truncate text-sm">
-                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}{estPointRelais(s) && <span className="mr-1 font-semibold text-teal-ink">Point relais ·</span>}
+                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
+                      {estPointRelais(s) && <span className="mr-1 font-semibold text-relais-ink">Relais{s.relay_name ? ` ${s.relay_name}` : ""} ·</span>}
                       {s.address}
                       {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
+                      {s.status === "delivered" && s.delivered_place === "point_relais" && <span className="block truncate text-xs text-relais-ink">{libellePreuve(s)}</span>}
                     </p>
                     {s.proof_code && (
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-navy/60" title={`QR code scanné : ${s.proof_code}`} aria-label={`Livré avec QR code ${s.proof_code}`}>
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-navy/60" title={`${s.delivered_place === "point_relais" ? "Code du relais" : "QR code"} scanné : ${s.proof_code}`} aria-label={`${s.delivered_place === "point_relais" ? "Code du relais" : "Livré avec QR code"} ${s.proof_code}`}>
                         <IconQrCode className="h-4 w-4" />
                         <span className="hidden font-mono sm:inline">{resumeCodeQr(s.proof_code, 14)}</span>
                       </span>

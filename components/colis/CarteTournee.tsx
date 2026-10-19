@@ -12,9 +12,10 @@ const TEAL = "#1BE4C1";
 const NAVY = "#0A0F1E";
 
 const GOLD = "#F5C842";
+const RELAIS = "#A78BFA";
 
-/** Pastille numérotée ; une ramasse a une encoche (coin carré) et une bordure dorée. */
-function pastille(numero: string, statut: Stop["status"], actif: boolean, ramasse = false): HTMLElement {
+/** Pastille numérotée ; une ramasse a une encoche (coin carré) et une bordure dorée, un point relais une bordure violette. */
+function pastille(numero: string, statut: Stop["status"], actif: boolean, ramasse = false, relais = false): HTMLElement {
   const el = document.createElement("button");
   el.type = "button";
   el.textContent = numero;
@@ -24,10 +25,10 @@ function pastille(numero: string, statut: Stop["status"], actif: boolean, ramass
   Object.assign(el.style, {
     width: `${taille}px`,
     height: `${taille}px`,
-    borderRadius: ramasse ? "999px 999px 999px 3px" : "999px",
+    borderRadius: ramasse || relais ? "999px 999px 999px 3px" : "999px",
     background: fond,
     color: texte,
-    border: ramasse ? `3px solid ${GOLD}` : "2px solid #FFFFFF",
+    border: ramasse ? `3px solid ${GOLD}` : relais ? `3px solid ${RELAIS}` : "2px solid #FFFFFF",
     boxShadow: "0 2px 6px rgba(10,15,30,.35)",
     font: `700 ${actif ? 15 : 12}px system-ui, sans-serif`,
     cursor: "pointer",
@@ -119,8 +120,8 @@ export function CarteTournee({
     }
     stops.forEach((s, i) => {
       if (s.lat === null || s.lng === null) return;
-      const el = pastille(String(i + 1), s.status, s.id === selection, s.kind === "ramasse");
-      el.setAttribute("aria-label", `${s.kind === "ramasse" ? "Ramasse" : "Arrêt"} ${i + 1} — ${s.address}`);
+      const el = pastille(String(i + 1), s.status, s.id === selection, s.kind === "ramasse", s.kind === "point_relais");
+      el.setAttribute("aria-label", `${s.kind === "ramasse" ? "Ramasse" : s.kind === "point_relais" ? "Point relais" : "Arrêt"} ${i + 1} — ${s.address}`);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         onSelection(s.id);

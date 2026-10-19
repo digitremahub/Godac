@@ -9,6 +9,8 @@ import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur"
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { MOTIFS_ECHEC, libelleMotif, refusCloture } from "@/lib/colis/cloture";
+import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
+import { NOM_RELAIS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
@@ -17,8 +19,10 @@ const patchSchema = z.object({
   precision: z.string().trim().max(200).nullable().optional(),
   /** Tournée attendue : l'arrêt doit lui appartenir (clôture depuis la liste). */
   run_id: z.string().uuid().optional(),
-  /** Livraison ou ramasse (enlèvement chez un expéditeur). */
-  type: z.enum(["livraison", "ramasse", "point_relais"]).optional(),
+  /** Livraison, ramasse (enlèvement chez un expéditeur) ou point relais. */
+  type: z.enum(TYPES_ARRET.map((t) => t.key) as [TypeArret, ...TypeArret[]]).optional(),
+  /** Point relais : nom du relais ; null pour l'effacer. */
+  relais: z.string().max(NOM_RELAIS_MAX * 2).nullable().optional(),
   /** Poids des colis de l'arrêt en kg ; null : poids inconnu. */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   adresse: z.string().trim().min(5).max(300).optional(),
@@ -46,7 +50,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-/** Livré / échec / type (livraison, ramasse ou point relais) / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
+/** Livré / échec / type (livraison, ramasse ou point relais) / nom du relais / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
@@ -54,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, motif, precision, run_id, type, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, list_id, creneau } = parsed.data;
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, organization_id").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
@@ -112,7 +116,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let previousStatus: string | null = null;
   if (status) {
     // Clôture dans n'importe quel ordre, mais pas deux fois ; annulation seulement d'un arrêt clôturé.
-    let q = supabase.from("delivery_stops").select("id, status, notes").eq("id", id).eq("organization_id", appUser.organization_id);
+    let q = supabase.from("delivery_stops").select("id, status, notes, kind").eq("id", id).eq("organization_id", appUser.organization_id);
     if (run_id) q = q.eq("run_id", run_id);
     const { data: actuel } = await q.maybeSingle();
     if (!actuel) return NextResponse.json({ error: run_id ? "Arrêt introuvable dans cette tournée." : "Arrêt introuvable." }, { status: 404 });
@@ -121,13 +125,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     previousStatus = actuel.status;
     update.status = status;
     update.done_at = status === "pending" ? null : new Date().toISOString();
-    if (status !== "delivered") Object.assign(update, { delivered_place: null, proof_code: null });
+    if (status !== "delivered") {
+      Object.assign(update, { delivered_place: null, proof_code: null });
+      // Le nom du relais d'une livraison remise au relais part avec la remise ; celui d'un arrêt point relais reste.
+      if (actuel.kind !== "point_relais" && type !== "point_relais") update.relay_name = null;
+    }
     update.failure_reason = status === "failed" ? (motif ?? "absent") : null;
     if (status === "failed" && precision) {
       update.notes = [actuel.notes, `${libelleMotif(motif ?? "absent")} : ${precision}`].filter(Boolean).join(" · ").slice(0, 500);
     }
   }
-  if (type) update.kind = type;
+  if (type) {
+    update.kind = type;
+    if (type !== "point_relais" && !status) update.relay_name = null;
+  }
+  if (relais !== undefined) update.relay_name = normaliserNomRelais(relais);
   if (poids !== undefined) update.weight_kg = poids === null ? null : lirePoids(poids);
   if (notes !== undefined) update.notes = notes;
   if (creneau !== undefined) {
