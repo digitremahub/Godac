@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { ChauffeurDashboard } from "@/components/dashboard/ChauffeurDashboard";
@@ -13,7 +13,9 @@ import { DirectionDashboard } from "@/components/dashboard/DirectionDashboard";
  * so this just reads the shared context once and delegates.
  */
 export default async function DashboardPage({ searchParams }: { searchParams: { presence?: string } }) {
-  const appUser = await requireAppUser();
+  const g = await garderPage("dashboard.accueil");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const enabledModules = await getEnabledModuleKeys(supabase, appUser.organization_id);
 

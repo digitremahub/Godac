@@ -1,4 +1,5 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
@@ -11,7 +12,9 @@ import { libelleLieu, libellePreuve } from "@/lib/colis/livraison";
  * (RLS) et y répond.
  */
 export default async function ContestationsPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("exploitation.contestations");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const [actif, ocr] = await Promise.all([
     isModuleEnabled(supabase, appUser.organization_id, "customer_disputes"),

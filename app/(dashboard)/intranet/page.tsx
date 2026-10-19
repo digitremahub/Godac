@@ -1,7 +1,7 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { AnnouncementForm } from "@/components/intranet/AnnouncementForm";
 import { AnnouncementsList } from "@/components/intranet/AnnouncementsList";
 import { MeetingRequestForm } from "@/components/intranet/MeetingRequestForm";
@@ -9,18 +9,11 @@ import { MeetingRequestsList } from "@/components/intranet/MeetingRequestsList";
 import { ConvocationsList } from "@/components/intranet/ConvocationsList";
 
 export default async function IntranetPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("communication.intranet");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const intranetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "intranet");
-  if (!intranetEnabled) {
-    return (
-      <EmptyState
-        title="Module Intranet & Convocations non activé"
-        description="Activez-le depuis les paramètres de votre organisation."
-      />
-    );
-  }
 
   const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
   const canRequestMeeting = appUser.role !== "direction";

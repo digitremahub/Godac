@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { NewFineForm } from "@/components/fines/NewFineForm";
 import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
@@ -12,21 +10,11 @@ import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
  * confirm/notify routes this page's components call.
  */
 export default async function FinesPage() {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    redirect("/dashboard");
-  }
+  const g = await garderPage("flotte.amendes");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const finesEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fines");
-  if (!finesEnabled) {
-    return (
-      <EmptyState
-        title="Module Amendes non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour suivre les amendes par véhicule."
-      />
-    );
-  }
 
   const [{ data: vehicles }, { data: finesData }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").order("registration"),

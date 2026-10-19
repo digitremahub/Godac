@@ -1,5 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { notFound } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
@@ -23,7 +23,9 @@ const STATUS_LABELS: Record<string, string> = {
  */
 export default async function VehicleQuickActionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderPage("flotte.actions_vehicule");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
   const [{ data: vehicle }, enabledModuleKeys, { data: activeTour }] = await Promise.all([

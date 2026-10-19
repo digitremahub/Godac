@@ -1,9 +1,11 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 
 export default async function MesAmendesPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.amendes");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
     .from("fines")

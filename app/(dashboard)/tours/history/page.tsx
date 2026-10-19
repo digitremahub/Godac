@@ -1,7 +1,6 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { TourHistoryFilters } from "@/components/tours/TourHistoryFilters";
 import { TourHistoryTable, type TourHistoryRow } from "@/components/tours/TourHistoryTable";
@@ -45,18 +44,11 @@ export default async function TourHistoryPage({
   searchParams: Promise<{ from?: string; to?: string; service?: string; driver?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("exploitation.historique");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
-  if (!planningEnabled) {
-    return (
-      <EmptyState
-        title="Module Planning non activé"
-        description="L'historique des tournées dépend du module Planning — activez-le depuis les paramètres de votre organisation."
-      />
-    );
-  }
 
   const isDirection = appUser.role === "direction";
   const isChauffeur = appUser.role === "chauffeur";

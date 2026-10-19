@@ -1,5 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { notFound } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/ui";
@@ -7,7 +7,9 @@ import { FaqManager, type FaqEntry } from "@/components/assistant/FaqManager";
 
 /** GODAC-level curation of the shared FAQ — platform admins only. */
 export default async function AdminFaqPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("admin.faq");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   if (!(await isPlatformAdmin(appUser.id))) notFound();
 
   const admin = createAdminSupabaseClient();

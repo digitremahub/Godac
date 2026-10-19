@@ -1,8 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
@@ -10,12 +9,10 @@ import { currentMonth } from "@/lib/planning/dates";
 import { PaieEditor } from "@/components/paie/PaieEditor";
 
 export default async function PaieSalariePage({ params, searchParams }: { params: Promise<{ userId: string }>; searchParams: Promise<{ mois?: string }> }) {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="La paie est réservée à la direction." />;
+  const g = await garderPage("equipe.paie_salarie");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, appUser.organization_id, "payslips"))) {
-    return <EmptyState title="Module Fiches de paie non activé" />;
-  }
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;
   const { userId } = await params;

@@ -1,6 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ReportsViewTabs } from "@/components/reports/ReportsViewTabs";
 import { ReportFilters } from "@/components/reports/ReportFilters";
@@ -62,18 +61,11 @@ interface ReportsSearchParams {
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportsSearchParams> }) {
   const params = await searchParams;
   const view = params.view === "photos" ? "photos" : "table";
-  const appUser = await requireAppUser();
+  const g = await garderPage("exploitation.rapports");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
-  if (!planningEnabled) {
-    return (
-      <EmptyState
-        title="Module Planning non activé"
-        description="Les rapports de tournée dépendent du module Planning — activez-le depuis les paramètres de votre organisation."
-      />
-    );
-  }
 
   const isDirection = appUser.role === "direction";
   const from = params.from && !Number.isNaN(Date.parse(params.from)) ? params.from : addDays(todayISO(), -30);

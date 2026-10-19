@@ -1,6 +1,5 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ClockButton } from "@/components/time-clock/ClockButton";
 import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/classify-location";
@@ -51,18 +50,11 @@ function mapLink(coords: Coordinates | null) {
  * the depot" vs "badged in from home" before trusting it for hours.
  */
 export default async function TimeClockPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.pointage");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const timeClockEnabled = await isModuleEnabled(supabase, appUser.organization_id, "time_clock");
-  if (!timeClockEnabled) {
-    return (
-      <EmptyState
-        title="Module Pointeuse non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour suivre les heures badgées."
-      />
-    );
-  }
 
   const isDirection = appUser.role === "direction";
 

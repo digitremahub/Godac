@@ -1,5 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
@@ -12,12 +12,10 @@ const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", curren
 
 /** Vue du mois : un bulletin à préparer par salarié, avec son état. Direction uniquement. */
 export default async function PaiePage({ searchParams }: { searchParams: Promise<{ mois?: string }> }) {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="La paie est réservée à la direction." />;
+  const g = await garderPage("equipe.paie");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, appUser.organization_id, "payslips"))) {
-    return <EmptyState title="Module Fiches de paie non activé" description="Activez-le depuis Modules & tarifs." />;
-  }
   const planning = await isModuleEnabled(supabase, appUser.organization_id, "planning");
   const onglets = <OngletsPaie actif="bulletins" paie planning={planning} />;
   const pays = await paysOrganisation(supabase, appUser.organization_id);

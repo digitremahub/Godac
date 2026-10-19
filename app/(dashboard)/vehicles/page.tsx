@@ -1,25 +1,17 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { RoleGate } from "@/components/layout/RoleGate";
 import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
 import { VehicleFleetTable } from "@/components/vehicles/VehicleFleetTable";
 
 export default async function VehiclesPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("flotte.vehicules");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const fleetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fleet");
-  if (!fleetEnabled) {
-    return (
-      <EmptyState
-        title="Module Flotte non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour gérer vos véhicules."
-      />
-    );
-  }
 
   const { data: vehicles } = await supabase
     .from("vehicles")

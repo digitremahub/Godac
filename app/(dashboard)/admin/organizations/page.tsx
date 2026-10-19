@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { estPoleBureau } from "@/lib/organization/poles";
@@ -15,7 +15,9 @@ import { JoinLinkCard } from "@/components/admin/JoinLinkCard";
 import { PayslipContributionLinesPanel } from "@/components/admin/PayslipContributionLinesPanel";
 
 export default async function OrganizationSettingsPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("admin.organisation");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
   const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }, { data: activeUsers }] =

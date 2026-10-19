@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { BillingPanel } from "@/components/admin/BillingPanel";
@@ -6,7 +6,9 @@ import { UsagePanel, type HistoriqueMois } from "@/components/admin/UsagePanel";
 import { bornesMoisParis, derniersMois, lignesConsommation, resoudreFormule, unitesEnDepassement, montantCentimes } from "@/lib/usage/quotas";
 
 export default async function BillingPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("admin.abonnement");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { data: organization } = await supabase
     .from("organizations")

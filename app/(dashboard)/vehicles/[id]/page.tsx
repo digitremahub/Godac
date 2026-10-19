@@ -1,7 +1,8 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { notFound } from "next/navigation";
 import { libellePhoto } from "@/lib/tours/changement-vehicule";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -37,7 +38,9 @@ function SpecProvenance({ field, specSources, label }: { field: string; specSour
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderPage("flotte.vehicule_fiche");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
   const [fleetEnabled, washesEnabled, rentalEnabled] = await Promise.all([

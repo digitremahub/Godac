@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
@@ -15,18 +15,11 @@ const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "num
  * Direction generates for anyone; everyone else sees only their own.
  */
 export default async function PayslipsPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.fiches_paie");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
-  if (!payslipsEnabled) {
-    return (
-      <EmptyState
-        title="Module Fiches de Paie non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour générer des bulletins indicatifs."
-      />
-    );
-  }
 
   const isDirection = appUser.role === "direction";
 

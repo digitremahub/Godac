@@ -1,18 +1,14 @@
-import { redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 import { DriverFineActions } from "@/components/fines/DriverFineActions";
 
 export default async function MesAmendesPage() {
-  const user = await requireAppUser();
-  if (!["chauffeur", "manager_chauffeur"].includes(user.role)) redirect("/dashboard");
+  const g = await garderPage("moi.amendes");
+  if (!g.ok) return g.ecran;
+  const user = g.appUser;
   const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, user.organization_id, "fines"))) {
-    return <EmptyState title="Module Amendes non activé" description="La direction peut activer ce module depuis Modules & tarifs." />;
-  }
   // Use service-role only after authenticating; scope strictly to this user and organization.
   const admin = createAdminSupabaseClient();
   const { data } = await admin.from("fines")

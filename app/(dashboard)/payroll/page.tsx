@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
@@ -67,10 +66,9 @@ export default async function PayrollPage({
   searchParams: Promise<{ month?: string; driver?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    redirect("/dashboard");
-  }
+  const g = await garderPage("equipe.heures");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
   const timeClockEnabled = await isModuleEnabled(supabase, appUser.organization_id, "time_clock");

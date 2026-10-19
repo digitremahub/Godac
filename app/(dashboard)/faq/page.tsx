@@ -1,12 +1,14 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { requireAppUser } from "@/lib/auth/session";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import type { UserRole } from "@/lib/types/domain";
 
 export default async function FaqPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("aide.faq");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const [{ data: rows }, platformAdmin] = await Promise.all([
     supabase.from("assistant_faq").select("id, question, answer, roles, asked_count").eq("status", "published").order("asked_count", { ascending: false }),

@@ -1,5 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { ROLE_LABELS } from "@/lib/roles/labels";
@@ -15,7 +15,9 @@ export const metadata = { title: "Guide d'utilisation — GODAC" };
  * non souscrits sont masquées.
  */
 export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderPage("aide.guide");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const [{ data: organization }, modules] = await Promise.all([
     supabase.from("organizations").select("is_demo").eq("id", appUser.organization_id).single(),

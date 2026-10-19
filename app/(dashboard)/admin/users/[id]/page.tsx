@@ -1,7 +1,8 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { PRESENCE_STATUS, estPoleBureau, libelleServiceAvecPole } from "@/lib/organization/poles";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { PageHeader, Card } from "@/components/ui";
@@ -48,7 +49,9 @@ const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", ye
  */
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderPage("equipe.utilisateur_fiche");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const canViewOthers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);
   if (!canViewOthers && id !== appUser.id) {
     redirect("/dashboard");

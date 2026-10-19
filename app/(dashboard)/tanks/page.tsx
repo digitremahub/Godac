@@ -1,4 +1,5 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -14,7 +15,9 @@ import { TanksPageTabs } from "@/components/tanks/TanksPageTabs";
 export default async function TanksPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const params = await searchParams;
   const tab = params.tab === "approvisionnements" ? "approvisionnements" : "cuves";
-  const appUser = await requireAppUser();
+  const g = await garderPage("carburant.cuves");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 

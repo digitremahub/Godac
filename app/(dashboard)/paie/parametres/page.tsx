@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -8,8 +8,9 @@ import { FRAIS_CONVENTIONNELS, parametresLegauxAu } from "@/lib/paie/parametres"
 import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 export default async function ReglagesPaiePage() {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="La paie est réservée à la direction." />;
+  const g = await garderPage("equipe.paie_reglages");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;

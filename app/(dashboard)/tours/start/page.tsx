@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { StartTourFlow } from "@/components/tours/StartTourFlow";
@@ -8,7 +8,9 @@ export default async function StartTourPage({
 }: {
   searchParams: Promise<{ vehicle?: string }>;
 }) {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.tournee_depart");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { vehicle } = await searchParams;
   const { data: organization } = await supabase

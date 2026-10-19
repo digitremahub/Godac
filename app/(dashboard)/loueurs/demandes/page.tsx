@@ -1,9 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState, StatTile } from "@/components/ui";
+import { PageHeader, StatTile } from "@/components/ui";
 import { RentalRequestsList } from "@/components/rental/RentalRequestsList";
 import { loadRentalRequests } from "@/lib/rental/load-requests";
 import { RENTAL_REQUEST_STATUSES, RENTAL_STATUS_LABELS } from "@/lib/rental/workflow";
@@ -13,12 +11,10 @@ export default async function RentalRequestsPage({
 }: {
   searchParams: Promise<{ statut?: string; loueur?: string; vehicule?: string }>;
 }) {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) redirect("/dashboard");
+  const g = await garderPage("flotte.loueurs_demandes");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, appUser.organization_id, "rental_providers"))) {
-    return <EmptyState title="Module Véhicules loués non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
   const sp = await searchParams;
   const status = RENTAL_REQUEST_STATUSES.includes(sp.statut as any) ? sp.statut : undefined;
   const uuid = /^[0-9a-f-]{36}$/i;

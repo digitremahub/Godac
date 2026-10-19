@@ -1,10 +1,12 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
 
 export default async function AlertsPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("communication.alertes");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { data: alerts } = await supabase
     .from("alerts")

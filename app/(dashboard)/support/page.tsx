@@ -1,7 +1,6 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { SupportRequestsList } from "@/components/assistant/SupportRequestsList";
 
 /**
@@ -13,16 +12,11 @@ import { SupportRequestsList } from "@/components/assistant/SupportRequestsList"
  * widening support_requests' org-wide manager-like SELECT policy.
  */
 export default async function SupportPage() {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
-    return <EmptyState title="Accès réservé" description="Cette page est réservée aux gestionnaires et à la direction." />;
-  }
+  const g = await garderPage("communication.assistance");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const assistantEnabled = await isModuleEnabled(supabase, appUser.organization_id, "assistant");
-  if (!assistantEnabled) {
-    return <EmptyState title="Module assistant non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
 
   let query = supabase
     .from("support_requests")

@@ -1,6 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planning/PlanningDuplicatesBanner";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
@@ -24,18 +23,11 @@ export default async function PlanningPage({
   searchParams: Promise<{ week?: string; day?: string; month?: string; service?: string; view?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("exploitation.planning");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
-  if (!planningEnabled) {
-    return (
-      <EmptyState
-        title="Module Planning non activé"
-        description="Activez-le depuis les paramètres de votre organisation."
-      />
-    );
-  }
 
   const view: PlanningView = (["week", "day", "month", "kanban", "list"] as const).includes(params.view as PlanningView)
     ? (params.view as PlanningView)

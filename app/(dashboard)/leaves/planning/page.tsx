@@ -1,7 +1,6 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { LeavePlanningCalendar } from "@/components/leaves/LeavePlanningCalendar";
 import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
 
@@ -18,16 +17,11 @@ export default async function LeavePlanningPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    return <EmptyState title="Accès réservé" description="Cette page est réservée à la direction." />;
-  }
+  const g = await garderPage("equipe.conges_calendrier");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const leaveEnabled = await isModuleEnabled(supabase, appUser.organization_id, "leave_management");
-  if (!leaveEnabled) {
-    return <EmptyState title="Module Congés & Absences non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
 
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonth();
   const monthStart = firstOfMonth(month);
