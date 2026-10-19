@@ -79,6 +79,7 @@ export function GoNavigation({
   const routeStopsRef = useRef<Array<{ label: string; latitude: number; longitude: number }>>(
     destination ? [destination] : [],
   );
+  const fullTourRef = useRef(false);
 
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'locating' | 'active' | 'error'>('idle');
@@ -304,6 +305,7 @@ export function GoNavigation({
   const setDestination = useCallback((next: { label: string; latitude: number; longitude: number }) => {
     setDestinationState(next);
     destinationRef.current = next;
+    fullTourRef.current = false;
     routeStopsRef.current = [next];
     const map = mapRef.current;
     map?.flyTo({ center: [next.longitude, next.latitude], zoom: 13, essential: true });
@@ -384,6 +386,30 @@ export function GoNavigation({
     const plannedStops = routeStopsRef.current;
     void calculateRoute(position, plannedStops.length > 0 ? plannedStops : destination);
   }, [destination, position, calculateRoute]);
+
+  useEffect(() => {
+    if (!fullTourRef.current) return;
+    const remainingStops = stops
+      .filter((stop) => !stop.completed && Number.isFinite(stop.latitude) && Number.isFinite(stop.longitude))
+      .map((stop) => ({
+        label: stop.label,
+        latitude: Number(stop.latitude),
+        longitude: Number(stop.longitude),
+      }));
+    routeStopsRef.current = remainingStops;
+    if (remainingStops.length === 0) {
+      routeRef.current = null;
+      setRoute(null);
+      setDestinationState(null);
+      destinationRef.current = null;
+      setError("La tournée est terminée : aucun arrêt restant.");
+      return;
+    }
+    const lastStop = remainingStops[remainingStops.length - 1];
+    setDestinationState(lastStop);
+    destinationRef.current = lastStop;
+    if (currentPositionRef.current) void calculateRoute(currentPositionRef.current, remainingStops);
+  }, [stops, calculateRoute]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -485,6 +511,7 @@ export function GoNavigation({
                     setError("Il ne reste aucun arrêt à desservir.");
                     return;
                   }
+                  fullTourRef.current = true;
                   routeStopsRef.current = remainingStops;
                   const lastStop = remainingStops[remainingStops.length - 1];
                   setDestinationState(lastStop);
