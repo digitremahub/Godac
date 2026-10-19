@@ -80,6 +80,7 @@ export function GoNavigation({
     destination ? [destination] : [],
   );
   const fullTourRef = useRef(false);
+  const initialRouteCalculatedRef = useRef(false);
 
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'locating' | 'active' | 'error'>('idle');
@@ -382,7 +383,8 @@ export function GoNavigation({
   }, [geocodingUrl, query]);
 
   useEffect(() => {
-    if (!destination || !position) return;
+    if (!destination || !position || initialRouteCalculatedRef.current) return;
+    initialRouteCalculatedRef.current = true;
     const plannedStops = routeStopsRef.current;
     void calculateRoute(position, plannedStops.length > 0 ? plannedStops : destination);
   }, [destination, position, calculateRoute]);
