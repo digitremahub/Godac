@@ -141,3 +141,6 @@ export function convertirPeriodesGoogle(periodes: PeriodeGoogle[] | null | undef
   }
   return lu ? normaliserSemaine(semaine) : null;
 }
+
+/** Libellé de l'origine d'une fiche horaires (delivery_address_hours.source). */
+export const LIBELLE_SOURCE: Record<string, string> = { openstreetmap: "OpenStreetMap", google: "Google", manuel: "saisie manuelle" };
