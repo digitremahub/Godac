@@ -1,6 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
@@ -20,10 +19,9 @@ const STATUS_LABELS: Record<string, string> = {
  * vehicle that's currently unassigned, or release their own.
  */
 export default async function MyVehiclePage() {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur"])) {
-    redirect("/dashboard");
-  }
+  const g = await garderPage("moi.vehicule");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
 

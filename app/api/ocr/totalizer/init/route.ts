@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
@@ -14,7 +14,9 @@ import { isModuleEnabled } from "@/lib/organization/modules";
  * app/api/fuel-entries).
  */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const ocrEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ocr");
   if (!ocrEnabled) {

@@ -1,7 +1,6 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
+import { PageHeader } from "@/components/ui";
 import { Contestations, type Contestation } from "@/components/contestations/Contestations";
 import { libelleLieu, libellePreuve } from "@/lib/colis/livraison";
 
@@ -11,13 +10,10 @@ import { libelleLieu, libellePreuve } from "@/lib/colis/livraison";
  * (RLS) et y répond.
  */
 export default async function ContestationsPage() {
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
-  const [actif, ocr] = await Promise.all([
-    isModuleEnabled(supabase, appUser.organization_id, "customer_disputes"),
-    isModuleEnabled(supabase, appUser.organization_id, "ocr"),
-  ]);
-  if (!actif) return <EmptyState title="Module Contestations clients non activé" description="La direction peut l'activer depuis Modules & tarifs." />;
+  const g = await garderPage("exploitation.contestations");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase, modules } = g;
+  const ocr = modules.has("ocr");
   const encadrement = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
   const [{ data: rows }, { data: users }] = await Promise.all([

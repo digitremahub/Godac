@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PAYS, type CodePays } from "@/lib/pays/pays";
 import { geocodeAddress } from "@/lib/geo/geocode";
@@ -34,7 +34,9 @@ const bodySchema = z.object({
 
 /** Module 9: org profile settings — réservé à la direction (RLS + contrôle explicite, audit F2). */
 export async function PATCH(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut modifier l'organisation." }, { status: 403 });
   }

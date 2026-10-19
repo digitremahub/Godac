@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { blockInDemo } from "@/lib/demo/guard";
@@ -13,7 +13,9 @@ export async function POST() {
     );
   }
 
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const demoBlocked = await blockInDemo(appUser.organization_id);
   if (demoBlocked) return demoBlocked;
   if (appUser.role !== "direction") {

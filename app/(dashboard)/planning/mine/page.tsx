@@ -1,9 +1,8 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { estPresence, libelleEntreePlanning } from "@/lib/organization/poles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { PageHeader, Card } from "@/components/ui";
 import { DayStrip, type StripTour } from "@/components/planning/DayStrip";
 import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays, parisCalendarDate } from "@/lib/planning/dates";
 
@@ -92,18 +91,11 @@ export default async function MyPlanningPage({
   searchParams: Promise<{ view?: string; anchor?: string; week?: string; entry?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.planning");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const planningEnabled = await isModuleEnabled(supabase, appUser.organization_id, "planning");
-  if (!planningEnabled) {
-    return (
-      <EmptyState
-        title="Module Planning non activé"
-        description="Contactez votre gestionnaire pour l'activer."
-      />
-    );
-  }
 
   // Month first: the driver's question is « quand je travaille ce mois-ci ».
   const view: ViewMode = params.view === "day" || params.view === "week" ? params.view : "month";

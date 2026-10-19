@@ -1,3 +1,4 @@
+import { estModuleVendable } from "@/lib/acces/catalogue";
 import { priceFor, type ModuleCatalogEntry, type ModulePlanPrice, type Plan, type PlanId } from "@/lib/organization/catalog-types";
 
 /**
@@ -47,7 +48,7 @@ export function calculerDevis(
   ];
   const voulus = new Set(choisis);
   for (const m of modules) {
-    if (m.wave === "v3") continue;
+    if (!estModuleVendable(m)) continue;
     const p = priceFor(prices, m.key, plan.id);
     if (!p) continue;
     if (p.included) {

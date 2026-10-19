@@ -1,10 +1,12 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createRecoveryCode, hashRecoveryCode } from "@/lib/auth/driver-recovery";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut générer un code de secours." }, { status: 403 });
   }

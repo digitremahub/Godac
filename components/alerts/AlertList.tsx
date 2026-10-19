@@ -17,6 +17,7 @@ interface Alert {
   created_at: string;
   related_table: string | null;
   related_id: string | null;
+  recipient_user_id?: string | null;
 }
 
 const SEVERITY_BADGE: Record<Alert["severity"], string> = {
@@ -67,9 +68,9 @@ export function AlertList({ alerts, viewerRole }: { alerts: Alert[]; viewerRole:
               {!alert.notified_at && <span className="badge-neutral">Email non envoyé</span>}
             </div>
             <p className="text-sm">{alert.message}</p>
-            {resolveAlertUrl(alert.related_table, alert.type, alert.related_id) && (
+            {resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: viewerRole }) && (
               <Link
-                href={resolveAlertUrl(alert.related_table, alert.type, alert.related_id)!}
+                href={resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: viewerRole })!}
                 className="mt-1 inline-block text-xs text-teal-ink underline"
               >
                 Voir →

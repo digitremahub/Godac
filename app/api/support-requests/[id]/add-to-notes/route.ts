@@ -1,11 +1,13 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /** "Ajouter cette réponse aux consignes" — direction only, per spec. RLS ("assistant_notes: direction manages") backs this too. */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut ajouter une consigne." }, { status: 403 });
   }

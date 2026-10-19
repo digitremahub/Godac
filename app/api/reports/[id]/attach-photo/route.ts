@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { arretsLivraison, type LectureArrets } from "@/lib/ocr/arrets";
 
@@ -48,7 +48,9 @@ const bodySchema = z.union([
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }

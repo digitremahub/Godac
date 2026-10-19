@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 
@@ -23,7 +23,9 @@ const bodySchema = z.object({
  * after_planning_entry_upsert trigger, which notifies the driver.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
     return NextResponse.json({ error: "Seule la Direction, le responsable exploitation ou le chef d’équipe peut attribuer une tournée." }, { status: 403 });
   }

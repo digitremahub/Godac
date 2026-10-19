@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 
@@ -14,7 +14,9 @@ const WINDOW_DAYS = 30;
  * the others).
  */
 export async function GET() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const since = new Date(Date.now() - WINDOW_DAYS * 86400000).toISOString();
 
@@ -39,7 +41,7 @@ export async function GET() {
     severity: a.severity,
     message: a.message,
     createdAt: a.created_at,
-    href: resolveAlertUrl(a.related_table, a.type, a.related_id) ?? "/alerts",
+    href: resolveAlertUrl(a.related_table, a.type, a.related_id, { recipientUserId: a.recipient_user_id, role: appUser.role }) ?? "/alerts",
     read: readSet.has(a.id),
   }));
   return NextResponse.json({ items, unread: items.filter((i) => !i.read).length });
@@ -49,7 +51,9 @@ const postSchema = z.object({ ids: z.array(z.string().uuid()).max(100) });
 
 /** Marks notifications as read for the caller only. */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ roles: "tous" });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const parsed = postSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   if (parsed.data.ids.length === 0) return NextResponse.json({ ok: true });

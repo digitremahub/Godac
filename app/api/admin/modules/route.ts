@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { moduleDisponible } from "@/lib/pays/pays";
 import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -24,7 +24,9 @@ const bodySchema = z.object({
  * retraits et les modules gratuits sont acceptés.
  */
 export async function PATCH(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut modifier les modules" }, { status: 403 });
   }

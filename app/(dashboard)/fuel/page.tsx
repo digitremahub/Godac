@@ -1,6 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
@@ -27,7 +28,9 @@ export default async function FuelPage({
   searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("carburant.pleins");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
   const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);

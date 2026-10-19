@@ -1,6 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { garderPage } from "@/lib/acces/garde-page";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ClockButton } from "@/components/time-clock/ClockButton";
 import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/classify-location";
@@ -51,20 +49,15 @@ function mapLink(coords: Coordinates | null) {
  * the depot" vs "badged in from home" before trusting it for hours.
  */
 export default async function TimeClockPage() {
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
+  const g = await garderPage("moi.pointage");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase } = g;
 
-  const timeClockEnabled = await isModuleEnabled(supabase, appUser.organization_id, "time_clock");
-  if (!timeClockEnabled) {
-    return (
-      <EmptyState
-        title="Module Pointeuse non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour suivre les heures badgées."
-      />
-    );
-  }
-
+  // Décision client Q3 : vue d'équipe pour la direction (tous) et les
+  // managers (membres de leur service, filtrés par la RLS
+  // « time_clock: manager reads service »). Les autres : leur historique.
   const isDirection = appUser.role === "direction";
+  const vueEquipe = isDirection || appUser.role === "manager" || appUser.role === "manager_chauffeur";
 
   const [{ data: openEntry }, { depotsFor }] = await Promise.all([
     supabase.from("time_clock_entries").select("id").eq("user_id", appUser.id).is("clocked_out_at", null).maybeSingle(),
@@ -78,7 +71,7 @@ export default async function TimeClockPage() {
     )
     .order("clocked_in_at", { ascending: false })
     .limit(100);
-  if (!isDirection) query = query.eq("user_id", appUser.id);
+  if (!vueEquipe) query = query.eq("user_id", appUser.id);
 
   const { data: entries } = await query;
 
@@ -90,7 +83,7 @@ export default async function TimeClockPage() {
         <ClockButton clockedIn={Boolean(openEntry)} />
       </div>
 
-      <h3 className="mb-2 text-base">{isDirection ? "Historique (tous les employés)" : "Mon historique"}</h3>
+      <h3 className="mb-2 text-base">{isDirection ? "Historique (tous les employés)" : vueEquipe ? "Historique (vous et votre service)" : "Mon historique"}</h3>
       {(entries ?? []).length === 0 ? (
         <EmptyState title="Aucun badgeage enregistré." />
       ) : (
@@ -105,7 +98,7 @@ export default async function TimeClockPage() {
             return (
               <div key={e.id} className="flex items-center justify-between border-t border-navy/5 py-1.5 text-sm first:border-t-0 first:pt-0">
                 <span>
-                  {isDirection && <span className="font-medium">{e.users?.full_name ?? "—"} — </span>}
+                  {vueEquipe && <span className="font-medium">{e.users?.full_name ?? "—"} — </span>}
                   {new Date(e.clocked_in_at).toLocaleString("fr-FR", {
                     day: "2-digit",
                     month: "2-digit",

@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -25,7 +25,9 @@ const UNDO_WINDOW_MS = 15 * 60 * 1000;
  *   the app can *offer* the clock-out; it never clocks out by itself.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["time_clock"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = positionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Position invalide." }, { status: 400 });
 
@@ -81,7 +83,9 @@ export async function POST(req: Request) {
  * caller's own, still-open, *assisted* entry from the last 15 minutes.
  */
 export async function DELETE(req: Request) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["time_clock"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const entryId = new URL(req.url).searchParams.get("id");
   if (!entryId || !/^[0-9a-f-]{36}$/i.test(entryId)) {
     return NextResponse.json({ error: "Pointage introuvable." }, { status: 400 });

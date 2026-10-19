@@ -1,4 +1,5 @@
 "use client";
+import { estModuleVendable } from "@/lib/acces/catalogue";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -29,7 +30,7 @@ export function PricingSimulator({
   const plan = plans.find((p) => p.id === planId);
   const selected = new Set(selectedModuleKeys);
   const selectedAddons = modules
-    .filter((m) => m.wave !== "v3")
+    .filter(estModuleVendable)
     .map((m) => ({ module: m, price: priceFor(prices, m.key, planId) }))
     .filter((x) => !x.price?.included && selected.has(x.module.key));
   const addonsTotal = selectedAddons.reduce((sum, x) => sum + Number(x.price?.monthly_price ?? 0), 0);

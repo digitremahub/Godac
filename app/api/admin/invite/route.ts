@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { inviteOrganizationMember } from "@/lib/auth/invitations";
 import { blockInDemo } from "@/lib/demo/guard";
 
@@ -15,7 +15,9 @@ const bodySchema = z.object({
 
 /** Module 9: invite a single user from the admin UI (see also the CSV bulk import in Module 1). */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut inviter des utilisateurs" }, { status: 403 });
   }

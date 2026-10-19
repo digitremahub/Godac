@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { addDays } from "@/lib/planning/dates";
@@ -46,7 +46,9 @@ function buildDigestMessage(entries: DigestEntry[]): string {
  * au-dessus.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "manager" && appUser.role !== "direction") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }

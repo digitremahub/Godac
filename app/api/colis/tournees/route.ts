@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { normaliserNomRelais } from "@/lib/colis/relais";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
@@ -10,7 +10,9 @@ import { aujourdhuiParis, cleAdresse, creerTournee, listerTournees, moduleActif,
 
 /** Tournées colis du chauffeur connecté (jour en cours + non clôturées de la semaine). */
 export async function GET() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   return NextResponse.json({ tournees: await listerTournees(supabase, appUser) });
@@ -20,7 +22,9 @@ const bodySchema = z.object({ name: z.string().trim().max(60).nullable().optiona
 
 /** Une seule fiche Colis par chauffeur et par jour, regroupant toutes ses tournées planifiées. */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["route_optimizer"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));

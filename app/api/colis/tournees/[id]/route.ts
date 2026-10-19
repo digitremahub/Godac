@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/audit/journal";
 import { avecHoraires, avecProfessionnel, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
@@ -8,7 +8,9 @@ import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
 
 async function contexte(id: string) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return { erreur: g.reponse };
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return { erreur: NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 }) };
   const run = await tourneeParId(supabase, appUser, id);
@@ -70,7 +72,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = (await params).id;
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["route_optimizer"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const direction = appUser.role === "direction";

@@ -116,7 +116,8 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         <Link href="/tours/history" className="block">
           <StatTile label="Tournées en cours" value={String(ongoingTours.length)} accent="teal" />
         </Link>
-        <Link href="/ocr-review" className="block">
+        {/* La revue OCR est réservée à l'encadrement : le comptable consulte la liste filtrée des pleins. */}
+        <Link href="/fuel?status=awaiting_validation" className="block">
           <StatTile label="Tickets OCR en attente" value={String(pendingOcrRes.count ?? 0)} accent="gold" />
         </Link>
         {leaveEnabled && (

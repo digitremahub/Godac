@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ACTIONS_AUDIT, type ActionAudit } from "@/lib/audit/journal";
@@ -8,8 +8,9 @@ const DATE = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", dateSt
 
 /** Journal des actions sensibles (direction) — exports, corrections, droits, PIN bloqués. */
 export default async function JournalAuditPage({ searchParams }: { searchParams: Promise<{ action?: string; page?: string }> }) {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") return <EmptyState title="Accès réservé" description="Le journal d'audit est réservé à la direction." />;
+  const g = await garderPage("admin.journal");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const params = await searchParams;
   const action = params.action && params.action in ACTIONS_AUDIT ? (params.action as ActionAudit) : null;
   const page = Math.max(1, Number(params.page) || 1);

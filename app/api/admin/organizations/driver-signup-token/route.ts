@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
@@ -12,7 +12,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
  * session-scoped client is enough — no admin client needed.
  */
 export async function POST() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Seule la direction peut régénérer ce lien." }, { status: 403 });
   }

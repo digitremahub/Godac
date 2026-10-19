@@ -1,8 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { notFound } from "next/navigation";
 import { libellePhoto } from "@/lib/tours/changement-vehicule";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { hasRole } from "@/lib/auth/session";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import Link from "next/link";
@@ -37,17 +36,11 @@ function SpecProvenance({ field, specSources, label }: { field: string; specSour
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
-
-  const [fleetEnabled, washesEnabled, rentalEnabled] = await Promise.all([
-    isModuleEnabled(supabase, appUser.organization_id, "fleet"),
-    isModuleEnabled(supabase, appUser.organization_id, "washes"),
-    isModuleEnabled(supabase, appUser.organization_id, "rental_providers"),
-  ]);
-  if (!fleetEnabled) {
-    return <EmptyState title="Module Flotte non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
+  const g = await garderPage("flotte.vehicule_fiche");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase, modules } = g;
+  const washesEnabled = modules.has("washes");
+  const rentalEnabled = modules.has("rental_providers");
 
   const [
     { data: vehicle },

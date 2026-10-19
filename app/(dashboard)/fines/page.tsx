@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { garderPage } from "@/lib/acces/garde-page";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { NewFineForm } from "@/components/fines/NewFineForm";
 import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
@@ -12,21 +9,12 @@ import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
  * confirm/notify routes this page's components call.
  */
 export default async function FinesPage() {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    redirect("/dashboard");
-  }
-
-  const supabase = await createServerSupabaseClient();
-  const finesEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fines");
-  if (!finesEnabled) {
-    return (
-      <EmptyState
-        title="Module Amendes non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour suivre les amendes par véhicule."
-      />
-    );
-  }
+  const g = await garderPage("flotte.amendes");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase } = g;
+  // Décision client Q2 : managers sur les véhicules de leur service (la
+  // RLS filtre la liste), comptable en lecture seule.
+  const lectureSeule = appUser.role === "comptable";
 
   const [{ data: vehicles }, { data: finesData }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").order("registration"),
@@ -58,13 +46,15 @@ export default async function FinesPage() {
         title="Amendes"
         description="Rattachement suggéré au chauffeur via le planning du véhicule — à confirmer avant notification."
       />
-      <div className="mb-4">
-        <NewFineForm vehicles={vehicles ?? []} />
-      </div>
+      {!lectureSeule && (
+        <div className="mb-4">
+          <NewFineForm vehicles={vehicles ?? []} />
+        </div>
+      )}
       {fines.length === 0 ? (
         <EmptyState title="Aucune amende" description="Les amendes enregistrées apparaîtront ici." />
       ) : (
-        <FinesTable fines={fines} />
+        <FinesTable fines={fines} lectureSeule={lectureSeule} />
       )}
     </div>
   );

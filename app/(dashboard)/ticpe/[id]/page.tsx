@@ -1,8 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { TicpeExportLinesReview } from "@/components/ticpe/TicpeExportLinesReview";
 
@@ -13,13 +12,11 @@ import { TicpeExportLinesReview } from "@/components/ticpe/TicpeExportLinesRevie
  */
 export default async function TicpeExportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderPage("carburant.ticpe_detail");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const ticpeEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ticpe_export");
-  if (!ticpeEnabled) {
-    return <EmptyState title="Module Export TICPE non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
 
   const [{ data: exportRow }, { data: lines }] = await Promise.all([
     supabase.from("ticpe_exports").select("id, period_start, period_end, vehicle_count, total_liters, pdf_file_path").eq("id", id).maybeSingle(),

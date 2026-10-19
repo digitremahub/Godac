@@ -1,10 +1,13 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /** Lien temporaire (5 min) vers le document de la contestation — encadrement uniquement. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["customer_disputes"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const { id } = await params;
   const supabase = await createServerSupabaseClient();

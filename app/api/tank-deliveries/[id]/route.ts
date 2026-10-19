@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
@@ -12,7 +13,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour annuler un approvisionnement" }, { status: 403 });
   }

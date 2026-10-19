@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { checkOdometerNotRegressing } from "@/lib/business/odometer";
 import { generateTourNumber } from "@/lib/business/tour-number";
@@ -78,7 +78,9 @@ const bodySchema = z
  * the actual file.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

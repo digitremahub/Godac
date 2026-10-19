@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer } from "@/lib/usage/consommer";
@@ -11,7 +11,9 @@ const bodySchema = z.object({ storagePath: z.string().min(1) });
 
 /** Reads a fine-notice photo already uploaded to fine-photos — same shape as app/api/ocr/tour-report/process. */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fines"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

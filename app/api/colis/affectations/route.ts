@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
@@ -22,7 +22,9 @@ const schema = z.object({
  * ensuite toutes ses affectations de la journée.
  */
 export async function GET() {
-  const user = await requireAppUser();
+  const g = await garderApi({ modules: ["route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const user = g.appUser;
   if (!roles.includes(user.role)) return NextResponse.json({ error: "Accès réservé à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
@@ -39,7 +41,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await requireAppUser();
+  const g2 = await garderApi({ modules: ["route_optimizer"] });
+  if (!g2.ok) return g2.reponse;
+  const user = g2.appUser;
   if (!roles.includes(user.role)) return NextResponse.json({ error: "Seule la Direction, le responsable exploitation ou le chef d'équipe peut affecter une tournée." }, { status: 403 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

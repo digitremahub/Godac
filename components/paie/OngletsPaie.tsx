@@ -8,12 +8,12 @@ export type OngletPaie = "bulletins" | "salaires" | "fiches" | "reglages";
  * L'onglet Bulletins / Réglages n'apparaît que si le module Fiches de paie
  * est actif ; Heures & salaires dépend du planning.
  */
-export function OngletsPaie({ actif, paie, planning }: { actif: OngletPaie; paie: boolean; planning: boolean }) {
+export function OngletsPaie({ actif, paie, planning, reglages = true }: { actif: OngletPaie; paie: boolean; planning: boolean; /** Réglages : direction uniquement. */ reglages?: boolean }) {
   const onglets: { cle: OngletPaie; href: string; label: string; visible: boolean }[] = [
     { cle: "bulletins", href: "/paie", label: "Bulletins du mois", visible: paie },
     { cle: "salaires", href: "/payroll", label: "Heures & salaires", visible: planning },
     { cle: "fiches", href: "/payslips", label: "Fiches de paie", visible: paie },
-    { cle: "reglages", href: "/paie/parametres", label: "Réglages", visible: paie },
+    { cle: "reglages", href: "/paie/parametres", label: "Réglages", visible: paie && reglages },
   ];
   const visibles = onglets.filter((o) => o.visible);
   if (visibles.length < 2) return null;

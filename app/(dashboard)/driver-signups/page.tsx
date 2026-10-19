@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { DriverSignupsList } from "@/components/admin/DriverSignupsList";
@@ -13,10 +12,9 @@ import { DriverSignupsList } from "@/components/admin/DriverSignupsList";
  * all — never a teammate's request for another service.
  */
 export default async function DriverSignupsPage() {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
-    redirect("/dashboard");
-  }
+  const g = await garderPage("equipe.inscriptions");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";

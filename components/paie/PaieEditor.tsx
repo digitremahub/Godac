@@ -59,6 +59,7 @@ export function PaieEditor({
   prefill,
   joursTravailles,
   dejaGenere,
+  peutModifierProfil = true,
 }: {
   userId: string;
   mois: string;
@@ -70,6 +71,8 @@ export function PaieEditor({
   prefill: VariablesMois;
   joursTravailles: number;
   dejaGenere: boolean;
+  /** Comptable : le profil de paie se lit, seule la direction le modifie. */
+  peutModifierProfil?: boolean;
 }) {
   const router = useRouter();
   const [regime, setRegime] = useState<RegimeTransport>(profil.regime);
@@ -147,9 +150,15 @@ export function PaieEditor({
     setBusy("bulletin");
     setMessage(null);
     try {
-      if (!profilEnregistre) await saveProfil();
+      if (!profilEnregistre && peutModifierProfil) await saveProfil();
       const json = await send("/api/paie/bulletins", "POST", { user_id: userId, mois, variables });
-      setMessage({ ok: true, text: `Bulletin généré — net à payer ${eur(json.netAPayer)} €. Le salarié le retrouve dans « Fiches de paie ».` });
+      setMessage({
+        ok: true,
+        text:
+          json.validation === "valide"
+            ? `Bulletin généré et validé — net à payer ${eur(json.netAPayer)} €. Le salarié le retrouve dans « Fiches de paie ».`
+            : `Bulletin généré — net à payer ${eur(json.netAPayer)} €. Il attend la validation de la direction : le salarié ne le verra qu'une fois validé.`,
+      });
       router.refresh();
     } catch (e) {
       setMessage({ ok: false, text: networkErrorMessage(e) });
@@ -165,6 +174,8 @@ export function PaieEditor({
       <div className="flex flex-col gap-4">
         <Card className="flex flex-col gap-3">
           <h2 className="text-lg">Profil de paie</h2>
+          {!peutModifierProfil && <p className="text-xs text-navy/60">Lecture seule : le profil de paie est modifié par la direction.</p>}
+          <fieldset disabled={!peutModifierProfil} className="flex flex-col gap-3 disabled:opacity-80">
           <label className="block">
             <span className="label">Régime</span>
             <select
@@ -197,7 +208,8 @@ export function PaieEditor({
             <input type="checkbox" checked={cadre} onChange={(e) => (setCadre(e.target.checked), setProfilEnregistre(false))} />
             Statut cadre
           </label>
-          {!profilEnregistre && (
+          </fieldset>
+          {!profilEnregistre && peutModifierProfil && (
             <button type="button" className="btn-secondary w-fit !py-2 text-sm" disabled={busy !== null || !tauxHoraire} onClick={saveProfil}>
               Enregistrer le profil
             </button>

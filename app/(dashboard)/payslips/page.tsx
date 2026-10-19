@@ -1,6 +1,5 @@
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { garderPage } from "@/lib/acces/garde-page";
+import { BadgeValidation } from "@/components/paie/ValidationBulletins";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import Link from "next/link";
 import { OngletsPaie } from "@/components/paie/OngletsPaie";
@@ -15,29 +14,23 @@ const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "num
  * Direction generates for anyone; everyone else sees only their own.
  */
 export default async function PayslipsPage() {
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
+  const g = await garderPage("moi.fiches_paie");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase } = g;
 
-  const payslipsEnabled = await isModuleEnabled(supabase, appUser.organization_id, "payslips");
-  if (!payslipsEnabled) {
-    return (
-      <EmptyState
-        title="Module Fiches de Paie non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour générer des bulletins indicatifs."
-      />
-    );
-  }
-
+  // Direction : tous les bulletins, avec leur statut de validation.
+  // Les autres (comptable compris, pour ses propres fiches) : leurs
+  // bulletins VALIDÉS uniquement — la RLS l'impose aussi au salarié.
   const isDirection = appUser.role === "direction";
 
   const [{ data: payslipRows }] = await Promise.all([
     (() => {
       let query = supabase
         .from("payslips")
-        .select("id, period_start, period_end, gross_amount, net_amount, meal_vouchers_amount, bonus_amount, file_path, users!payslips_user_id_fkey(full_name)")
+        .select("id, period_start, period_end, gross_amount, net_amount, meal_vouchers_amount, bonus_amount, file_path, validation_status, users!payslips_user_id_fkey(full_name)")
         .order("period_start", { ascending: false })
         .limit(100);
-      if (!isDirection) query = query.eq("user_id", appUser.id);
+      if (!isDirection) query = query.eq("user_id", appUser.id).eq("validation_status", "valide");
       return query;
     })(),
   ]);
@@ -55,7 +48,7 @@ export default async function PayslipsPage() {
         title={isDirection ? "Paie & salaires" : "Fiches de paie"}
         description="Bulletins indicatifs générés à partir du salaire brut/net enregistré."
       />
-      {isDirection && <OngletsPaie actif="fiches" paie planning={await isModuleEnabled(supabase, appUser.organization_id, "planning")} />}
+      {isDirection && <OngletsPaie actif="fiches" paie planning={g.modules.has("planning")} />}
 
       {isDirection && (
         <Card className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -75,6 +68,11 @@ export default async function PayslipsPage() {
               <span>
                 {isDirection && <span className="font-medium">{p.users?.full_name ?? "—"} — </span>}
                 {MONTH_LABEL.format(new Date(p.period_start))}
+                {isDirection && p.validation_status !== "valide" && (
+                  <span className="ml-2">
+                    <BadgeValidation statut={p.validation_status} />
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-3">
                 <span className="text-xs text-navy/60">

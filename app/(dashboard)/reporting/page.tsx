@@ -1,7 +1,6 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, StatTile, EmptyState } from "@/components/ui";
+import { PageHeader, StatTile } from "@/components/ui";
 import { BarChartCard, type BarDatum } from "@/components/reporting/BarChartCard";
 import { addDays } from "@/lib/planning/dates";
 import { summarizeFuelRows, TRUSTED_FUEL_STATUSES } from "@/lib/fuel/totals";
@@ -16,23 +15,11 @@ import { parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
  * see in one screen.
  */
 export default async function ReportingPage() {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") {
-    return (
-      <EmptyState title="Réservé à la direction" description="Le reporting consolidé n'est visible que par les comptes direction." />
-    );
-  }
+  const g = await garderPage("dashboard.reporting");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const biEnabled = await isModuleEnabled(supabase, appUser.organization_id, "bi_reporting");
-  if (!biEnabled) {
-    return (
-      <EmptyState
-        title="Module Reporting BI non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour consolider carburant et tournées."
-      />
-    );
-  }
 
   // Minuit de Paris il y a 30 jours (pas minuit UTC).
   const since = parisMidnightIso(addDays(parisDay(), -30));

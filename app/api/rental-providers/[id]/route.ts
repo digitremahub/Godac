@@ -1,5 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { providerSchema } from "@/lib/rental/schemas";
@@ -7,7 +8,9 @@ import { providerSchema } from "@/lib/rental/schemas";
 /** Modification (ou archivage via `active: false`) d'un loueur / prestataire. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["rental_providers"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Réservé aux responsables et à la direction." }, { status: 403 });
   }

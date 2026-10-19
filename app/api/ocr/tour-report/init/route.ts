@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -22,7 +22,9 @@ const bodySchema = z.object({ contentType: z.string().optional() });
  * content block (image vs document) later.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   const contentType = parsed.success ? parsed.data.contentType : undefined;
   const ext = (contentType && EXTENSION_BY_CONTENT_TYPE[contentType]) || "jpg";

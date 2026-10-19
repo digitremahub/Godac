@@ -1,3 +1,4 @@
+import { estModuleVendable } from "@/lib/acces/catalogue";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
   // it runs.
   const { modules, prices } = await getFullCatalog(admin);
   const baseline = modules
-    .filter((m) => m.wave !== "v3")
+    .filter(estModuleVendable)
     .map((m) => {
       const included = priceFor(prices, m.key, "starter")?.included ?? false;
       return {

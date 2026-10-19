@@ -1,4 +1,5 @@
 "use client";
+import { estModuleVendable } from "@/lib/acces/catalogue";
 
 import type { ModuleCatalogEntry, ModulePlanPrice, PlanId } from "@/lib/organization/catalog-types";
 import { priceFor } from "@/lib/organization/catalog-types";
@@ -24,7 +25,7 @@ export function ModuleSelector({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
-  const sellable = modules.filter((m) => m.wave !== "v3");
+  const sellable = modules.filter(estModuleVendable);
   const withPrice = sellable.map((m) => ({ module: m, price: priceFor(prices, m.key, planId) }));
   const included = withPrice.filter((x) => x.price?.included);
   const addons = withPrice.filter((x) => !x.price?.included);

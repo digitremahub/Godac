@@ -1,11 +1,12 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /** Same as .../download, but for the PDF file (regenerated whenever a line is reviewed — see app/api/ticpe/export-lines/[id]/route.ts). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  if (!g.ok) return g.reponse;
   const supabase = await createServerSupabaseClient();
 
   const { data: exportRow, error } = await supabase.from("ticpe_exports").select("pdf_file_path").eq("id", id).single();

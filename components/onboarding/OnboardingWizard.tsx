@@ -1,4 +1,5 @@
 "use client";
+import { estModuleVendable } from "@/lib/acces/catalogue";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -426,7 +427,7 @@ function SubscriptionSummary({
   const plan = catalog.plans.find((p) => p.id === planId);
   const selected = new Set(selectedModuleKeys);
   const addons = catalog.modules
-    .filter((m) => m.wave !== "v3")
+    .filter(estModuleVendable)
     .map((m) => ({ module: m, price: priceFor(catalog.prices, m.key, planId) }))
     .filter((x) => !x.price?.included && selected.has(x.module.key));
   const addonsTotal = addons.reduce((sum, a) => sum + Number(a.price?.monthly_price ?? 0), 0);

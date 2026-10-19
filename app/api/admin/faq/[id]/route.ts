@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -14,7 +14,9 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!(await isPlatformAdmin(appUser.id))) return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
@@ -35,7 +37,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ roles: "tous" });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   if (!(await isPlatformAdmin(appUser.id))) return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
   const { id } = await params;
   const { error } = await createAdminSupabaseClient().from("assistant_faq").delete().eq("id", id);

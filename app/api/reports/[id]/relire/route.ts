@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer } from "@/lib/usage/consommer";
@@ -17,7 +17,9 @@ import { arretsLivraison } from "@/lib/ocr/arrets";
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
   const supabase = await createServerSupabaseClient();

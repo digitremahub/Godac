@@ -1,10 +1,10 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
@@ -65,7 +65,9 @@ const bodySchema = z.object({
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { normalizeDriverCodeInput } from "@/lib/business/driver-code";
 
@@ -12,7 +12,8 @@ import { normalizeDriverCodeInput } from "@/lib/business/driver-code";
  * this to the caller's own organisation; no admin client needed.
  */
 export async function GET(req: Request) {
-  await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
   // Deux formats cohabitent : l'ancien (6 chiffres aléatoires, pour
   // les comptes sans date de naissance renseignée) et le nouveau
   // (initiales + mois/année, ex: FT1188, voir lib/business/driver-code.ts)

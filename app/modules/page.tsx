@@ -1,3 +1,4 @@
+import { estModuleVendable } from "@/lib/acces/catalogue";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFullCatalog, priceFor } from "@/lib/organization/catalog";
@@ -35,7 +36,7 @@ export default async function ModulesPage() {
   const plans = allPlans.filter((p) => p.is_public);
   const cheapestPlanId = plans[0]?.id;
 
-  const v1v2Modules = modules.filter((m) => m.wave === "v1" || m.wave === "v2");
+  const v1v2Modules = modules.filter(estModuleVendable);
 
   return (
     <div className="min-h-screen">

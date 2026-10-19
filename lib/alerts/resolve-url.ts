@@ -49,7 +49,35 @@ const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) =
   rental_contract: (relatedId) => (relatedId ? `/vehicles/${relatedId}#location` : "/vehicles"),
 };
 
-export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null): string | null {
+/** Destinataire de l'alerte, quand le lien dépend de qui la lit. */
+export interface ContexteDestinataire {
+  /** alerts.recipient_user_id : alerte personnelle. */
+  recipientUserId?: string | null;
+  /** Rôle de la personne qui ouvre l'alerte (centre d'alertes, cloche). */
+  role?: string | null;
+}
+
+/**
+ * Alerte d'amende : le chauffeur à qui l'amende est attribuée
+ * (recipient_user_id) ouvre ses propres amendes ; l'encadrement (alerte de
+ * contestation adressée à la direction) ouvre la gestion des amendes.
+ * Avant ce correctif, le chauffeur était renvoyé vers /fines, réservée.
+ */
+function urlAmende(contexte?: ContexteDestinataire): string {
+  if (contexte?.recipientUserId) return "/mes-amendes";
+  if (contexte?.role === "chauffeur") return "/mes-amendes";
+  return "/fines";
+}
+
+export function resolveAlertUrl(
+  relatedTable: string | null,
+  type?: string | null,
+  relatedId?: string | null,
+  contexte?: ContexteDestinataire,
+): string | null {
+  if (type === "fine_notification" || (relatedTable === "fines" && !type)) return urlAmende(contexte);
+  // Bulletins en attente de validation : vue Paie du mois (direction).
+  if (type === "payslip_validation") return "/paie";
   if (type && RESOLVE_URL_BY_TYPE[type]) {
     const entry = RESOLVE_URL_BY_TYPE[type];
     return typeof entry === "function" ? entry(relatedId ?? null) : entry;

@@ -1,5 +1,5 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import { redirect } from "next/navigation";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { HelpColleagueFlow } from "@/components/tours/HelpColleagueFlow";
@@ -12,7 +12,9 @@ export default async function HelpColleaguePage({
 }: {
   searchParams: Promise<{ vehicle?: string }>;
 }) {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.tournee_collegue");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   if (!HELPER_ROLES.includes(appUser.role)) redirect("/dashboard");
   const supabase = await createServerSupabaseClient();
   const { vehicle } = await searchParams;

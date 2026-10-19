@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -23,10 +22,9 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
  * vehicles/users org-wide today and is out of scope here.
  */
 export default async function QrCodesPage() {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["direction", "manager", "manager_chauffeur"])) {
-    redirect("/dashboard");
-  }
+  const g = await garderPage("flotte.badges");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";

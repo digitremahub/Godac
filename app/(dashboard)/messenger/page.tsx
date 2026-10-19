@@ -1,9 +1,9 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { synchroniserGroupesEquipeSansErreur } from "@/lib/messenger/synchro-serveur";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { MessageForm } from "@/components/messenger/MessageForm";
 import { MessageThread } from "@/components/messenger/MessageThread";
@@ -42,18 +42,11 @@ interface GroupListRow {
  */
 export default async function MessengerPage({ searchParams }: { searchParams: Promise<{ with?: string; groupe?: string }> }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("communication.messenger");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const messengerEnabled = await isModuleEnabled(supabase, appUser.organization_id, "messenger");
-  if (!messengerEnabled) {
-    return (
-      <EmptyState
-        title="Module Messenger non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour discuter entre collègues."
-      />
-    );
-  }
 
   // Groupes d'équipe tenus à jour à l'ouverture (et après chaque
   // changement de service ou de compte, voir lib/messenger/synchro-serveur).

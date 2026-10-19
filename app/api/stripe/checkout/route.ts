@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
@@ -27,7 +27,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const demoBlocked = await blockInDemo(appUser.organization_id);
   if (demoBlocked) return demoBlocked;
   // Audit M19 : seule la direction souscrit l'abonnement de l'entreprise.

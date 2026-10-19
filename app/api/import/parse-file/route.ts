@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer } from "@/lib/usage/consommer";
@@ -28,7 +28,9 @@ const SCHEMAS = { vehicles: vehicleCsvRowSchema, drivers: driverCsvRowSchema } a
  * rather than assuming any particular structure.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
 
   const form = await req.formData();
   const file = form.get("file");

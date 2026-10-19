@@ -1,8 +1,9 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { MaintenanceRequestForm } from "@/components/maintenance/MaintenanceRequestForm";
 import { MaintenanceRequestsList } from "@/components/maintenance/MaintenanceRequestsList";
 
@@ -13,19 +14,12 @@ export default async function MaintenancePage({
 }: {
   searchParams: Promise<{ vehicle?: string }>;
 }) {
-  const appUser = await requireAppUser();
+  const g = await garderPage("flotte.entretien");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { vehicle } = await searchParams;
 
-  const maintenanceEnabled = await isModuleEnabled(supabase, appUser.organization_id, "maintenance_requests");
-  if (!maintenanceEnabled) {
-    return (
-      <EmptyState
-        title="Module Demandes d'Entretien non activé"
-        description="Activez-le depuis les paramètres de votre organisation."
-      />
-    );
-  }
 
   const [{ data: vehicles }, { data: requests }, { data: organization }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active").order("registration"),

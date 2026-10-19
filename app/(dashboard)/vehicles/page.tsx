@@ -1,30 +1,22 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { requireAppUser } from "@/lib/auth/session";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { JaugeQuota } from "@/components/acces/JaugeQuota";
+import { limiteVehicules } from "@/lib/acces/limites-serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { RoleGate } from "@/components/layout/RoleGate";
 import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
 import { VehicleFleetTable } from "@/components/vehicles/VehicleFleetTable";
 
 export default async function VehiclesPage() {
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
+  const g = await garderPage("flotte.vehicules");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase } = g;
+  const encadrement = appUser.role !== "comptable";
 
-  const fleetEnabled = await isModuleEnabled(supabase, appUser.organization_id, "fleet");
-  if (!fleetEnabled) {
-    return (
-      <EmptyState
-        title="Module Flotte non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour gérer vos véhicules."
-      />
-    );
-  }
-
-  const { data: vehicles } = await supabase
-    .from("vehicles")
-    .select("id, registration, type, status, tank_capacity_liters, services(name)")
-    .order("registration");
+  const [{ data: vehicles }, limite] = await Promise.all([
+    supabase.from("vehicles").select("id, registration, type, status, tank_capacity_liters, services(name)").order("registration"),
+    encadrement ? limiteVehicules(appUser.organization_id) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -39,6 +31,17 @@ export default async function VehiclesPage() {
           </RoleGate>
         }
       />
+
+      {limite && limite.inclus !== null && (
+        <div className="mb-4 max-w-md">
+          <JaugeQuota
+            libelle={`Véhicules inclus dans la formule ${limite.nomFormule ?? ""}`.trim()}
+            utilise={limite.utilise}
+            inclus={limite.inclus}
+            direction={appUser.role === "direction"}
+          />
+        </div>
+      )}
 
       <RoleGate role={appUser.role} allow={["direction"]}>
         <div className="mb-4">

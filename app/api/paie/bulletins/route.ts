@@ -1,9 +1,9 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
+import { journaliser } from "@/lib/audit/journal";
+import { ROLES_GENERATION } from "@/lib/paie/validation";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { calculerBulletin } from "@/lib/paie/calcul";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
@@ -22,15 +22,14 @@ const jour = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("fr-FR
  * relisant côté serveur profil, réglages et cumuls — les chiffres
  * affichés à l'écran ne sont jamais repris tels quels du navigateur —,
  * génère le PDF et l'enregistre. Un bulletin déjà généré pour ce mois
- * est remplacé (correction).
+ * est remplacé (correction) et repasse « en attente de validation ».
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
-  if (appUser.role !== "direction") return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
-  const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, appUser.organization_id, "payslips"))) {
-    return NextResponse.json({ error: "Module Fiches de paie non activé." }, { status: 403 });
-  }
+  // Décision client Q1 : direction ET comptable génèrent ; le bulletin naît
+  // « en attente de validation direction » (trigger payslips_guard_validation).
+  const g = await garderApi({ roles: ROLES_GENERATION, modules: ["payslips"] });
+  if (!g.ok) return g.reponse;
+  const { appUser, supabase } = g;
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur) return NextResponse.json({ error: paieIndisponible(pays) }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
@@ -125,5 +124,32 @@ export async function POST(req: Request) {
     payslipId = data.id;
   }
 
-  return NextResponse.json({ id: payslipId, netAPayer: bulletin.netAPayer });
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "paie_bulletin_genere",
+    targetTable: "payslips",
+    targetId: payslipId,
+    details: { salarie: userId, mois, regeneration: Boolean(ctx.bulletinExistant), par: appUser.role },
+  });
+
+  // La direction qui génère elle-même valide dans la foulée (c'est elle qui
+  // valide) ; un bulletin du comptable attend sa décision.
+  let validation: "en_attente" | "valide" = "en_attente";
+  if (appUser.role === "direction") {
+    const { error: validationError } = await supabase.from("payslips").update({ validation_status: "valide" }).eq("id", payslipId);
+    if (!validationError) {
+      validation = "valide";
+      await journaliser({
+        organizationId: appUser.organization_id,
+        userId: appUser.id,
+        action: "paie_bulletin_valide",
+        targetTable: "payslips",
+        targetId: payslipId,
+        details: { salarie: userId, mois, automatique: true },
+      });
+    }
+  }
+
+  return NextResponse.json({ id: payslipId, netAPayer: bulletin.netAPayer, validation });
 }

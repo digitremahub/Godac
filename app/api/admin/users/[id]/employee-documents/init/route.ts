@@ -1,7 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
@@ -24,7 +24,9 @@ const bodySchema = z.object({ contentType: z.string().optional() });
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction"], modules: ["employee_files"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
   }

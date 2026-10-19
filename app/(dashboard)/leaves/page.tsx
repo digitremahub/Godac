@@ -1,24 +1,17 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { findOverlappingLeaves } from "@/lib/business/leave-overlap";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { LeaveRequestForm } from "@/components/leaves/LeaveRequestForm";
 import { LeaveRequestsList } from "@/components/leaves/LeaveRequestsList";
 
 export default async function LeavesPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("moi.conges");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
-  const leaveEnabled = await isModuleEnabled(supabase, appUser.organization_id, "leave_management");
-  if (!leaveEnabled) {
-    return (
-      <EmptyState
-        title="Module Congés & Absences non activé"
-        description="Activez-le depuis les paramètres de votre organisation pour permettre les demandes de congés."
-      />
-    );
-  }
 
   const isDecisionMaker = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 

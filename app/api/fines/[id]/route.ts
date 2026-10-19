@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderApi } from "@/lib/acces/garde-api";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const bodySchema = z.object({
@@ -18,14 +17,28 @@ const bodySchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur", "chauffeur"], modules: ["fines"] });
+  if (!g.ok) return g.reponse;
+  const { appUser, supabase } = g;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const supabase = await createServerSupabaseClient();
-  if (appUser.role === "chauffeur" || appUser.role === "manager_chauffeur") {
+  // Contestation par le chauffeur de sa propre amende (un manager-chauffeur
+  // peut aussi contester la sienne) ; sinon, gestion par l'encadrement.
+  let contestationPersonnelle = appUser.role === "chauffeur";
+  if (appUser.role === "manager_chauffeur" && parsed.data.status === "contested" && !parsed.data.confirm && !parsed.data.notify) {
+    const { data: sienne } = await createAdminSupabaseClient()
+      .from("fines")
+      .select("id")
+      .eq("id", id)
+      .eq("organization_id", appUser.organization_id)
+      .eq("driver_id", appUser.id)
+      .maybeSingle();
+    contestationPersonnelle = Boolean(sienne);
+  }
+  if (contestationPersonnelle) {
     if (parsed.data.status !== "contested" || parsed.data.confirm || parsed.data.notify) {
       return NextResponse.json({ error: "Action non autorisée." }, { status: 403 });
     }
@@ -49,7 +62,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (alertError) return NextResponse.json({ error: alertError.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
-  if (appUser.role !== "direction") return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  // Encadrement : la RLS limite les managers aux véhicules de leur service
+  // (lecture ci-dessous : amende hors service = introuvable).
 
   const { data: fine, error: fineError } = await supabase
     .from("fines")

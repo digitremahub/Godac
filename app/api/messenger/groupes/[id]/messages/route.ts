@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { chargerAccesGroupe, notifierMessageGroupe } from "@/lib/messenger/groupes-serveur";
@@ -19,7 +19,9 @@ const bodySchema = z
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["messenger"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "messenger"))) {
     return NextResponse.json({ error: "Module Messenger non activé." }, { status: 403 });

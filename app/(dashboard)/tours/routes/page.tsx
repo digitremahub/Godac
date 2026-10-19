@@ -1,4 +1,4 @@
-import { requireAppUser } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/ui";
@@ -113,7 +113,9 @@ async function loadRenfortDay(
  */
 export default async function TourRoutesPage({ searchParams }: { searchParams: Promise<{ jour?: string }> }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
+  const g = await garderPage("exploitation.tournees");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const gestion = peutGererTournees(appUser.role);
   const carte = peutVoirCarteTournees(appUser.role);

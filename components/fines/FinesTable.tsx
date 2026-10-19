@@ -31,8 +31,8 @@ const STATUS_BADGE: Record<FineRow["status"], string> = {
   paid: "badge-teal",
 };
 
-/** Direction-only actions (confirm/notify/status) — see app/api/fines/[id], which re-checks the role server-side. */
-export function FinesTable({ fines }: { fines: FineRow[] }) {
+/** Actions de l'encadrement (direction ; managers sur les véhicules de leur service, RLS) (confirm/notify/status) — see app/api/fines/[id], which re-checks the role server-side. */
+export function FinesTable({ fines, lectureSeule = false }: { fines: FineRow[]; /** Comptable : consultation sans action. */ lectureSeule?: boolean }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
                 <span className={STATUS_BADGE[f.status]}>{STATUS_LABEL[f.status]}</span>
               </td>
               <td className="py-2">
-                <div className="flex flex-wrap gap-1.5">
+                {!lectureSeule && <div className="flex flex-wrap gap-1.5">
                   {f.status === "pending_identification" && f.suggested_driver_name && (
                     <button
                       className="btn-secondary !px-2 !py-1 text-xs"
@@ -132,7 +132,7 @@ export function FinesTable({ fines }: { fines: FineRow[] }) {
                       Marquer payée
                     </button>
                   )}
-                </div>
+                </div>}
               </td>
             </tr>
           ))}

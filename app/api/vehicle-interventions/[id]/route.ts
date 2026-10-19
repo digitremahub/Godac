@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
@@ -24,7 +25,9 @@ const bodySchema = z.object({
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["maintenance_requests"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour modifier une demande d'entretien" }, { status: 403 });
   }

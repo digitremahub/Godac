@@ -1,5 +1,5 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 
 /**
@@ -13,7 +13,9 @@ import { resolveTourActor } from "@/lib/tours/on-behalf";
  * retyping a matching tour number.
  */
 export async function GET(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   // Same endpoint for « J'entre pour un collègue »: with a valid on-behalf
   // token this answers for the colleague instead (lib/tours/on-behalf.ts).
   const actor = await resolveTourActor(req, appUser);

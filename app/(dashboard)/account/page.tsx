@@ -1,4 +1,5 @@
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { garderPage } from "@/lib/acces/garde-page";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { PageHeader, Card } from "@/components/ui";
@@ -17,7 +18,9 @@ import Link from "next/link";
 const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
 export default async function AccountPage() {
-  const appUser = await requireAppUser();
+  const g = await garderPage("aide.compte");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const isFieldRole = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
 
   let pinAlreadySet = false;
@@ -51,6 +54,7 @@ export default async function AccountPage() {
           .from("payslips")
           .select("id, period_start, gross_amount, net_amount, file_path")
           .eq("user_id", appUser.id)
+          .eq("validation_status", "valide")
           .order("period_start", { ascending: false })
           .limit(5)
       ).data

@@ -1,11 +1,13 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
 /** Colleague picker for the floating widget's "+" button. */
 export async function GET() {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["messenger"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
 
   const messengerEnabled = await isModuleEnabled(supabase, appUser.organization_id, "messenger");

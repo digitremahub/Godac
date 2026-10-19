@@ -1,4 +1,5 @@
 import "server-only";
+import { statutValide, type StatutValidation } from "@/lib/paie/validation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parametresLegauxAu, FRAIS_CONVENTIONNELS } from "@/lib/paie/parametres";
 import { HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
@@ -46,7 +47,13 @@ export interface ContextePaie {
   /** Variables préremplies depuis GODAC (tournées, congés) — modifiables avant calcul. */
   prefill: VariablesMois & { joursTravailles: number };
   cumuls: { brut: number; netImposable: number; heuresSupExonerees: number };
-  bulletinExistant: { id: string; variables: VariablesMois | null } | null;
+  bulletinExistant: {
+    id: string;
+    variables: VariablesMois | null;
+    validation: StatutValidation;
+    commentaire: string | null;
+    valideLe: string | null;
+  } | null;
 }
 
 /**
@@ -89,11 +96,28 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .from("payslips")
       .select("gross_amount, net_taxable, overtime_exempt")
       .eq("user_id", userId)
+      // Cumuls annuels : seuls les bulletins validés par la direction comptent.
+      .eq("validation_status", "valide")
       .gte("period_start", `${mois.slice(0, 4)}-01-01`)
       .lt("period_start", debut),
-    supabase.from("payslips").select("id, variables").eq("user_id", userId).eq("period_start", debut).eq("period_end", fin).maybeSingle(),
+    supabase
+      .from("payslips")
+      .select("id, variables, validation_status, validation_comment, validated_at")
+      .eq("user_id", userId)
+      .eq("period_start", debut)
+      .eq("period_end", fin)
+      .maybeSingle(),
     // Dernier bulletin antérieur : on y reprend les retenues récurrentes (saisies, ATD, pension, prêt).
-    supabase.from("payslips").select("variables").eq("user_id", userId).lt("period_start", debut).order("period_start", { ascending: false }).limit(1).maybeSingle(),
+    // Jamais reprises d'un bulletin non validé (en attente ou refusé).
+    supabase
+      .from("payslips")
+      .select("variables")
+      .eq("user_id", userId)
+      .eq("validation_status", "valide")
+      .lt("period_start", debut)
+      .order("period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const regime = (profil?.regime ?? "courte_distance") as RegimeTransport;
@@ -162,6 +186,14 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       joursTravailles,
     },
     cumuls,
-    bulletinExistant: existant ? { id: existant.id, variables: (existant.variables as VariablesMois | null) ?? null } : null,
+    bulletinExistant: existant
+      ? {
+          id: existant.id,
+          variables: (existant.variables as VariablesMois | null) ?? null,
+          validation: statutValide(existant.validation_status),
+          commentaire: (existant.validation_comment as string | null) ?? null,
+          valideLe: (existant.validated_at as string | null) ?? null,
+        }
+      : null,
   };
 }

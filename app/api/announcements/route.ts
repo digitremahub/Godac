@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
@@ -17,7 +18,9 @@ const bodySchema = z.object({
  * just gives a clearer error.
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["intranet"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour publier une annonce" }, { status: 403 });
   }

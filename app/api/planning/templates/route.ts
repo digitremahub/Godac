@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const writeRoles = ["direction", "manager", "manager_chauffeur"] as const;
@@ -16,7 +16,9 @@ const createSchema = z.object({
 
 /** Liste les modèles de tournées du service (ou de tous les services pour la Direction). */
 export async function GET(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["planning"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const { searchParams } = new URL(req.url);
   const requestedService = searchParams.get("service_id");
@@ -52,7 +54,9 @@ export async function GET(req: Request) {
 
 /** Crée un modèle à partir d'une fiche tournée existante et de ses villages. */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ modules: ["planning"] });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   if (!writeRoles.includes(appUser.role as (typeof writeRoles)[number])) {
     return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut créer un modèle." }, { status: 403 });
   }

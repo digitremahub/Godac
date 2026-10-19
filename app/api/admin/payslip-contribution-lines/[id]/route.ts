@@ -1,6 +1,6 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
@@ -11,7 +11,9 @@ const bodySchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: "tous" });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Rôle non autorisé pour gérer les cotisations." }, { status: 403 });
   }
@@ -35,7 +37,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appUser = await requireAppUser();
+  const g2 = await garderApi({ roles: "tous" });
+  if (!g2.ok) return g2.reponse;
+  const appUser = g2.appUser;
   if (appUser.role !== "direction") {
     return NextResponse.json({ error: "Rôle non autorisé pour gérer les cotisations." }, { status: 403 });
   }

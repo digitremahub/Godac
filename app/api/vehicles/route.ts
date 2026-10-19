@@ -1,6 +1,7 @@
+import { garderApi, refus } from "@/lib/acces/garde-api";
+import { controlerAjoutVehicules } from "@/lib/acces/limites-serveur";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const specSourceEntrySchema = z.object({ origin: z.literal("ia"), confirmed: z.boolean() });
@@ -23,11 +24,18 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fleet"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+
+  // Limite de la formule (décision client Q8) : avertissement à 100 %,
+  // refus au-delà de 110 % des véhicules inclus.
+  const limite = await controlerAjoutVehicules(appUser.organization_id, [parsed.data.registration]);
+  if (!limite.ok) return refus("LIMITE_FORMULE", limite.message, { utilise: limite.limite.utilise, inclus: limite.limite.inclus ?? undefined });
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -37,5 +45,5 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ vehicle: data });
+  return NextResponse.json({ vehicle: data, avertissement: limite.avertissement });
 }

@@ -1,6 +1,7 @@
+import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
+import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { isRentedOwnership } from "@/lib/rental/workflow";
@@ -15,7 +16,9 @@ const bodySchema = z.object({ intervention_id: z.string().uuid() });
  * automatiquement (déclencheur SQL, migration 20260101000134).
  */
 export async function POST(req: Request) {
-  const appUser = await requireAppUser();
+  const g = await garderApi({ modules: ["rental_providers"] });
+  if (!g.ok) return g.reponse;
+  const appUser = g.appUser;
   if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
     return NextResponse.json({ error: "Réservé aux responsables et à la direction." }, { status: 403 });
   }

@@ -95,7 +95,7 @@ export function DashboardShell({
           <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{children}</div>
         </main>
       </div>
-      {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} />}
+      {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}
       <FloatingChatWidget
         assistantAvailable={assistantAvailable}
         messengerAvailable={messengerAvailable}

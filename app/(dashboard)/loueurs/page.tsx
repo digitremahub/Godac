@@ -1,18 +1,14 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { RentalProvidersManager } from "@/components/rental/RentalProvidersManager";
 
 export default async function RentalProvidersPage() {
-  const appUser = await requireAppUser();
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) redirect("/dashboard");
+  const g = await garderPage("flotte.loueurs");
+  if (!g.ok) return g.ecran;
+  const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
-  if (!(await isModuleEnabled(supabase, appUser.organization_id, "rental_providers"))) {
-    return <EmptyState title="Module Véhicules loués non activé" description="Activez-le depuis les paramètres de votre organisation." />;
-  }
 
   const [{ data: providers }, { data: vehicles }] = await Promise.all([
     supabase.from("rental_providers").select("id, name, kind, contact_name, maintenance_emails, phone, contract_reference, notes, active").order("active", { ascending: false }).order("name"),

@@ -1,8 +1,7 @@
+import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { requireAppUser, hasRole } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isModuleEnabled } from "@/lib/organization/modules";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { hasRole } from "@/lib/auth/session";
+import { PageHeader } from "@/components/ui";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { TourneeColis } from "@/components/colis/TourneeColis";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
@@ -17,13 +16,10 @@ import { parisDay } from "@/lib/utils/paris-time";
  */
 export default async function ColisPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const appUser = await requireAppUser();
-  const supabase = await createServerSupabaseClient();
-  const [actif, pays] = await Promise.all([
-    isModuleEnabled(supabase, appUser.organization_id, "route_optimizer"),
-    paysOrganisation(supabase, appUser.organization_id),
-  ]);
-  if (!actif) return <EmptyState title="Module Tournée colis non activé" description="La direction peut l'activer depuis Modules & tarifs." />;
+  const g = await garderPage("exploitation.colis");
+  if (!g.ok) return g.ecran;
+  const { appUser, supabase } = g;
+  const pays = await paysOrganisation(supabase, appUser.organization_id);
 
   const encadrement = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
   const historiqueVisible = encadrement || appUser.role === "chauffeur";
