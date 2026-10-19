@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { Contestations, type Contestation } from "@/components/contestations/Contestations";
-import { libelleLieu } from "@/lib/colis/livraison";
+import { libelleLieu, libellePreuve } from "@/lib/colis/livraison";
 
 /**
  * Contestations clients. L'encadrement importe la réclamation, valide le
@@ -21,7 +21,7 @@ export default async function ContestationsPage() {
   const encadrement = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
   const [{ data: rows }, { data: users }] = await Promise.all([
-    supabase.from("customer_disputes").select("*, driver:users!customer_disputes_driver_id_fkey(full_name), stop:delivery_stops(id, proof_photo_path, proof_code, delivered_place, done_at)").order("created_at", { ascending: false }).limit(200),
+    supabase.from("customer_disputes").select("*, driver:users!customer_disputes_driver_id_fkey(full_name), stop:delivery_stops(id, proof_photo_path, proof_code, delivered_place, done_at, kind, relay_name, packages_picked_up)").order("created_at", { ascending: false }).limit(200),
     encadrement
       ? supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name")
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
@@ -34,7 +34,7 @@ export default async function ContestationsPage() {
       status: r.status,
       has_document: Boolean(r.document_path),
       preuve: r.stop
-        ? { stopId: r.stop.id, photo: Boolean(r.stop.proof_photo_path), lieu: libelleLieu(r.stop.delivered_place), code: r.stop.proof_code ?? null, livreLe: r.stop.done_at }
+        ? { stopId: r.stop.id, photo: Boolean(r.stop.proof_photo_path), lieu: libelleLieu(r.stop.delivered_place), relais: r.stop.delivered_place === "point_relais" ? libellePreuve(r.stop) : null, code: r.stop.proof_code ?? null, livreLe: r.stop.done_at }
         : null,
       client_name: r.client_name,
       reference: r.reference,

@@ -1,3 +1,4 @@
+import { normaliserNomRelais } from "@/lib/colis/relais";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
@@ -161,10 +162,12 @@ export async function POST(req: Request) {
             .map((s: any) => ({
               address: s.address.trim(),
               kind: s.type === "point_relais" ? "point_relais" : "ramasse",
+              // Point relais : le nom saisi sur la fiche du village devient le nom du relais.
+              relayName: s.type === "point_relais" ? normaliserNomRelais(typeof s.name === "string" ? s.name : null) : null,
             }));
           const pickups = (Array.isArray(village.pickup_addresses) ? village.pickup_addresses : [])
             .filter((a: unknown): a is string => typeof a === "string")
-            .map((address: string) => ({ address: address.trim(), kind: "ramasse" }));
+            .map((address: string) => ({ address: address.trim(), kind: "ramasse", relayName: null as string | null }));
           const allStops = [...plannedStops, ...pickups];
 
           for (const stop of allStops) {
@@ -180,6 +183,7 @@ export async function POST(req: Request) {
               list_id: liste.id,
               position: positionArret++,
               kind: stop.kind,
+              ...(stop.relayName ? { relay_name: stop.relayName } : {}),
               address,
               // Les ramasses et points relais comptent comme des arrêts uniquement.
               // Le nombre de colis réels sera renseigné lors du traitement de l'arrêt.

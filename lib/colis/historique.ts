@@ -342,6 +342,9 @@ export interface ArretDetail {
   notes: string | null;
   kind?: string | null;
   proof_code?: string | null;
+  /** Point relais : nom du relais et retours repris. */
+  relay_name?: string | null;
+  packages_picked_up?: number | null;
   weight_kg?: number | string | null;
   failure_reason?: string | null;
   lat: number | string | null;
@@ -358,7 +361,7 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
   const [{ data: stops }, { data: listes }, { data: chauffeur }] = await Promise.all([
     supabase
       .from("delivery_stops")
-      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng")
+      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng, relay_name, packages_picked_up")
       .eq("run_id", id)
       .order("position")
       .order("created_at"),
