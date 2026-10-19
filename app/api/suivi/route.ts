@@ -1,3 +1,4 @@
+import { libellePreuve } from "@/lib/colis/livraison";
 import { NextResponse } from "next/server";
 import { requireAppUser, hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,7 +14,7 @@ export interface TourneeSuivie {
   statut: "loading" | "in_progress" | "done";
   position: { lat: number; lng: number; at: string } | null;
   depot: { lat: number; lng: number } | null;
-  arrets: { lat: number | null; lng: number | null; status: string; ordre: number; ramasse?: boolean; adresse: string; destinataire: string | null; telephone: string | null; colis: number; notes: string | null }[];
+  arrets: { lat: number | null; lng: number | null; status: string; ordre: number; ramasse?: boolean; relais?: string | true; preuve?: string | null; adresse: string; destinataire: string | null; telephone: string | null; colis: number; notes: string | null }[];
   adressesRestantes: number;
   colisRestants: number;
   adressesFaites: number;
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
   const { data: runs } = await supabase
     .from("delivery_runs")
     .select(
-      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, kind, parcel_count, lat, lng, done_at, position, address, recipient, phone, notes, window_start, window_end)",
+      "id, name, status, driver_id, start_lat, start_lng, return_to_start, last_lat, last_lng, last_position_at, users!delivery_runs_driver_id_fkey(full_name, user_services(services(id, name))), delivery_stops(status, kind, relay_name, delivered_place, proof_code, packages_picked_up, parcel_count, lat, lng, done_at, position, address, recipient, phone, notes, window_start, window_end)",
     )
     .eq("run_date", aujourdhuiParis())
     .in("status", ["in_progress", "loading", "done"])
@@ -76,7 +77,7 @@ export async function GET(req: Request) {
         statut: r.status,
         position,
         depot,
-        arrets: stops.map((s, i) => ({ lat: s.lat === null ? null : Number(s.lat), lng: s.lng === null ? null : Number(s.lng), status: s.status, ordre: i + 1, ramasse: s.kind === "ramasse", adresse: s.address ?? "Adresse non renseignée", destinataire: s.recipient ?? null, telephone: s.phone ?? null, colis: Number(s.parcel_count ?? 1), notes: s.notes ?? null })),
+        arrets: stops.map((s, i) => ({ lat: s.lat === null ? null : Number(s.lat), lng: s.lng === null ? null : Number(s.lng), status: s.status, ordre: i + 1, ramasse: s.kind === "ramasse", ...(s.kind === "point_relais" ? { relais: s.relay_name || true } : {}), preuve: s.status === "delivered" ? libellePreuve(s) : null, adresse: s.address ?? "Adresse non renseignée", destinataire: s.recipient ?? null, telephone: s.phone ?? null, colis: Number(s.parcel_count ?? 1), notes: s.notes ?? null })),
         ...av,
         finEstimee: r.status === "in_progress" ? av.finEstimee : null,
       };

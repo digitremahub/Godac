@@ -13,7 +13,7 @@ export interface Contestation {
   status: "to_validate" | "assigned" | "answered" | "resolved" | "rejected";
   has_document: boolean;
   /** Livraison retrouvée dans une tournée colis (lieu de dépôt, photo). */
-  preuve: { stopId: string; photo: boolean; lieu: string | null; code?: string | null; livreLe: string | null } | null;
+  preuve: { stopId: string; photo: boolean; lieu: string | null; relais?: string | null; code?: string | null; livreLe: string | null } | null;
   client_name: string | null;
   reference: string | null;
   parcel_code: string | null;
@@ -37,6 +37,22 @@ function PreuveLivraison({ c }: { c: Contestation }) {
   if (!c.preuve) return null;
   const quand = c.preuve.livreLe ? new Date(c.preuve.livreLe).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
   const texte = ["Livré", c.preuve.lieu?.toLowerCase(), quand && `le ${quand}`].filter(Boolean).join(" ");
+  // Remise au point relais (ou dépôt sur un arrêt point relais) : relais, puis photo et / ou code du relais.
+  if (c.preuve.relais) {
+    return (
+      <span className="flex flex-wrap items-center gap-2 self-center text-xs text-navy/60">
+        <span className="text-relais-ink">
+          {c.preuve.relais}
+          {quand ? ` · le ${quand}` : ""}
+        </span>
+        {c.preuve.photo && (
+          <a href={`/api/colis/arrets/${c.preuve.stopId}/livraison`} target="_blank" rel="noreferrer" className="btn-ghost !py-1 text-xs text-teal-ink">
+            📷 Photo du dépôt
+          </a>
+        )}
+      </span>
+    );
+  }
   // Livraison avec QR code : la valeur scannée chez le destinataire fait preuve.
   if (c.preuve.code) {
     return (

@@ -15,6 +15,7 @@ export const MOTIFS_ECHEC = [
   { key: "ferme", label: "Fermé" },
   { key: "refuse", label: "Colis refusé" },
   { key: "rien_a_ramasser", label: "Rien à ramasser" },
+  { key: "relais_complet", label: "Relais complet / refus" },
   { key: "autre", label: "Autre motif" },
 ] as const;
 
@@ -22,9 +23,24 @@ export type MotifEchec = (typeof MOTIFS_ECHEC)[number]["key"];
 
 export const libelleMotif = (motif: string | null | undefined) => MOTIFS_ECHEC.find((m) => m.key === motif)?.label ?? null;
 
-/** Motifs pertinents selon le type d'arrêt (« Rien à ramasser » seulement pour une ramasse, « Colis refusé » pour une livraison). */
-export function motifsPour(ramasse: boolean) {
-  return MOTIFS_ECHEC.filter((m) => (ramasse ? m.key !== "refuse" : m.key !== "rien_a_ramasser"));
+/** Motifs propres à un type d'arrêt (absents des autres types). */
+const MOTIFS_DU_TYPE: Record<string, readonly MotifEchec[]> = {
+  livraison: ["absent", "refuse"],
+  ramasse: ["absent", "rien_a_ramasser"],
+  point_relais: ["relais_complet"],
+};
+const MOTIFS_SPECIFIQUES = new Set(Object.values(MOTIFS_DU_TYPE).flat());
+
+/**
+ * Motifs pertinents selon le type d'arrêt : « Colis refusé » pour une
+ * livraison, « Rien à ramasser » pour une ramasse, « Relais complet /
+ * refus » (et pas « Client absent ») pour un point relais. Un booléen
+ * vaut ramasse (true) ou livraison (false).
+ */
+export function motifsPour(type: boolean | "livraison" | "ramasse" | "point_relais") {
+  const t = type === true ? "ramasse" : type === false ? "livraison" : type;
+  const propres = MOTIFS_DU_TYPE[t] ?? [];
+  return MOTIFS_ECHEC.filter((m) => !MOTIFS_SPECIFIQUES.has(m.key) || propres.includes(m.key));
 }
 
 export const estClos = (s: { status: string }) => s.status !== "pending";

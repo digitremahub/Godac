@@ -184,8 +184,9 @@ const JOUR_PAR_DEFAUT: Creneau[] = [{ open: "08:00", close: "18:00" }];
 export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jour: string; onClose: () => void; onSaved: (texte: string) => void }) {
   const [debut, setDebut] = useState(versChamp(stop.window_start));
   const [fin, setFin] = useState(versChamp(stop.window_end));
-  const [pro, setPro] = useState(Boolean(stop.horaire));
-  const [nom, setNom] = useState(stop.horaire?.label ?? stop.recipient ?? "");
+  // Un point relais est une adresse pro : ses horaires vont dans l'annuaire et comptent dans l'optimisation.
+  const [pro, setPro] = useState(Boolean(stop.horaire) || stop.kind === "point_relais");
+  const [nom, setNom] = useState(stop.horaire?.label ?? (stop.kind === "point_relais" ? stop.relay_name : null) ?? stop.recipient ?? "");
   const [notes, setNotes] = useState(stop.horaire?.notes ?? "");
   const [semaine, setSemaine] = useState<Semaine>(() => normaliserSemaine(stop.horaire?.weekly_schedule));
   const [busy, setBusy] = useState(false);

@@ -102,27 +102,33 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
         el.setAttribute("aria-label", `${t.chauffeur} — arrêt ${a.ordre} — ${a.adresse}`);
         el.style.cursor = "pointer";
         const fait = a.status !== "pending";
-        // Ramasse : carré à bordure dorée (même encoche que la liste des arrêts).
+        // Ramasse : carré à bordure dorée ; point relais : carré à bordure violette (mêmes couleurs que les encoches).
         Object.assign(el.style, {
           width: "12px",
           height: "12px",
-          borderRadius: a.ramasse ? "3px" : "999px",
+          borderRadius: a.ramasse || a.relais ? "3px" : "999px",
           background: fait ? "#9AA3B5" : couleur,
-          border: a.ramasse ? "2px solid #F5C842" : "2px solid #FFFFFF",
+          border: a.ramasse ? "2px solid #F5C842" : a.relais ? "2px solid #A78BFA" : "2px solid #FFFFFF",
           opacity: attenue ? "0.25" : fait ? "0.7" : "1",
         });
-        el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
+        el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : a.relais ? "point relais" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
         el.addEventListener("click", (event) => {
           event.stopPropagation();
           const contenu = document.createElement("div");
           contenu.style.cssText = "min-width:210px;max-width:280px;font:13px system-ui,sans-serif;color:#0A0F1E";
           const titre = document.createElement("strong");
-          titre.textContent = `${a.ordre}. ${a.ramasse ? "Ramasse" : "Livraison"} · ${t.chauffeur}`;
+          titre.textContent = `${a.ordre}. ${a.ramasse ? "Ramasse" : a.relais ? `Point relais${typeof a.relais === "string" ? ` ${a.relais}` : ""}` : "Livraison"} · ${t.chauffeur}`;
           titre.style.cssText = "display:block;margin-bottom:6px;font-size:14px";
           const adresse = document.createElement("div");
           adresse.textContent = a.adresse;
           adresse.style.cssText = "margin-bottom:5px;white-space:normal";
           contenu.append(titre, adresse);
+          if (a.preuve) {
+            const preuve = document.createElement("div");
+            preuve.textContent = a.preuve;
+            preuve.style.cssText = "margin-bottom:5px;color:#4B5563";
+            contenu.append(preuve);
+          }
           if (a.destinataire) { const el = document.createElement("div"); el.textContent = `Destinataire : ${a.destinataire}`; contenu.append(el); }
           if (a.telephone) { const el = document.createElement("div"); el.textContent = `Téléphone : ${a.telephone}`; contenu.append(el); }
           const infos = document.createElement("div");
@@ -242,7 +248,11 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
                     {t.arrets.map((a) => (
                       <li key={`${t.id}-${a.ordre}`} className="flex gap-2 text-xs">
                         <span className={`w-5 shrink-0 text-right font-bold ${a.status === "pending" ? "text-teal-ink" : "text-navy/40"}`}>{a.ordre}.</span>
-                        <span className="min-w-0 flex-1 break-words">{a.ramasse ? "Ramasse · " : ""}{a.adresse}</span>
+                        <span className="min-w-0 flex-1 break-words">
+                          {a.ramasse ? "Ramasse · " : a.relais ? <span className="font-semibold text-relais-ink">Relais{typeof a.relais === "string" ? ` ${a.relais}` : ""} · </span> : ""}
+                          {a.adresse}
+                          {a.preuve && <span className="block text-navy/50">{a.preuve}</span>}
+                        </span>
                         <span className="shrink-0 text-navy/45">{a.status === "pending" ? "À faire" : "Fait"}</span>
                       </li>
                     ))}
