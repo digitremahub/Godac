@@ -67,3 +67,13 @@ alter policy "fine-photos: manager-like uploads within org" on storage.objects
     and (storage.foldername(name))[1] = (public.current_organization_id())::text
     and public.is_manager_like()
   );
+
+-- ---------------------------------------------------------------------------
+-- M3 : une seule fiche « Tournée colis » ouverte par chauffeur et par jour
+-- (double clic = deux fiches). Vérifié le 19/10/2026 en SELECT : aucun
+-- doublon de fiche non clôturée en base. app/api/colis/tournees reprend la
+-- fiche existante en cas de conflit.
+-- ---------------------------------------------------------------------------
+create unique index if not exists delivery_runs_driver_open_day_uidx
+  on public.delivery_runs (organization_id, driver_id, run_date)
+  where status <> 'done';
