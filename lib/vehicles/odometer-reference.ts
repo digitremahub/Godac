@@ -83,30 +83,72 @@ export function dernierReleve(releves: DernierReleveKm[]): DernierReleveKm | nul
   }, null);
 }
 
+export interface RelevesEncadrants {
+  /** Dernier relevé à la date du plein ou avant. */
+  avant: DernierReleveKm | null;
+  /** Premier relevé après la date du plein (saisie rétroactive). */
+  apres: DernierReleveKm | null;
+}
+
+/** Le relevé le plus ancien ; à date égale, le kilométrage le plus bas. */
+export function premierReleve(releves: DernierReleveKm[]): DernierReleveKm | null {
+  return releves.reduce<DernierReleveKm | null>((best, r) => {
+    if (!best) return r;
+    const d = Date.parse(r.at) - Date.parse(best.at);
+    return d < 0 || (d === 0 && r.km < best.km) ? r : best;
+  }, null);
+}
+
 /**
- * Référence kilométrique arrêtée à la date réelle du plein.
- * Un relevé saisi le 12 octobre peut être inférieur au dernier relevé
- * du 15 octobre : on compare donc avec les relevés déjà connus à cette date.
+ * Relevés kilométriques qui encadrent la date réelle d'un plein. Un plein
+ * saisi le 12 octobre est comparé au dernier relevé connu au 12 (plancher)
+ * et au premier relevé postérieur (plafond) : un kilométrage supérieur à
+ * celui du 15 octobre est aussi incohérent qu'un recul.
+ *
+ * Une requête `order().limit(1)` par source et par sens, au lieu de relire
+ * tout l'historique du véhicule. Le client doit voir toutes les tournées du
+ * véhicule (client admin, véhicule déjà vérifié dans l'organisation) : avec
+ * la RLS, un chauffeur ne verrait que ses propres tournées.
  */
-export async function getVehicleKmReadingAt(
+export async function getVehicleKmReadingsAround(
   supabase: SupabaseClient,
   vehicleId: string,
   occurredAt: string,
-): Promise<DernierReleveKm | null> {
-  const [{ data: vehicle }, { data: entries }, { data: interventions }, { data: fuelEntries }] = await Promise.all([
+): Promise<RelevesEncadrants> {
+  const iso = new Date(occurredAt).toISOString();
+  type Ligne = Record<string, unknown>;
+  /** Un relevé par source, le plus proche de la date du plein, d'un côté ou de l'autre. */
+  const proche = async (table: string, colonnes: string, colonneDate: string, colonneKm: string, avant: boolean, statuts?: string[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = supabase.from(table).select(colonnes).eq("vehicle_id", vehicleId).not(colonneKm, "is", null);
+    if (statuts) q = q.in("status", statuts);
+    q = avant ? q.lte(colonneDate, iso) : q.gt(colonneDate, iso);
+    const { data } = await q.order(colonneDate, { ascending: !avant }).limit(1);
+    return ((data ?? []) as Ligne[])[0] ?? null;
+  };
+  const sens = async (avant: boolean): Promise<DernierReleveKm[]> => {
+    const [depart, retour, intervention, plein] = await Promise.all([
+      proche("planning_entries", "tour_number, start_at, start_km", "start_at", "start_km", avant),
+      proche("planning_entries", "tour_number, end_at, end_km", "end_at", "end_km", avant),
+      proche("vehicle_interventions", "type, created_at, odometer_km", "created_at", "odometer_km", avant),
+      proche("fuel_entries", "occurred_at, vehicle_km", "occurred_at", "vehicle_km", avant, TRUSTED_STATUSES),
+    ]);
+    const releves: DernierReleveKm[] = [];
+    if (depart) releves.push({ km: Number(depart.start_km), at: String(depart.start_at), source: `Départ tournée n°${depart.tour_number}` });
+    if (retour) releves.push({ km: Number(retour.end_km), at: String(retour.end_at), source: `Retour tournée n°${retour.tour_number}` });
+    if (intervention) releves.push({ km: Number(intervention.odometer_km), at: String(intervention.created_at), source: `Intervention : ${intervention.type}` });
+    if (plein) releves.push({ km: Number(plein.vehicle_km), at: String(plein.occurred_at), source: "Plein de carburant" });
+    return releves;
+  };
+
+  const [{ data: vehicle }, avant, apres] = await Promise.all([
     supabase.from("vehicles").select("initial_km, created_at").eq("id", vehicleId).single(),
-    supabase.from("planning_entries").select("tour_number, start_at, start_km, end_at, end_km").eq("vehicle_id", vehicleId).or("start_km.not.is.null,end_km.not.is.null"),
-    supabase.from("vehicle_interventions").select("type, created_at, odometer_km").eq("vehicle_id", vehicleId).not("odometer_km", "is", null),
-    supabase.from("fuel_entries").select("occurred_at, vehicle_km").eq("vehicle_id", vehicleId).in("status", TRUSTED_STATUSES).not("vehicle_km", "is", null),
+    sens(true),
+    sens(false),
   ]);
-  const readings: DernierReleveKm[] = [];
-  if (vehicle?.initial_km != null && vehicle.created_at) readings.push({ km: Number(vehicle.initial_km), at: vehicle.created_at, source: "Kilométrage initial" });
-  for (const e of entries ?? []) {
-    if (e.start_km != null && e.start_at) readings.push({ km: Number(e.start_km), at: e.start_at, source: `Départ tournée n°${e.tour_number}` });
-    if (e.end_km != null && e.end_at) readings.push({ km: Number(e.end_km), at: e.end_at, source: `Retour tournée n°${e.tour_number}` });
+  if (vehicle?.initial_km != null && vehicle.created_at) {
+    const initial = { km: Number(vehicle.initial_km), at: vehicle.created_at as string, source: "Kilométrage initial" };
+    (Date.parse(initial.at) <= Date.parse(iso) ? avant : apres).push(initial);
   }
-  for (const i of interventions ?? []) readings.push({ km: Number(i.odometer_km), at: i.created_at, source: `Intervention : ${i.type}` });
-  for (const f of fuelEntries ?? []) readings.push({ km: Number(f.vehicle_km), at: f.occurred_at, source: "Plein de carburant" });
-  const cutoff = Date.parse(occurredAt);
-  return dernierReleve(readings.filter((reading) => Date.parse(reading.at) <= cutoff));
+  return { avant: dernierReleve(avant), apres: premierReleve(apres) };
 }
