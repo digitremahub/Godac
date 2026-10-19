@@ -58,6 +58,17 @@ export async function POST(req: Request) {
     );
   }
 
+  // Audit M7 : le service choisi doit appartenir à l'organisation du lien.
+  if (parsed.data.service_id) {
+    const { data: service } = await admin
+      .from("services")
+      .select("id")
+      .eq("id", parsed.data.service_id)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (!service) return NextResponse.json({ error: "Service invalide pour ce lien." }, { status: 422 });
+  }
+
   try {
     const { id } = await createPinDriver({
       fullName: parsed.data.full_name,

@@ -4,6 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { addDays } from "@/lib/planning/dates";
+import { minuitParis } from "@/lib/ticpe/export";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -76,8 +77,9 @@ export async function POST(req: Request) {
     .eq("service_id", service_id)
     .eq("status", "planned")
     .not("driver_id", "is", null)
-    .gte("start_at", `${week_start}T00:00:00`)
-    .lt("start_at", `${weekEnd}T00:00:00`)
+    // Bornes de semaine en heure de Paris (audit M15).
+    .gte("start_at", minuitParis(week_start))
+    .lt("start_at", minuitParis(weekEnd))
     .order("start_at");
   if (entriesError) return NextResponse.json({ error: entriesError.message }, { status: 500 });
 
