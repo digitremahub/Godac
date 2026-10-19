@@ -176,8 +176,6 @@ export function sequenceParListes(
     }
     if (ordre.length) courant = pts[ordre[ordre.length - 1]!]!;
     sequence.push(...g.sansGps.map((s) => s.id));
-    // Même sans coordonnées, une remise prend en moyenne 3 minutes.
-    if (horaires) heure += g.sansGps.length * (horaires.minutesParArret ?? 3);
   });
 
   const signales = new Set([...fermes, ...impossibles]);

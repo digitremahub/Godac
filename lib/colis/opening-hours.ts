@@ -79,7 +79,7 @@ export function parserOpeningHours(valeur: string | null | undefined): Semaine |
   // commence par une virgule suivie d'un jour : « Mo-Fr 08:00-12:00, Sa 09:00-12:00 ».
   const regles: { texte: string; additionnelle: boolean }[] = [];
   for (const bloc of texte.split(/;|\|\|/)) {
-    const parties = bloc.split(/,\s*(?=(?:Mo|Tu|We|Th|Fr|Sa|Su|PH|SH)\b)/i);
+    const parties = bloc.split(/(?<=\d|off|closed)\s*,\s*(?=(?:Mo|Tu|We|Th|Fr|Sa|Su|PH|SH)\b)/i);
     parties.forEach((p, i) => p.trim() && regles.push({ texte: p.trim(), additionnelle: i > 0 }));
   }
 
