@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { IconCheck, IconRamasse, IconX } from "@/components/layout/icons";
+import { IconCheck, IconPointRelais, IconRamasse, IconX } from "@/components/layout/icons";
 import { motifsPour, type MotifEchec } from "@/lib/colis/cloture";
-import { estRamasse } from "@/lib/colis/livraison";
-import { BadgeRamasse } from "@/components/colis/Ramasse";
+import { estPointRelais, estRamasse, typeArret } from "@/lib/colis/livraison";
+import { BadgeArret } from "@/components/colis/Ramasse";
 import type { Stop } from "@/components/colis/commun";
 
 /**
@@ -32,7 +32,8 @@ export function ClotureSheet({
   onClose: () => void;
 }) {
   const ramasse = estRamasse(stop);
-  const [motif, setMotif] = useState<MotifEchec | null>(mode === "echec" ? "absent" : null);
+  const relais = estPointRelais(stop);
+  const [motif, setMotif] = useState<MotifEchec | null>(mode === "echec" ? (relais ? "ferme" : "absent") : null);
   const [precision, setPrecision] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -61,7 +62,7 @@ export function ClotureSheet({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-teal-ink">
-              {ramasse && <BadgeRamasse />}
+              <BadgeArret stop={stop} />
               Arrêt {numero}
             </p>
             <h2 id="cloture-titre" className="font-display text-lg font-bold leading-snug">
@@ -79,7 +80,8 @@ export function ClotureSheet({
         {motif === null ? (
           <div className="grid grid-cols-1 gap-2">
             <button type="button" className="btn-primary justify-center !py-4 text-lg" disabled={envoi} onClick={onLivrer}>
-              {ramasse ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {ramasse ? "Colis ramassés" : "Livré"}
+              {ramasse ? <IconRamasse className="h-6 w-6" /> : relais ? <IconPointRelais className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />}{" "}
+              {ramasse ? "Colis ramassés" : relais ? "Déposé au relais" : "Livré"}
             </button>
             {ramasse ? (
               <>
@@ -90,6 +92,10 @@ export function ClotureSheet({
                   <IconX className="h-5 w-5" /> Fermé
                 </button>
               </>
+            ) : relais ? (
+              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" disabled={envoi} onClick={() => setMotif("ferme")}>
+                <IconX className="h-5 w-5" /> Dépôt impossible
+              </button>
             ) : (
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" disabled={envoi} onClick={() => setMotif("absent")}>
                 <IconX className="h-5 w-5" /> Échec / absent
@@ -100,7 +106,7 @@ export function ClotureSheet({
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-semibold">Motif de l&apos;échec</legend>
             <div className="grid grid-cols-2 gap-2">
-              {motifsPour(ramasse).map((m) => (
+              {motifsPour(typeArret(stop.kind)).map((m) => (
                 <button
                   key={m.key}
                   type="button"

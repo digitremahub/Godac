@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
-import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
+import { IconPointRelais, IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
@@ -13,8 +13,8 @@ import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
-import { estRamasse, estPointRelais, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
-import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
+import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
@@ -901,18 +901,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
       )}
 
       {enLivraison && prochain ? (
-        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${estRamasse(prochain) ? "border-gold/80" : "border-teal/50"}`}>
-          {estRamasse(prochain) && <EncocheRamasse large />}
+        <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${bordureArret(prochain, "border-teal/50")}`}>
+          <EncocheArret stop={prochain} large />
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
-            {estRamasse(prochain) && <BadgeRamasse />}
-            {estPointRelais(prochain) && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
-                <IconMapPin className="h-3.5 w-3.5" /> Point relais
-              </span>
-            )}
+            <BadgeArret stop={prochain} />
             <span>
               Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
-              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
+              {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : estPointRelais(prochain) ? " à déposer" : ""}`}
               {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
             </span>
           </p>
@@ -940,7 +935,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
             <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
-              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
+              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(prochain) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(prochain)}
             </button>
             <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
               <IconX className="h-5 w-5" /> Échec / absent
@@ -1157,8 +1152,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   return (
-                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estRamasse(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
-                      {estRamasse(s) && <EncocheRamasse />}
+                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                      <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
@@ -1168,14 +1163,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {(estRamasse(s) || estPointRelais(s) || (s.status === "pending" && !s.phone)) && (
+                          {(estMarque(s) || (s.status === "pending" && !s.phone)) && (
                             <div className="mb-1 flex flex-wrap gap-1">
-                              {estRamasse(s) && <BadgeRamasse />}
-                              {estPointRelais(s) && (
-                                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
-                                  <IconMapPin className="h-3.5 w-3.5" /> Point relais
-                                </span>
-                              )}
+                              <BadgeArret stop={s} />
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
                           )}
