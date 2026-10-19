@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { PlanningDuplicatesBanner, type DuplicateRow } from "@/components/planning/PlanningDuplicatesBanner";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
+import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
 import { PlanningViewTabs } from "@/components/planning/PlanningViewTabs";
 import { PlanningDayView } from "@/components/planning/PlanningDayView";
 import { PlanningMonthView } from "@/components/planning/PlanningMonthView";
@@ -177,6 +178,10 @@ export default async function PlanningPage({
     driverServiceIds.set(row.user_id, list);
   }
 
+  const { data: routeRows } = await supabase.from("tour_routes").select("tour_number, service_id").eq("organization_id", appUser.organization_id).order("tour_number");
+  const availableTours = Array.from(new Map(((routeRows ?? []) as { tour_number: string; service_id: string | null }[]).map((r) => [r.tour_number, r])).values())
+    .map((r) => ({ tourNumber: r.tour_number, serviceId: r.service_id }));
+
   const commonProps = {
     services: transportServices,
     filteredServices,
@@ -184,6 +189,7 @@ export default async function PlanningPage({
     drivers: drivers ?? [],
     entries: (entries ?? []) as any,
     selectedService: params.service ?? "",
+    availableTours,
   };
 
   // Duplicated planned entries (± 60 days) — direction only, the only
@@ -212,6 +218,9 @@ export default async function PlanningPage({
       />
       {duplicates.length > 0 && <PlanningDuplicatesBanner duplicates={duplicates} />}
       <PlanningViewTabs view={view} selectedService={params.service ?? ""} services={services} />
+      {view === "week" && ["direction", "manager", "manager_chauffeur"].includes(appUser.role) && transportServices.length > 0 && (
+        <PlanningTemplatesPanel services={transportServices} selectedService={params.service ?? ""} weekStart={weekStart} />
+      )}
       {view === "week" && (
         <PlanningGrid
           {...commonProps}

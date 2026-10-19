@@ -4,7 +4,7 @@
  * - Arrêt « point relais » (delivery_stops.kind = 'point_relais') : commerce
  *   partenaire où le chauffeur dépose plusieurs colis et reprend
  *   éventuellement des retours. Nom du relais dans relay_name, retours
- *   repris dans returns_count. Ses horaires viennent de l'annuaire des
+ *   repris dans packages_picked_up. Ses horaires viennent de l'annuaire des
  *   adresses pro (même adresse normalisée), comme pour toute adresse.
  * - Livraison remise au point relais en cas d'absence
  *   (delivered_place = 'point_relais') : nom ou adresse du relais dans
@@ -17,7 +17,7 @@ export const RESEAUX_RELAIS = ["Relais Colis", "Pickup", "Mondial Relay", "Chron
 
 /** Longueur maximale du nom du relais (contrainte delivery_stops_relay_name_check). */
 export const NOM_RELAIS_MAX = 200;
-/** Nombre maximal de retours repris en un passage (contrainte delivery_stops_returns_count_check). */
+/** Nombre maximal de retours repris en un passage (contrainte delivery_stops_packages_picked_up_check). */
 export const RETOURS_MAX = 500;
 
 /** Nom (ou adresse) du relais prêt à être enregistré : espaces normalisés, tronqué ; null si vide. */

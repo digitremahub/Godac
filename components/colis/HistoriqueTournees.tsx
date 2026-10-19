@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HistoriqueCarte from "@/components/colis/HistoriqueCarte";
 import { Card, EmptyState } from "@/components/ui";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
 import { versParams, type Historique, type detailTournee } from "@/lib/colis/historique";
@@ -136,10 +137,13 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
             {run.start_label && ` · départ : ${run.start_label}`}
           </p>
         </div>
-        <Link href={fermer} className="btn-secondary !py-1.5 text-sm" scroll={false}>
-          Fermer
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href={fermer} className="btn-secondary !py-1.5 text-sm" scroll={false}>
+            Fermer
+          </Link>
+        </div>
       </div>
+      {arrets.length > 0 && <HistoriqueCarte stops={arrets.map((s) => ({ id: s.id, address: s.address, status: s.status, lat: s.lat, lng: s.lng, done_at: s.done_at }))} depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null} />}
       {arrets.length === 0 ? (
         <p className="text-sm text-navy/60">Aucun arrêt dans cette tournée.</p>
       ) : (

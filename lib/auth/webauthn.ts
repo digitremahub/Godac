@@ -9,9 +9,11 @@ import "server-only";
  * and must track NEXT_PUBLIC_APP_URL.
  */
 export function webauthnConfig() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const rpID = new URL(appUrl).hostname;
-  return { rpName: "GODAC", rpID, origin: appUrl };
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const parsedUrl = new URL(configuredUrl);
+  const origin = parsedUrl.origin;
+  const rpID = parsedUrl.hostname;
+  return { rpName: "GODAC", rpID, origin };
 }
 
 export const WEBAUTHN_CHALLENGE_COOKIE = "webauthn_challenge";

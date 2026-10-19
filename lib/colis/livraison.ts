@@ -64,7 +64,7 @@ export function libellePreuve(s: {
   proof_code?: string | null;
   kind?: string | null;
   relay_name?: string | null;
-  returns_count?: number | null;
+  packages_picked_up?: number | null;
 }): string | null {
   const lieu = libelleLieu(s.delivered_place);
   if (!lieu) return null;
@@ -72,7 +72,7 @@ export function libellePreuve(s: {
     const base = estPointRelais(s) ? "Déposé au relais" : "Remis au point relais";
     return [
       [base, s.relay_name?.trim() || null].filter(Boolean).join(" ") + (s.proof_code ? ` (code ${resumeCodeQr(s.proof_code)})` : ""),
-      libelleRetours(s.returns_count),
+      estPointRelais(s) ? libelleRetours(s.packages_picked_up) : null,
     ]
       .filter(Boolean)
       .join(" · ");

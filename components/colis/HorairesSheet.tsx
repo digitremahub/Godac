@@ -105,6 +105,8 @@ export interface ResumeOptimisation {
   horsHoraires: string[];
   fermes: string[];
   impossibles: string[];
+  /** false quand le moteur de routage est indisponible et que GODAC utilise une estimation. */
+  distanceRoutiere?: boolean;
 }
 
 const heureIso = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", " h ") : "—");
@@ -129,7 +131,7 @@ export function ResumeOptimisationCarte({ resume, stops, onFermer }: { resume: R
         </button>
       </div>
       <p className="text-xs text-navy/65">
-        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)}
+        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)} · 3 min moyennes par livraison
         {resume.avecHoraires > 0 && ` · ${resume.avecHoraires} adresse${resume.avecHoraires > 1 ? "s" : ""} avec horaires`}
         {resume.sansGps > 0 && ` · ${resume.sansGps} adresse(s) à vérifier en fin de liste`}
       </p>
@@ -251,6 +253,19 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
         <section className="flex flex-col gap-2 rounded-2xl border border-navy/10 p-3">
           <h3 className="text-sm font-semibold">Créneau pour aujourd&apos;hui seulement</h3>
           <p className="text-xs text-navy/60">Ex. « avant 10 h » demandé par le client. Prioritaire sur les horaires d&apos;ouverture.</p>
+          <p className="text-xs font-medium text-navy/70">Créneaux DPD</p>
+          <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
+            {[
+              ["8 h – 11 h", "08:00", "11:00"],
+              ["10 h – 13 h", "10:00", "13:00"],
+              ["12 h – 15 h", "12:00", "15:00"],
+              ["14 h – 17 h", "14:00", "17:00"],
+            ].map(([l, d, f]) => (
+              <button key={l} type="button" className={debut === d && fin === f ? "btn-primary !px-2 !py-2 text-xs" : "btn-ghost !px-2 !py-2 text-xs"} onClick={() => (setDebut(d!), setFin(f!))}>
+                {l}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-1.5 text-xs">
             {[
               ["Avant 10 h", "", "10:00"],

@@ -23,8 +23,9 @@ const nextConfig = {
   // string literal at the fs.readFileSync call site) — Next's static
   // file tracing can't follow that, so the directory is force-included
   // for the one route that needs it at runtime (Vercel).
-  outputFileTracingIncludes: {
-    "/api/assistant/message": ["./content/help/**"],
+  experimental: {
+    outputFileTracingIncludes: {
+      "/api/assistant/message": ["./content/help/**"],
     // @react-pdf/renderer ALWAYS touches pdfkit's built-in "Helvetica"
     // standard font, no matter what font our own styles request:
     // @react-pdf/font eagerly pre-loads it the moment the library is
@@ -44,9 +45,10 @@ const nextConfig = {
     // files, now a project-root path like any other — so this entry
     // just makes sure that copy (and the embedded NotoSans font the
     // generators actually ask for) gets traced.
-    "/api/payslips/generate": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
-    "/api/ticpe/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
-    "/api/ticpe/export-lines/[id]": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      "/api/payslips/generate": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      "/api/ticpe/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      "/api/ticpe/export-lines/[id]": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+    },
   },
   images: {
     remotePatterns: [

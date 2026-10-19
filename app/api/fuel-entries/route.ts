@@ -4,7 +4,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { getCurrentTankPmp } from "@/lib/fuel/current-pmp";
 import { checkOdometerJump, checkOdometerNotRegressing } from "@/lib/business/odometer";
-import { getVehicleLatestKmReading } from "@/lib/vehicles/odometer-reference";
+import { getVehicleKmReadingAt } from "@/lib/vehicles/odometer-reference";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
@@ -115,10 +115,12 @@ export async function POST(req: Request) {
   }
 
   if (d.vehicle_km !== undefined) {
-    const dernier = await getVehicleLatestKmReading(supabase, d.vehicle_id);
-    const recul = checkOdometerNotRegressing(d.vehicle_km, dernier?.km ?? null, `la dernière lecture (${dernier?.source ?? "véhicule"})`);
+    // Saisie rétroactive : comparer le kilométrage aux relevés connus à
+    // la date réelle du plein, pas au relevé actuel (qui peut être supérieur).
+    const dernier = await getVehicleKmReadingAt(supabase, d.vehicle_id, d.occurred_at);
+    const recul = checkOdometerNotRegressing(d.vehicle_km, dernier?.km ?? null, `la dernière lecture à cette date (${dernier?.source ?? "véhicule"})`);
     if (!recul.ok) return NextResponse.json({ error: recul.message }, { status: 422 });
-    const saut = checkOdometerJump(d.vehicle_km, dernier?.km ?? null, dernier?.at ?? null);
+    const saut = checkOdometerJump(d.vehicle_km, dernier?.km ?? null, dernier?.at ?? null, new Date(d.occurred_at));
     if (!saut.ok) return NextResponse.json({ error: saut.message }, { status: 422 });
   }
 

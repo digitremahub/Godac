@@ -18,10 +18,13 @@ type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 /** La fiche de la tournée du jour ; sans la migration des renforts, relue sans le drapeau. */
 async function loadTodayRoute(supabase: Supabase, tourNumber: string) {
-  const villages = "tour_route_villages(name, postal_code, notes, position)";
+  const villages = "tour_route_villages(name, postal_code, notes, pickup_addresses, position)";
   const withRenfort = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
   if (!withRenfort.error) return withRenfort;
-  return supabase.from("tour_routes").select(`id, tour_number, notes, ${villages}`).eq("tour_number", tourNumber).maybeSingle();
+  const legacyVillages = "tour_route_villages(name, postal_code, notes, position)";
+  const legacy = await supabase.from("tour_routes").select(`id, tour_number, notes, is_renfort, ${legacyVillages}`).eq("tour_number", tourNumber).maybeSingle();
+  if (!legacy.error) return legacy;
+  return supabase.from("tour_routes").select(`id, tour_number, notes, ${legacyVillages}`).eq("tour_number", tourNumber).maybeSingle();
 }
 
 /** Villages couverts par un renfort pour ce passage (choix du jour, sinon couverture par défaut). */
@@ -164,7 +167,7 @@ export async function ChauffeurDashboard({
     .filter((sv) => sv && (sv.team_leader_name || sv.team_leader_phone || sv.team_leader_email));
   // Tournée de renfort : les villages empruntés du jour (choisis pour ce passage, sinon par défaut), avec leur tournée.
   const todayIsRenfort = Boolean((todayRoute as any)?.is_renfort);
-  const todayVillages: { name: string; homeTour?: string }[] = todayIsRenfort
+  const todayVillages: { name: string; homeTour?: string; pickup_addresses?: string[] }[] = todayIsRenfort
     ? await loadRenfortVillages(supabase, (todayRoute as any).id, todayEntryId)
     : (((todayRoute as any)?.tour_route_villages ?? []) as any[]).sort((a, b) => a.position - b.position);
 
@@ -207,13 +210,22 @@ export async function ChauffeurDashboard({
               </div>
               <ol className="flex flex-wrap gap-1.5">
                 {todayVillages.map((v, i) => (
-                  <li key={i} className="flex items-center gap-1.5 rounded-full bg-navy/[0.045] py-1 pl-1 pr-3 text-sm">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
-                    {v.name}
-                    {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
+                  <li key={i} className="flex flex-col gap-1 rounded-xl bg-navy/[0.045] p-2.5 text-sm">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
+                      <span className="font-semibold">{v.name}</span>
+                      {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
+                    </div>
+                    {(v.pickup_addresses ?? []).length > 0 && (
+                      <div className="ml-7">
+                        <p className="text-xs font-bold uppercase tracking-wide text-orange-ink">Ramasses à effectuer</p>
+                        <ul className="mt-1 list-inside list-disc text-sm">
+                          {(v.pickup_addresses ?? []).map((address, j) => <li key={j}>{address}</li>)}
+                        </ul>
+                      </div>
+                    )}
                   </li>
-                ))}
-              </ol>
+                ))}              </ol>
               {(todayRoute as any)?.notes && <p className="mt-3 whitespace-pre-line text-sm text-navy/70">{(todayRoute as any).notes}</p>}
             </Card>
           )}

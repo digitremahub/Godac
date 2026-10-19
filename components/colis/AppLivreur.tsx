@@ -10,11 +10,12 @@ import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { BadgeRamasse, EncocheRamasse } from "@/components/colis/Ramasse";
-import { estRamasse, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
+import { estRamasse, estPointRelais, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
@@ -47,7 +48,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
+  const [confirmationLancement, setConfirmationLancement] = useState(false);
+  const [villagesConfirmes, setVillagesConfirmes] = useState<string[]>([]);
   const [livraison, setLivraison] = useState<Stop | null>(null);
+  const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [vue, setVue] = useState<"liste" | "carte">("liste");
@@ -206,14 +210,66 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
-      setToast({ ok: false, text: networkErrorMessage(e) });
+      if (isNetworkFailure(e)) {
+        try {
+          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+          setToast({ ok: true, text: "Action enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
+          return;
+        } catch (queueError) {
+          setToast({ ok: false, text: networkErrorMessage(queueError) });
+        }
+      } else setToast({ ok: false, text: networkErrorMessage(e) });
       await charger(run?.id);
     }
   }
 
-  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
-  function terminer(s: Stop) {
-    if (estRamasse(s)) return statut(s, "delivered");
+  /** Valide les quantités physiques avant de clôturer une ramasse ou un point relais. */
+  async function terminer(s: Stop) {
+    if (estRamasse(s)) {
+      const valeur = prompt(`Nombre de colis récupérés — ${s.recipient ?? s.address}`, String(s.packages_picked_up ?? s.parcel_count ?? 1));
+      if (valeur === null) return;
+      const quantite = Number(valeur);
+      if (!Number.isInteger(quantite) || quantite < 0 || quantite > 500) {
+        setToast({ ok: false, text: "Saisissez un nombre entier de colis entre 0 et 500." });
+        return;
+      }
+      try {
+        const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${s.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ run_id: run?.id, packages_picked_up: quantite, status: "delivered" }),
+        });
+        setStops((all) => all.map((x) => x.id === s.id ? maj : x));
+        setToast({ ok: true, text: `${quantite} colis récupéré(s) enregistré(s).` });
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+        await charger(run?.id);
+      }
+      return;
+    }
+    if (estPointRelais(s)) {
+      const depose = prompt(`Nombre de colis déposés au point relais — ${s.address}`, String(s.parcel_count ?? 0));
+      if (depose === null) return;
+      const recuperes = prompt(`Nombre de colis récupérés au point relais — ${s.address}`, String(s.packages_picked_up ?? 0));
+      if (recuperes === null) return;
+      const deposeN = Number(depose);
+      const recuperesN = Number(recuperes);
+      if (![deposeN, recuperesN].every((n) => Number.isInteger(n) && n >= 0 && n <= 500)) {
+        setToast({ ok: false, text: "Saisissez des nombres entiers entre 0 et 500." });
+        return;
+      }
+      try {
+        const { stop: maj } = await api<{ stop: Stop }>(`/api/colis/arrets/${s.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ run_id: run?.id, parcel_count: Math.max(1, deposeN), packages_delivered: deposeN, packages_picked_up: recuperesN }),
+        });
+        setStops((all) => all.map((x) => x.id === s.id ? maj : x));
+        setLivraison(maj);
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+        await charger(run?.id);
+      }
+      return;
+    }
     setLivraison(s);
   }
 
@@ -230,12 +286,47 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
+  /** Passe temporairement cet arrêt en fin de file sans le marquer comme livré. */
+  async function passerAdresseSuivante(s: Stop) {
+    if (!run) return;
+    const restant = arretsRestants(stops).length;
+    if (restant < 2) return;
+    setBusy(true);
+    try {
+      for (let i = 0; i < restant; i++) {
+        await api(`/api/colis/arrets/${s.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ run_id: run.id, deplacer: "bas" }),
+        });
+      }
+      await charger(run.id);
+      setToast({ ok: true, text: "Arrêt déplacé en fin de tournée. Il reste à traiter." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+      await charger(run.id);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function demanderDemarrage() {
+    setVillagesConfirmes([]);
+    setConfirmationLancement(true);
+  }
+
   async function demarrer() {
     if (!run) return;
+    const groupesAvantDepart = grouperParListe(stops, lists);
+    const idsVillages = groupesAvantDepart.map((g) => g.liste?.id ?? "__principale__");
+    if (idsVillages.some((id) => !villagesConfirmes.includes(id))) {
+      setToast({ ok: false, text: "Confirmez chaque village avant de lancer la tournée." });
+      return;
+    }
     setBusy(true);
     try {
       if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
       await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
+      setConfirmationLancement(false);
       await charger(run.id);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -258,7 +349,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
       const hors = r.horsHoraires.length + r.impossibles.length;
       setToast({
         ok: !hors && !r.fermes.length,
-        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
+        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
       });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -446,6 +537,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                 <div>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
                     {estRamasse(arretCarte) && <BadgeRamasse />}
+                    {estPointRelais(arretCarte) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
                     <span>
                       Arrêt {stops.indexOf(arretCarte) + 1} / {stops.length}
                       {arretCarte.parcel_count > 1 && ` · ${arretCarte.parcel_count} colis`}
@@ -488,6 +580,57 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         </section>
       )}
 
+      {detailsStop && (
+        <div className="fixed inset-0 z-[85] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="fiche-arret-title">
+          <section className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-pop">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="fiche-arret-title" className="font-display text-xl font-bold">Fiche de livraison</h2>
+                <p className="mt-1 text-sm text-navy/60">{estRamasse(detailsStop) ? "Ramasse" : estPointRelais(detailsStop) ? "Point relais" : "Livraison"}</p>
+              </div>
+              <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDetailsStop(null)} aria-label="Fermer la fiche">✕</button>
+            </div>
+            <p className="mt-4 break-words text-lg font-semibold">{detailsStop.address}</p>
+            {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
+            {detailsStop.phone && <p className="mt-1 text-sm">{detailsStop.phone}</p>}
+            {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
+            <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · récupérés : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
+              <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Navigation</a>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
+              <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>Traiter cet arrêt</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {confirmationLancement && run && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirmation-tournee-title">
+          <section className="w-full max-w-xl rounded-2xl bg-surface p-5 shadow-pop">
+            <h2 id="confirmation-tournee-title" className="font-display text-xl font-bold">Confirmation de la tournée</h2>
+            <p className="mt-1 text-sm text-navy/65">Vérifiez la tournée attribuée à votre planning et cochez chaque village dont vous prenez bien les colis avant le départ.</p>
+            <div className="mt-4 flex flex-col gap-2">
+              {grouperParListe(stops, lists).map((g) => {
+                const id = g.liste?.id ?? "__principale__";
+                const nom = nomGroupe(g);
+                const ok = villagesConfirmes.includes(id);
+                return <label key={id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${ok ? "border-teal bg-teal/5" : "border-navy/15"}`}>
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-teal" checked={ok} onChange={(e) => setVillagesConfirmes((anciens) => e.target.checked ? [...anciens, id] : anciens.filter((x) => x !== id))} />
+                  <span className="flex-1"><strong>{nom}</strong><span className="block text-xs text-navy/60">{g.arrets.length} adresse(s) · {g.arrets.reduce((n, s) => n + s.parcel_count, 0)} colis</span></span>
+                </label>;
+              })}
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button type="button" className="btn-secondary flex-1" disabled={busy} onClick={() => setConfirmationLancement(false)}>Annuler</button>
+              <button type="button" className="btn-primary flex-1" disabled={busy || !grouperParListe(stops, lists).length || grouperParListe(stops, lists).some((g) => !villagesConfirmes.includes(g.liste?.id ?? "__principale__"))} onClick={demarrer}>{busy ? "Optimisation…" : "Je confirme et je démarre"}</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
@@ -505,8 +648,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <p className="text-sm text-navy/65">
               {stops.length} adresse(s) chargée(s). GODAC calcule le meilleur ordre puis vous guide arrêt par arrêt.
             </p>
-            <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demarrer}>
-              {busy ? "Calcul de l'ordre…" : "Démarrer la livraison"}
+            <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demanderDemarrage}>
+              Vérifier les villages et démarrer
             </button>
             <Link href="/colis" className="btn-ghost w-fit !px-2 text-sm">
               Ajouter ou modifier des colis
@@ -521,6 +664,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             {multi && <p className="-mb-2 text-xs font-semibold text-navy/60">{separateur(prochain)}</p>}
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
               {estRamasse(prochain) && <BadgeRamasse />}
+              {estPointRelais(prochain) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
               <span>
                 Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
                 {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
@@ -563,6 +707,11 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                 <IconMapPin className="h-4 w-4" /> Google Maps
               </a>
             </div>
+            {pending.length > 1 && (
+              <button type="button" className="btn-ghost justify-center !py-2.5 text-sm" disabled={busy} onClick={() => passerAdresseSuivante(prochain)}>
+                Passer à l’adresse suivante (garder cet arrêt pour plus tard)
+              </button>
+            )}
             <div className="grid grid-cols-[2fr_1fr] gap-2">
               <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
                 {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {estRamasse(prochain) ? "Ramassé" : "Livré"}
@@ -616,23 +765,29 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     {estRamasse(s) && <EncocheRamasse />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
-                      {(estRamasse(s) || !s.phone) && (
+                      {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                         <div className="mb-1 flex flex-wrap gap-1">
                           {estRamasse(s) && <BadgeRamasse />}
+                          {estPointRelais(s) && <span className="rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase text-teal-ink">Point relais</span>}
                           {!s.phone && <BadgeSansTelephone />}
                         </div>
                       )}
                       <p className="text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
-                      <button
-                        type="button"
-                        className="mt-1.5 rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
-                        onClick={() => setCloture({ stop: s, mode: "choix" })}
-                        aria-label={`Clôturer ${s.recipient ?? s.address}`}
-                      >
-                        Clôturer ›
-                      </button>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        <button type="button" className="rounded-full border border-teal/40 px-3 py-1.5 text-xs font-semibold text-teal-ink hover:bg-teal/10" onClick={() => setDetailsStop(s)}>
+                          Ouvrir la fiche
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
+                          onClick={() => setCloture({ stop: s, mode: "choix" })}
+                          aria-label={`Clôturer ${s.recipient ?? s.address}`}
+                        >
+                          Clôturer ›
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -679,7 +834,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       {s.status === "delivered" ? "✓" : "!"}
                     </span>
                     <p className="min-w-0 flex-1 truncate text-sm">
-                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}
+                      {estRamasse(s) && <span className="mr-1 font-semibold text-gold-ink">Ramasse ·</span>}{estPointRelais(s) && <span className="mr-1 font-semibold text-teal-ink">Point relais ·</span>}
                       {s.address}
                       {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
                     </p>

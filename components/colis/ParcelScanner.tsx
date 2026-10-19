@@ -21,12 +21,14 @@ export function ParcelScanner({
   onClose,
   consigne = "Passez les colis un par un devant la caméra",
   bouton = "Terminer le scan",
+  statut = "",
   calque = "z-[60]",
 }: {
-  onCode: (text: string) => void;
+  onCode: (text: string, image?: string) => void;
   onClose: () => void;
   consigne?: string;
   bouton?: string;
+  statut?: string;
   calque?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -57,7 +59,21 @@ export function ParcelScanner({
       navigator.vibrate?.(60);
       setFlash(true);
       setTimeout(() => setFlash(false), 250);
-      onCodeRef.current(text);
+      // Capture l'étiquette au moment du scan pour lire l'adresse automatiquement.
+      let image: string | undefined;
+      const video = videoRef.current;
+      if (video?.videoWidth && video.videoHeight) {
+        const scale = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
+        const shot = document.createElement("canvas");
+        shot.width = Math.round(video.videoWidth * scale);
+        shot.height = Math.round(video.videoHeight * scale);
+        const ctx = shot.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, shot.width, shot.height);
+          image = shot.toDataURL("image/jpeg", 0.45).split(",")[1];
+        }
+      }
+      onCodeRef.current(text, image);
     };
 
     async function tick() {
@@ -118,6 +134,7 @@ export function ParcelScanner({
         <p className="absolute inset-x-0 top-4 text-center text-sm font-semibold text-white drop-shadow">
           {consigne}
           <span className="block text-xs font-normal text-white/75">{natif ? "QR, Datamatrix et codes-barres" : "Codes QR"}</span>
+          {statut && <span className="mx-auto mt-2 block max-w-[90%] rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white">{statut}</span>}
         </p>
         {error && <p className="absolute inset-x-4 bottom-24 rounded-xl bg-orange px-4 py-3 text-sm font-semibold text-white">{error}</p>}
       </div>

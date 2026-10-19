@@ -9,6 +9,7 @@ import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { ConvocationButton } from "@/components/intranet/ConvocationButton";
 import { DriverServicesPanel } from "@/components/admin/DriverServicesPanel";
+import { DriverContactForm } from "@/components/admin/DriverContactForm";
 import { EmployeeFileForm } from "@/components/admin/EmployeeFileForm";
 import { EmployeeDocumentsPanel, type EmployeeDocument } from "@/components/admin/EmployeeDocumentsPanel";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -238,22 +239,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {isDirection && (
-        <Card className="mb-6 flex flex-col gap-2">
-          <p className="text-sm font-medium">Coordonnées</p>
-          <div>
-            <p className="text-xs text-navy/60">Téléphone</p>
-            <p className="text-sm">{u.phone ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-navy/60">Adresse</p>
-            <p className="text-sm">{u.address ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-navy/60">Email de contact</p>
-            <p className="text-sm">{u.contact_email ?? "—"}</p>
-          </div>
-        </Card>
+      {(isDirection || isManagerLike) && isFieldRole && !isSelf && (
+        <DriverContactForm
+          userId={u.id}
+          currentPhone={u.phone ?? null}
+          currentAddress={u.address ?? null}
+          currentContactEmail={u.contact_email ?? null}
+          canEditAll={isDirection}
+        />
       )}
 
       {canSeePayrollAndHr && (

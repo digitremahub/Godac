@@ -12,6 +12,7 @@ import { TourReportPhotoCapture } from "@/components/shared/TourReportPhotoCaptu
 import { Card, EmptyState } from "@/components/ui";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
 import { IconCamera, IconCheck, IconRefresh } from "@/components/layout/icons";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 
 interface OpenTour {
   id: string;
@@ -65,6 +66,8 @@ export function StartTourFlow({
   const [startKmPhotoPath, setStartKmPhotoPath] = useState("");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
   const [startSheetPath, setStartSheetPath] = useState("");
+  const [scanUploadBusy, setScanUploadBusy] = useState(false);
+  const [sheetUploadBusy, setSheetUploadBusy] = useState(false);
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
@@ -73,6 +76,13 @@ export function StartTourFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [pendingOffline, setPendingOffline] = useState(false);
+
+  useEffect(() => {
+    const synced = () => { setPendingOffline(false); router.refresh(); };
+    window.addEventListener("godac:offline-synced", synced);
+    return () => window.removeEventListener("godac:offline-synced", synced);
+  }, [router]);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [vehicleChanged, setVehicleChanged] = useState(false);
   const [changeReason, setChangeReason] = useState("");
@@ -149,6 +159,8 @@ export function StartTourFlow({
   }
 
   const canSubmit =
+    !scanUploadBusy &&
+    !sheetUploadBusy &&
     Boolean(vehicleId) &&
     Boolean(startKm) &&
     (!requireOdometerPhoto || Boolean(startKmPhotoPath)) &&
@@ -163,6 +175,23 @@ export function StartTourFlow({
     setBusy(true);
     setError(null);
     try {
+      if ([sheetPhotoPath, startSheetPath, startKmPhotoPath].some((path) => path.startsWith("offline://"))) {
+        if (problemPhotoFile) throw new Error("La photo du problème doit être envoyée en ligne avant de valider le départ. Retirez-la temporairement ou reconnectez-vous.");
+        await enqueueOfflineMutation("/api/tours", {
+          method: "POST",
+          headers: tourHeaders,
+          body: JSON.stringify({
+            vehicle_id: vehicleId, service_id: polyvalentServices ? serviceId : undefined,
+            tour_number: tourNumber || undefined, planned_entry_id: plannedToday?.id, start_km: Number(startKm),
+            start_km_photo_path: startKmPhotoPath || undefined, sheet_photo_path: sheetPhotoPath || undefined,
+            start_sheet_path: startSheetPath || undefined, report_fields: reportFields ?? undefined,
+            vehicle_ok: vehicleOk, problem_description: vehicleOk ? undefined : problemDescription,
+            change_reason: vehicleChanged ? changeReason : undefined, change_type: vehicleChanged ? changeType : undefined,
+            change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
+          }),
+        });
+        setPendingOffline(true); setDone(true); return;
+      }
       const res = await fetch("/api/tours", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tourHeaders },
@@ -197,7 +226,36 @@ export function StartTourFlow({
       setDone(true);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inattendue");
+      if (isNetworkFailure(e) && !problemPhotoFile) {
+        try {
+          await enqueueOfflineMutation("/api/tours", {
+            method: "POST",
+            headers: tourHeaders,
+            body: JSON.stringify({
+              vehicle_id: vehicleId,
+              service_id: polyvalentServices ? serviceId : undefined,
+              tour_number: tourNumber || undefined,
+              planned_entry_id: plannedToday?.id,
+              start_km: Number(startKm),
+              start_km_photo_path: startKmPhotoPath || undefined,
+              sheet_photo_path: sheetPhotoPath || undefined,
+              start_sheet_path: startSheetPath || undefined,
+              report_fields: reportFields ?? undefined,
+              vehicle_ok: vehicleOk,
+              problem_description: vehicleOk ? undefined : problemDescription,
+              change_reason: vehicleChanged ? changeReason : undefined,
+              change_type: vehicleChanged ? changeType : undefined,
+              change_photos: vehicleChanged && changeType === "changement" ? changePhotos : undefined,
+            }),
+          });
+          setPendingOffline(true);
+          setDone(true);
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Enregistrement hors ligne impossible");
+        }
+      } else {
+        setError(e instanceof Error ? e.message : "Erreur inattendue");
+      }
     } finally {
       setBusy(false);
     }
@@ -206,8 +264,8 @@ export function StartTourFlow({
   if (done) {
     return (
       <EmptyState
-        title="Tournée démarrée"
-        description={onBehalf ? `Le départ de ${onBehalf.colleagueName} a été enregistré à son nom.` : "Le départ a été enregistré. Bonne route !"}
+        title={pendingOffline ? "Départ enregistré sur le téléphone" : "Tournée démarrée"}
+        description={pendingOffline ? "Le départ est en attente de synchronisation. Laissez GODAC ouvert ou reconnectez-vous pour l’envoyer. Vérifiez ensuite que la tournée apparaît dans l’application." : onBehalf ? `Le départ de ${onBehalf.colleagueName} a été enregistré à son nom.` : "Le départ a été enregistré. Bonne route !"}
       />
     );
   }
@@ -340,6 +398,7 @@ export function StartTourFlow({
             initUrl="/api/ocr/odometer/init"
             processUrl="/api/ocr/odometer/process"
             bucket="tour-photos"
+            offlineSupported
             onCaptured={({ photoPath, reading }) => {
               setStartKmPhotoPath(photoPath);
               if (reading !== null) setStartKm(String(reading));
@@ -389,6 +448,7 @@ export function StartTourFlow({
 
       <TourReportPhotoCapture
         label="Scan de l'écran « Statistiques Tournée » du terminal (optionnel — lecture auto)"
+        onUploadBusyChange={setScanUploadBusy}
         onCaptured={({ photoPath, fields }) => {
           setSheetPhotoPath(photoPath);
           setReportFields(fields);
@@ -397,6 +457,8 @@ export function StartTourFlow({
       />
       <TourReportPhotoCapture
         label="Feuille de début de tournée — photo ou PDF (optionnel)"
+        offlineSupported
+        onUploadBusyChange={setSheetUploadBusy}
         onCaptured={({ photoPath, fields }) => {
           setStartSheetPath(photoPath);
           // Complète ce que l'écran du terminal n'a pas donné.
@@ -425,7 +487,7 @@ export function StartTourFlow({
       </label>
 
       <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>
-        {busy ? "Envoi…" : "Valider mon départ"}
+        {busy ? "Envoi…" : scanUploadBusy || sheetUploadBusy ? "Attendez la fin de l’envoi des documents…" : "Valider mon départ"}
       </button>
     </Card>
   );

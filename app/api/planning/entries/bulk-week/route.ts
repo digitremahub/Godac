@@ -29,6 +29,9 @@ const bodySchema = z.object({
  */
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
+  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
+    return NextResponse.json({ error: "Seule la Direction, le responsable exploitation ou le chef d’équipe peut attribuer une tournée." }, { status: 403 });
+  }
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -68,7 +71,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0, skipped });
   }
 
-  const { data: inserted, error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" }).select("id, start_at");
+  const { data: inserted, error, count } = await supabase.from("planning_entries").insert(rows, { count: "exact" }).select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at");
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json(
@@ -78,6 +81,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
 
   const warnings = (
     await Promise.all(

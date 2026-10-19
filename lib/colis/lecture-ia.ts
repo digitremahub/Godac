@@ -19,7 +19,7 @@ export interface EtiquetteLue {
 
 export type LectureResult = { ok: true; etiquette: EtiquetteLue } | { ok: false; reason: string };
 
-const PROMPT = `Tu lis la photo d'une étiquette de colis (DPD, Colissimo, Chronopost, GLS, UPS, DHL…). Extrais UNIQUEMENT l'adresse de LIVRAISON du destinataire (pas l'expéditeur, pas le dépôt) : numéro et rue, complément utile (bâtiment, lieu-dit), code postal et ville, sur une seule ligne. Donne aussi le nom du destinataire (personne ou société), son numéro de téléphone (pas celui de l'expéditeur ni du transporteur ; cherche aussi « Tél », « Tel », « Mobile », « Phone », « GSM », souvent sous l'adresse), le poids du colis en kilogrammes (« Poids », « Weight », « kg » ; convertis les grammes en kg : 850 g → 0.85) et le numéro de colis / de suivi s'ils sont lisibles. Ne devine jamais : null si illisible.`;
+const PROMPT = `Lis cette étiquette de colis. Priorité absolue : adresse de LIVRAISON du destinataire (numéro, rue, complément utile, code postal, ville), jamais l’expéditeur ni le dépôt. Extrais aussi le nom du destinataire, son téléphone, le poids en kg (convertis les grammes) et le numéro de suivi s’ils sont lisibles. Ne devine rien : renvoie null si illisible. Réponse très concise.`;
 
 /**
  * Champs bruts renvoyés par l'IA → étiquette nettoyée : téléphone normalisé
@@ -52,15 +52,15 @@ export async function lireEtiquette(imageBase64: string, mediaType: string, pays
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 512,
+        model: "claude-haiku-4-5",
+        max_tokens: 256,
         system: PROMPT,
         messages: [
           {
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-              { type: "text", text: "Extrais l'adresse de livraison via l'outil fourni." },
+              { type: "text", text: "Lis les champs demandés rapidement et sans rien inventer." },
             ],
           },
         ],

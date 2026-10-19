@@ -82,3 +82,31 @@ export function dernierReleve(releves: DernierReleveKm[]): DernierReleveKm | nul
     return d > 0 || (d === 0 && r.km > best.km) ? r : best;
   }, null);
 }
+
+/**
+ * Référence kilométrique arrêtée à la date réelle du plein.
+ * Un relevé saisi le 12 octobre peut être inférieur au dernier relevé
+ * du 15 octobre : on compare donc avec les relevés déjà connus à cette date.
+ */
+export async function getVehicleKmReadingAt(
+  supabase: SupabaseClient,
+  vehicleId: string,
+  occurredAt: string,
+): Promise<DernierReleveKm | null> {
+  const [{ data: vehicle }, { data: entries }, { data: interventions }, { data: fuelEntries }] = await Promise.all([
+    supabase.from("vehicles").select("initial_km, created_at").eq("id", vehicleId).single(),
+    supabase.from("planning_entries").select("tour_number, start_at, start_km, end_at, end_km").eq("vehicle_id", vehicleId).or("start_km.not.is.null,end_km.not.is.null"),
+    supabase.from("vehicle_interventions").select("type, created_at, odometer_km").eq("vehicle_id", vehicleId).not("odometer_km", "is", null),
+    supabase.from("fuel_entries").select("occurred_at, vehicle_km").eq("vehicle_id", vehicleId).in("status", TRUSTED_STATUSES).not("vehicle_km", "is", null),
+  ]);
+  const readings: DernierReleveKm[] = [];
+  if (vehicle?.initial_km != null && vehicle.created_at) readings.push({ km: Number(vehicle.initial_km), at: vehicle.created_at, source: "Kilométrage initial" });
+  for (const e of entries ?? []) {
+    if (e.start_km != null && e.start_at) readings.push({ km: Number(e.start_km), at: e.start_at, source: `Départ tournée n°${e.tour_number}` });
+    if (e.end_km != null && e.end_at) readings.push({ km: Number(e.end_km), at: e.end_at, source: `Retour tournée n°${e.tour_number}` });
+  }
+  for (const i of interventions ?? []) readings.push({ km: Number(i.odometer_km), at: i.created_at, source: `Intervention : ${i.type}` });
+  for (const f of fuelEntries ?? []) readings.push({ km: Number(f.vehicle_km), at: f.occurred_at, source: "Plein de carburant" });
+  const cutoff = Date.parse(occurredAt);
+  return dernierReleve(readings.filter((reading) => Date.parse(reading.at) <= cutoff));
+}

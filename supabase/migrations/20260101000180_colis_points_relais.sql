@@ -15,10 +15,8 @@ alter table delivery_stops add column if not exists relay_name text;
 alter table delivery_stops drop constraint if exists delivery_stops_relay_name_check;
 alter table delivery_stops add constraint delivery_stops_relay_name_check check (relay_name is null or char_length(relay_name) <= 200);
 
--- Retours repris au relais lors du dépôt (null : non renseigné).
-alter table delivery_stops add column if not exists returns_count integer;
-alter table delivery_stops drop constraint if exists delivery_stops_returns_count_check;
-alter table delivery_stops add constraint delivery_stops_returns_count_check check (returns_count is null or (returns_count >= 0 and returns_count <= 500));
+-- Retours repris au relais : colonne existante packages_picked_up
+-- (20261018000007_delivery_stop_package_counts.sql), rien à ajouter.
 
 -- 2. Mode de remise « point_relais » : dépôt au relais (arrêt point relais)
 --    ou livraison au relais en cas d'absence. Preuve : photo ou code /

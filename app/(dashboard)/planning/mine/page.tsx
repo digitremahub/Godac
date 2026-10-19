@@ -24,9 +24,9 @@ const timeFmt = (iso: string) =>
   new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 
 /** One tour on one line: status dot, n°, truck, hours — readable at a glance on a phone. */
-function TourLine({ entry }: { entry: any }) {
+function TourLine({ entry, day }: { entry: any; day: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 text-sm">
+    <Link href={"/planning/mine?view=day&anchor=" + day + "&entry=" + entry.id} className="flex min-w-0 items-center gap-2 rounded-md text-sm hover:bg-teal/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-ink">
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[entry.status] ?? "bg-navy/30"}`} />
       <span className="shrink-0 font-semibold tabular-nums">{libelleEntreePlanning(entry)}</span>
       <span className="min-w-0 truncate text-navy/70">{entry.vehicles?.registration ?? "—"}</span>
@@ -35,7 +35,7 @@ function TourLine({ entry }: { entry: any }) {
         {entry.end_at ? `–${timeFmt(entry.end_at)}` : ""}
       </span>
       <span className="sr-only">{STATUS_LABEL[entry.status] ?? entry.status}</span>
-    </div>
+    </Link>
   );
 }
 const STATUS_LABEL: Record<string, string> = {
@@ -89,7 +89,7 @@ function windowFor(view: ViewMode, anchor: string): { start: string; end: string
 export default async function MyPlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; anchor?: string; week?: string }>;
+  searchParams: Promise<{ view?: string; anchor?: string; week?: string; entry?: string }>;
 }) {
   const params = await searchParams;
   const appUser = await requireAppUser();
@@ -123,11 +123,24 @@ export default async function MyPlanningPage({
 
   const { data: entries } = await supabase
     .from("planning_entries")
-    .select("id, tour_number, start_at, end_at, status, vehicles(registration), services(name)")
+    .select("id, service_id, tour_number, start_at, end_at, status, vehicles(registration), services(name, depot_address)")
     .eq("driver_id", appUser.id)
     .gte("start_at", `${queryStart}T00:00:00`)
     .lt("start_at", `${queryEnd}T00:00:00`)
     .order("start_at");
+
+  const selectedEntryInRange = params.entry ? ((entries ?? []) as any[]).find((e) => e.id === params.entry) ?? null : null;
+  const { data: selectedEntryOutsideRange } = params.entry && !selectedEntryInRange
+    ? await supabase.from("planning_entries")
+        .select("id, service_id, tour_number, start_at, end_at, status, vehicles(registration), services(name, depot_address)")
+        .eq("id", params.entry)
+        .eq("driver_id", appUser.id)
+        .maybeSingle()
+    : { data: null };
+  const selectedEntry = selectedEntryInRange ?? selectedEntryOutsideRange;
+  const { data: routeDetails } = selectedEntry
+    ? await supabase.from("tour_routes").select("id, notes, tour_route_villages(name, postal_code, notes, position)").eq("organization_id", appUser.organization_id).eq("tour_number", selectedEntry.tour_number).maybeSingle()
+    : { data: null };
 
   const entriesByDay = new Map<string, any[]>();
   for (const e of (entries ?? []) as any[]) {
@@ -156,6 +169,47 @@ export default async function MyPlanningPage({
   return (
     <div>
       <PageHeader title="Mon planning" description="Vos tournées prévues et effectuées, et vos horaires de présence si vous êtes dans un pôle bureau." />
+
+      {selectedEntry && (
+        <Card className="mb-5 border-teal-ink/25 bg-teal/[0.045]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">Ma tournée affectée</p>
+              <h2 className="mt-1 text-xl font-bold">Tournée n°{selectedEntry.tour_number}</h2>
+              <p className="mt-1 text-sm text-navy/70">{new Date(selectedEntry.start_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" })} · {timeFmt(selectedEntry.start_at)}{selectedEntry.end_at ? "–" + timeFmt(selectedEntry.end_at) : ""}</p>
+            </div>
+            <Link href={"/planning/mine?view=day&anchor=" + parisCalendarDate(selectedEntry.start_at)} className="btn-secondary !px-3 !py-1.5 text-sm">Fermer</Link>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-surface p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-navy/55">Service affecté</p>
+              <p className="mt-1 font-semibold">{selectedEntry.services?.name ?? "Service non renseigné"}</p>
+              <p className="mt-1 text-sm text-navy/70">{selectedEntry.services?.depot_address ?? "Adresse du service non renseignée"}</p>
+              {selectedEntry.services?.depot_address && <a className="mt-2 inline-block text-sm text-teal-ink hover:underline" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(selectedEntry.services.depot_address)} target="_blank" rel="noreferrer">Ouvrir l’adresse dans Maps ↗</a>}
+            </div>
+            <div className="rounded-xl bg-surface p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-navy/55">Véhicule</p>
+              <p className="mt-1 font-semibold">{selectedEntry.vehicles?.registration ?? "Non affecté"}</p>
+              <p className="mt-1 text-sm text-navy/70">Statut : {STATUS_LABEL[selectedEntry.status] ?? selectedEntry.status}</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="font-semibold">Villages à desservir</h3>
+            {((routeDetails as any)?.tour_route_villages ?? []).length ? (
+              <ol className="mt-2 grid gap-2 sm:grid-cols-2">
+                {[...((routeDetails as any).tour_route_villages as any[])].sort((a, b) => a.position - b.position).map((v, i) => (
+                  <li key={v.id ?? v.name} className="rounded-lg bg-surface px-3 py-2 text-sm">
+                    <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{i + 1}</span>
+                    <span className="font-semibold">{v.name}</span>{v.postal_code ? <span className="ml-1 text-navy/60">({v.postal_code})</span> : null}
+                    {v.notes && <p className="ml-8 mt-1 whitespace-pre-line text-xs text-navy/65">{v.notes}</p>}
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="mt-2 text-sm text-navy/60">Aucun village n’est encore renseigné pour cette tournée. Contactez votre responsable exploitation.</p>}
+            {(routeDetails as any)?.notes && <p className="mt-3 whitespace-pre-line text-sm text-navy/70">{(routeDetails as any).notes}</p>}
+          </div>
+        </Card>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {(["month", "week", "day"] as const).map((v) => (
@@ -252,7 +306,7 @@ export default async function MyPlanningPage({
                     ) : (
                       dayEntries.map((e) => (
                         <div key={e.id} className="flex flex-col">
-                          <TourLine entry={e} />
+                          <TourLine entry={e} day={dayISO} />
                           {e.services?.name && <span className="pl-[18px] text-xs text-navy/60">{e.services.name}</span>}
                         </div>
                       ))

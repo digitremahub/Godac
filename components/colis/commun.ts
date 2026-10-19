@@ -19,6 +19,12 @@ export interface Stop {
   position: number;
   parcel_code: string | null;
   parcel_count: number;
+  /** Nombre réellement ramassé, renseigné après l’enlèvement. */
+  packages_picked_up?: number | null;
+  /** Nombre réellement déposé au point relais, y compris zéro. */
+  packages_delivered?: number | null;
+  /** Ramasse ponctuelle qui ne doit pas devenir une habitude. */
+  exceptional_pickup?: boolean;
   address: string;
   lat: number | null;
   lng: number | null;
@@ -29,8 +35,10 @@ export interface Stop {
   done_at?: string | null;
   delivered_place: string | null;
   proof_photo_path: string | null;
+  /** Chemins de 1 à 3 photos de preuve ; proof_photo_path reste la compatibilité historique. */
+  proof_photo_paths?: string[] | null;
   /** Livraison (par défaut) ou ramasse ; absent avant la migration 170. */
-  kind?: "livraison" | "ramasse" | null;
+  kind?: "livraison" | "ramasse" | "point_relais" | null;
   /** Livraison avec QR code : valeur scannée (preuve de remise). */
   proof_code?: string | null;
   /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */

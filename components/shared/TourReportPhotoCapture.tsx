@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineFile, isNetworkFailure } from "@/lib/offline/outbox";
 import type { TourReportFields } from "@/lib/ocr/tour-report";
 import { IconFileText, IconPaperclip } from "@/components/layout/icons";
 
@@ -21,9 +22,13 @@ import { IconFileText, IconPaperclip } from "@/components/layout/icons";
 export function TourReportPhotoCapture({
   label,
   onCaptured,
+  onUploadBusyChange,
+  offlineSupported = false,
 }: {
   label: string;
   onCaptured: (result: { photoPath: string; fields: TourReportFields | null }) => void;
+  onUploadBusyChange?: (busy: boolean) => void;
+  offlineSupported?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [status, setStatus] = useState<"idle" | "uploading" | "extracting" | "done" | "error">("idle");
@@ -38,6 +43,8 @@ export function TourReportPhotoCapture({
     setFileName(file.name);
     setError(null);
     setStatus("uploading");
+    onUploadBusyChange?.(true);
+    let uploadedPath: string | null = null;
     try {
       const initRes = await fetch("/api/ocr/tour-report/init", {
         method: "POST",
@@ -50,23 +57,56 @@ export function TourReportPhotoCapture({
 
       const { error: uploadError } = await supabase.storage.from("tour-photos").upload(storagePath, file, { contentType: file.type });
       if (uploadError) throw new Error(`Envoi échoué: ${uploadError.message}`);
+      uploadedPath = storagePath;
 
+      // Persist the attachment in the parent form as soon as storage confirms
+      // the upload. OCR is a separate best-effort step and must never make the
+      // uploaded document disappear from the tour report if processing fails.
+      onCaptured({ photoPath: storagePath, fields: null });
+      onUploadBusyChange?.(false);
       setStatus("extracting");
-      const processRes = await fetch("/api/ocr/tour-report/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storagePath }),
-      });
-      const processJson = await processRes.json();
-      const fields = processRes.ok ? ((processJson.fields as TourReportFields | null) ?? null) : null;
-      if (!fields) {
-        setError(processJson.error ?? "Lecture automatique indisponible — la photo reste attachée.");
+      try {
+        const processRes = await fetch("/api/ocr/tour-report/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ storagePath }),
+        });
+        const processJson = await processRes.json();
+        const fields = processRes.ok ? ((processJson.fields as TourReportFields | null) ?? null) : null;
+        if (!fields) {
+          setError(processJson.error ?? "Lecture automatique indisponible — le document est bien envoyé et sera conservé.");
+        }
+        setStatus("done");
+        onCaptured({ photoPath: storagePath, fields });
+      } catch (e) {
+        // A network error during OCR used to skip onCaptured entirely, leaving
+        // the file in Storage but no path on planning_entries: reports then
+        // incorrectly showed "manquant" for a document the driver had sent.
+        setStatus("done");
+        setError(`Document envoyé et attaché ; lecture OCR indisponible : ${networkErrorMessage(e)}`);
+        onCaptured({ photoPath: storagePath, fields: null });
       }
-      setStatus("done");
-      onCaptured({ photoPath: storagePath, fields });
     } catch (e) {
-      setStatus("error");
-      setError(networkErrorMessage(e));
+      if (!uploadedPath && isNetworkFailure(e) && offlineSupported) {
+        try {
+          const localPath = await enqueueOfflineFile(file, { initUrl: "/api/ocr/tour-report/init", processUrl: "/api/ocr/tour-report/process", bucket: "tour-photos" });
+          setStatus("done");
+          setError("Document conservé sur le téléphone ; il sera envoyé avec le départ/retour dès que le réseau revient.");
+          onCaptured({ photoPath: localPath, fields: null });
+        } catch (queueError) {
+          setStatus("error");
+          setError(networkErrorMessage(queueError));
+        }
+      } else {
+        setStatus("error");
+        setError(networkErrorMessage(e));
+        if (uploadedPath) {
+          setStatus("done");
+          onCaptured({ photoPath: uploadedPath, fields: null });
+        }
+      }
+    } finally {
+      onUploadBusyChange?.(false);
     }
   }
 

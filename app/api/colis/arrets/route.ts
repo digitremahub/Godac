@@ -10,6 +10,19 @@ import { NOM_RELAIS_MAX, arretARejoindre, normaliserNomRelais, typeApresRegroupe
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { cleAdresse, horairesDesAdresses, listeDeLaTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 
+/** Extrait le nom de commune des adresses BAN courantes (« 66000 Perpignan »). */
+function communeDepuisAdresse(adresse: string): string | null {
+  const sansPays = adresse.split(",").map((x) => x.trim()).filter(Boolean).filter((x) => !/^(france|fr)$/i.test(x));
+  const avecCodePostal = [...sansPays].reverse().find((partie) => /^\d{5}\s+/.test(partie));
+  if (avecCodePostal) {
+    const ville = avecCodePostal.replace(/^\d{5}\s+/, "").replace(/\s+\([^)]*\)$/, "").trim();
+    if (ville.length >= 2 && ville.length <= 80) return ville;
+  }
+  const derniere = sansPays[sansPays.length - 1];
+  if (sansPays.length >= 2 && derniere && derniere.length >= 2 && derniere.length <= 80 && !/^\d/.test(derniere)) return derniere;
+  return null;
+}
+
 const bodySchema = z.object({
   run_id: z.string().uuid(),
   /** Liste de la tournée où ranger le colis (sinon la liste implicite). */
@@ -22,10 +35,15 @@ const bodySchema = z.object({
   type: z.enum(TYPES_ARRET.map((t) => t.key) as [TypeArret, ...TypeArret[]]).optional(),
   /** Point relais : nom du relais (Relais Colis, Pickup, Mondial Relay…). */
   relais: z.string().max(NOM_RELAIS_MAX * 2).nullable().optional(),
-  /** Nombre de colis de l'arrêt (point relais : colis à déposer) ; 1 par défaut. */
-  colis: z.number().int().min(1).max(500).optional(),
+  /** Point relais : nombre de colis à déposer (0 par défaut, les colis scannés à son adresse s'y ajoutent). */
+  colis: z.number().int().min(0).max(500).optional(),
   /** Poids du colis en kg (lu sur l'étiquette ou saisi). */
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
+  /** Une ramasse exceptionnelle ne devient pas une habitude quotidienne. */
+  exceptionnelle: z.boolean().optional(),
+  /** Créneau suggéré/confirmé avant l’ajout de l’adresse. */
+  window_start: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  window_end: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
 });
 
 /**
@@ -40,11 +58,35 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Adresse manquante ou trop courte." }, { status: 400 });
+  if (!parsed.success) {
+    const champs = parsed.error.issues.map((issue) => `${issue.path.join(".") || "requête"} : ${issue.message}`).join(" · ");
+    return NextResponse.json({ error: `Impossible d’ajouter cet arrêt. Vérifiez les champs requis. ${champs}` }, { status: 400 });
+  }
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
-  const listId = parsed.data.list_id ?? null;
+  let listId = parsed.data.list_id ?? null;
   if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
+
+  // Par défaut, GODAC range chaque adresse dans la liste de sa commune.
+  // Une liste existante est réutilisée ; sinon elle est créée à la volée.
+  const village = communeDepuisAdresse(parsed.data.adresse);
+  if (village) {
+    const { data: listes } = await supabase.from("delivery_lists").select("id, name, position").eq("run_id", run.id).order("position");
+    const existante = (listes ?? []).find((l) => l.name.trim().toLocaleLowerCase("fr-FR") === village.toLocaleLowerCase("fr-FR"));
+    if (existante) {
+      listId = existante.id;
+    } else {
+      const positionListe = (listes ?? []).reduce((max, l) => Math.max(max, l.position), -1) + 1;
+      const { data: creee, error: erreurListe } = await supabase.from("delivery_lists").insert({
+        organization_id: appUser.organization_id,
+        run_id: run.id,
+        name: village.slice(0, 60),
+        position: positionListe,
+      }).select("id").single();
+      if (erreurListe) return NextResponse.json({ error: `Impossible de créer la liste du village : ${erreurListe.message}` }, { status: 500 });
+      listId = creee.id;
+    }
+  }
 
   const { data: stops } = await supabase.from("delivery_stops").select("id, list_id, kind, parcel_code, parcel_count, address, phone, status, position, weight_kg, relay_name").eq("run_id", run.id);
   const code = parsed.data.code || null;
@@ -57,7 +99,6 @@ export async function POST(req: Request) {
 
   const cle = cleAdresse(parsed.data.adresse);
   const kind: TypeArret = parsed.data.type ?? "livraison";
-  const nombre = parsed.data.colis ?? 1;
   let relais = kind === "point_relais" ? normaliserNomRelais(parsed.data.relais) : null;
   // Point relais : son nom et ses horaires viennent de l'annuaire des adresses pro s'il y figure.
   let horaires = false;
@@ -66,7 +107,6 @@ export async function POST(req: Request) {
     horaires = Boolean(fiche);
     relais ??= normaliserNomRelais(fiche?.label);
   }
-
   // Regroupement seulement dans la même liste et pour un type compatible :
   // une ramasse et une livraison à la même adresse restent deux arrêts ;
   // les colis adressés à un relais rejoignent l'arrêt point relais.
@@ -76,17 +116,22 @@ export async function POST(req: Request) {
   );
   if (memeAdresse) {
     const codes = [memeAdresse.parcel_code, code].filter(Boolean).join(",") || null;
-    const typeFinal = typeApresRegroupement(typeArret(memeAdresse.kind), kind) ?? typeArret(memeAdresse.kind);
+    const typeAvant = typeArret(memeAdresse.kind);
+    const typeFinal = typeApresRegroupement(typeAvant, kind) ?? typeAvant;
+    // Colis ajoutés : un colis à livrer, ou le nombre saisi pour un point relais.
+    const ajout = kind === "livraison" ? 1 : kind === "point_relais" ? (parsed.data.colis ?? 0) : 0;
     const { data } = await supabase
       .from("delivery_stops")
       .update({
-        parcel_count: Math.min(500, memeAdresse.parcel_count + nombre),
+        ...(ajout ? { parcel_count: Math.min(500, memeAdresse.parcel_count + ajout) } : {}),
+        ...(typeFinal !== typeAvant ? { kind: typeFinal } : {}),
+        ...(relais && relais !== memeAdresse.relay_name ? { relay_name: relais } : {}),
         parcel_code: codes,
         ...(telephone && !memeAdresse.phone ? { phone: telephone } : {}),
         // Poids de l'arrêt = somme des colis dont le poids est connu.
         ...(poids ? { weight_kg: lirePoids(Number(memeAdresse.weight_kg ?? 0) + poids) } : {}),
-        ...(typeFinal !== typeArret(memeAdresse.kind) ? { kind: typeFinal } : {}),
-        ...(relais && relais !== memeAdresse.relay_name ? { relay_name: relais } : {}),
+        ...(parsed.data.window_start ? { window_start: parsed.data.window_start } : {}),
+        ...(parsed.data.window_end ? { window_end: parsed.data.window_end } : {}),
       })
       .eq("id", memeAdresse.id)
       .select(STOP_FIELDS)
@@ -104,18 +149,28 @@ export async function POST(req: Request) {
       ...(listId ? { list_id: listId } : {}),
       position,
       ...(kind !== "livraison" ? { kind } : {}),
-      ...(relais ? { relay_name: relais } : {}),
-      ...(nombre > 1 ? { parcel_count: nombre } : {}),
+      ...(kind === "ramasse" ? { exceptional_pickup: parsed.data.exceptionnelle === true } : {}),
       parcel_code: code,
+      // Une ramasse ou un point relais est un arrêt, pas un colis.
+      // Le compteur de colis est renseigné seulement pour les livraisons réelles.
+      // Point relais : nombre de colis à déposer saisi à la création.
+      parcel_count: kind === "livraison" ? 1 : kind === "point_relais" ? (parsed.data.colis ?? 0) : 0,
+      ...(relais ? { relay_name: relais } : {}),
       address: parsed.data.adresse,
       recipient: parsed.data.destinataire || null,
       phone: telephone,
       ...(poids ? { weight_kg: poids } : {}),
+      window_start: parsed.data.window_start ?? null,
+      window_end: parsed.data.window_end ?? null,
       lat: geo?.lat ?? null,
       lng: geo?.lng ?? null,
     })
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Une ramasse ajoutée par le chauffeur reste limitée à cette tournée.
+  // Les ramasses récurrentes sont gérées par la direction sur la fiche du village,
+  // afin qu’elles soient communes à tous les chauffeurs qui desservent ce village.
   return NextResponse.json({ stop: data, geocoded: Boolean(geo), ...(kind === "point_relais" ? { horaires } : {}) });
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineFile, isNetworkFailure } from "@/lib/offline/outbox";
 import { IconCamera } from "@/components/layout/icons";
 
 /**
@@ -19,12 +20,14 @@ export function CounterPhotoCapture({
   initUrl,
   processUrl,
   bucket,
+  offlineSupported = false,
   onCaptured,
 }: {
   label: string;
   initUrl: string;
   processUrl: string;
   bucket: string;
+  offlineSupported?: boolean;
   onCaptured: (result: { photoPath: string; reading: number | null }) => void;
 }) {
   const supabase = createBrowserSupabaseClient();
@@ -59,8 +62,20 @@ export function CounterPhotoCapture({
       setStatus("done");
       onCaptured({ photoPath: storagePath, reading });
     } catch (e) {
-      setStatus("error");
-      setError(networkErrorMessage(e));
+      if (isNetworkFailure(e) && offlineSupported) {
+        try {
+          const photoPath = await enqueueOfflineFile(file, { initUrl, processUrl, bucket });
+          setStatus("done");
+          setError("Photo conservée sur le téléphone ; elle sera envoyée à la synchronisation. Saisissez le kilométrage manuellement si nécessaire.");
+          onCaptured({ photoPath, reading: null });
+        } catch (queueError) {
+          setStatus("error");
+          setError(networkErrorMessage(queueError));
+        }
+      } else {
+        setStatus("error");
+        setError(networkErrorMessage(e));
+      }
     }
   }
 

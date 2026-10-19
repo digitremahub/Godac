@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -8,6 +9,7 @@ import { MonthlyEarningsCard } from "@/components/tours/MonthlyEarningsCard";
 import { addDays, todayISO, firstOfMonth, addMonths, currentMonth } from "@/lib/planning/dates";
 import { estimateReturnDistanceDeltaKm } from "@/lib/business/fuel-profitability";
 import { computeHourlyRates, estimateSalary, countWeekdays, leaveDayHoursEquivalent } from "@/lib/business/payroll";
+import { TourneesTabs } from "@/components/colis/TourneesTabs";
 
 const STATUS_LABEL: Record<string, string> = { planned: "Prévue", in_progress: "En cours", done: "Terminée" };
 const RETURN_TYPE_LABEL: Record<string, string> = { depot: "Dépôt", domicile: "Domicile" };
@@ -105,6 +107,41 @@ export default async function TourHistoryPage({
   const { data: rows } = await query;
   const history = (rows ?? []) as unknown as HistoryRow[];
 
+  // Les fiches quotidiennes Colis sont consultables dans l'historique,
+  // jamais dans le planning opérationnel. Leur classement est service,
+  // chauffeur, puis date décroissante.
+  const canSeeDriverRuns = ["direction", "manager", "manager_chauffeur"].includes(appUser.role);
+  let driverRuns: { id: string; name: string | null; run_date: string; status: string; driver_id: string; service_id: string | null }[] = [];
+  let driverRunNames: Record<string, string> = {};
+  let driverRunServices: Record<string, string> = {};
+  if (canSeeDriverRuns) {
+    const { data: runs } = await supabase
+      .from("delivery_runs")
+      .select("id, name, run_date, status, driver_id, service_id")
+      .eq("organization_id", appUser.organization_id)
+      .gte("run_date", from)
+      .lt("run_date", toExclusive)
+      .order("run_date", { ascending: false });
+    driverRuns = (runs ?? []) as typeof driverRuns;
+    const runDriverIds = [...new Set(driverRuns.map((r) => r.driver_id).filter(Boolean))];
+    const runServiceIds = [...new Set(driverRuns.map((r) => r.service_id).filter((id): id is string => Boolean(id)))];
+    const [{ data: runDrivers }, { data: runServices }] = await Promise.all([
+      runDriverIds.length
+        ? supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).in("id", runDriverIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+      runServiceIds.length
+        ? supabase.from("services").select("id, name").in("id", runServiceIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    ]);
+    driverRunNames = Object.fromEntries((runDrivers ?? []).map((d) => [d.id, d.full_name]));
+    driverRunServices = Object.fromEntries((runServices ?? []).map((s) => [s.id, s.name]));
+    driverRuns.sort((a, b) =>
+      (driverRunServices[a.service_id ?? ""] ?? "Service non renseigné").localeCompare(driverRunServices[b.service_id ?? ""] ?? "Service non renseigné", "fr") ||
+      (driverRunNames[a.driver_id] ?? "Chauffeur").localeCompare(driverRunNames[b.driver_id] ?? "Chauffeur", "fr") ||
+      b.run_date.localeCompare(a.run_date)
+    );
+  }
+
   // Own running month-to-date earnings estimate — chauffeur only, and
   // always this own user's data (RLS on user_contracts already backs
   // this up, see 20260101000077), never another driver's.
@@ -184,6 +221,35 @@ export default async function TourHistoryPage({
             : "Tournées passées de votre périmètre — démarrées ou terminées."
         }
       />
+      <TourneesTabs canTrack={["manager", "manager_chauffeur", "direction"].includes(appUser.role)} />
+
+      {canSeeDriverRuns && (
+        <section className="mb-6 rounded-xl border border-navy/10 bg-white p-4">
+          <h2 className="text-lg font-semibold">Fiches Tournée Colis des chauffeurs</h2>
+          <p className="mt-1 text-sm text-navy/65">Historique des fiches quotidiennes, classées par service, chauffeur et date. Elles restent distinctes des affectations Planning.</p>
+          {driverRuns.length === 0 ? (
+            <p className="mt-3 text-sm text-navy/60">Aucune fiche Colis sur cette période.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead><tr className="border-b border-navy/10 text-navy/60"><th className="py-2 pr-3">Service</th><th className="py-2 pr-3">Chauffeur</th><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Fiche</th><th className="py-2 pr-3">Statut</th><th className="py-2">Action</th></tr></thead>
+                <tbody>
+                  {driverRuns.map((run) => (
+                    <tr key={run.id} className="border-b border-navy/5">
+                      <td className="py-2 pr-3">{driverRunServices[run.service_id ?? ""] ?? "Service non renseigné"}</td>
+                      <td className="py-2 pr-3">{driverRunNames[run.driver_id] ?? "Chauffeur"}</td>
+                      <td className="py-2 pr-3">{run.run_date.split("-").reverse().join("/")}</td>
+                      <td className="py-2 pr-3">{run.name ?? "Tournée du jour"}</td>
+                      <td className="py-2 pr-3">{{ loading: "À préparer", in_progress: "En cours", done: "Terminée" }[run.status] ?? run.status}</td>
+                      <td className="py-2"><Link className="btn-secondary !px-3 !py-1.5 text-sm" href={`/colis?onglet=historique&tournee=${encodeURIComponent(run.id)}`}>Ouvrir la fiche</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {monthlyEarnings && <MonthlyEarningsCard {...monthlyEarnings} />}
 

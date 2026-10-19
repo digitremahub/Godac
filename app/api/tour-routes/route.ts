@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
   tour_number: z.string().trim().min(1).max(60),
-  service_id: z.string().uuid().nullable().optional(),
+  service_id: z.string().uuid(),
 });
 
 /** Creates a tour's reference sheet (villages are added on /tours/routes). */
@@ -15,12 +15,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Numéro de tournée requis." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Numéro de tournée et service requis." }, { status: 400 });
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("tour_routes")
-    .insert({ organization_id: appUser.organization_id, tour_number: parsed.data.tour_number, service_id: parsed.data.service_id ?? null })
+    .insert({ organization_id: appUser.organization_id, tour_number: parsed.data.tour_number, service_id: parsed.data.service_id })
     .select("id")
     .single();
   if (error) {

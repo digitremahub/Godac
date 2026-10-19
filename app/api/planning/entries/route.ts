@@ -24,6 +24,9 @@ const bodySchema = z.object({
  */
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
+  if (!["direction", "manager", "manager_chauffeur"].includes(appUser.role)) {
+    return NextResponse.json({ error: "Seule la Direction, le responsable exploitation ou le chef d’équipe peut attribuer une tournée." }, { status: 403 });
+  }
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
       start_at: parsed.data.start_at,
       status: "planned",
     })
-    .select("id")
+    .select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at")
     .single();
 
   if (error) {
@@ -53,6 +56,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
 
   const warning = await warnIfDriverDoubleBooked(supabase, {
     organizationId: appUser.organization_id,

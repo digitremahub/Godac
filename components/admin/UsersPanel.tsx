@@ -76,6 +76,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editRoleTitle, setEditRoleTitle] = useState("");
   const [editServiceId, setEditServiceId] = useState("");
@@ -208,6 +209,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   function startEdit(user: UserRow) {
     setEditingId(user.id);
     setEditName(user.full_name);
+    setEditEmail(user.email ?? "");
     setEditPhone(user.phone ?? "");
     setEditRoleTitle(user.role_title ?? "");
     setEditServiceId(user.service_id ?? "");
@@ -223,6 +225,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: editName,
+          email: editEmail.trim(),
           phone: editPhone || null,
           role_title: editRoleTitle || null,
           service_id: editServiceId || null,
@@ -387,7 +390,9 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     )}
                   </td>
                   <td className="py-2">
-                    {u.auth_method === "pin" ? (
+                    {isEditing && u.auth_method !== "pin" ? (
+                      <input aria-label="Email de connexion" className="input !py-1 min-w-48" type="email" autoComplete="off" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                    ) : u.auth_method === "pin" ? (
                       <span className="badge-neutral">{u.pin_set_at ? "Badge + PIN" : "Badge — PIN non créé"}</span>
                     ) : (
                       u.email

@@ -36,6 +36,15 @@ export function ClotureSheet({
   const [precision, setPrecision] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
+  async function signalerRamasse(motifRapide: "rien_a_ramasser" | "ferme") {
+    setEnvoi(true);
+    try {
+      await onEchec(motifRapide, null);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
   async function valider() {
     if (!motif) return;
     setEnvoi(true);
@@ -69,12 +78,23 @@ export function ClotureSheet({
 
         {motif === null ? (
           <div className="grid grid-cols-1 gap-2">
-            <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={onLivrer}>
-              {ramasse ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {ramasse ? "Ramassé" : "Livré"}
+            <button type="button" className="btn-primary justify-center !py-4 text-lg" disabled={envoi} onClick={onLivrer}>
+              {ramasse ? <IconRamasse className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {ramasse ? "Colis ramassés" : "Livré"}
             </button>
-            <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setMotif("absent")}>
-              <IconX className="h-5 w-5" /> {ramasse ? "Ramasse impossible" : "Échec / absent"}
-            </button>
+            {ramasse ? (
+              <>
+                <button type="button" className="btn-secondary justify-center !py-4" disabled={envoi} onClick={() => void signalerRamasse("rien_a_ramasser")}>
+                  Pas de colis
+                </button>
+                <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" disabled={envoi} onClick={() => void signalerRamasse("ferme")}>
+                  <IconX className="h-5 w-5" /> Fermé
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" disabled={envoi} onClick={() => setMotif("absent")}>
+                <IconX className="h-5 w-5" /> Échec / absent
+              </button>
+            )}
           </div>
         ) : (
           <fieldset className="flex flex-col gap-2">

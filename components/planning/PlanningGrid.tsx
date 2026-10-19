@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
 import { addDays } from "@/lib/planning/dates";
 import { DriverWeekSheet } from "@/components/planning/DriverWeekSheet";
@@ -70,6 +70,7 @@ export function PlanningGrid({
   prevWeek,
   nextWeek,
   selectedService,
+  availableTours = [],
   lastTourByDriver = {},
   canValidate = false,
   validatedByService = {},
@@ -83,6 +84,7 @@ export function PlanningGrid({
   prevWeek: string;
   nextWeek: string;
   selectedService: string;
+  availableTours?: { tourNumber: string; serviceId: string | null }[];
   /** Each driver's most recent tour (any week) — pre-fills the form below so re-typing the same weekly route isn't needed every time. */
   lastTourByDriver?: Record<string, { vehicleId: string; tourNumber: string }>;
   /** Only manager/direction get "Valider et envoyer" — see app/api/planning/validate. */
@@ -102,6 +104,7 @@ export function PlanningGrid({
   const [formDay, setFormDay] = useState(weekStart);
   const [formTime, setFormTime] = useState("07:00");
   const [formTourNumber, setFormTourNumber] = useState("");
+  const [selectedTourNumbers, setSelectedTourNumbers] = useState<string[]>([]);
   const [formDriverId, setFormDriverId] = useState("");
   const [formVehicleId, setFormVehicleId] = useState("");
   const [formBusy, setFormBusy] = useState(false);
@@ -116,6 +119,14 @@ export function PlanningGrid({
   const [editDriverId, setEditDriverId] = useState("");
   const [editVehicleId, setEditVehicleId] = useState("");
   const [editTime, setEditTime] = useState("07:00");
+  const [jumpDate, setJumpDate] = useState(weekStart);
+
+  // Keep form dates synchronized when navigation changes the displayed week.
+  // Otherwise the grid can show 19/10 while the form silently keeps 12/10.
+  useEffect(() => {
+    setFormDay(weekStart);
+    setJumpDate(weekStart);
+  }, [weekStart]);
 
   function toggleFormDay(offset: number) {
     setFormDays((prev) => {
@@ -196,6 +207,15 @@ export function PlanningGrid({
     qs.set("week", week);
     if (service) qs.set("service", service);
     router.push(`/planning?${qs.toString()}`);
+  }
+
+  function jumpToDate(value: string) {
+    setJumpDate(value);
+    if (!value) return;
+    const date = new Date(`${value}T12:00:00`);
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    const monday = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    navTo(monday, selectedService);
   }
 
   async function moveEntry(entryId: string, targetServiceId: string, targetDay: string) {
@@ -315,59 +335,61 @@ export function PlanningGrid({
   }
 
   async function createEntry() {
-    if (!formService || !formDriverId || !formVehicleId || !formTourNumber || !formTime) return;
+    const tourNumbers = Array.from(new Set(selectedTourNumbers));
+    if (!formService || !formDriverId || !formVehicleId || tourNumbers.length === 0 || !formTime) return;
     if (formWholeWeek && formDays.size === 0) return;
+    const todayParis = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const datesToCreate = formWholeWeek ? Array.from(formDays).map((offset) => addDays(weekStart, offset)) : [formDay];
+    const pastDates = datesToCreate.filter((date) => date < todayParis);
+    if (pastDates.length > 0) {
+      const datesLabel = pastDates.join(", ");
+      if (!window.confirm(`Attention : ${pastDates.length} date(s) sélectionnée(s) sont dans le passé (${datesLabel}). Voulez-vous vraiment créer ces affectations rétroactivement ?`)) return;
+      if (!window.confirm("Deuxième confirmation : ces affectations seront enregistrées à une date passée et pourront apparaître comme doublons dans le planning. Confirmer l'ajout rétroactif ?")) return;
+    }
     setFormBusy(true);
     setError(null);
     setWarning(null);
     setBulkSummary(null);
     try {
-      if (formWholeWeek) {
-        const res = await fetch("/api/planning/entries/bulk-week", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: formService,
-            driver_id: formDriverId,
-            vehicle_id: formVehicleId,
-            tour_number: formTourNumber,
-            week_start: weekStart,
-            time: formTime,
-            days: Array.from(formDays),
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-        if (json.warning) setWarning(json.warning);
-        setBulkSummary(
-          json.created > 0
-            ? `${json.created} jour(s) affecté(s)${json.skipped > 0 ? ` (${json.skipped} déjà occupé(s), ignoré(s))` : ""}.`
-            : "Rien à créer (tous les jours sélectionnés ont déjà une affectation).",
-        );
-      } else {
-        const start = new Date(`${formDay}T${formTime}:00`);
-        const res = await fetch("/api/planning/entries", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: formService,
-            driver_id: formDriverId,
-            vehicle_id: formVehicleId,
-            tour_number: formTourNumber,
-            start_at: start.toISOString(),
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
-        if (json.warning) setWarning(json.warning);
+      let created = 0;
+      let skipped = 0;
+      const warnings: string[] = [];
+      for (const tourNumber of tourNumbers) {
+        if (formWholeWeek) {
+          const res = await fetch("/api/planning/entries/bulk-week", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ service_id: formService, driver_id: formDriverId, vehicle_id: formVehicleId, tour_number: tourNumber, week_start: weekStart, time: formTime, days: Array.from(formDays) }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : `Erreur pour ${tourNumber}`);
+          created += Number(json.created ?? 0);
+          skipped += Number(json.skipped ?? 0);
+          if (json.warning) warnings.push(json.warning);
+        } else {
+          const start = new Date(`${formDay}T${formTime}:00`);
+          const res = await fetch("/api/planning/entries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ service_id: formService, driver_id: formDriverId, vehicle_id: formVehicleId, tour_number: tourNumber, start_at: start.toISOString() }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : `Erreur pour ${tourNumber}`);
+          if (json.warning) warnings.push(json.warning);
+          created += 1;
+        }
       }
+      if (warnings.length) setWarning(Array.from(new Set(warnings)).join(" "));
+      setBulkSummary(`${created} affectation(s) créée(s) pour ${tourNumbers.length} tournée(s)${skipped ? ` ; ${skipped} créneau(x) déjà occupé(s), ignoré(s)` : ""}.`);
       setFormOpen(false);
       setFormTourNumber("");
+      setSelectedTourNumbers([]);
       setFormDriverId("");
       setFormVehicleId("");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
+      router.refresh();
     } finally {
       setFormBusy(false);
     }
@@ -381,6 +403,10 @@ export function PlanningGrid({
             ← Semaine préc.
           </button>
           <span className="text-sm text-navy/70">Semaine du {weekStart.split("-").reverse().join("/")}</span>
+          <label className="flex items-center gap-2 text-xs text-navy/65">
+            Aller à une date
+            <input className="input !w-auto !py-1.5 text-sm" type="date" value={jumpDate} onChange={(e) => jumpToDate(e.target.value)} aria-label="Afficher la semaine contenant cette date" />
+          </label>
           <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(nextWeek, selectedService)}>
             Semaine suiv. →
           </button>
@@ -388,7 +414,7 @@ export function PlanningGrid({
         <button className="btn-secondary ml-auto !px-3 !py-1.5 text-sm" disabled={duplicating} onClick={duplicatePreviousWeek}>
           {duplicating ? "Copie…" : <><IconCopy className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Dupliquer la semaine préc.</>}
         </button>
-        <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => setFormOpen((v) => !v)}>
+        <button className="btn-primary !px-3 !py-1.5 text-sm" onClick={() => { setFormDay(weekStart); setFormOpen((v) => !v); }}>
           + Nouvelle affectation
         </button>
         {canValidate &&
@@ -453,27 +479,25 @@ export function PlanningGrid({
           ) : (
             <div>
               <label className="block"><span className="label">Jour</span>
-              <select className="input !w-auto" value={formDay} onChange={(e) => setFormDay(e.target.value)}>
-                {days.map((d, i) => (
-                  <option key={d} value={d}>
-                    {DAY_LABELS[i]} {d.split("-").reverse().join("/")}
-                  </option>
-                ))}
-              </select></label>
+              <input className="input !w-auto" type="date" value={formDay} onChange={(e) => setFormDay(e.target.value)} required /></label>
             </div>
           )}
           <div>
             <label className="block"><span className="label">Heure</span>
             <input className="input !w-auto" type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} /></label>
           </div>
-          <div>
-            <label className="block"><span className="label">N° de tournée</span>
-            <input
-              className="input !w-auto"
-              value={formTourNumber}
-              onChange={(e) => setFormTourNumber(e.target.value)}
-              placeholder="ex: T-042"
-            /></label>
+          <div className="min-w-[220px] max-w-sm">
+            <span className="label">Tournées à attribuer</span>
+            <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-navy/15 bg-white p-2">
+              {availableTours.filter((t) => !formService || !t.serviceId || t.serviceId === formService).map((tour) => (
+                <label key={tour.tourNumber} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-navy/[0.04]">
+                  <input type="checkbox" checked={selectedTourNumbers.includes(tour.tourNumber)} onChange={(e) => setSelectedTourNumbers((current) => e.target.checked ? Array.from(new Set([...current, tour.tourNumber])) : current.filter((n) => n !== tour.tourNumber))} />
+                  <span>{tour.tourNumber}</span>
+                </label>
+              ))}
+              {availableTours.filter((t) => !formService || !t.serviceId || t.serviceId === formService).length === 0 && <p className="px-2 py-1 text-xs text-navy/60">Aucune fiche de tournée permanente pour ce service.</p>}
+            </div>
+            <p className="mt-1 text-xs text-navy/60">{selectedTourNumbers.length} tournée(s) sélectionnée(s).</p>
           </div>
           <div>
             <label className="block"><span className="label">Chauffeur</span>
@@ -510,7 +534,7 @@ export function PlanningGrid({
               !formService ||
               !formDriverId ||
               !formVehicleId ||
-              !formTourNumber ||
+              selectedTourNumbers.length === 0 ||
               (formWholeWeek && formDays.size === 0)
             }
             onClick={createEntry}

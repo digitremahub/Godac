@@ -71,11 +71,11 @@ describe("remise au point relais", () => {
     expect(libellePreuve({ delivered_place: "point_relais", relay_name: "Pickup Tabac de la Gare", proof_code: "R123" })).toBe(
       "Remis au point relais Pickup Tabac de la Gare (code R123)",
     );
-    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", relay_name: "Relais Colis Presse", returns_count: 2 })).toBe(
+    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", relay_name: "Relais Colis Presse", packages_picked_up: 2 })).toBe(
       "Déposé au relais Relais Colis Presse · 2 retours repris",
     );
-    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", returns_count: 1 })).toBe("Déposé au relais · 1 retour repris");
-    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", returns_count: 0 })).toBe("Déposé au relais");
+    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", packages_picked_up: 1 })).toBe("Déposé au relais · 1 retour repris");
+    expect(libellePreuve({ delivered_place: "point_relais", kind: "point_relais", packages_picked_up: 0 })).toBe("Déposé au relais");
     expect(libellePreuve({ delivered_place: "qr_code", proof_code: "ABC" })).toBe("Avec QR code (ABC)");
   });
   it("retours", () => {

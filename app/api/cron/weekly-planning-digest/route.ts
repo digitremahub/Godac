@@ -26,7 +26,7 @@ function buildDigestMessage(entries: DigestEntry[]): string {
 }
 
 /**
- * Vercel Cron, Saturdays (see vercel.json) — the weekly digest
+ * Vercel Cron, Fridays at 17:00 Europe/Paris (see vercel.json) — the weekly digest
  * replicates the paper/WhatsApp habit of handing each driver their
  * full next-week schedule in one go, as a complement to the
  * per-assignment notifications the planning_entries_after_upsert
@@ -45,9 +45,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const paris = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }).format(new Date());
+  if (paris !== "16" && paris !== "17") return NextResponse.json({ skipped: true, reason: "Outside the 16:00–17:00 Europe/Paris delivery window" });
+
   const supabase = createAdminSupabaseClient();
 
-  // Runs on a Saturday; mondayOf(today) is this week's Monday, so +7
+  // Runs on a Friday; mondayOf(today) is this week's Monday, so +7
   // days is the Monday of the week being announced.
   const nextMonday = addDays(toISODate(mondayOf(new Date())), 7);
   const weekEnd = addDays(nextMonday, 7);

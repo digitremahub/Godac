@@ -1,10 +1,9 @@
 /**
  * Ordre de passage d'une tournée de livraison : variante du problème du
  * voyageur de commerce, résolue par heuristiques (plus proche voisin,
- * puis améliorations 2-opt et Or-opt) sur des distances à vol d'oiseau
- * corrigées d'un facteur routier. Pour une tournée de colis (10 à 150
- * arrêts), on obtient en quelques millisecondes un ordre à quelques %
- * de l'optimum — sans service de calcul d'itinéraire payant.
+ * puis améliorations 2-opt et Or-opt). Le moteur accepte une matrice de
+ * distances routières (OSRM) et retombe sur une estimation géographique
+ * corrigée d'un facteur routier si le service n'est pas disponible.
  */
 
 export interface Point {
@@ -12,8 +11,9 @@ export interface Point {
   lng: number;
 }
 
-/** Les routes ne sont pas en ligne droite : ~1,3 × la distance à vol d'oiseau en moyenne. */
+/** Repli estimatif : ~1,3 × la distance à vol d'oiseau si aucune matrice routière n'est disponible. */
 export const FACTEUR_ROUTIER = 1.3;
+export const distanceEstimee = (a: Point, b: Point) => distanceKm(a, b) * FACTEUR_ROUTIER;
 
 export function distanceKm(a: Point, b: Point): number {
   const R = 6371;
@@ -24,15 +24,15 @@ export function distanceKm(a: Point, b: Point): number {
 }
 
 /** Longueur d'un parcours départ → arrêts dans l'ordre (→ retour au départ si demandé). */
-export function longueurParcours(depart: Point | null, arrets: Point[], retour: boolean): number {
+export function longueurParcours(depart: Point | null, arrets: Point[], retour: boolean, distance: (a: Point, b: Point) => number = distanceEstimee): number {
   let total = 0;
   let prev = depart;
   for (const p of arrets) {
-    if (prev) total += distanceKm(prev, p);
+    if (prev) total += distance(prev, p);
     prev = p;
   }
-  if (retour && depart && prev) total += distanceKm(prev, depart);
-  return total * FACTEUR_ROUTIER;
+  if (retour && depart && prev) total += distance(prev, depart);
+  return total;
 }
 
 /**
@@ -41,7 +41,7 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
  * `arrivee` (facultatif) : point d'arrivée imposé, différent du départ —
  * dernière liste d'une tournée qui revient au dépôt (lib/colis/listes.ts).
  */
-export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = true, arrivee: Point | null = null): number[] {
+export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = true, arrivee: Point | null = null, distance: (a: Point, b: Point) => number = distanceKm): number[] {
   const n = arrets.length;
   if (n <= 1 || (n <= 2 && !arrivee)) return arrets.map((_, i) => i);
 
@@ -49,10 +49,10 @@ export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = t
   const pts: Point[] = depart ? [depart, ...arrets] : arrets;
   const offset = depart ? 1 : 0;
   const m = pts.length;
-  const d: number[][] = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => (i === j ? 0 : distanceKm(pts[i]!, pts[j]!))));
+  const d: number[][] = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => (i === j ? 0 : distance(pts[i]!, pts[j]!))));
   const ferme = retour && Boolean(depart);
   // Distance de chaque nœud au point d'arrivée imposé (sinon on referme sur le départ).
-  const da = arrivee ? pts.map((p) => distanceKm(p, arrivee)) : null;
+  const da = arrivee ? pts.map((p) => distance(p, arrivee)) : null;
 
   // 1. Plus proche voisin depuis le départ.
   const visite = new Array<boolean>(m).fill(false);

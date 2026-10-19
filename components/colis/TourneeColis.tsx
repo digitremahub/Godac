@@ -4,14 +4,16 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
+import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
-import { estRamasse, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
+import { estRamasse, estPointRelais, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { BadgeRamasse, ChoixTypeArret, EncocheRamasse } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
@@ -21,6 +23,7 @@ import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
+import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
@@ -33,38 +36,74 @@ interface Draft {
   type: TypeArret;
   /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
   poids: string;
+  /** Créneau confirmé avant l’ajout du colis. */
+  window_start?: string;
+  window_end?: string;
+  /** Ne pas mémoriser cette ramasse dans les tournées futures. */
+  exceptionnelle?: boolean;
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
-/** Suggestions de la Base Adresse Nationale (`france`) : seulement pour les entreprises en France. */
+/** Suggestions d'adresses et d'entreprises : BAN en France + lieux professionnels OpenStreetMap. */
 function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<{ label: string; detail?: string }[]>([]);
+  const [loading, setLoading] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  const request = useRef(0);
+
   function change(v: string) {
     onChange(v);
     clearTimeout(timer.current);
-    if (!france || v.trim().length < 4) return setSuggestions([]);
+    const query = v.trim();
+    const id = ++request.current;
+    if (query.length < 3) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
     timer.current = setTimeout(async () => {
+      setLoading(true);
       try {
-        const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(v)}&limit=5&autocomplete=1`);
-        const data = (await res.json()) as { features?: { properties?: { label?: string } }[] };
-        setSuggestions((data.features ?? []).map((f) => f.properties?.label ?? "").filter(Boolean));
-      } catch {
-        setSuggestions([]);
+        const jobs: Promise<{ label: string; detail?: string }[]>[] = [
+          fetch(`/api/geo/search?q=${encodeURIComponent(query)}&country=${france ? "FR" : "CH"}`)
+            .then(async (res) => res.ok ? (await res.json() as { results?: { label: string; detail?: string }[] }).results ?? [] : [])
+            .catch(() => []),
+        ];
+        if (france) {
+          jobs.push(fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5&autocomplete=1`)
+            .then(async (res) => {
+              const data = await res.json() as { features?: { properties?: { label?: string } }[] };
+              return (data.features ?? []).map((f) => ({ label: f.properties?.label ?? "" })).filter((x) => x.label);
+            }).catch(() => []));
+        }
+        const results = (await Promise.all(jobs)).flat();
+        if (request.current !== id) return;
+        const seen = new Set<string>();
+        setSuggestions(results.filter((x) => {
+          const key = x.label.toLocaleLowerCase("fr-FR");
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 7));
+      } finally {
+        if (request.current === id) setLoading(false);
       }
-    }, 250);
+    }, 450);
   }
+
   return (
     <div className="relative">
-      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="N°, rue, code postal, ville" autoFocus={autoFocus} aria-label="Adresse de livraison" autoComplete="off" />
+      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="Entreprise, commerce ou adresse…" autoFocus={autoFocus} aria-label="Entreprise ou adresse de livraison" autoComplete="off" />
+      {loading && <p className="absolute right-3 top-3 text-xs text-navy/45">Recherche…</p>}
       {suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-navy/10 bg-surface shadow-pop">
+        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-navy/10 bg-surface shadow-pop">
           {suggestions.map((s) => (
-            <li key={s}>
-              <button type="button" className="block w-full px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05]" onClick={() => (onChange(s), setSuggestions([]))}>
-                {s}
+            <li key={s.label}>
+              <button type="button" className="block w-full px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05]" onClick={() => (onChange(s.label), setSuggestions([]))}>
+                <span className="block font-medium">{s.label}</span>
+                {s.detail && <span className="mt-0.5 block text-xs text-navy/55">{s.detail}</span>}
               </button>
             </li>
           ))}
@@ -74,8 +113,9 @@ function AdresseInput({ value, onChange, autoFocus, france }: { value: string; o
   );
 }
 
-export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquette: boolean; pays?: string }) {
+export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
+  const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -86,6 +126,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [scanStatus, setScanStatus] = useState("");
+  const scanQueue = useRef<{ image: string; code: string | null; telephone: string | null }[]>([]);
+  const scanProcessing = useRef(false);
   const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
@@ -96,9 +139,43 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
+  const [rechercheAdresse, setRechercheAdresse] = useState("");
+  const [suggestionHoraires, setSuggestionHoraires] = useState<{ adresse: string; label: string | null; weekly_schedule: Record<string, { open: string; close: string }[]> } | null>(null);
+  const [chargementSuggestionHoraires, setChargementSuggestionHoraires] = useState(false);
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Recherche les horaires habituels connus dès que l’adresse est saisie,
+  // avant que le colis soit ajouté à la tournée.
+  useEffect(() => {
+    const adresse = draft?.adresse.trim() ?? "";
+    if (adresse.length < 5 || draft?.type !== "livraison") {
+      setSuggestionHoraires(null);
+      setChargementSuggestionHoraires(false);
+      return;
+    }
+    let actif = true;
+    const timer = setTimeout(async () => {
+      setChargementSuggestionHoraires(true);
+      try {
+        const response = await fetch(`/api/colis/horaires?adresse=${encodeURIComponent(adresse)}`);
+        const data = await response.json();
+        if (!actif) return;
+        const fiche = data?.fiche;
+        if (fiche?.weekly_schedule && typeof fiche.weekly_schedule === "object") {
+          setSuggestionHoraires({ adresse, label: fiche.label ?? null, weekly_schedule: fiche.weekly_schedule });
+        } else {
+          setSuggestionHoraires(null);
+        }
+      } catch {
+        if (actif) setSuggestionHoraires(null);
+      } finally {
+        if (actif) setChargementSuggestionHoraires(false);
+      }
+    }, 450);
+    return () => { actif = false; clearTimeout(timer); };
+  }, [draft?.adresse, draft?.type]);
 
   const chargerTournee = useCallback(async (id: string) => {
     try {
@@ -151,6 +228,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   async function nouvelleTournee() {
+    if (encadrement) { setAffectationOuverte(true); return; }
     setBusy("nouvelle");
     try {
       const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
@@ -170,6 +248,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
   async function supprimerTournee() {
     if (!run) return;
+    if (run.status === "done") { setToast({ ok: false, text: "Une tournée clôturée ne peut pas être supprimée." }); return; }
     if (!confirm(`Supprimer « ${run.name ?? "cette tournée"} » et ses ${stops.length} arrêt(s) ? C'est définitif.`)) return;
     setBusy("suppr");
     try {
@@ -206,7 +285,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   async function ajouter(d: Draft) {
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string }>("/api/colis/arrets", {
+      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; horairesProfessionnel?: boolean }>("/api/colis/arrets", {
         method: "POST",
         body: JSON.stringify({
           run_id: run?.id,
@@ -217,6 +296,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           telephone: d.telephone.trim() || null,
           type: d.type,
           poids: lirePoids(d.poids),
+          exceptionnelle: d.exceptionnelle === true,
+          window_start: d.window_start ?? null,
+          window_end: d.window_end ?? null,
         }),
       });
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
@@ -235,7 +317,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                       ? `${d.type === "ramasse" ? "Ramasse ajoutée" : "Adresse ajoutée"} en fin de tournée : réoptimisez pour l'insérer au bon endroit.`
                       : d.type === "ramasse"
                         ? "Ramasse ajoutée."
-                        : "Colis ajouté.") + sansTel,
+                        : "Colis ajouté.") + (r.professionnel ? ` · Professionnel détecté : ${r.professionnel}${r.horairesProfessionnel ? " (horaires importés)" : " (horaires à vérifier)"}.` : "") + sansTel,
                 },
       );
       setDraft(null);
@@ -247,24 +329,82 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     }
   }
 
-  /** Renvoie true si le colis a été ajouté directement (le scan peut continuer). */
-  function onCode(text: string): boolean {
+  /** Lit les étiquettes en série, pendant que la caméra reste ouverte. */
+  async function lireImageScannee(image: string, code: string | null, telephone: string | null): Promise<boolean> {
+    setBusy("photo");
+    try {
+      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
+      const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      // Seuls le numéro et l'adresse sont bloquants. Nom, téléphone et poids
+      // restent facultatifs : ne pas interrompre le chauffeur pour ces champs.
+      const manquants = [
+        !d.code && "numéro de colis",
+        d.adresse.trim().length < 5 && "adresse",
+      ].filter(Boolean);
+      // Une lecture OCR peut confondre des lignes d'étiquette : toujours faire valider le brouillon.
+      setDraft(d);
+      setScanner(false);
+      setToast({
+        ok: manquants.length === 0,
+        text: manquants.length === 0
+          ? "Étiquette lue : vérifiez les informations avant d'ajouter le colis."
+          : "Lecture partielle : complétez " + manquants.join(", ") + " avant l'ajout.",
+      });
+      return false;
+    } catch (e) {
+      setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
+      setScanner(false);
+      setToast({ ok: false, text: "Lecture impossible pour " + (code ?? "ce colis") + " : " + networkErrorMessage(e) + ". Complétez l’adresse." });
+      return false;
+    } finally { setBusy(null); }
+  }
+
+  async function traiterFileScans() {
+    if (scanProcessing.current) return;
+    scanProcessing.current = true;
+    try {
+      while (scanQueue.current.length) {
+        const item = scanQueue.current.shift()!;
+        setScanStatus("Colis " + (item.code ?? "détecté") + " — lecture des informations…");
+        const ok = await lireImageScannee(item.image, item.code, item.telephone);
+        if (!ok) { scanQueue.current = []; setScanStatus(""); return; }
+        setScanStatus(scanQueue.current.length ? "Colis ajouté · " + scanQueue.current.length + " en attente" : "Colis " + (item.code ?? "") + " ajouté");
+      }
+    } finally { scanProcessing.current = false; }
+  }
+
+  function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
     if (lu.adresse) {
-      // Adresse dans le code : ajout direct, sans quitter le scanner.
-      ajouter({ adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      return true;
+      const d: Draft = { adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      // Toujours demander confirmation : les champs d'un QR ne sont pas normalisés.
+      setScanner(false);
+      setDraft(d);
+      setToast({
+        ok: Boolean(d.code && d.adresse.trim().length >= 5),
+        text: d.code && d.adresse.trim().length >= 5
+          ? "QR lu : vérifiez l'adresse et le numéro avant d'ajouter le colis."
+          : "QR lu partiellement : vérifiez et complétez les informations avant l'ajout.",
+      });
+      return false;
+    }
+    if (lectureEtiquette && image) {
+      scanQueue.current.push({ image, code: lu.code, telephone: lu.telephone ?? null });
+      setScanStatus("Code lu : " + (lu.code ?? text) + " · lecture automatique");
+      void traiterFileScans();
     } else {
       setScanner(false);
       setDraft({ adresse: "", destinataire: "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) });
-      setToast({ ok: true, text: "Colis lu : ajoutez l'adresse (photo de l'étiquette ou saisie)." });
-      return false;
+      setToast({ ok: true, text: "Numéro de colis lu : " + (lu.code ?? text) + ". Complétez l’adresse." });
     }
+    return true;
   }
 
   /** Application des stores : scanner natif Google, rouvert après chaque colis ajouté. Sinon scanner web. */
   async function ouvrirScanner() {
-    if (!scannerNatifDisponible()) return setScanner(true);
+    // La lecture automatique d'étiquette a besoin de l'image caméra complète.
+    // Le scanner natif ne fournit que le texte du code, donc on utilise le scanner web.
+    if (lectureEtiquette || !scannerNatifDisponible()) return setScanner(true);
     try {
       for (;;) {
         const code = await scannerNatif();
@@ -319,7 +459,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       const signales = r.horsHoraires.length + r.fermes.length + r.impossibles.length;
       setToast({
         ok: !signales,
-        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
+        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
       });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
@@ -346,7 +486,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     try {
       await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
     } catch (e) {
-      setToast({ ok: false, text: networkErrorMessage(e) });
+      if (isNetworkFailure(e)) {
+        try {
+          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+          setToast({ ok: true, text: "Action enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
+          return;
+        } catch (queueError) {
+          setToast({ ok: false, text: networkErrorMessage(queueError) });
+        }
+      } else setToast({ ok: false, text: networkErrorMessage(e) });
       await recharger(run?.id);
     }
   }
@@ -478,10 +626,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
   }
 
   // Arrêts par liste. Une seule liste implicite : affichage identique à une tournée sans liste.
-  const groupes = grouperParListe(stops, lists);
-  const multi = groupes.length > 1 || groupes[0]?.liste != null;
-  const listeCible = groupes.some((g) => (g.liste?.id ?? null) === cible) ? cible : (groupes[groupes.length - 1]?.liste?.id ?? null);
-  const cibles = groupes.map((g) => ({ id: g.liste?.id ?? null, nom: nomGroupe(g) }));
+  const groupesComplets = grouperParListe(stops, lists);
+  const termeAdresse = rechercheAdresse.trim().toLocaleLowerCase("fr-FR");
+  const groupes = termeAdresse
+    ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
+    : groupesComplets;
+  const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
+  const listeCible = groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? cible : (groupesComplets[groupesComplets.length - 1]?.liste?.id ?? null);
+  const cibles = groupesComplets.map((g) => ({ id: g.liste?.id ?? null, nom: nomGroupe(g) }));
   const choixCible = multi && (
     <label className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
@@ -524,10 +676,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     </div>
   );
 
-  if (!runs) return <p className="text-sm text-navy/60">Chargement des tournées…</p>;
+  const modalAffectation = affectationOuverte ? <AffecterTournee onClose={() => setAffectationOuverte(false)} onCreated={async (runId) => { setAffectationOuverte(false); try { localStorage.setItem("godac-tournee-colis", runId); } catch { /* stockage indisponible */ } await recharger(runId); setToast({ ok: true, text: "Tournée créée : vous pouvez scanner les colis." }); }} /> : null;
+
+  if (!runs) return <>{modalAffectation}<p className="text-sm text-navy/60">Chargement des tournées…</p></>;
   if (!run) {
     return (
       <div className="flex flex-col gap-4">
+        {modalAffectation}
         {toast && (
           <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
             {toast.text}
@@ -561,7 +716,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
     },
   );
 
-  const explicites = groupes.filter((g) => g.liste);
+  const explicites = groupesComplets.filter((g) => g.liste);
   /** En-tête d'une liste : nom (renommable), compteurs, ordre, suppression. */
   const enteteListe = (g: (typeof groupes)[number], k: number) => {
     const c = compteurs(g.arrets);
@@ -692,7 +847,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           }}
         />
       )}
-      {scanner && <ParcelScanner onCode={onCode} onClose={() => setScanner(false)} />}
+      {scanner && <ParcelScanner onCode={onCode} onClose={() => { setScanner(false); scanQueue.current = []; setScanStatus(""); }} statut={scanStatus} />}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
       {selecteur}
@@ -705,11 +860,18 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm" onClick={renommer}>
             Renommer
           </button>
-          <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
+          {run.status !== "done" && <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
             Supprimer la tournée
-          </button>
+          </button>}
         </div>
       </div>
+      <label className="relative block">
+        <span className="sr-only">Rechercher une adresse dans la tournée</span>
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45">⌕</span>
+        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
+        {rechercheAdresse && <button type="button" className="absolute inset-y-0 right-2 px-2 text-sm text-navy/60" onClick={() => setRechercheAdresse("")}>Effacer</button>}
+      </label>
+      {rechercheAdresse && <p className="-mt-2 text-xs text-navy/60">{groupes.reduce((n, g) => n + g.arrets.length, 0)} résultat(s) sur {stops.length} arrêt(s).</p>}
       <div className="grid grid-cols-3 gap-2">
         {[
           ["Arrêts", stops.length, ramasses ? `dont ${ramasses} ramasse${ramasses > 1 ? "s" : ""}` : null],
@@ -743,6 +905,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           {estRamasse(prochain) && <EncocheRamasse large />}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
             {estRamasse(prochain) && <BadgeRamasse />}
+            {estPointRelais(prochain) && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
+                <IconMapPin className="h-3.5 w-3.5" /> Point relais
+              </span>
+            )}
             <span>
               Arrêt {stops.indexOf(prochain) + 1} / {stops.length}
               {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : ""}`}
@@ -863,7 +1030,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
       {draft && (
         <Card className="flex flex-col gap-3 border-2 border-teal/40">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : "Nouveau colis"}</h2>
+            <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : draft.type === "point_relais" ? "Dépôt en point relais" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
               <IconX className="h-5 w-5" />
             </button>
@@ -871,7 +1038,56 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
           <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
-          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse })} autoFocus={!lectureEtiquette} />
+          {draft.type === "ramasse" && (
+            <label className="flex items-start gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm">
+              <input type="checkbox" checked={draft.exceptionnelle === true} onChange={(e) => setDraft({ ...draft, exceptionnelle: e.target.checked })} className="mt-0.5" />
+              <span><strong>Ramasse exceptionnelle</strong><span className="block text-xs text-navy/65">Ne pas ajouter cette adresse aux ramasses quotidiennes des prochaines tournées.</span></span>
+            </label>
+          )}
+          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse, window_start: undefined, window_end: undefined })} autoFocus={!lectureEtiquette} />
+          {draft.type === "livraison" && (
+            <div className="rounded-xl border border-teal/25 bg-teal/5 p-3" aria-live="polite">
+              <p className="text-sm font-semibold">Créneau de livraison pour aujourd'hui</p>
+              <p className="mt-1 text-xs text-navy/65">
+                {chargementSuggestionHoraires
+                  ? "Recherche des horaires habituels connus…"
+                  : suggestionHoraires && suggestionHoraires.adresse.toLocaleLowerCase("fr-FR") === draft.adresse.trim().toLocaleLowerCase("fr-FR")
+                    ? "Horaires habituels" + (suggestionHoraires.label ? " · " + suggestionHoraires.label : "") + " — choisissez un créneau pour cette livraison."
+                    : "Aucun horaire habituel connu : vous pouvez tout de même définir le créneau souhaité pour aujourd'hui."}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  ["8 h – 11 h", "08:00", "11:00"],
+                  ["10 h – 13 h", "10:00", "13:00"],
+                  ["12 h – 15 h", "12:00", "15:00"],
+                  ["14 h – 17 h", "14:00", "17:00"],
+                ].map(([label, open, close]) => {
+                  const selected = draft.window_start === open && draft.window_end === close;
+                  return (
+                    <button key={label} type="button" className={selected ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"}
+                      onClick={() => setDraft({ ...draft, window_start: open, window_end: close })}>
+                      {label}{selected ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label className="flex items-center gap-1.5">De
+                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_start ?? ""} onChange={(e) => setDraft({ ...draft, window_start: e.target.value || undefined })} aria-label="Début du créneau du jour" />
+                </label>
+                <label className="flex items-center gap-1.5">À
+                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_end ?? ""} onChange={(e) => setDraft({ ...draft, window_end: e.target.value || undefined })} aria-label="Fin du créneau du jour" />
+                </label>
+                {(draft.window_start || draft.window_end) && (
+                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => setDraft({ ...draft, window_start: undefined, window_end: undefined })}>Retirer le créneau</button>
+                )}
+              </div>
+              {draft.window_start && draft.window_end && draft.window_start >= draft.window_end && (
+                <p role="alert" className="mt-1 text-xs font-semibold text-orange-ink">L'heure de fin doit être après l'heure de début.</p>
+              )}
+              <p className="mt-2 text-xs text-navy/55">Ce créneau est enregistré uniquement pour cette livraison. Les horaires habituels restent inchangés.</p>
+            </div>
+          )}
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
             className={`input ${normaliserTelephone(draft.telephone, pays) ? "" : "!border-orange ring-2 ring-orange/30"}`}
@@ -899,7 +1115,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
           </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
-              {draft.type === "ramasse" ? "Ajouter la ramasse" : "Ajouter à la tournée"}
+              {draft.type === "ramasse" ? "Ajouter la ramasse" : draft.type === "point_relais" ? "Ajouter au point relais" : "Ajouter à la tournée"}
             </button>
             {lectureEtiquette && (
               <button type="button" className="btn-secondary" disabled={busy === "photo"} onClick={() => fileRef.current?.click()}>
@@ -933,6 +1149,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
             </div>
           )}
           <ol className="mt-2 divide-y divide-navy/[0.07]">
+            {rechercheAdresse && groupes.length === 0 && <li className="px-4 py-6 text-center text-sm text-navy/60">Aucune adresse ne correspond à « {rechercheAdresse} ».</li>}
             {groupes.map((g, k) => (
               <Fragment key={g.liste?.id ?? "principale"}>
                 {multi && enteteListe(g, k)}
@@ -951,9 +1168,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {(estRamasse(s) || (s.status === "pending" && !s.phone)) && (
+                          {(estRamasse(s) || estPointRelais(s) || (s.status === "pending" && !s.phone)) && (
                             <div className="mb-1 flex flex-wrap gap-1">
                               {estRamasse(s) && <BadgeRamasse />}
+                              {estPointRelais(s) && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-teal-ink">
+                                  <IconMapPin className="h-3.5 w-3.5" /> Point relais
+                                </span>
+                              )}
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
                           )}
@@ -1056,6 +1278,27 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
                           )}
                         </div>
                       )}
+                      {s.status === "pending" && run.status !== "done" && estRamasse(s) && (
+                        <div className="mt-1 pl-9">
+                          <button type="button" className="btn-secondary !px-3 !py-1 text-xs" onClick={async () => {
+                            const valeur = prompt("Nombre de colis réellement ramassés", String(s.packages_picked_up ?? ""));
+                            if (valeur === null || !valeur.trim()) return;
+                            const nombre = Number(valeur);
+                            if (!Number.isInteger(nombre) || nombre < 0 || nombre > 500) {
+                              setToast({ ok: false, text: "Saisissez un nombre entier entre 0 et 500." });
+                              return;
+                            }
+                            try {
+                              await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ packages_picked_up: nombre }) });
+                              await recharger(run.id);
+                              setToast({ ok: true, text: `${nombre} colis ramassé(s) enregistré(s).` });
+                            } catch (e) {
+                              setToast({ ok: false, text: networkErrorMessage(e) });
+                            }
+                          }}>📦 Saisir les colis ramassés{s.packages_picked_up != null ? ` (${s.packages_picked_up})` : ""}</button>
+                        </div>
+                      )}
+                      <HistoriqueArret stop={s} />
                       {edition?.id === s.id && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
@@ -1121,17 +1364,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR" }: { lectureEtiquet
 
       {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
-          <button
-            type="button"
-            className="btn-primary w-full !py-3.5 text-base"
-            disabled={busy !== null}
-            onClick={async () => {
-              if (!run.optimized_at) await optimiser(false);
-              await phase("in_progress");
-              router.push("/livreur");
-            }}
-          >
-            Démarrer la livraison ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
+          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => router.push("/livreur")}>
+            Vérifier la tournée et démarrer ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
           </button>
         </div>
       )}

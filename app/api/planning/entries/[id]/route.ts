@@ -32,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update(parsed.data)
     .eq("id", id)
     .eq("status", "planned")
-    .select("id, driver_id, start_at")
+    .select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at")
     .maybeSingle();
 
   if (error) {
@@ -45,6 +45,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
+
 
   const warning = data.driver_id
     ? await warnIfDriverDoubleBooked(supabase, {
