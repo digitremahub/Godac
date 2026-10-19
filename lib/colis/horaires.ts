@@ -386,8 +386,10 @@ export function ordonnerAvecHoraires(
   for (let i = 0; i < n; i++) {
     const f = arrets[i]!.fenetres;
     if (f && !f.length) fermes.push(i);
-    // Laisser l'optimiseur tenter cet arrêt avant de le déclarer impossible :
-    // l'ordre et le temps d'arrivée dépendent aussi des autres arrêts de la liste.
+    // Même en y allant directement, on arriverait après la dernière fermeture :
+    // inutile de le laisser peser sur l'ordre des autres. Les arrêts encore
+    // atteignables sont laissés à l'optimiseur (l'arrivée dépend de l'ordre).
+    else if (f && debut + trajet(depart, arrets[i]!.point) >= f[f.length - 1]![1]) impossibles.push(i);
     else reste.push(i);
   }
 
