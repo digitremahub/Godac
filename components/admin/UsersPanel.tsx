@@ -144,7 +144,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   }
 
   async function resetPin(user: UserRow) {
-    if (!window.confirm(`Réinitialiser le code PIN de ${user.full_name} ? Il devra en créer un nouveau à sa prochaine connexion.`)) {
+    if (!window.confirm(`Réinitialiser le code PIN de ${user.full_name} ? Il devra en créer un nouveau avec le code d'activation qui va s'afficher.`)) {
       return;
     }
     setBusy(true);
@@ -157,6 +157,12 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       });
       const json = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(json.error));
+      if (typeof json.activationCode === "string") {
+        // Affiché une seule fois : exigé pour créer le nouveau PIN depuis le badge.
+        window.alert(
+          `Code d'activation de ${user.full_name} : ${json.activationCode}\n\nRemettez-le au chauffeur : il le saisira avec son nouveau PIN après avoir scanné son badge. Valable 7 jours, ce code ne sera plus affiché.`,
+        );
+      }
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");

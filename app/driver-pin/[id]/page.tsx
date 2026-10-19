@@ -14,13 +14,15 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 export default async function DriverPinPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = createAdminSupabaseClient();
-  const [{ data: user }, { count: passkeyCount }] = await Promise.all([
+  const [{ data: user }, { count: passkeyCount }, { count: activationCount }] = await Promise.all([
     admin
       .from("users")
       .select("full_name, auth_method, pin_set_at, active, pending_approval")
       .eq("id", id)
       .maybeSingle(),
     admin.from("webauthn_credentials").select("id", { count: "exact", head: true }).eq("user_id", id),
+    // Accès réinitialisé : code d'activation exigé (migration 20261019000005).
+    admin.from("driver_pin_activations").select("user_id", { count: "exact", head: true }).eq("user_id", id),
   ]);
 
   if (!user || user.auth_method !== "pin" || !user.active) {
@@ -42,6 +44,7 @@ export default async function DriverPinPage({ params }: { params: Promise<{ id: 
         needsSetup={!user.pin_set_at}
         pendingApproval={user.pending_approval}
         hasPasskey={(passkeyCount ?? 0) > 0}
+        needsActivation={(activationCount ?? 0) > 0}
       />
     </AuthLayout>
   );

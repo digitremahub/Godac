@@ -8,15 +8,18 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { postLoginPath } from "@/lib/auth/post-login";
 
 export function DriverPinFlow({
-  id, fullName, needsSetup, pendingApproval, hasPasskey = false,
+  id, fullName, needsSetup, pendingApproval, hasPasskey = false, needsActivation = false,
 }: {
   id: string; fullName: string; needsSetup: boolean; pendingApproval: boolean; hasPasskey?: boolean;
+  /** Accès réinitialisé par l'encadrement : code d'activation exigé pour créer le PIN. */
+  needsActivation?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [pin, setPin] = useState("");
   const [showFallback, setShowFallback] = useState(false);
   const [confirmPin, setConfirmPin] = useState("");
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [activationCode, setActivationCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
@@ -41,7 +44,7 @@ export function DriverPinFlow({
     e.preventDefault(); setBusy(true); setError(null);
     try {
       const res = await fetch(`/api/auth/driver-pin/${id}/set`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, confirmPin }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, confirmPin, ...(activationCode.trim() ? { activationCode: activationCode.trim() } : {}) }),
       });
       const json = await readResponse(res);
       if (typeof json?.recoveryCode !== "string") throw new Error("Le code de secours n'a pas été généré. Réessayez.");
@@ -121,10 +124,13 @@ export function DriverPinFlow({
       <Card className="flex w-full max-w-sm flex-col gap-4">
         <div><h1 className="text-2xl">Bonjour {fullName.split(" ")[0] ?? fullName}</h1><p className="mt-1 text-sm text-navy/65">Première connexion : créez votre PIN de 4 à 6 chiffres. Un code de secours obligatoire sera généré ensuite.</p></div>
         <form onSubmit={submitSetup} className="flex flex-col gap-3">
+          {needsActivation && (
+            <label className="block"><span className="label">Code d&apos;activation remis par votre responsable</span><input className="input font-mono uppercase" autoComplete="off" required value={activationCode} onChange={e => setActivationCode(e.target.value)} placeholder="ABCD-EFGH" /></label>
+          )}
           <label className="block"><span className="label">Code PIN</span><input className="input" type="password" inputMode="numeric" autoComplete="off" required value={pin} onChange={e => setPin(e.target.value)} /></label>
           <label className="block"><span className="label">Confirmez le code PIN</span><input className="input" type="password" inputMode="numeric" autoComplete="off" required value={confirmPin} onChange={e => setConfirmPin(e.target.value)} /></label>
           {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-          <button type="submit" className="btn-primary" disabled={busy || !pin || !confirmPin}>{busy ? "Création…" : "Créer mon PIN et mon code de secours"}</button>
+          <button type="submit" className="btn-primary" disabled={busy || !pin || !confirmPin || (needsActivation && !activationCode.trim())}>{busy ? "Création…" : "Créer mon PIN et mon code de secours"}</button>
         </form>
       </Card>
     );

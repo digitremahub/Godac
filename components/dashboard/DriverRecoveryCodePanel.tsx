@@ -15,6 +15,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [activationCodes, setActivationCodes] = useState<{ driverId: string; fullName: string; code: string }[]>([]);
 
   async function generate(driver: Driver) {
     const confirmed = window.confirm(`Générer un nouveau code de secours pour ${driver.full_name} ? L'ancien code sera immédiatement invalidé.`);
@@ -50,6 +51,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
         body: JSON.stringify({ confirmation }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (Array.isArray(payload.activationCodes)) setActivationCodes(payload.activationCodes);
       if (!response.ok || payload.ok !== true) {
         if (payload.failedCount > 0) {
           throw new Error(`${payload.message ?? "Réinitialisation partielle."} ${payload.resetCount ?? 0} entièrement traité(s), ${payload.failedCount} en échec. Identifiants concernés : ${(payload.failures ?? []).map((item: { driverId: string; step: string }) => `${item.driverId} (${item.step})`).join(", ")}`);
@@ -87,7 +89,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
       {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {resetMessage && <p role="status" className="mb-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-900">{resetMessage}</p>}
       <div className="mb-4 rounded-xl border border-orange-300 bg-orange-50 p-3">
-        <p className="text-sm text-orange-950">La réinitialisation révoque les clés biométriques et les codes de connexion des chauffeurs, mais conserve leurs comptes et l’historique des tournées. Chaque chauffeur devra réenregistrer son accès. Cette opération peut interrompre leur connexion.</p>
+        <p className="text-sm text-orange-950">La réinitialisation révoque les clés biométriques et les codes de connexion des chauffeurs, mais conserve leurs comptes et l’historique des tournées. Chaque chauffeur devra réenregistrer son accès avec le code d’activation affiché ici. Cette opération peut interrompre leur connexion.</p>
         {!showResetConfirmation ? (
           <button type="button" disabled={resettingAll} onClick={() => { setError(null); setShowResetConfirmation(true); }} className="mt-3 rounded-lg border border-orange-500 px-3 py-2 text-sm font-semibold text-orange-950 disabled:opacity-50">Préparer la réinitialisation globale</button>
         ) : (
@@ -101,6 +103,21 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
           </div>
         )}
       </div>
+      {activationCodes.length > 0 && (
+        <div className="mb-4 rounded-xl border border-teal-600/30 bg-teal-50 p-4">
+          <p className="text-sm font-medium">Codes d&apos;activation (affichés une seule fois, valables 7 jours)</p>
+          <p className="mt-1 text-xs text-navy/60">Remettez à chaque chauffeur son code de manière confidentielle : il le saisira avec son nouveau PIN après avoir scanné son badge.</p>
+          <ul className="mt-3 divide-y divide-teal-600/20">
+            {activationCodes.map((item) => (
+              <li key={item.driverId} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm">{item.fullName}</span>
+                <span className="select-all font-mono font-bold tracking-wider">{item.code}</span>
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setActivationCodes([])} className="mt-3 rounded-lg border border-navy/15 px-3 py-2 text-sm">Masquer les codes</button>
+        </div>
+      )}
       {generated && (
         <div className="mb-4 rounded-xl border border-teal-600/30 bg-teal-50 p-4">
           <p className="text-sm font-medium">Nouveau code de secours — {generated.name}</p>
