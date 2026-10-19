@@ -20,7 +20,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data, error } = await supabase.from("delivery_stop_events")
     .select("id, event_type, previous_value, new_value, details, created_at, actor_id")
     .eq("stop_id", id).eq("organization_id", user.organization_id).order("created_at", { ascending: false }).limit(100);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Historique indisponible (table absente tant que la migration n'est pas
+  // appliquée) : liste vide plutôt qu'une erreur à chaque ouverture.
+  if (error) {
+    console.error("delivery_stop_events (lecture)", error.message);
+    return NextResponse.json({ events: [], indisponible: true });
+  }
   return NextResponse.json({ events: data ?? [] });
 }
 

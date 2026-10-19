@@ -4,7 +4,8 @@ import { requireAppUser } from "@/lib/auth/session";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { getCurrentTankPmp } from "@/lib/fuel/current-pmp";
 import { checkOdometerJump, checkOdometerNotRegressing } from "@/lib/business/odometer";
-import { getVehicleKmReadingAt } from "@/lib/vehicles/odometer-reference";
+import { getVehicleKmReadingsAround } from "@/lib/vehicles/odometer-reference";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
@@ -117,9 +118,20 @@ export async function POST(req: Request) {
   if (d.vehicle_km !== undefined) {
     // Saisie rétroactive : comparer le kilométrage aux relevés connus à
     // la date réelle du plein, pas au relevé actuel (qui peut être supérieur).
-    const dernier = await getVehicleKmReadingAt(supabase, d.vehicle_id, d.occurred_at);
+    // Client admin : le véhicule est déjà vérifié dans l'organisation, et
+    // toutes ses tournées doivent compter (la RLS limiterait un chauffeur
+    // aux siennes).
+    const { avant: dernier, apres: suivant } = await getVehicleKmReadingsAround(createAdminSupabaseClient(), vehicle.id, d.occurred_at);
     const recul = checkOdometerNotRegressing(d.vehicle_km, dernier?.km ?? null, `la dernière lecture à cette date (${dernier?.source ?? "véhicule"})`);
     if (!recul.ok) return NextResponse.json({ error: recul.message }, { status: 422 });
+    // Saisie rétroactive : le kilométrage ne peut pas dépasser un relevé postérieur.
+    if (suivant && d.vehicle_km > suivant.km) {
+      const date = new Date(suivant.at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+      return NextResponse.json(
+        { error: `${d.vehicle_km} km dépasse un relevé postérieur au plein (${suivant.km} km le ${date}, ${suivant.source}). Vérifiez la saisie.` },
+        { status: 422 },
+      );
+    }
     const saut = checkOdometerJump(d.vehicle_km, dernier?.km ?? null, dernier?.at ?? null, new Date(d.occurred_at));
     if (!saut.ok) return NextResponse.json({ error: saut.message }, { status: 422 });
   }

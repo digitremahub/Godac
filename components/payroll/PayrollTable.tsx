@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { computeHourlyRates, estimateSalary, type HourlyRates } from "@/lib/business/payroll";
 import { IconCheck, IconCoins, IconPencil } from "@/components/layout/icons";
@@ -67,77 +68,6 @@ export function PayrollTable({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [mealVouchers, setMealVouchers] = useState("");
-  const [bonus, setBonus] = useState("");
-  const [genBusyId, setGenBusyId] = useState<string | null>(null);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkSummary, setBulkSummary] = useState<string | null>(null);
-
-  function startGenerate(row: PayrollRow) {
-    setGeneratingId(row.driver_id);
-    setMealVouchers("");
-    setBonus("");
-    setGenError(null);
-  }
-
-  function cancelGenerate() {
-    setGeneratingId(null);
-  }
-
-  async function postGenerate(row: PayrollRow, mealVouchersAmount: number, bonusAmount: number): Promise<string | null> {
-    const res = await fetch("/api/payslips/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: row.driver_id,
-        period_start: periodStart,
-        period_end: periodEnd,
-        meal_vouchers_amount: mealVouchersAmount,
-        bonus_amount: bonusAmount,
-      }),
-    });
-    if (res.ok) return null;
-    const json = await res.json();
-    return typeof json.error === "string" ? json.error : "Erreur";
-  }
-
-  async function generateOne(row: PayrollRow) {
-    setGenBusyId(row.driver_id);
-    setGenError(null);
-    const err = await postGenerate(row, mealVouchers.trim() === "" ? 0 : Number(mealVouchers), bonus.trim() === "" ? 0 : Number(bonus));
-    setGenBusyId(null);
-    if (err) {
-      setGenError(err);
-      return;
-    }
-    setGeneratingId(null);
-    router.refresh();
-  }
-
-  /** "Génération générale sauf celles déjà faites" — pas de paniers/primes ici, par construction : toute exception individuelle passe par le bouton par chauffeur. */
-  async function generateAllMissing() {
-    const targets = rows.filter((r) => !r.payslip_generated && r.monthly_gross_salary !== null && r.monthly_net_salary !== null);
-    const skippedNoSalary = rows.filter((r) => !r.payslip_generated && (r.monthly_gross_salary === null || r.monthly_net_salary === null)).length;
-    setBulkBusy(true);
-    setBulkSummary(null);
-    let created = 0;
-    let failed = 0;
-    for (const row of targets) {
-      const err = await postGenerate(row, 0, 0);
-      if (err) failed++;
-      else created++;
-    }
-    setBulkBusy(false);
-    setBulkSummary(
-      `${created} fiche(s) générée(s)` +
-        (failed > 0 ? `, ${failed} échec(s)` : "") +
-        (skippedNoSalary > 0 ? `, ${skippedNoSalary} ignoré(s) (salaire non renseigné)` : ""),
-    );
-    if (created > 0) router.refresh();
-  }
-
   function startEdit(row: PayrollRow) {
     setEditingId(row.driver_id);
     setEdit(toEditState(row));
@@ -191,14 +121,6 @@ export function PayrollTable({
   return (
     <Card className="overflow-x-auto">
       {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
-      {payslipsEnabled && (
-        <div className="mb-3 flex items-center gap-3">
-          <button className="btn-secondary !px-3 !py-1.5 text-sm" disabled={bulkBusy || missingCount === 0} onClick={generateAllMissing}>
-            {bulkBusy ? "Génération…" : `Générer les fiches manquantes (${missingCount})`}
-          </button>
-          {bulkSummary && <p className="text-xs text-navy/70">{bulkSummary}</p>}
-        </div>
-      )}
       <table className="w-full min-w-[980px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -307,46 +229,15 @@ export function PayrollTable({
                       <span className="text-xs text-navy/60" title="Renseignez le salaire brut/net pour générer une fiche">
                         Salaire non renseigné
                       </span>
-                    ) : generatingId === row.driver_id ? (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex gap-1">
-                          <input
-                            className="input !h-7 !w-24 !py-0.5 !text-xs"
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            aria-label="Panier repas €" placeholder="Panier repas €"
-                            value={mealVouchers}
-                            onChange={(e) => setMealVouchers(e.target.value)}
-                          />
-                          <input
-                            className="input !h-7 !w-20 !py-0.5 !text-xs"
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            aria-label="Prime €" placeholder="Prime €"
-                            value={bonus}
-                            onChange={(e) => setBonus(e.target.value)}
-                          />
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            className="btn-primary !h-6 !px-2 !py-0 !text-xs"
-                            disabled={genBusyId === row.driver_id}
-                            onClick={() => generateOne(row)}
-                          >
-                            {genBusyId === row.driver_id ? "…" : "Générer"}
-                          </button>
-                          <button className="btn-secondary !h-6 !px-2 !py-0 !text-xs" disabled={genBusyId === row.driver_id} onClick={cancelGenerate}>
-                            Annuler
-                          </button>
-                        </div>
-                        {genError && <p role="alert" className="text-xs text-orange-ink">{genError}</p>}
-                      </div>
                     ) : (
-                      <button className="btn-secondary !h-7 !px-2 !py-0.5 !text-xs" onClick={() => startGenerate(row)}>
-                        <IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Générer fiche
-                      </button>
+                      // Bulletins calculés par le moteur de paie (lib/paie) :
+                      // l'ancien générateur au net figé est retiré (audit E8).
+                      <Link
+                        className="btn-secondary !h-7 !px-2 !py-0.5 !text-xs"
+                        href={`/paie/${row.driver_id}?mois=${periodStart.slice(0, 7)}`}
+                      >
+                        <IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Préparer le bulletin
+                      </Link>
                     )}
                   </td>
                 )}

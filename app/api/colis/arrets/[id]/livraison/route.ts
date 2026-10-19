@@ -121,11 +121,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 /** Lien temporaire (5 min) vers la photo de livraison. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireAppUser();
+  const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
   const { id } = await params;
-  const { data: stop } = await supabase.from("delivery_stops").select("proof_photo_path").eq("id", id).maybeSingle();
-  const paths = Array.isArray((stop as any)?.proof_photo_paths) ? (stop as any).proof_photo_paths as string[] : stop?.proof_photo_path ? [stop.proof_photo_path] : [];
+  // Audit M4 : proof_photo_paths (photos 2 et 3) doit être sélectionné.
+  const { data: stop } = await supabase
+    .from("delivery_stops")
+    .select("proof_photo_path, proof_photo_paths")
+    .eq("id", id)
+    .eq("organization_id", appUser.organization_id)
+    .maybeSingle();
+  const multiples = Array.isArray(stop?.proof_photo_paths) ? (stop.proof_photo_paths as string[]).filter(Boolean) : [];
+  const paths = multiples.length ? multiples : stop?.proof_photo_path ? [stop.proof_photo_path as string] : [];
   const index = Math.max(0, Number(new URL(_req.url).searchParams.get("index") ?? "0") || 0);
   const path = paths[index];
   if (!path) return NextResponse.json({ error: "Photo de preuve introuvable." }, { status: 404 });

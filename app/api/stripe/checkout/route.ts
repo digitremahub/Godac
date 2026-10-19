@@ -6,6 +6,10 @@ import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
 import { blockInDemo } from "@/lib/demo/guard";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
+import { z } from "zod";
+
+/** Changement de formule depuis la page Abonnement (BillingPanel) ; sans corps : formule actuelle. */
+const bodySchema = z.object({ planId: z.enum(["starter", "pro", "business"]).optional() }).default({});
 
 /**
  * Builds the subscription price from the org's chosen plan
@@ -15,7 +19,7 @@ import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
  * `price_data` rather than pre-created Price objects, since the
  * per-org total isn't one of a fixed set of Stripe Prices.
  */
-export async function POST() {
+export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json(
       { error: "La facturation Stripe n'est pas configurée sur cet environnement. Contactez un administrateur GODAC." },
@@ -26,25 +30,58 @@ export async function POST() {
   const appUser = await requireAppUser();
   const demoBlocked = await blockInDemo(appUser.organization_id);
   if (demoBlocked) return demoBlocked;
+  // Audit M19 : seule la direction souscrit l'abonnement de l'entreprise.
+  if (appUser.role !== "direction") {
+    return NextResponse.json({ error: "Seule la direction peut souscrire l'abonnement." }, { status: 403 });
+  }
+  const texte = await req.text();
+  let corps: unknown = {};
+  try {
+    corps = texte ? JSON.parse(texte) : {};
+  } catch {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(corps);
+  if (!parsed.success) return NextResponse.json({ error: "Formule invalide." }, { status: 400 });
   const supabase = await createServerSupabaseClient();
 
   const [{ data: organization }, { plans, modules }] = await Promise.all([
-    supabase.from("organizations").select("id, name, plan, stripe_customer_id").eq("id", appUser.organization_id).single(),
+    supabase
+      .from("organizations")
+      .select("id, name, plan, stripe_customer_id, stripe_subscription_id, subscription_status")
+      .eq("id", appUser.organization_id)
+      .single(),
     getFullCatalog(supabase),
   ]);
 
   if (!organization) {
     return NextResponse.json({ error: "Organisation introuvable" }, { status: 409 });
   }
+  // Un abonnement en cours se modifie depuis le portail Stripe : un second
+  // checkout créerait un second abonnement.
+  if (organization.stripe_subscription_id && ["active", "trialing", "past_due"].includes(organization.subscription_status ?? "")) {
+    return NextResponse.json(
+      { error: "Un abonnement est déjà en cours : utilisez « Gérer l'abonnement » ou contactez GODAC pour changer de formule." },
+      { status: 409 },
+    );
+  }
 
-  const planId = organization.plan as PlanId;
+  // Le plan n'est écrit sur l'organisation que par le webhook Stripe, à
+  // partir des métadonnées ci-dessous (audit E1/C4).
+  const planId = (parsed.data.planId ?? organization.plan) as PlanId;
   const plan = plans.find((p) => p.id === planId);
   if (!plan) {
     return NextResponse.json({ error: "Plan introuvable" }, { status: 500 });
   }
 
   // Prix des modules au palier d'utilisateurs (app Livreur) à jour avant la commande.
-  await synchroniserPaliers(createAdminSupabaseClient(), organization.id);
+  // En cas d'échec, pas de commande : le prix des modules au palier serait faux (audit C3).
+  try {
+    await synchroniserPaliers(createAdminSupabaseClient(), organization.id);
+  } catch (e) {
+    console.error("synchroniserPaliers (checkout)", e);
+    return NextResponse.json({ error: "Calcul du tarif impossible pour le moment, réessayez dans quelques minutes." }, { status: 503 });
+  }
 
   const { data: addonRows } = await supabase
     .from("organization_modules")
@@ -136,7 +173,7 @@ export async function POST() {
         modules: addons.map((a) => a.module_key).join(",") || "none",
       },
     },
-    metadata: { godac_organization_id: organization.id },
+    metadata: { godac_organization_id: organization.id, plan: plan.id },
     success_url: `${appUrl}/onboarding?stripe=success`,
     cancel_url: `${appUrl}/onboarding?stripe=cancelled`,
   });

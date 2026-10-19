@@ -11,6 +11,7 @@ export const ACTIONS_AUDIT = {
   livraison_cuve_annulee: "Livraison de cuve annulée",
   role_modifie: "Rôle ou accès modifié",
   pin_reinitialise: "Code PIN réinitialisé",
+  acces_chauffeurs_reinitialises: "Accès chauffeurs réinitialisés (tous)",
   pin_bloque: "Code PIN bloqué (trop d'essais)",
   utilisateur_desactive: "Compte désactivé / réactivé",
   tournee_colis_supprimee: "Tournée colis supprimée",

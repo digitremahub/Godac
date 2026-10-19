@@ -2,8 +2,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { GeneratePayslipForm } from "@/components/payslips/GeneratePayslipForm";
-import { RegeneratePayslipButton } from "@/components/payslips/RegeneratePayslipButton";
+import Link from "next/link";
 import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
@@ -31,10 +30,7 @@ export default async function PayslipsPage() {
 
   const isDirection = appUser.role === "direction";
 
-  const [{ data: employees }, { data: payslipRows }] = await Promise.all([
-    isDirection
-      ? supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).order("full_name")
-      : Promise.resolve({ data: null }),
+  const [{ data: payslipRows }] = await Promise.all([
     (() => {
       let query = supabase
         .from("payslips")
@@ -61,9 +57,12 @@ export default async function PayslipsPage() {
       />
       {isDirection && <OngletsPaie actif="fiches" paie planning={await isModuleEnabled(supabase, appUser.organization_id, "planning")} />}
 
-      {isDirection && (employees ?? []).length > 0 && (
-        <Card className="mb-6">
-          <GeneratePayslipForm employees={employees ?? []} />
+      {isDirection && (
+        <Card className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span>Les bulletins se préparent salarié par salarié dans le moteur de paie (heures, primes, cotisations).</span>
+          <Link href="/paie" className="btn-primary !py-2 text-sm">
+            Préparer les bulletins
+          </Link>
         </Card>
       )}
 
@@ -85,13 +84,6 @@ export default async function PayslipsPage() {
                   <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
                     Télécharger
                   </a>
-                )}
-                {isDirection && (
-                  <RegeneratePayslipButton
-                    payslipId={p.id}
-                    initialMealVouchers={Number(p.meal_vouchers_amount ?? 0)}
-                    initialBonus={Number(p.bonus_amount ?? 0)}
-                  />
                 )}
               </span>
             </div>

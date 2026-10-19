@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
+import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
 
 const bodySchema = z.object({
   role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
@@ -136,11 +137,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } = parsed.data;
   const { email, ...ordinaryUserFields } = userFields;
   const updateFields: Record<string, unknown> = { ...ordinaryUserFields };
+  /** E-mail Auth avant modification, pour compenser si l'écriture dans `users` échoue. */
+  let emailAuthAncien: string | null = null;
 
   if (email !== undefined) {
     const { data: target, error: targetError } = await supabase
       .from("users")
-      .select("id, organization_id, email, auth_method")
+      .select("id, organization_id, email, auth_method, role")
       .eq("id", id)
       .single();
     if (targetError || !target || target.organization_id !== appUser.organization_id) {
@@ -149,11 +152,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (target.auth_method === "pin") {
       return NextResponse.json({ error: "Ce compte utilise un badge + PIN ; l'email de connexion ne se modifie pas depuis cette fiche." }, { status: 409 });
     }
+    // Changer l'e-mail de connexion d'un autre compte direction permettrait
+    // d'en prendre le contrôle : refusé (chacun le change depuis son compte).
+    if (target.role === "direction" && id !== appUser.id) {
+      return NextResponse.json({ error: "L'e-mail de connexion d'un compte direction ne se modifie que par son titulaire." }, { status: 403 });
+    }
     const normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail !== String(target.email ?? "").toLowerCase()) {
       const admin = createAdminSupabaseClient();
+      const { data: authUser } = await admin.auth.admin.getUserById(id);
       const { error: authError } = await admin.auth.admin.updateUserById(id, { email: normalizedEmail, email_confirm: false });
       if (authError) return NextResponse.json({ error: `Mise à jour de l'email de connexion impossible : ${authError.message}` }, { status: 400 });
+      emailAuthAncien = authUser?.user?.email ?? target.email ?? null;
       updateFields.email = normalizedEmail;
     }
   }
@@ -164,12 +174,47 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Ce compte ne se connecte pas par code PIN." }, { status: 409 });
     }
     updateFields.pin_set_at = null;
+    updateFields.driver_recovery_code_hash = null;
+  }
+
+  // PIN réinitialisé : code d'activation à remettre au chauffeur (exigé
+  // pour choisir le nouveau PIN depuis le badge) et sessions fermées.
+  // Créé AVANT d'effacer pin_set_at, pour qu'il n'existe aucune fenêtre où
+  // le badge seul suffirait.
+  let activationCode: string | null = null;
+  if (reset_pin) {
+    const admin = createAdminSupabaseClient();
+    try {
+      activationCode = await creerCodeActivation(admin, { userId: id, organizationId: appUser.organization_id, createdBy: appUser.id });
+      await revoquerSessions(admin, id);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Réinitialisation incomplète." }, { status: 500 });
+    }
   }
 
   let targetUser: { id: string; role: string } | null = null;
   if (Object.keys(updateFields).length > 0) {
-    const { data, error } = await supabase.from("users").update(updateFields).eq("id", id).select("id, role, role_title").single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Manager en mode « contact seulement » : la RLS de `users` ne lui
+    // permet pas d'écrire la fiche d'un chauffeur. Le périmètre (même
+    // organisation, chauffeur de ses services, seuls téléphone/adresse/
+    // e-mail de contact) est contrôlé plus haut : écriture par le client
+    // admin, limitée à l'organisation.
+    const ecrivain = appUser.role === "direction" ? supabase : createAdminSupabaseClient();
+    const { data, error } = await ecrivain
+      .from("users")
+      .update(updateFields)
+      .eq("id", id)
+      .eq("organization_id", appUser.organization_id)
+      .select("id, role, role_title")
+      .single();
+    if (error) {
+      if (emailAuthAncien) {
+        // Compensation : l'e-mail Auth a déjà changé, on le rétablit.
+        const { error: retourError } = await createAdminSupabaseClient().auth.admin.updateUserById(id, { email: emailAuthAncien, email_confirm: true });
+        if (retourError) console.error("compensation e-mail Auth impossible", id, retourError.message);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     targetUser = data;
   }
 
@@ -253,5 +298,5 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
   }
   await synchroniserGroupesEquipeSansErreur(createAdminSupabaseClient(), appUser.organization_id);
-  return NextResponse.json({ user: targetUser ?? { id } });
+  return NextResponse.json({ user: targetUser ?? { id }, ...(activationCode ? { activationCode } : {}) });
 }

@@ -67,6 +67,8 @@ export async function POST(req: Request) {
     })
     .select("id, clocked_in_at")
     .single();
+  // Pointage déjà ouvert entre-temps (index unique, audit M1).
+  if (error?.code === "23505") return NextResponse.json({ status: "clocked_in", atDepot: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ status: "auto_clocked_in", entryId: entry.id, clockedInAt: entry.clocked_in_at, distanceM: match.distanceM });

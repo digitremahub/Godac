@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { journaliser } from "@/lib/audit/journal";
+import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
 
 const CONFIRMATION_PHRASE = "REINITIALISER LES ACCES";
 
@@ -16,8 +18,11 @@ function isSameOrigin(request: NextRequest) {
 }
 
 /**
- * Réinitialise les moyens d'authentification des chauffeurs de l'organisation
- * courante. Les opérations Supabase Auth et Postgres ne partagent pas de
+ * Réinitialise les moyens d'authentification des chauffeurs (et chefs
+ * d'équipe chauffeurs) de l'organisation courante : mot de passe
+ * aléatoire, sessions révoquées, clés biométriques supprimées et, pour un
+ * compte badge + PIN, PIN effacé et code d'activation à remettre au
+ * chauffeur (exigé pour choisir le nouveau PIN). Opération journalisée. Les opérations Supabase Auth et Postgres ne partagent pas de
  * transaction : chaque chauffeur est donc traité séparément et les erreurs
  * partielles sont explicitement renvoyées.
  */
@@ -45,23 +50,28 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminSupabaseClient();
+  // Chauffeurs et chefs d'équipe chauffeurs (manager_chauffeur).
   const { data: drivers, error: lookupError } = await admin
     .from("users")
-    .select("id")
+    .select("id, full_name, auth_method")
     .eq("organization_id", appUser.organization_id)
-    .eq("role", "chauffeur");
+    .in("role", ["chauffeur", "manager_chauffeur"]);
 
   if (lookupError) {
     return NextResponse.json({ error: "Impossible de récupérer les chauffeurs de l'organisation." }, { status: 500 });
   }
 
-  const ids = (drivers ?? []).map((driver) => driver.id);
-  if (ids.length === 0) return NextResponse.json({ ok: true, resetCount: 0, failedCount: 0, failures: [] });
+  const comptes = drivers ?? [];
+  if (comptes.length === 0) return NextResponse.json({ ok: true, resetCount: 0, failedCount: 0, failures: [], activationCodes: [] });
 
   const succeeded: string[] = [];
   const failures: { driverId: string; step: string; error: string }[] = [];
+  // Codes d'activation en clair, affichés une seule fois à la direction :
+  // sans eux, le badge seul ne permet plus de choisir un nouveau PIN.
+  const activationCodes: { driverId: string; fullName: string; code: string }[] = [];
 
-  for (const id of ids) {
+  for (const driver of comptes) {
+    const id = driver.id;
     const { error: passwordError } = await admin.auth.admin.updateUserById(id, {
       password: randomBytes(48).toString("base64url"),
     });
@@ -70,16 +80,33 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const { error: profileError } = await admin
-      .from("users")
-      .update({ auth_method: "pin", pin_set_at: null, driver_recovery_code_hash: null })
-      .eq("id", id)
-      .eq("organization_id", appUser.organization_id)
-      .eq("role", "chauffeur");
-
-    if (profileError) {
-      failures.push({ driverId: id, step: "profile", error: profileError.message });
+    try {
+      await revoquerSessions(admin, id);
+    } catch (e) {
+      failures.push({ driverId: id, step: "sessions", error: e instanceof Error ? e.message : String(e) });
       continue;
+    }
+
+    // auth_method n'est plus forcé : un compte e-mail reste un compte e-mail
+    // (nouveau mot de passe aléatoire, sessions et clés biométriques révoquées).
+    if (driver.auth_method === "pin") {
+      let code: string;
+      try {
+        code = await creerCodeActivation(admin, { userId: id, organizationId: appUser.organization_id, createdBy: appUser.id });
+      } catch (e) {
+        failures.push({ driverId: id, step: "activation", error: e instanceof Error ? e.message : String(e) });
+        continue;
+      }
+      const { error: profileError } = await admin
+        .from("users")
+        .update({ pin_set_at: null, driver_recovery_code_hash: null })
+        .eq("id", id)
+        .eq("organization_id", appUser.organization_id);
+      if (profileError) {
+        failures.push({ driverId: id, step: "profile", error: profileError.message });
+        continue;
+      }
+      activationCodes.push({ driverId: id, fullName: driver.full_name, code });
     }
 
     const { error: passkeyError } = await admin.from("webauthn_credentials").delete().eq("user_id", id);
@@ -97,6 +124,14 @@ export async function POST(request: NextRequest) {
     succeeded.push(id);
   }
 
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "acces_chauffeurs_reinitialises",
+    targetTable: "users",
+    details: { reinitialises: succeeded.length, echecs: failures.length, codes_activation: activationCodes.length },
+  });
+
   if (failures.length > 0) {
     return NextResponse.json({
       ok: false,
@@ -104,8 +139,9 @@ export async function POST(request: NextRequest) {
       resetCount: succeeded.length,
       failedCount: failures.length,
       failures,
+      activationCodes,
     }, { status: 207 });
   }
 
-  return NextResponse.json({ ok: true, resetCount: succeeded.length, failedCount: 0, failures: [] });
+  return NextResponse.json({ ok: true, resetCount: succeeded.length, failedCount: 0, failures: [], activationCodes });
 }

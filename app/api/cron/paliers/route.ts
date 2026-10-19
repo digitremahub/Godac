@@ -12,5 +12,10 @@ export async function GET(req: Request) {
   if (req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ ok: true, changes: await synchroniserPaliers(createAdminSupabaseClient()) });
+  try {
+    return NextResponse.json({ ok: true, changes: await synchroniserPaliers(createAdminSupabaseClient()) });
+  } catch (e) {
+    console.error("cron paliers", e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Erreur" }, { status: 500 });
+  }
 }

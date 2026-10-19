@@ -51,7 +51,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ run: ficheCloturee, reused: true });
     }
 
-    const run = ficheExistante ?? await creerTournee(supabase, appUser, parsed.data.name ?? null);
+    let run: NonNullable<typeof ficheExistante> | Awaited<ReturnType<typeof creerTournee>> | undefined = ficheExistante;
+    if (!run) {
+      try {
+        run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
+      } catch (e) {
+        // Double clic : l'index unique « une fiche ouverte par chauffeur et
+        // par jour » (migration 20261019000006, audit M3) refuse la seconde ;
+        // on reprend la fiche créée par la première requête.
+        const doublon = (e as { code?: string })?.code === "23505" || /duplicate key|delivery_runs_driver_open_day_uidx/i.test(e instanceof Error ? e.message : "");
+        if (!doublon) throw e;
+        const { data: concurrente, error: erreurConcurrente } = await supabase
+          .from("delivery_runs")
+          .select(RUN_FIELDS)
+          .eq("organization_id", appUser.organization_id)
+          .eq("driver_id", appUser.id)
+          .eq("run_date", dateDuJour)
+          .neq("status", "done")
+          .limit(1)
+          .maybeSingle();
+        if (erreurConcurrente || !concurrente) throw e;
+        return NextResponse.json({ run: concurrente, reused: true });
+      }
+    }
     runCreee = run;
     const pays = await codePays(appUser.organization_id);
     // Au clic du chauffeur, charger toutes les tournées qui lui sont planifiées
