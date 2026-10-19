@@ -8,7 +8,7 @@ import { TourneeColis } from "@/components/colis/TourneeColis";
 import { TourneesTabs } from "@/components/colis/TourneesTabs";
 import { HistoriqueTournees } from "@/components/colis/HistoriqueTournees";
 import { AffecterTourneeColis } from "@/components/colis/AffecterTourneeColis";
-import { detailTournee, historiqueTournees, lireFiltres } from "@/lib/colis/historique";
+import { detailTournee, historiqueTournees, lireFiltres, lireRecherche, rechercherColis } from "@/lib/colis/historique";
 import { parisDay } from "@/lib/utils/paris-time";
 
 /**
@@ -54,9 +54,11 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
     const aujourdhui = parisDay();
     const filtres = lireFiltres(params, aujourdhui);
     const tournee = typeof params.tournee === "string" ? params.tournee : null;
-    const [historique, detail] = await Promise.all([
+    const recherche = lireRecherche(params);
+    const [historique, detail, resultats] = await Promise.all([
       historiqueTournees(supabase, appUser.id, encadrement, filtres),
       tournee ? detailTournee(supabase, appUser.id, encadrement, tournee) : Promise.resolve(null),
+      rechercherColis(supabase, appUser.id, encadrement, filtres, recherche),
     ]);
     return (
       <div>
@@ -66,7 +68,15 @@ export default async function ColisPage({ searchParams }: { searchParams: Promis
         />
         <TourneesTabs canTrack={encadrement} />
         {onglets}
-        <HistoriqueTournees historique={historique} detail={detail} aujourdhui={aujourdhui} encadrement={encadrement} />
+        <HistoriqueTournees
+          historique={historique}
+          detail={detail}
+          aujourdhui={aujourdhui}
+          encadrement={encadrement}
+          direction={appUser.role === "direction"}
+          recherche={recherche}
+          resultats={resultats}
+        />
       </div>
     );
   }

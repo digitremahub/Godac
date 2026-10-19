@@ -5,6 +5,7 @@ import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
+import { assurerListesVillages, planningEtVillages } from "@/lib/colis/villages-serveur";
 import { aujourdhuiParis, cleAdresse, creerTournee, listerTournees, moduleActif, RUN_FIELDS } from "@/lib/colis/serveur";
 
 /** Tournées colis du chauffeur connecté (jour en cours + non clôturées de la semaine). */
@@ -218,6 +219,16 @@ export async function POST(req: Request) {
           }
         }
       }
+    }
+
+    // Une liste par village de la tournée du jour, y compris les villages
+    // empruntés par un renfort, rattachée à son village (rangement des
+    // adresses par commune ou proximité, lib/colis/villages-serveur.ts).
+    try {
+      const { villages } = await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date);
+      if (villages.length) await assurerListesVillages(supabase, appUser, run.id, villages);
+    } catch (e) {
+      console.warn("[colis/tournees] Listes des villages incomplètes", { runId: run.id, error: e instanceof Error ? e.message : e });
     }
 
     // Retourner la version persistée : le nom et les métadonnées viennent

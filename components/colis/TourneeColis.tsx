@@ -24,6 +24,7 @@ import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
+import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
 import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
@@ -71,6 +72,9 @@ function NomRelaisInput({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
+/** « Ajouter dans » : rangement automatique dans la liste du village (ou « Hors tournée »). */
+const AUTO = "__auto__";
+
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
 /** Suggestions d'adresses et d'entreprises : BAN en France + lieux professionnels OpenStreetMap. */
@@ -148,7 +152,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   const [stops, setStops] = useState<Stop[]>([]);
   const [lists, setLists] = useState<Liste[]>([]);
   /** Liste où vont les colis ajoutés (scan, saisie, import) ; null = liste implicite. */
-  const [cible, setCible] = useState<string | null>(null);
+  const [cible, setCible] = useState<string | null>(AUTO);
   const [renommage, setRenommage] = useState<{ id: string | null; nom: string } | null>(null);
   const [suppression, setSuppression] = useState<{ id: string; vers: string } | null>(null);
   const [scanner, setScanner] = useState(false);
@@ -243,7 +247,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
 
   function choisir(id: string) {
     setActiveId(id);
-    setCible(null);
+    setCible(AUTO);
     setRenommage(null);
     setSuppression(null);
     try {
@@ -312,11 +316,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   async function ajouter(d: Draft) {
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; horairesProfessionnel?: boolean; relais?: boolean; horaires?: boolean }>("/api/colis/arrets", {
+      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null }>("/api/colis/arrets", {
         method: "POST",
         body: JSON.stringify({
           run_id: run?.id,
-          list_id: listeCible,
+          list_id: listeCible === AUTO ? null : listeCible,
           code: d.code,
           adresse: d.adresse,
           destinataire: d.destinataire || null,
@@ -348,15 +352,47 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                         : d.type === "point_relais"
                           ? "Point relais ajouté."
                           : "Colis ajouté.") +
-                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.professionnel ? ` · Professionnel détecté : ${r.professionnel}${r.horairesProfessionnel ? " (horaires importés)" : " (horaires à vérifier)"}.` : "") + sansTel,
+                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? " · Rangé dans « Hors tournée »." : ` · Village : ${r.village.nom}.`) : "") +
+                    (r.professionnel ? ` · Professionnel détecté : ${r.professionnel} (recherche de ses horaires…).` : "") +
+                    sansTel,
                 },
       );
       setDraft(null);
       await recharger(run?.id);
+      // Adresse pro : horaires cherchés sur internet en arrière-plan, sans bloquer le chargement.
+      if (r.stop?.id && !r.grouped && !r.duplicate) void chercherHoraires([r.stop.id]);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
       setBusy(null);
+    }
+  }
+
+  /**
+   * Détection des adresses pro et recherche de leurs horaires (OpenStreetMap,
+   * Google en option), enregistrés dans l'annuaire. Sans `ids` : tous les
+   * arrêts de la tournée jamais examinés (après un import).
+   */
+  async function chercherHoraires(ids?: string[]) {
+    if (!run) return;
+    try {
+      const { resultats } = await api<{ resultats: { stopId: string; nom: string | null; horaires: { source: string; nom: string } | null }[] }>("/api/colis/horaires/recherche", {
+        method: "POST",
+        body: JSON.stringify({ run_id: run.id, ...(ids ? { stop_ids: ids } : {}) }),
+      });
+      const trouves = resultats.filter((x) => x.horaires);
+      if (!trouves.length) return;
+      const source = LIBELLE_SOURCE[trouves[0]!.horaires!.source] ?? trouves[0]!.horaires!.source;
+      setToast({
+        ok: true,
+        text:
+          trouves.length === 1
+            ? `Horaires trouvés (${source}) pour ${trouves[0]!.horaires!.nom} : vérifiez-les avec le bouton « Horaires ».`
+            : `Horaires trouvés pour ${trouves.length} adresses pro : vérifiez-les avec le bouton « Horaires ».`,
+      });
+      await chargerTournee(run.id);
+    } catch {
+      /* recherche facultative : rien à signaler au chauffeur */
     }
   }
 
@@ -664,8 +700,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
     : groupesComplets;
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
-  const listeCible = groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? cible : (groupesComplets[groupesComplets.length - 1]?.liste?.id ?? null);
-  const cibles = groupesComplets.map((g) => ({ id: g.liste?.id ?? null, nom: nomGroupe(g) }));
+  const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
+  const cibles = [{ id: AUTO, nom: "Automatique (village / Hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
   const choixCible = multi && (
     <label className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
@@ -1031,12 +1067,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           </div>
           <ImportTournee
             runId={run.id}
-            cibles={cibles}
-            cibleParDefaut={listeCible}
+            cibles={cibles.map((c) => (c.id === AUTO ? { id: null, nom: c.nom } : c))}
+            cibleParDefaut={listeCible === AUTO ? null : listeCible}
             onImporte={async (texte, ok, listId) => {
               setToast({ ok, text: texte });
               if (listId) setCible(listId);
               await recharger(run.id);
+              void chercherHoraires();
             }}
           />
         </Card>

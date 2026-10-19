@@ -164,14 +164,28 @@ export async function horairesDesAdresses(supabase: SupabaseClient, organization
   const cles = [...new Set(adresses.map(cleAdresse).filter(Boolean))];
   const fiches = new Map<string, FicheHoraires>();
   for (let i = 0; i < cles.length; i += 200) {
-    const { data } = await supabase
+    const lot = cles.slice(i, i + 200);
+    // Origine de la fiche (migration 190) ; repli sans ces colonnes si elle n'est pas appliquée.
+    let { data, error }: { data: unknown[] | null; error: unknown } = await supabase
       .from("delivery_address_hours")
-      .select(HOURS_FIELDS)
+      .select(`${HOURS_FIELDS}, source, found_at`)
       .eq("organization_id", organizationId)
-      .in("address_key", cles.slice(i, i + 200));
+      .in("address_key", lot);
+    if (error) ({ data } = await supabase.from("delivery_address_hours").select(HOURS_FIELDS).eq("organization_id", organizationId).in("address_key", lot));
     for (const f of (data ?? []) as FicheHoraires[]) fiches.set(f.address_key, { ...f, weekly_schedule: normaliserSemaine(f.weekly_schedule) });
   }
   return fiches;
+}
+
+/** Nom du professionnel détecté sur chaque arrêt (migration 190 ; vide si elle n'est pas appliquée). */
+export async function avecProfessionnel<T extends { id: string }>(supabase: SupabaseClient, stops: T[]): Promise<(T & { business_name: string | null })[]> {
+  const noms = new Map<string, string | null>();
+  for (let i = 0; i < stops.length; i += 200) {
+    const { data, error } = await supabase.from("delivery_stops").select("id, business_name").in("id", stops.slice(i, i + 200).map((s) => s.id));
+    if (error) break;
+    for (const s of (data ?? []) as { id: string; business_name: string | null }[]) noms.set(s.id, s.business_name);
+  }
+  return stops.map((s) => ({ ...s, business_name: noms.get(s.id) ?? null }));
 }
 
 /** Arrêts complétés de leur fiche horaires (`horaire`, null si l'adresse n'est pas dans l'annuaire). */

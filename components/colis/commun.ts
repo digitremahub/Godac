@@ -52,6 +52,8 @@ export interface Stop {
   /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */
   window_start?: string | null;
   window_end?: string | null;
+  /** Professionnel détecté à la saisie (nom de l'entreprise ou du commerce) ; absent avant la migration 190. */
+  business_name?: string | null;
   /** Fiche de l'annuaire des adresses pro (horaires d'ouverture), si l'adresse y figure. */
   horaire?: FicheHoraires | null;
 }

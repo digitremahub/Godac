@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { geocodeAddress, reverseGeocode } from "@/lib/geo/geocode";
+import { geocodeAddressDetail, reverseGeocode } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { cleAdresse, listeDeLaTournee, materialiserListePrincipale, moduleActif, tourneeParId, LIST_FIELDS } from "@/lib/colis/serveur";
+import { chargerContexteRangement, listePourAdresse } from "@/lib/colis/villages-serveur";
 
 const pointSchema = z.object({
   adresse: z.string().trim().max(300).nullable(),
@@ -16,14 +17,6 @@ const pointSchema = z.object({
 });
 // Géocodage d'une longue liste hors de France (une adresse par seconde).
 export const maxDuration = 300;
-
-function communeDepuisAdresse(adresse: string): string | null {
-  const parties = adresse.split(",").map((x) => x.trim()).filter(Boolean).filter((x) => !/^(france|fr)$/i.test(x));
-  const codePostal = [...parties].reverse().find((x) => /^\d{5}\s+/.test(x));
-  if (codePostal) return codePostal.replace(/^\d{5}\s+/, "").trim().slice(0, 60) || null;
-  const derniere = parties[parties.length - 1];
-  return parties.length >= 2 && derniere && !/^\d/.test(derniere) ? derniere.slice(0, 60) : null;
-}
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -71,13 +64,17 @@ export async function POST(req: Request) {
     // Nominatim : une requête par seconde au plus (conditions d'utilisation d'OpenStreetMap).
     if (pays !== "FR") await new Promise((r) => setTimeout(r, 1000));
     let { adresse, lat, lng } = p;
+    let commune: string | null = null;
+    let codePostal: string | null = null;
     if ((lat === null || lng === null) && adresse) {
-      const geo = await geocodeAddress(adresse, pays);
+      const geo = await geocodeAddressDetail(adresse, pays);
       lat = geo?.lat ?? null;
       lng = geo?.lng ?? null;
+      commune = geo?.city ?? null;
+      codePostal = geo?.postcode ?? null;
     }
     if (!adresse && lat !== null && lng !== null) adresse = (await reverseGeocode(lat, lng, pays)) ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    return adresse && adresse.length >= 3 ? { adresse, lat, lng, nom: p.nom, telephone: normaliserTelephone(p.telephone, pays) } : null;
+    return adresse && adresse.length >= 3 ? { adresse, lat, lng, commune, codePostal, nom: p.nom, telephone: normaliserTelephone(p.telephone, pays) } : null;
   });
 
   // Import dans une nouvelle liste : la liste implicite devient d'abord une
@@ -97,24 +94,19 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: existantesListes } = await supabase.from("delivery_lists").select("id, name, position").eq("run_id", run.id).order("position");
-  const listeParVillage = new Map<string, string>();
-  let prochainePositionListe = (existantesListes ?? []).reduce((max, l) => Math.max(max, l.position), -1) + 1;
-  for (const p of complets) {
-    if (!p?.adresse) continue;
-    const village = communeDepuisAdresse(p.adresse);
-    if (!village) continue;
-    const cleVillage = village.toLocaleLowerCase("fr-FR");
-    if (listeParVillage.has(cleVillage)) continue;
-    const deja = (existantesListes ?? []).find((l) => l.name.trim().toLocaleLowerCase("fr-FR") === cleVillage);
-    if (deja) { listeParVillage.set(cleVillage, deja.id); continue; }
-    const { data: creee, error } = await supabase.from("delivery_lists").insert({
-      organization_id: appUser.organization_id,
-      run_id: run.id,
-      name: village,
-      position: prochainePositionListe,
-    }).select("id").single();
-    if (!error && creee) { listeParVillage.set(cleVillage, creee.id); prochainePositionListe += 1; }
+  // Liste choisie (ou nouvelle liste nommée) : tout l'import y va. Sinon,
+  // rangement automatique : village de la tournée par commune ou proximité,
+  // « Hors tournée » pour le reste (tournée sans villages : liste de la commune).
+  const listeChoisie = listId;
+  const contexte = listeChoisie ? null : await chargerContexteRangement(supabase, run.id);
+  const listeDe = new Map<number, string | null>();
+  for (const [k, p] of complets.entries()) {
+    if (!p) continue;
+    if (listeChoisie || !contexte) listeDe.set(k, listeChoisie);
+    else {
+      const r = await listePourAdresse(supabase, appUser, run.id, { texte: p.adresse, commune: p.commune, codePostal: p.codePostal, point: p.lat !== null && p.lng !== null ? { lat: p.lat, lng: p.lng } : null }, contexte);
+      listeDe.set(k, r.listId);
+    }
   }
 
   const { data: existants } = await supabase.from("delivery_stops").select("id, list_id, address, parcel_count, phone, status, position").eq("run_id", run.id);
@@ -125,14 +117,12 @@ export async function POST(req: Request) {
   let regroupes = 0;
   let ignores = 0;
 
-  for (const p of complets) {
+  for (const [k, p] of complets.entries()) {
     if (!p) {
       ignores++;
       continue;
     }
-    const village = communeDepuisAdresse(p.adresse);
-    const idVillage = village ? listeParVillage.get(village.toLocaleLowerCase("fr-FR")) : undefined;
-    const listePoint = idVillage ?? listId;
+    const listePoint = listeDe.get(k) ?? null;
     const cle = `${listePoint ?? ""}|${cleAdresse(p.adresse)}`;
     const existant = parCle.get(cle);
     const nouveau = nouveaux.get(cle);
@@ -166,5 +156,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
   const sansGps = [...nouveaux.values()].filter((s) => s.lat === null).length;
+  // Nouvelles adresses avant le départ : l'ordre est à recalculer (fait au lancement).
+  if (nouveaux.size && run.status === "loading" && run.optimized_at) await supabase.from("delivery_runs").update({ optimized_at: null }).eq("id", run.id);
   return NextResponse.json({ ajoutes: nouveaux.size, regroupes, ignores, sansGps, list_id: listId });
 }

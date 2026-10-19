@@ -49,23 +49,21 @@ export async function PUT(req: Request) {
   if (!Object.keys(semaine).length) return NextResponse.json({ error: "Indiquez les horaires d'au moins un jour." }, { status: 400 });
   const cle = cleAdresse(adresse);
   if (!cle) return NextResponse.json({ error: "Adresse invalide." }, { status: 400 });
-  const { data, error } = await ctx.supabase
-    .from("delivery_address_hours")
-    .upsert(
-      {
-        organization_id: ctx.appUser.organization_id,
-        address_key: cle,
-        address: adresse,
-        label: nom || null,
-        weekly_schedule: semaine,
-        notes: notes || null,
-        updated_by: ctx.appUser.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "organization_id,address_key" },
-    )
-    .select(HOURS_FIELDS)
-    .single();
+  const fiche = {
+    organization_id: ctx.appUser.organization_id,
+    address_key: cle,
+    address: adresse,
+    label: nom || null,
+    weekly_schedule: semaine,
+    notes: notes || null,
+    updated_by: ctx.appUser.id,
+    updated_at: new Date().toISOString(),
+  };
+  // Saisie ou correction par une personne : la fiche devient « manuelle » (jamais
+  // écrasée par une recherche automatique). Sans la migration 190 : sans la colonne.
+  let { data, error } = await ctx.supabase.from("delivery_address_hours").upsert({ ...fiche, source: "manuel" }, { onConflict: "organization_id,address_key" }).select(HOURS_FIELDS).single();
+  if (error && /source/.test(error.message)) ({ data, error } = await ctx.supabase.from("delivery_address_hours").upsert(fiche, { onConflict: "organization_id,address_key" }).select(HOURS_FIELDS).single());
+  if (!data) return NextResponse.json({ error: error?.message ?? "Enregistrement impossible." }, { status: 500 });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ fiche: { ...data, weekly_schedule: normaliserSemaine(data.weekly_schedule) } });
 }

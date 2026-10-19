@@ -5,7 +5,7 @@
  * « Liste principale », toujours en tête : une tournée sans liste se
  * comporte exactement comme avant.
  */
-import { distanceEstimee, distanceKm, longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { FACTEUR_ROUTIER, distanceEstimee, longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
 import { minutesTrajet } from "@/lib/colis/estimation";
 import { ordonnerAvecHoraires, simulerPassages, type Fenetres, type Passage } from "@/lib/colis/horaires";
 
@@ -117,6 +117,8 @@ export function sequenceParListes(
   depart: Point | null,
   retour: boolean,
   horaires?: OptionsHoraires,
+  /** Distance à utiliser sans horaires (matrice routière) ; avec horaires, `horaires.distance`. */
+  distanceSansHoraires?: (a: Point, b: Point) => number,
 ): ResultatSequence {
   const pt = (s: ArretOptimisable): Point | null => (s.lat === null || s.lng === null ? null : { lat: Number(s.lat), lng: Number(s.lng) });
   const faits = [...arrets].filter((s) => s.status !== "pending").sort((a, b) => a.position - b.position);
@@ -134,7 +136,12 @@ export function sequenceParListes(
   const impossibles: string[] = [];
   let courant = depart;
   let heure = horaires?.debut ?? 0;
-  const distance = horaires?.distance ?? distanceEstimee;
+  const distance = horaires?.distance ?? distanceSansHoraires ?? distanceEstimee;
+  // `distance` donne des km routiers (réels ou estimés) ; minutesTrajet()
+  // applique lui-même le facteur routier à une distance à vol d'oiseau : on
+  // lui passe donc l'équivalent « vol d'oiseau » pour ne pas compter ce
+  // facteur deux fois (régression : heures de passage gonflées de 30 %).
+  const distanceTemps = (a: Point, b: Point) => distance(a, b) / FACTEUR_ROUTIER;
   groupes.forEach((g, i) => {
     const pts = g.avecGps.map((s) => pt(s)!);
     avant.push(...pts);
@@ -147,7 +154,7 @@ export function sequenceParListes(
       const r = ordonnerAvecHoraires(
         courant,
         pts.map((p, k) => ({ point: p, fenetres: fen[k]! })),
-        { debut: heure, retour: boucle ? fin : false, arrivee: boucle ? null : fin ? depart : null, minutesParArret: horaires.minutesParArret, distance },
+        { debut: heure, retour: boucle ? fin : false, arrivee: boucle ? null : fin ? depart : null, minutesParArret: horaires.minutesParArret, distance: distanceTemps },
       );
       ordre = r.ordre;
       fermes.push(...r.fermes.map((k) => g.avecGps[k]!.id));
@@ -156,7 +163,7 @@ export function sequenceParListes(
         { point: courant, minute: heure },
         ordre.map((k) => ({ point: pts[k]!, fenetres: fen[k]! })),
         horaires.minutesParArret,
-        { distance },
+        { distance: distanceTemps },
       );
       ordre.forEach((k, j) => (passages[g.avecGps[k]!.id] = sim.passages[j]!));
       heure = sim.fin;
@@ -169,8 +176,6 @@ export function sequenceParListes(
     }
     if (ordre.length) courant = pts[ordre[ordre.length - 1]!]!;
     sequence.push(...g.sansGps.map((s) => s.id));
-    // Même sans coordonnées, une remise prend en moyenne 3 minutes.
-    if (horaires) heure += g.sansGps.length * (horaires.minutesParArret ?? 3);
   });
 
   const signales = new Set([...fermes, ...impossibles]);
@@ -185,7 +190,7 @@ export function sequenceParListes(
       .map(([id]) => id),
     fermes,
     impossibles,
-    fin: horaires ? heure + (retour && depart && courant && courant !== depart ? minutesTrajet(distance(courant, depart)) : 0) : null,
+    fin: horaires ? heure + (retour && depart && courant && courant !== depart ? minutesTrajet(distanceTemps(courant, depart)) : 0) : null,
   };
 }
 

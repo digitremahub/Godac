@@ -14,6 +14,7 @@ export const ACTIONS_AUDIT = {
   acces_chauffeurs_reinitialises: "Accès chauffeurs réinitialisés (tous)",
   pin_bloque: "Code PIN bloqué (trop d'essais)",
   utilisateur_desactive: "Compte désactivé / réactivé",
+  tournee_colis_supprimee: "Tournée colis supprimée",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 
