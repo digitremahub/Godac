@@ -3,8 +3,12 @@
  * IndexedDB (pas localStorage) permet de conserver les mutations et les photos
  * encodées même si l'onglet est fermé ou le téléphone redémarre.
  */
+import { decisionApresEchec, rejouablePar } from "@/lib/offline/rejeu";
+
 export type OfflineMutation = {
   id: string;
+  /** Compte qui a enregistré l'action : jamais rejouée sous un autre compte (tablette partagée). */
+  userId?: string | null;
   url: string;
   method: string;
   body: string | null;
@@ -34,7 +38,18 @@ function dbOpen(): Promise<IDBDatabase> {
 function signal() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CHANGE_EVENT));
 }
-export type OfflineFile = { id: string; blob: Blob; name: string; type: string; createdAt: string; initUrl: string; processUrl: string; bucket: string };
+/** Compte connecté sur cet appareil (session locale, sans appel réseau). */
+async function utilisateurCourant(): Promise<string | null> {
+  try {
+    const { createBrowserSupabaseClient } = await import("@/lib/supabase/client");
+    const { data } = await createBrowserSupabaseClient().auth.getSession();
+    return data.session?.user.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export type OfflineFile = { id: string; userId?: string | null; blob: Blob; name: string; type: string; createdAt: string; initUrl: string; processUrl: string; bucket: string };
 
 export async function listOfflineFiles(): Promise<OfflineFile[]> {
   const db = await dbOpen();
@@ -46,10 +61,11 @@ export async function listOfflineFiles(): Promise<OfflineFile[]> {
 }
 export async function enqueueOfflineFile(file: File, options?: { initUrl?: string; processUrl?: string; bucket?: string }): Promise<string> {
   const id = crypto.randomUUID();
+  const userId = await utilisateurCourant();
   const db = await dbOpen();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(FILE_STORE, "readwrite");
-    tx.objectStore(FILE_STORE).add({ id, blob: file, name: file.name, type: file.type || "application/octet-stream", createdAt: new Date().toISOString(), initUrl: options?.initUrl ?? "/api/ocr/tour-report/init", processUrl: options?.processUrl ?? "/api/ocr/tour-report/process", bucket: options?.bucket ?? "tour-photos" } satisfies OfflineFile);
+    tx.objectStore(FILE_STORE).add({ id, userId, blob: file, name: file.name, type: file.type || "application/octet-stream", createdAt: new Date().toISOString(), initUrl: options?.initUrl ?? "/api/ocr/tour-report/init", processUrl: options?.processUrl ?? "/api/ocr/tour-report/process", bucket: options?.bucket ?? "tour-photos" } satisfies OfflineFile);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -77,6 +93,7 @@ async function removeOfflineFile(id: string) {
 async function uploadOfflineFile(id: string): Promise<string> {
   const item = await getOfflineFile(id);
   if (!item) throw new Error("Le fichier local lié à ce document est introuvable.");
+  if (item.userId && item.userId !== (await utilisateurCourant())) throw new Error("Ce document a été enregistré sous un autre compte.");
   const init = await fetch(item.initUrl, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: item.type }) });
   const initJson = await init.json().catch(() => ({})) as { storagePath?: string; error?: string };
   if (!init.ok || !initJson.storagePath) throw new Error(initJson.error ?? "Impossible de préparer l'envoi du document.");
@@ -85,18 +102,37 @@ async function uploadOfflineFile(id: string): Promise<string> {
   const file = new File([item.blob], item.name, { type: item.type });
   const uploaded = await supabase.storage.from(item.bucket).upload(initJson.storagePath, file, { contentType: item.type });
   if (uploaded.error) throw new Error(uploaded.error.message);
-  await fetch(item.processUrl, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storagePath: initJson.storagePath }) }).catch(() => undefined);
+  // Lecture OCR du document : best effort, le document est déjà envoyé.
+  const lecture = await fetch(item.processUrl, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storagePath: initJson.storagePath }) }).catch(() => null);
+  if (!lecture?.ok) console.warn("Lecture automatique du document hors ligne indisponible", lecture?.status ?? "réseau");
   await removeOfflineFile(id);
   return initJson.storagePath;
 }
 
-export async function listOfflineMutations(): Promise<OfflineMutation[]> {
+async function toutesLesMutations(): Promise<OfflineMutation[]> {
   const db = await dbOpen();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
     request.onsuccess = () => resolve((request.result as OfflineMutation[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
     request.onerror = () => reject(request.error);
   });
+}
+/** Actions en attente du compte connecté. */
+export async function listOfflineMutations(): Promise<OfflineMutation[]> {
+  const [items, userId] = await Promise.all([toutesLesMutations(), utilisateurCourant()]);
+  return items.filter((item) => rejouablePar(item.userId, userId));
+}
+/** Vide la file (actions et documents) : appelé à la déconnexion. */
+export async function clearOfflineQueue(): Promise<void> {
+  const db = await dbOpen();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([STORE, FILE_STORE], "readwrite");
+    tx.objectStore(STORE).clear();
+    tx.objectStore(FILE_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  signal();
 }
 export async function enqueueOfflineMutation(url: string, init: RequestInit): Promise<OfflineMutation> {
   const method = (init.method ?? "POST").toUpperCase();
@@ -110,6 +146,7 @@ export async function enqueueOfflineMutation(url: string, init: RequestInit): Pr
     headers: init.headers ? Object.fromEntries(new Headers(init.headers).entries()) : {},
     createdAt: new Date().toISOString(),
     attempts: 0,
+    userId: await utilisateurCourant(),
   };
   const db = await dbOpen();
   await new Promise<void>((resolve, reject) => {
@@ -124,8 +161,15 @@ export async function enqueueOfflineMutation(url: string, init: RequestInit): Pr
 export async function flushOfflineMutations(): Promise<{ synced: number; pending: number; error?: string }> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: 0, pending: (await listOfflineMutations()).length };
   let synced = 0;
+  const abandons: string[] = [];
+  // Seules les actions du compte connecté sont rejouées : celles d'un autre
+  // compte (tablette partagée) attendent leur titulaire, sans jamais partir
+  // avec la session d'un collègue.
   const items = await listOfflineMutations();
   for (const item of items) {
+    const essais = item.attempts + 1;
+    let status: number | null = null;
+    let reason = "Connexion interrompue : nouvel essai automatique.";
     try {
       let body = item.body;
       if (body && body.includes("offline://")) {
@@ -144,23 +188,36 @@ export async function flushOfflineMutations(): Promise<{ synced: number; pending
         headers: { ...(item.headers ?? {}), ...(body ? { "Content-Type": "application/json" } : {}), "X-GODAC-Offline-Action": item.id },
         body: body ?? undefined,
       });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({})) as { error?: unknown };
-        const reason = typeof data.error === "string" ? data.error : `Réponse serveur ${response.status}`;
-        await updateOfflineMutation(item.id, { attempts: item.attempts + 1, lastError: reason });
-        signal();
-        return { synced, pending: items.length - synced, error: reason };
+      if (response.ok) {
+        await removeOfflineMutation(item.id);
+        synced++;
+        continue;
       }
-      await removeOfflineMutation(item.id);
-      synced++;
-    } catch {
-      await updateOfflineMutation(item.id, { attempts: item.attempts + 1, lastError: "Connexion interrompue : nouvel essai automatique." });
-      signal();
-      return { synced, pending: items.length - synced, error: "Connexion interrompue." };
+      status = response.status;
+      const data = await response.json().catch(() => ({})) as { error?: unknown };
+      reason = typeof data.error === "string" ? data.error : `Réponse serveur ${response.status}`;
+    } catch (e) {
+      if (e instanceof Error && !isNetworkFailure(e)) reason = e.message;
     }
+
+    if (decisionApresEchec(status, essais) === "abandonner") {
+      // Refus définitif (4xx) ou trop d'essais : l'action est retirée de la
+      // file et signalée, au lieu d'être retentée sans fin.
+      await removeOfflineMutation(item.id);
+      abandons.push(reason);
+      continue;
+    }
+    await updateOfflineMutation(item.id, { attempts: essais, lastError: reason });
+    signal();
+    const pending = (await listOfflineMutations()).length;
+    return { synced, pending, error: abandons.length ? `${abandons.length} action(s) abandonnée(s) : ${abandons.join(" ; ")}. ${reason}` : reason };
   }
   signal();
-  return { synced, pending: (await listOfflineMutations()).length };
+  return {
+    synced,
+    pending: (await listOfflineMutations()).length,
+    ...(abandons.length ? { error: `${abandons.length} action(s) hors ligne abandonnée(s) : ${abandons.join(" ; ")}` } : {}),
+  };
 }
 async function updateOfflineMutation(id: string, patch: Partial<OfflineMutation>) {
   const db = await dbOpen();
