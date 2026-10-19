@@ -21,11 +21,14 @@ const config: Config = {
         teal: "#1BE4C1",
         orange: "#FF6B35",
         gold: "#F5C842",
+        // Points relais (tournée colis) : violet, distinct de l'or des ramasses.
+        relais: "#A78BFA",
         // Readable text variants of the three accents: deep on light
         // backgrounds, bright on dark ones (fills keep the brand hues).
         "teal-ink": "rgb(var(--c-teal-ink) / <alpha-value>)",
         "orange-ink": "rgb(var(--c-orange-ink) / <alpha-value>)",
         "gold-ink": "rgb(var(--c-gold-ink) / <alpha-value>)",
+        "relais-ink": "rgb(var(--c-relais-ink) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-heading)", "sans-serif"],

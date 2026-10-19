@@ -10,6 +10,7 @@
   --c-teal-ink: 15 118 110;
   --c-orange-ink: 194 65 12;
   --c-gold-ink: 146 102 10;
+  --c-relais-ink: 109 40 217;
   --color-paper: rgb(var(--c-paper));
   color-scheme: light;
 }
@@ -24,6 +25,7 @@
     --c-teal-ink: 46 230 198;
     --c-orange-ink: 255 140 96;
     --c-gold-ink: 245 200 66;
+    --c-relais-ink: 196 181 253;
     color-scheme: dark;
   }
 }
@@ -34,6 +36,7 @@
   --c-teal-ink: 46 230 198;
   --c-orange-ink: 255 140 96;
   --c-gold-ink: 245 200 66;
+  --c-relais-ink: 196 181 253;
   color-scheme: dark;
 }
 

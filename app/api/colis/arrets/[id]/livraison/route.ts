@@ -21,6 +21,8 @@ const bodySchema = z.object({
   relais: z.string().max(NOM_RELAIS_MAX * 2).nullable().optional(),
   /** Arrêt point relais : retours repris au relais (packages_picked_up). */
   retours: z.number().int().min(0).max(RETOURS_MAX).nullable().optional(),
+  /** Arrêt point relais : colis effectivement déposés (packages_delivered). */
+  deposes: z.number().int().min(0).max(RETOURS_MAX).nullable().optional(),
   message_laisse: z.boolean().optional(),
   reserve: z.string().trim().max(500).nullable().optional(),
 });
@@ -104,6 +106,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ...(relaisObligatoire(lieu) ? { relay_name: relais } : pointRelais ? {} : { relay_name: null }),
       // Arrêt point relais : retours repris (colis récupérés au relais).
       ...(pointRelais && typeof parsed.data.retours === "number" ? { packages_picked_up: parsed.data.retours } : {}),
+      ...(pointRelais && typeof parsed.data.deposes === "number" ? { packages_delivered: parsed.data.deposes } : {}),
       failure_reason: null,
       ...(notesAjoutees.length ? { notes: [stop.notes, ...notesAjoutees].filter(Boolean).join(" · ").slice(0, 500) } : {}),
     })

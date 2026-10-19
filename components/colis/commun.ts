@@ -41,6 +41,8 @@ export interface Stop {
   kind?: "livraison" | "ramasse" | "point_relais" | null;
   /** Livraison avec QR code : valeur scannée (preuve de remise). */
   proof_code?: string | null;
+  /** Point relais : nom du relais (arrêt point relais, ou livraison remise au relais). */
+  relay_name?: string | null;
   /** Poids des colis de l'arrêt en kg (null : inconnu) ; absent avant la migration 171. */
   weight_kg?: number | string | null;
   /** Échec : motif choisi par le chauffeur (lib/colis/cloture.ts). */
