@@ -10,6 +10,7 @@
 // Les prix écrits viennent toujours de la grille (module_plan_prices) :
 // jamais du client.
 
+import { estModuleVendable } from "@/lib/acces/catalogue";
 import { priceFor, type ModuleCatalogEntry, type ModulePlanPrice, type PlanId } from "@/lib/organization/catalog-types";
 
 export interface EtatFacturation {
@@ -46,7 +47,7 @@ export function calculerLignesModules(params: {
 }): LigneModule[] {
   const { organizationId, planId, modules, prices, selection, disponible } = params;
   return modules
-    .filter((m) => m.wave !== "v3")
+    .filter(estModuleVendable)
     .map((m) => {
       const price = priceFor(prices, m.key, planId);
       const included = price?.included ?? false;

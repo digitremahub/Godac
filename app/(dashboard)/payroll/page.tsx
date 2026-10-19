@@ -1,3 +1,4 @@
+import { EtatAcces } from "@/components/acces/EtatAcces";
 import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -79,10 +80,7 @@ export default async function PayrollPage({
       <div>
         <PageHeader title={paie ? "Paie & salaires" : "Salaires"} />
         <OngletsPaie actif="salaires" paie={paie} planning={planningEnabled} />
-        <EmptyState
-          title="Module Pointeuse non activé"
-          description="Le calcul des salaires dépend des heures badgées (module Pointeuse électronique) — activez-le depuis les paramètres de votre organisation."
-        />
+        <EtatAcces motif="module" ecran="Heures & salaires" modules={["time_clock"]} direction={appUser.role === "direction"} />
       </div>
     );
   }
