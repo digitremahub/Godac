@@ -76,7 +76,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: modulesError.message }, { status: 500 });
   }
   // App Livreur : prix selon le palier d'utilisateurs de l'entreprise.
-  await synchroniserPaliers(admin, appUser.organization_id);
+  // Un échec laisse le prix de la grille ; la tâche nocturne réessaiera.
+  await synchroniserPaliers(admin, appUser.organization_id).catch((e) => console.error("synchroniserPaliers", e));
 
   return NextResponse.json({ ok: true });
 }
