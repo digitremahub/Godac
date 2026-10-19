@@ -2,7 +2,8 @@ import Link from "next/link";
 import HistoriqueCarte from "@/components/colis/HistoriqueCarte";
 import { Card, EmptyState } from "@/components/ui";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
-import { versParams, type Historique, type detailTournee } from "@/lib/colis/historique";
+import { versParams, type Historique, type detailTournee, type LigneColis, type RechercheColis, type rechercherColis } from "@/lib/colis/historique";
+import { SupprimerTourneeDirection } from "@/components/colis/SupprimerTourneeDirection";
 import { estMarque, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
 import { BadgeArret, EncocheArret } from "@/components/colis/Ramasse";
 import { formatPoids } from "@/lib/colis/poids";
@@ -23,14 +24,22 @@ export function HistoriqueTournees({
   detail,
   aujourdhui,
   encadrement,
+  direction = false,
+  recherche = { q: null, statut: null },
+  resultats = null,
 }: {
   historique: Historique;
   detail: Awaited<ReturnType<typeof detailTournee>>;
   aujourdhui: string;
   encadrement: boolean;
+  /** Direction : peut supprimer une tournée (même clôturée), avec audit. */
+  direction?: boolean;
+  recherche?: RechercheColis;
+  resultats?: Awaited<ReturnType<typeof rechercherColis>>;
 }) {
   const { filtres, lignes, page, pages, total } = historique;
-  const lien = (extra: Record<string, string | null>, p = page) => `/colis?${versParams({ ...filtres, page: p }, aujourdhui, extra).toString()}`;
+  const garde = { q: recherche.q, statut: recherche.statut };
+  const lien = (extra: Record<string, string | null>, p = page) => `/colis?${versParams({ ...filtres, page: p }, aujourdhui, { ...garde, ...extra }).toString()}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -39,7 +48,9 @@ export function HistoriqueTournees({
 
       {historique.erreur && <Card className="text-orange-ink">{historique.erreur}</Card>}
 
-      {detail && <DetailTournee detail={detail} fermer={lien({})} />}
+      {resultats && <ResultatsColis resultats={resultats} lienTournee={(id) => lien({ tournee: id })} encadrement={encadrement} />}
+
+      {detail && <DetailTournee detail={detail} fermer={lien({})} direction={direction} />}
 
       {lignes.length === 0 ? (
         <EmptyState title="Aucune tournée sur cette période" description="Élargissez la période ou retirez un filtre." />
@@ -123,7 +134,7 @@ export function HistoriqueTournees({
   );
 }
 
-function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnType<typeof detailTournee>>>; fermer: string }) {
+function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awaited<ReturnType<typeof detailTournee>>>; fermer: string; direction: boolean }) {
   const { run, arrets, chauffeur, listes } = detail;
   const plusieursListes = listes > 1;
   return (
@@ -141,6 +152,7 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
           <Link href={fermer} className="btn-secondary !py-1.5 text-sm" scroll={false}>
             Fermer
           </Link>
+          {direction && <SupprimerTourneeDirection runId={run.id} nom={run.name ?? "Tournée"} cloturee={run.status === "done"} retour={fermer} />}
         </div>
       </div>
       {arrets.length > 0 && <HistoriqueCarte stops={arrets.map((s) => ({ id: s.id, address: s.address, status: s.status, lat: s.lat, lng: s.lng, done_at: s.done_at }))} depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null} />}
@@ -189,6 +201,87 @@ function DetailTournee({ detail, fermer }: { detail: NonNullable<Awaited<ReturnT
             </li>
           ))}
         </ol>
+      )}
+    </Card>
+  );
+}
+
+const STATUT_ARRET: Record<string, string> = { delivered: "Livré", failed: "Échec", pending: "Non fait" };
+
+/** Résultats de la recherche d'un colis (code, destinataire, adresse) sur la période. */
+function ResultatsColis({
+  resultats,
+  lienTournee,
+  encadrement,
+}: {
+  resultats: NonNullable<Awaited<ReturnType<typeof rechercherColis>>>;
+  lienTournee: (runId: string) => string;
+  encadrement: boolean;
+}) {
+  const { lignes, tronque, erreur } = resultats;
+  return (
+    <Card className="flex flex-col gap-2 !p-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4">
+        <h2 className="text-lg">Colis trouvés</h2>
+        <p className="text-xs text-navy/60">
+          {lignes.length} arrêt{lignes.length > 1 ? "s" : ""}
+          {tronque && " (200 premiers : précisez la recherche)"}
+        </p>
+      </div>
+      {erreur && <p className="px-4 text-sm text-orange-ink">{erreur}</p>}
+      {lignes.length === 0 ? (
+        <p className="px-4 pb-4 text-sm text-navy/60">Aucun colis ne correspond sur cette période.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="text-left text-xs text-navy/60">
+              <tr>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Heure</th>
+                {encadrement && <th className="px-3 py-2">Chauffeur</th>}
+                <th className="px-3 py-2">Colis</th>
+                <th className="px-3 py-2">Destinataire · adresse</th>
+                <th className="px-3 py-2">Statut</th>
+                <th className="px-3 py-2">Mode et preuve</th>
+                <th className="px-3 py-2">Tournée</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((s: LigneColis) => (
+                <tr key={s.id} className="border-t border-navy/5 align-top">
+                  <td className="whitespace-nowrap px-3 py-2">{s.run_date ? date(s.run_date) : "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">{heure(s.done_at)}</td>
+                  {encadrement && <td className="px-3 py-2">{s.chauffeur}</td>}
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {s.parcel_code ?? "—"}
+                    {s.parcel_count > 1 && <span className="block font-sans text-navy/60">{s.parcel_count} colis</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {s.recipient && <span className="block font-semibold">{s.recipient}</span>}
+                    <span className="text-navy/70">{s.address}</span>
+                  </td>
+                  <td className={`whitespace-nowrap px-3 py-2 ${s.status === "failed" ? "text-orange-ink" : ""}`}>
+                    {s.kind && s.kind !== "livraison" ? libelleStatut(s) : STATUT_ARRET[s.status]}
+                    {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs">{libelleMotif(s.failure_reason)}</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {s.status === "delivered" ? (libellePreuve(s) ?? "—") : "—"}
+                    {s.proof_photo_path && (
+                      <a href={`/api/colis/arrets/${s.id}/livraison`} target="_blank" rel="noreferrer" className="ml-2 text-xs font-semibold text-teal-ink hover:underline">
+                        📷 Photo
+                      </a>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Link href={lienTournee(s.run_id)} className="font-semibold text-teal-ink hover:underline" scroll={false}>
+                      {s.tournee ?? "Tournée"}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </Card>
   );

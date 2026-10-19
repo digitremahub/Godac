@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface Option {
@@ -66,10 +67,38 @@ export function HistoriqueFiltres({
     </select>
   );
 
-  const filtre = ["du", "au", "service", "chauffeur", "camion"].some((k) => searchParams.get(k)) || Boolean(searchParams.get("page"));
+  const filtre = ["du", "au", "service", "chauffeur", "camion", "q", "statut"].some((k) => searchParams.get(k)) || Boolean(searchParams.get("page"));
+  const [texte, setTexte] = useState(searchParams.get("q") ?? "");
+  useEffect(() => setTexte(searchParams.get("q") ?? ""), [searchParams]);
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
+      <form
+        className="flex w-full flex-wrap items-center gap-2"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          changer("q", texte.trim());
+        }}
+      >
+        <input
+          type="search"
+          className="input min-w-0 flex-1"
+          value={texte}
+          onChange={(e) => setTexte(e.target.value)}
+          placeholder="Rechercher un colis : code, destinataire ou adresse (3 caractères min.)"
+          aria-label="Rechercher un colis par code, destinataire ou adresse"
+        />
+        <select aria-label="Filtrer par statut de livraison" className="input !w-auto" value={searchParams.get("statut") ?? ""} onChange={(e) => changer("statut", e.target.value)}>
+          <option value="">Tous les statuts</option>
+          <option value="delivered">Livrés</option>
+          <option value="failed">Échecs</option>
+          <option value="pending">Non faits</option>
+        </select>
+        <button type="submit" className="btn-secondary !py-2 text-sm">
+          Rechercher
+        </button>
+      </form>
       <label className="flex items-center gap-1.5 text-sm text-navy/70">
         Du
         <input type="date" aria-label="Du" className="input !w-auto" value={du} max={au} onChange={(e) => changer("du", e.target.value)} />
