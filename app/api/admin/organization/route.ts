@@ -5,6 +5,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PAYS, type CodePays } from "@/lib/pays/pays";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getModulePlanPrices, priceFor, type PlanId } from "@/lib/organization/catalog";
+import { estEnEssai } from "@/lib/organization/facturation-modules";
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -29,9 +32,12 @@ const bodySchema = z.object({
   country: z.enum(PAYS.map((p) => p.code) as [CodePays, ...CodePays[]]).optional(),
 });
 
-/** Module 9: org profile settings — RLS restricts this to `direction` regardless of what's sent here. */
+/** Module 9: org profile settings — réservé à la direction (RLS + contrôle explicite, audit F2). */
 export async function PATCH(req: Request) {
   const appUser = await requireAppUser();
+  if (appUser.role !== "direction") {
+    return NextResponse.json({ error: "Seule la direction peut modifier l'organisation." }, { status: 403 });
+  }
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -81,16 +87,50 @@ export async function PATCH(req: Request) {
   if (country !== undefined) profileFields.country = country;
 
   if (Object.keys(profileFields).length > 0) {
-    const { error } = await supabase.from("organizations").update(profileFields).eq("id", appUser.organization_id);
+    const { data: modifiees, error } = await supabase
+      .from("organizations")
+      .update(profileFields)
+      .eq("id", appUser.organization_id)
+      .select("id");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!modifiees || modifiees.length === 0) {
+      return NextResponse.json({ error: "Modification refusée." }, { status: 403 });
+    }
   }
 
   if (ocr_enabled !== undefined) {
-    const { error } = await supabase.from("organization_modules").upsert(
+    // Module OCR : prix et mode de facturation tirés de la grille, jamais
+    // du client ; écriture par le client admin (audit C4).
+    const admin = createAdminSupabaseClient();
+    const { data: org, error: orgError } = await admin
+      .from("organizations")
+      .select("plan, subscription_status, stripe_subscription_id")
+      .eq("id", appUser.organization_id)
+      .single();
+    if (orgError || !org) return NextResponse.json({ error: "Organisation introuvable" }, { status: 409 });
+    const prix = priceFor(await getModulePlanPrices(admin), "ocr", org.plan as PlanId);
+    const included = prix?.included ?? false;
+    const mensuel = ocr_enabled ? Number(prix?.monthly_price ?? 0) : 0;
+    const miseEnService = ocr_enabled && !included ? Number(prix?.setup_price ?? 0) : 0;
+    if (ocr_enabled && !included && (mensuel > 0 || miseEnService > 0) && !estEnEssai(org)) {
+      const { data: actuel } = await admin
+        .from("organization_modules")
+        .select("enabled")
+        .eq("organization_id", appUser.organization_id)
+        .eq("module_key", "ocr")
+        .maybeSingle();
+      if (!actuel?.enabled) {
+        return NextResponse.json({ error: "Module payant à ajouter à votre abonnement : contactez GODAC." }, { status: 402 });
+      }
+    }
+    const { error } = await admin.from("organization_modules").upsert(
       {
         organization_id: appUser.organization_id,
         module_key: "ocr",
         enabled: ocr_enabled,
+        pricing_mode: included ? "included" : "a_la_carte",
+        effective_monthly_price: mensuel,
+        effective_setup_price: miseEnService,
       },
       { onConflict: "organization_id,module_key" },
     );

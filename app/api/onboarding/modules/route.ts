@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleDisponible } from "@/lib/pays/pays";
-import { paysOrganisation } from "@/lib/pays/serveur";
-import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
+import { getFullCatalog, type PlanId } from "@/lib/organization/catalog";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { synchroniserPaliers } from "@/lib/organization/paliers-serveur";
+import { calculerLignesModules, estEnEssai } from "@/lib/organization/facturation-modules";
 
 const bodySchema = z.object({
   planId: z.enum(["essentiel", "starter", "pro", "business"]),
@@ -19,9 +18,17 @@ const bodySchema = z.object({
  * generic organization_modules switchboard (see migration
  * 20260101000015_module_catalog.sql). V3 modules aren't sellable yet
  * and are silently ignored even if sent.
+ *
+ * Sécurité (audit C4) : réservé à la direction et à la période d'essai
+ * (aucun abonnement Stripe). Une fois abonné, le plan ne change plus que
+ * par le webhook Stripe. Écriture par le client admin : la direction n'a
+ * plus le droit d'écrire elle-même ces colonnes (migration 20261019000002).
  */
 export async function POST(req: Request) {
   const appUser = await requireAppUser();
+  if (appUser.role !== "direction") {
+    return NextResponse.json({ error: "Seule la direction peut choisir la formule." }, { status: 403 });
+  }
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -30,45 +37,44 @@ export async function POST(req: Request) {
   if (planId === "essentiel") {
     return NextResponse.json({ error: "Le plan Essentiel est accessible sur demande uniquement, contactez GODAC." }, { status: 403 });
   }
-  const selected = new Set(parsed.data.selectedModuleKeys);
 
-  const supabase = await createServerSupabaseClient();
-
-  const { error: planError } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { data: organization, error: orgError } = await admin
     .from("organizations")
-    .update({ plan: planId })
-    .eq("id", appUser.organization_id);
+    .select("country, subscription_status, stripe_subscription_id")
+    .eq("id", appUser.organization_id)
+    .single();
+  if (orgError || !organization) {
+    return NextResponse.json({ error: "Organisation introuvable" }, { status: 409 });
+  }
+  if (!estEnEssai(organization)) {
+    return NextResponse.json(
+      { error: "Votre abonnement est déjà souscrit : changez de formule depuis la page Abonnement." },
+      { status: 409 },
+    );
+  }
+
+  const { error: planError } = await admin.from("organizations").update({ plan: planId }).eq("id", appUser.organization_id);
   if (planError) {
     return NextResponse.json({ error: planError.message }, { status: 500 });
   }
 
-  const pays = await paysOrganisation(supabase, appUser.organization_id);
-  const { modules, prices } = await getFullCatalog(supabase);
-  const sellable = modules.filter((m) => m.wave !== "v3");
-
-  const rows = sellable.map((m) => {
-    const price = priceFor(prices, m.key, planId);
-    const included = price?.included ?? false;
-    // Jamais activé (ni facturé) un module sans objet dans le pays de l'entreprise.
-    const enabled = (included || selected.has(m.key)) && moduleDisponible(pays.code, m.key);
-    return {
-      organization_id: appUser.organization_id,
-      module_key: m.key,
-      enabled,
-      pricing_mode: included ? ("included" as const) : ("a_la_carte" as const),
-      effective_monthly_price: enabled ? Number(price?.monthly_price ?? 0) : 0,
-      effective_setup_price: enabled && !included ? Number(price?.setup_price ?? 0) : 0,
-    };
+  const { modules, prices } = await getFullCatalog(admin);
+  const rows = calculerLignesModules({
+    organizationId: appUser.organization_id,
+    planId,
+    modules,
+    prices,
+    selection: new Set(parsed.data.selectedModuleKeys),
+    disponible: (key) => moduleDisponible(organization.country, key),
   });
 
-  const { error: modulesError } = await supabase
-    .from("organization_modules")
-    .upsert(rows, { onConflict: "organization_id,module_key" });
+  const { error: modulesError } = await admin.from("organization_modules").upsert(rows, { onConflict: "organization_id,module_key" });
   if (modulesError) {
     return NextResponse.json({ error: modulesError.message }, { status: 500 });
   }
   // App Livreur : prix selon le palier d'utilisateurs de l'entreprise.
-  await synchroniserPaliers(createAdminSupabaseClient(), appUser.organization_id);
+  await synchroniserPaliers(admin, appUser.organization_id);
 
   return NextResponse.json({ ok: true });
 }
