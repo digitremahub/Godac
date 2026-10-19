@@ -32,12 +32,17 @@ export async function POST(req: Request) {
   const latitude = parsed.success ? parsed.data.latitude : undefined;
   const longitude = parsed.success ? parsed.data.longitude : undefined;
 
-  const { data: open } = await supabase
+  // Plusieurs entrées ouvertes (avant l'index unique, audit M1) : on ferme
+  // la plus récente au lieu d'échouer silencieusement.
+  const { data: ouvertes, error: openError } = await supabase
     .from("time_clock_entries")
     .select("id")
     .eq("user_id", appUser.id)
     .is("clocked_out_at", null)
-    .maybeSingle();
+    .order("clocked_in_at", { ascending: false })
+    .limit(1);
+  if (openError) return NextResponse.json({ error: openError.message }, { status: 500 });
+  const open = ouvertes?.[0] ?? null;
 
   if (open) {
     const { error } = await supabase
@@ -58,6 +63,8 @@ export async function POST(req: Request) {
     clock_in_lat: latitude ?? null,
     clock_in_lng: longitude ?? null,
   });
+  // Double tap : l'index unique « une entrée ouverte par utilisateur » refuse la seconde.
+  if (error?.code === "23505") return NextResponse.json({ status: "clocked_in" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ status: "clocked_in" });
 }
