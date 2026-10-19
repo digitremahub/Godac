@@ -185,6 +185,11 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       </div>
 
       <Card className="mb-6">
+        {ongoingRunsRes.error && (
+          <p role="alert" className="mb-3 rounded-lg border border-orange/40 bg-orange/10 p-3 text-sm text-orange-ink">
+            Le suivi des tournées est momentanément indisponible. Vérifiez les droits d’accès Supabase sur les fiches chauffeur.
+          </p>
+        )}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg">Tournées actuellement effectuées</h2>

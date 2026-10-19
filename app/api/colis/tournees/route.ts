@@ -26,19 +26,27 @@ export async function POST(req: Request) {
   let runCreee: Awaited<ReturnType<typeof creerTournee>> | null = null;
   try {
     const dateDuJour = aujourdhuiParis();
-    const { data: ficheExistante, error: erreurFiche } = await supabase
+    const { data: fichesDuJour, error: erreurFiche } = await supabase
       .from("delivery_runs")
       .select(RUN_FIELDS)
       .eq("organization_id", appUser.organization_id)
       .eq("driver_id", appUser.id)
       .eq("run_date", dateDuJour)
-      .order("created_at")
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(50);
     if (erreurFiche) throw erreurFiche;
+
+    // Priorité à une fiche ouverte : une ancienne fiche clôturée ne doit pas
+    // masquer une fiche active créée ensuite. On conserve toutes les fiches
+    // historiques sans supprimer ni écraser leurs données.
+    const ficheExistante = (fichesDuJour ?? []).find((fiche: any) =>
+      ["loading", "in_progress"].includes(fiche.status)
+    ) ?? (fichesDuJour ?? []).find((fiche: any) => fiche.status !== "done");
+
     // Une fiche clôturée ne doit jamais être recréée ni modifiée par un second clic.
-    if (ficheExistante?.status === "done") {
-      return NextResponse.json({ run: ficheExistante, reused: true });
+    if (!ficheExistante && (fichesDuJour ?? []).some((fiche: any) => fiche.status === "done")) {
+      const ficheCloturee = (fichesDuJour ?? []).find((fiche: any) => fiche.status === "done");
+      return NextResponse.json({ run: ficheCloturee, reused: true });
     }
 
     const run = ficheExistante ?? await creerTournee(supabase, appUser, parsed.data.name ?? null);
@@ -186,7 +194,16 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ run });
+    // Retourner la version persistée : le nom et les métadonnées viennent
+    // d'être mis à jour pendant la fusion des tournées planifiées.
+    const { data: runActualise, error: erreurRunActualise } = await supabase
+      .from("delivery_runs")
+      .select(RUN_FIELDS)
+      .eq("id", run.id)
+      .maybeSingle();
+    if (erreurRunActualise) throw erreurRunActualise;
+
+    return NextResponse.json({ run: runActualise ?? run, reused: Boolean(ficheExistante) });
   } catch (e) {
     // La tournée est créée avant l'ajout facultatif des ramasses. Une erreur
     // sur le planning, les migrations ou une ramasse ne doit pas faire croire
