@@ -140,15 +140,19 @@ export function EndTourFlow({
     }
   }
 
-  const canSubmit =
-    Boolean(vehicleId) &&
-    Boolean(openTour) &&
-    Boolean(endKm) &&
-    (!requireOdometerPhoto || Boolean(endKmPhotoPath)) &&
-    vehicleOk !== null &&
-    (vehicleOk || problemDescription.trim().length > 0) &&
-    (!vehicleChanged || (changeReason.trim().length > 0 && photosManquantes(changeType, changePhotos).length === 0)) &&
-    confirmed;
+  const missingRequirements = [
+    !vehicleId ? "Véhicule non sélectionné" : null,
+    !openTour ? "Aucune tournée en cours détectée" : null,
+    !endKm.trim() ? "Renseignez le kilométrage au retour" : Number(endKm) < 0 || !Number.isFinite(Number(endKm)) ? "Le kilométrage doit être un nombre valide positif" : null,
+    requireOdometerPhoto && !endKmPhotoPath ? "La photo du compteur est obligatoire pour votre entreprise" : null,
+    vehicleOk === null ? "Indiquez l’état du véhicule" : null,
+    vehicleOk === false && !problemDescription.trim() ? "Décrivez le problème constaté sur le véhicule" : null,
+    vehicleChanged && !changeReason.trim() ? "Précisez le motif du changement de véhicule" : null,
+    vehicleChanged && photosManquantes(changeType, changePhotos).length > 0 ? "Ajoutez les photos requises pour le changement de véhicule" : null,
+    !confirmed ? "Cochez la confirmation de fin de tournée" : null,
+  ].filter((item): item is string => Boolean(item));
+
+  const canSubmit = missingRequirements.length === 0;
 
   async function submit() {
     if (!vehicleId || !openTour || vehicleOk === null) return;
@@ -444,8 +448,22 @@ export function EndTourFlow({
         Je confirme terminer la tournée avec le véhicule{(registration ?? openTour?.vehicles?.registration) ? ` ${registration ?? openTour?.vehicles?.registration}` : ""}.
       </label>
 
-      <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>
-        {busy ? "Envoi…" : "Valider mon retour"}
+      {!canSubmit && (
+        <div role="status" aria-live="polite" className="rounded-lg border border-orange-ink/20 bg-orange-ink/5 p-3 text-sm">
+          <p id="retour-validation-aide" className="font-semibold text-orange-ink">Pour valider votre retour, complétez :</p>
+          <ul className="mt-1 list-inside list-disc text-navy/80">
+            {missingRequirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
+          </ul>
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn-primary w-full justify-center text-base"
+        disabled={!canSubmit || busy}
+        aria-describedby={!canSubmit ? "retour-validation-aide" : undefined}
+        onClick={submit}
+      >
+        {busy ? "Envoi du retour…" : canSubmit ? "Valider mon retour" : "Complétez les champs requis"}
       </button>
     </Card>
   );
