@@ -54,6 +54,9 @@ export interface FicheHoraires {
   weekly_schedule: Semaine;
   notes: string | null;
   updated_at: string;
+  /** Origine : saisie manuelle, ou trouvée sur internet (openstreetmap, google) — migration 190. */
+  source?: string | null;
+  found_at?: string | null;
 }
 
 export const MAX_CRENEAUX = 2;

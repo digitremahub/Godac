@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/audit/journal";
-import { avecHoraires, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { avecHoraires, avecProfessionnel, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
 
@@ -29,7 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     listesDeTournee(ctx.supabase, ctx.run.id),
   ]);
   const ordonnes = ordonnerParListe((stops ?? []) as { id: string; list_id: string | null; position: number; address: string }[], lists);
-  return NextResponse.json({ run: ctx.run, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, ordonnes) });
+  return NextResponse.json({ run: ctx.run, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
 }
 
 const patchSchema = z.object({
