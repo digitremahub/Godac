@@ -235,7 +235,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/tanks", label: "Cuves" } },
           { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
           { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
-          { titre: "Fiches de paie", texte: "Consultez et distribuez les bulletins des salariés.", lien: { href: "/payslips", label: "Fiches de paie" }, module: "payslips" },
+          { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/paie", label: "Paie & salaires" }, module: "payslips" },
           { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/alerts", label: "Alertes" } },
         ],
       },

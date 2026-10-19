@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { getCurrentAppUser } from "@/lib/auth/session";
+import { modulesActifs, utilisateurCourant } from "@/lib/acces/modules-requete";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import type { Metadata } from "next";
 
@@ -14,7 +13,8 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let appUser = await getCurrentAppUser();
+  // Partagé (cache de requête) avec garderPage() de la page affichée.
+  let appUser = await utilisateurCourant();
 
   if (!appUser) {
     // An invited user's first visit after clicking their email link
@@ -30,7 +30,7 @@ export default async function DashboardLayout({
   const supabase = await createServerSupabaseClient();
   const isFieldRole = appUser.role === "chauffeur" || appUser.role === "manager_chauffeur";
   const [enabledModuleKeys, { data: organization }, activeTour] = await Promise.all([
-    getEnabledModuleKeys(supabase, appUser.organization_id),
+    modulesActifs(appUser.organization_id).then((m) => [...m]),
     supabase.from("organizations").select("name, logo_url, accent_color, is_demo").eq("id", appUser.organization_id).single(),
     isFieldRole
       ? supabase.from("planning_entries").select("id").eq("driver_id", appUser.id).eq("status", "in_progress").maybeSingle()
