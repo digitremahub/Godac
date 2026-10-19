@@ -25,6 +25,7 @@ import {
   type Semaine,
 } from "@/lib/colis/horaires";
 import { api, type Run, type Stop } from "@/components/colis/commun";
+import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
 
 /** Heure saisie / stockée (« 10:00:00 ») → valeur d'un champ <input type="time"> (« 10:00 »). */
 const versChamp = (v: string | null | undefined) => {
@@ -80,6 +81,11 @@ export function BadgeHoraires({ stop, fenetres, passage, inverse = false }: { st
         <span className={`rounded-full px-2 py-0.5 ${fenetres && !fenetres.length ? "bg-orange/15 text-orange-ink" : pastille}`}>
           🕘 {stop.horaire?.label ? `${stop.horaire.label} · ` : ""}
           {libelle}
+        </span>
+      )}
+      {stop.horaire?.source && stop.horaire.source !== "manuel" && (
+        <span className={`rounded-full px-2 py-0.5 ${inverse ? "bg-white/10 text-white" : "bg-teal/10 text-teal-ink"}`} title="Horaires trouvés automatiquement : à vérifier">
+          Horaires trouvés ({LIBELLE_SOURCE[stop.horaire.source] ?? stop.horaire.source})
         </span>
       )}
       {passage && (
@@ -312,6 +318,11 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
           </label>
           {pro && (
             <>
+              {stop.horaire?.source && stop.horaire.source !== "manuel" && (
+                <p className="rounded-xl bg-teal/10 px-3 py-2 text-xs font-semibold text-teal-ink">
+                  Horaires trouvés ({LIBELLE_SOURCE[stop.horaire.source] ?? stop.horaire.source}) : vérifiez-les et corrigez-les si besoin ; une fois enregistrés, ils deviennent une saisie manuelle.
+                </p>
+              )}
               <input className="input" value={nom} maxLength={120} onChange={(e) => setNom(e.target.value)} placeholder="Nom de l'entreprise (facultatif)" aria-label="Nom de l'entreprise" />
               <div className="flex flex-wrap gap-1.5 text-xs">
                 {PRESETS.map((p) => (

@@ -93,3 +93,20 @@ describe("agregerArrets", () => {
     expect(agregerArrets([], null, true)).toEqual({ arrets: 0, livres: 0, echecs: 0, colis: 0, fin: null, km: null });
   });
 });
+
+import { lireRecherche, nettoyerRecherche } from "@/lib/colis/historique";
+
+describe("recherche d'un colis dans l'historique", () => {
+  it("nettoie le texte (filtre PostgREST) et exige 3 caractères", () => {
+    expect(nettoyerRecherche("  6A123,(x)  ")).toBe("6A123 x");
+    expect(nettoyerRecherche("ab")).toBeNull();
+    expect(nettoyerRecherche("1%*")).toBeNull();
+    expect(nettoyerRecherche(null)).toBeNull();
+  });
+
+  it("lit la recherche et le statut depuis l'URL", () => {
+    expect(lireRecherche({ q: "Dupont", statut: "failed" })).toEqual({ q: "Dupont", statut: "failed" });
+    expect(lireRecherche({ q: ["XY12345"], statut: "nimporte" })).toEqual({ q: "XY12345", statut: null });
+    expect(lireRecherche({})).toEqual({ q: null, statut: null });
+  });
+});

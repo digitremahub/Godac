@@ -2,30 +2,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { geocodeAddress } from "@/lib/geo/geocode";
+import { geocodeAddressDetail, type GeocodeDetail } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { TYPES_ARRET, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, arretARejoindre, normaliserNomRelais, typeApresRegroupement } from "@/lib/colis/relais";
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { cleAdresse, horairesDesAdresses, listeDeLaTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
-
-/** Extrait le nom de commune des adresses BAN courantes (« 66000 Perpignan »). */
-function communeDepuisAdresse(adresse: string): string | null {
-  const sansPays = adresse.split(",").map((x) => x.trim()).filter(Boolean).filter((x) => !/^(france|fr)$/i.test(x));
-  const avecCodePostal = [...sansPays].reverse().find((partie) => /^\d{5}\s+/.test(partie));
-  if (avecCodePostal) {
-    const ville = avecCodePostal.replace(/^\d{5}\s+/, "").replace(/\s+\([^)]*\)$/, "").trim();
-    if (ville.length >= 2 && ville.length <= 80) return ville;
-  }
-  const derniere = sansPays[sansPays.length - 1];
-  if (sansPays.length >= 2 && derniere && derniere.length >= 2 && derniere.length <= 80 && !/^\d/.test(derniere)) return derniere;
-  return null;
-}
+import { listePourAdresse } from "@/lib/colis/villages-serveur";
+import { detecterProfessionnel } from "@/lib/colis/professionnel";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
-  /** Liste de la tournée où ranger le colis (sinon la liste implicite). */
+  /** Liste choisie par le chauffeur ; absente : rangement automatique par village (lib/colis/villages.ts). */
   list_id: z.string().uuid().nullable().optional(),
   code: z.string().trim().max(120).nullable().optional(),
   adresse: z.string().trim().min(5).max(300),
@@ -67,37 +56,38 @@ export async function POST(req: Request) {
   let listId = parsed.data.list_id ?? null;
   if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
 
-  // Par défaut, GODAC range chaque adresse dans la liste de sa commune.
-  // Une liste existante est réutilisée ; sinon elle est créée à la volée.
-  const village = communeDepuisAdresse(parsed.data.adresse);
-  if (village) {
-    const { data: listes } = await supabase.from("delivery_lists").select("id, name, position").eq("run_id", run.id).order("position");
-    const existante = (listes ?? []).find((l) => l.name.trim().toLocaleLowerCase("fr-FR") === village.toLocaleLowerCase("fr-FR"));
-    if (existante) {
-      listId = existante.id;
-    } else {
-      const positionListe = (listes ?? []).reduce((max, l) => Math.max(max, l.position), -1) + 1;
-      const { data: creee, error: erreurListe } = await supabase.from("delivery_lists").insert({
-        organization_id: appUser.organization_id,
-        run_id: run.id,
-        name: village.slice(0, 60),
-        position: positionListe,
-      }).select("id").single();
-      if (erreurListe) return NextResponse.json({ error: `Impossible de créer la liste du village : ${erreurListe.message}` }, { status: 500 });
-      listId = creee.id;
-    }
-  }
-
   const { data: stops } = await supabase.from("delivery_stops").select("id, list_id, kind, parcel_code, parcel_count, address, phone, status, position, weight_kg, relay_name").eq("run_id", run.id);
-  const code = parsed.data.code || null;
   const pays = await codePays(appUser.organization_id);
-  const telephone = normaliserTelephone(parsed.data.telephone, pays);
-  const poids = lirePoids(parsed.data.poids ?? null);
+  const cle = cleAdresse(parsed.data.adresse);
+  const code = parsed.data.code || null;
   if (code && (stops ?? []).some((s) => s.parcel_code?.split(",").includes(code))) {
     return NextResponse.json({ duplicate: true, message: "Colis déjà dans la tournée." });
   }
 
-  const cle = cleAdresse(parsed.data.adresse);
+  // Rangement automatique (aucune liste choisie) : une adresse déjà présente
+  // garde sa liste ; sinon village de la tournée par commune ou proximité,
+  // « Hors tournée » sinon (tournée sans villages : liste de la commune).
+  let geo: GeocodeDetail | null | undefined;
+  let rangement: Awaited<ReturnType<typeof listePourAdresse>> | null = null;
+  if (!listId) {
+    const deja = (stops ?? []).find((s) => s.status === "pending" && s.list_id && cleAdresse(s.address) === cle);
+    if (deja) listId = deja.list_id;
+    else {
+      geo = await geocodeAddressDetail(parsed.data.adresse, pays);
+      rangement = await listePourAdresse(supabase, appUser, run.id, {
+        texte: parsed.data.adresse,
+        commune: geo?.city,
+        codePostal: geo?.postcode,
+        point: geo ? { lat: geo.lat, lng: geo.lng } : null,
+      });
+      listId = rangement.listId;
+    }
+  }
+  const village = rangement?.nom ? { nom: rangement.nom, horsTournee: rangement.raison === "hors_tournee" } : null;
+
+  const telephone = normaliserTelephone(parsed.data.telephone, pays);
+  const poids = lirePoids(parsed.data.poids ?? null);
+
   const kind: TypeArret = parsed.data.type ?? "livraison";
   let relais = kind === "point_relais" ? normaliserNomRelais(parsed.data.relais) : null;
   // Point relais : son nom et ses horaires viennent de l'annuaire des adresses pro s'il y figure.
@@ -136,10 +126,14 @@ export async function POST(req: Request) {
       .eq("id", memeAdresse.id)
       .select(STOP_FIELDS)
       .single();
-    return NextResponse.json({ stop: data, grouped: true, relais: typeFinal === "point_relais", ...(kind === "point_relais" ? { horaires } : {}) });
+    return NextResponse.json({ stop: data, grouped: true, relais: typeFinal === "point_relais", village, ...(kind === "point_relais" ? { horaires } : {}) });
   }
 
-  const geo = await geocodeAddress(parsed.data.adresse, pays);
+  if (geo === undefined) geo = await geocodeAddressDetail(parsed.data.adresse, pays);
+  // Adresse pro (forme juridique, mot-clé métier) : nom retenu sur l'arrêt ;
+  // les horaires sont cherchés ensuite, sans bloquer l'ajout
+  // (/api/colis/horaires/recherche, appelé par l'écran).
+  const pro = kind === "ramasse" || kind === "point_relais" ? null : detecterProfessionnel({ destinataire: parsed.data.destinataire, adresse: parsed.data.adresse });
   const position = (stops ?? []).reduce((m, s) => Math.max(m, s.position), -1) + 1;
   const { data, error } = await supabase
     .from("delivery_stops")
@@ -168,9 +162,18 @@ export async function POST(req: Request) {
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (pro?.pro && pro.nom) await supabase.from("delivery_stops").update({ business_name: pro.nom.slice(0, 200) }).eq("id", data.id).then(() => undefined, () => undefined);
+  // Nouvel arrêt avant le départ : l'ordre est à recalculer (fait au lancement).
+  if (run.status === "loading" && run.optimized_at) await supabase.from("delivery_runs").update({ optimized_at: null }).eq("id", run.id);
 
   // Une ramasse ajoutée par le chauffeur reste limitée à cette tournée.
   // Les ramasses récurrentes sont gérées par la direction sur la fiche du village,
   // afin qu’elles soient communes à tous les chauffeurs qui desservent ce village.
-  return NextResponse.json({ stop: data, geocoded: Boolean(geo), ...(kind === "point_relais" ? { horaires } : {}) });
+  return NextResponse.json({
+    stop: data,
+    geocoded: Boolean(geo),
+    village,
+    professionnel: pro?.pro ? pro.nom : null,
+    ...(kind === "point_relais" ? { horaires } : {}),
+  });
 }

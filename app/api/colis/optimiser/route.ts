@@ -5,37 +5,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleAdresse, horairesDesAdresses, listesDeTournee, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { sequenceParListes } from "@/lib/colis/listes";
 import { fenetresArret, heureDepart, instantParis, lireHeure, type Fenetres } from "@/lib/colis/horaires";
-import { distanceEstimee, type Point } from "@/lib/colis/optimisation";
-import { rechercherHorairesOSMPlusieurs } from "@/lib/colis/horaires-internet";
+import { type Point } from "@/lib/colis/optimisation";
+import { rechercherEtEnregistrerHoraires } from "@/lib/colis/horaires-internet";
+import { matriceRoutiere } from "@/lib/colis/matrice";
+import { ordonnerListesGlobalement } from "@/lib/colis/tournee-globale";
 
-const ROUTING_URL = process.env.ROUTING_URL ?? "https://router.project-osrm.org";
-const clePoint = (p: Point) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
-
-/** Matrice des distances routières OSRM ; null en cas d'indisponibilité ou de tournée trop grande. */
-async function matriceRoutiere(points: Point[]): Promise<Map<string, number> | null> {
-  const uniques = [...new Map(points.map((p) => [clePoint(p), p])).values()];
-  if (uniques.length < 2) return new Map();
-  // La limite du service public OSRM varie : au-delà de 90 points, repli propre.
-  if (uniques.length > 90) return null;
-  const coords = uniques.map((p) => `${p.lng.toFixed(5)},${p.lat.toFixed(5)}`).join(";");
-  try {
-    const res = await fetch(`${ROUTING_URL}/table/v1/driving/${coords}?annotations=distance,duration`, {
-      headers: { "User-Agent": "GODAC (https://godac.app)" },
-      signal: AbortSignal.timeout(9000),
-      cache: "no-store",
-    });
-    const data = (await res.json()) as { code?: string; distances?: (number | null)[][] };
-    if (!res.ok || data.code !== "Ok" || !data.distances) return null;
-    const resultat = new Map<string, number>();
-    uniques.forEach((a, i) => uniques.forEach((b, j) => {
-      const metres = data.distances?.[i]?.[j];
-      if (typeof metres === "number" && Number.isFinite(metres)) resultat.set(`${clePoint(a)}>${clePoint(b)}`, metres / 1000);
-    }));
-    return resultat;
-  } catch {
-    return null;
-  }
-}
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -84,48 +59,29 @@ export async function POST(req: Request) {
     ...arrets.filter((s) => s.status === "pending" && s.lat !== null && s.lng !== null).map((s) => ({ lat: Number(s.lat), lng: Number(s.lng) })),
     ...(depot ? [depot] : []),
   ];
+  // Matrice des km routiers réels (OSRM, découpée et mise en cache) ; repli à vol d'oiseau × 1,3.
   const matrice = await matriceRoutiere(pointsRoutage);
-  let estimationUtilisee = matrice === null;
-  const distance = (a: Point, b: Point) => {
-    const route = matrice?.get(`${clePoint(a)}>${clePoint(b)}`);
-    if (route !== undefined) return route;
-    estimationUtilisee = true;
-    return distanceEstimee(a, b);
-  };
+  const distance = matrice.distance;
+  const retour = run.return_to_start && !parsed.data.depuis;
 
-  // Réordonne les listes-villages en séquence géographique globale, en utilisant
-  // la distance routière entre le point courant et l'entrée la plus proche de chaque village.
-  const groupesVillages = new Map<string, typeof arrets>();
-  for (const stop of arrets.filter((s) => s.status === "pending" && s.lat !== null && s.lng !== null)) {
-    const cle = stop.list_id ?? "__sans_liste__";
-    groupesVillages.set(cle, [...(groupesVillages.get(cle) ?? []), stop]);
-  }
-  const listesOrdonnees = [...listes];
-  let pointCourant = depart;
-  const resteListes = new Set(listesOrdonnees.map((l) => l.id));
-  const nouvelOrdre: typeof listesOrdonnees = [];
-  while (resteListes.size) {
-    let meilleure: (typeof listesOrdonnees)[number] | null = null;
-    let meilleurArret: (typeof arrets)[number] | null = null;
-    let meilleurCout = Number.POSITIVE_INFINITY;
-    for (const liste of listesOrdonnees) {
-      if (!resteListes.has(liste.id)) continue;
-      const candidats = groupesVillages.get(liste.id) ?? [];
-      for (const stop of candidats) {
-        const p = { lat: Number(stop.lat), lng: Number(stop.lng) };
-        const cout = pointCourant ? distance(pointCourant, p) : 0;
-        if (cout < meilleurCout) { meilleurCout = cout; meilleure = liste; meilleurArret = stop; }
-      }
-      // Conserver aussi les listes vides, à la fin.
-      if (!candidats.length && !meilleure) meilleure = liste;
-    }
-    if (!meilleure) break;
-    nouvelOrdre.push(meilleure);
-    resteListes.delete(meilleure.id);
-    if (meilleurArret?.lat !== null && meilleurArret?.lat !== undefined && meilleurArret?.lng !== null && meilleurArret?.lng !== undefined) pointCourant = { lat: Number(meilleurArret.lat), lng: Number(meilleurArret.lng) };
-  }
-  if (nouvelOrdre.length === listesOrdonnees.length) {
-    await Promise.all(nouvelOrdre.map((l, position) => l.position === position ? Promise.resolve() : supabase.from("delivery_lists").update({ position }).eq("id", l.id)));
+  // Ordre global des villages : toutes les listes s'enchaînent dans un seul
+  // sens de tournée (lib/colis/tournee-globale.ts).
+  const { listes: nouvelOrdre } = ordonnerListesGlobalement(arrets, listes, depart, retour, distance);
+  await Promise.all(
+    nouvelOrdre.map((l) => (listes.find((x) => x.id === l.id)?.position === l.position ? null : supabase.from("delivery_lists").update({ position: l.position }).eq("id", l.id))),
+  );
+
+  // Adresses pro jamais examinées (ajoutées avant cette fonction, import…) :
+  // recherche des horaires sur internet, enregistrés dans l'annuaire.
+  const aExaminer = await supabase
+    .from("delivery_stops")
+    .select("id, address, recipient, lat, lng, kind, business_name")
+    .eq("run_id", run.id)
+    .eq("status", "pending")
+    .is("hours_lookup_at", null)
+    .limit(40);
+  if (!aExaminer.error && aExaminer.data?.length) {
+    await rechercherEtEnregistrerHoraires(supabase, appUser.organization_id, appUser.id, aExaminer.data as any[], { budgetMs: 15000 }).catch(() => undefined);
   }
 
   // Heure de départ et jour (Paris) des horaires à appliquer.
@@ -135,29 +91,11 @@ export async function POST(req: Request) {
     appUser.organization_id,
     arrets.filter((s) => s.status === "pending").map((s) => s.address),
   );
-  // Horaires OSM consultés à la demande, sans stockage ni clé payante.
-  // Un seul appel Overpass pour les arrêts localisés (jusqu'à 40 par requête).
-  const horairesOSM = await rechercherHorairesOSMPlusieurs(
-    arrets
-      .filter((s) => s.status === "pending" && s.lat !== null && s.lng !== null)
-      .map((s) => ({ id: s.id, address: s.address, lat: Number(s.lat), lng: Number(s.lng) })),
-  );
   const fenetres = new Map<string, Fenetres>(
-    arrets.map((s) => {
-      const horairesManuels = fiches.get(cleAdresse(s.address))?.weekly_schedule;
-      const horairesAutomatiques = horairesOSM.get(s.id)?.semaine;
-      return [
-        s.id,
-        fenetresArret({
-          semaine: horairesManuels ?? horairesAutomatiques,
-          debut: s.window_start,
-          fin: s.window_end,
-        }, jour),
-      ];
-    }),
+    arrets.map((s) => [s.id, fenetresArret({ semaine: fiches.get(cleAdresse(s.address))?.weekly_schedule, debut: s.window_start, fin: s.window_end }, jour)]),
   );
 
-  const r = sequenceParListes(arrets, nouvelOrdre, depart, run.return_to_start && !parsed.data.depuis, {
+  const r = sequenceParListes(arrets, nouvelOrdre, depart, retour, {
     debut: minute,
     fenetres: (id) => fenetres.get(id) ?? null,
     distance,
@@ -179,7 +117,7 @@ export async function POST(req: Request) {
     horsHoraires: r.horsHoraires,
     fermes: r.fermes,
     impossibles: r.impossibles,
-    distanceRoutiere: !estimationUtilisee,
+    distanceRoutiere: !matrice.estimation(),
     passages: Object.fromEntries(
       Object.entries(r.passages).map(([id, p]) => [id, { arrivee: iso(p.arrivee), attenteMin: Math.round(p.attente), statut: p.statut }]),
     ),

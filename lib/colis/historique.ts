@@ -384,3 +384,103 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
   });
   return { run: run as { id: string; name: string | null; run_date: string; status: string; started_at: string | null; start_label: string | null; start_lat: number | null; start_lng: number | null }, chauffeur: chauffeur?.full_name ?? "—", arrets, listes: ls.length };
 }
+
+// ── Recherche d'un colis dans l'historique ──────────────────────
+
+export const STATUTS_ARRET = ["delivered", "failed", "pending"] as const;
+export type StatutArret = (typeof STATUTS_ARRET)[number];
+
+export interface RechercheColis {
+  /** Code colis, destinataire ou adresse (3 caractères au moins). */
+  q: string | null;
+  statut: StatutArret | null;
+}
+
+/**
+ * Texte recherché, sans les caractères qui ont un sens dans un filtre
+ * PostgREST (virgules, parenthèses, jokers) ; null si trop court.
+ */
+export function nettoyerRecherche(v: string | null | undefined): string | null {
+  const t = (v ?? "")
+    .replace(/[,()%*\\:"']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return t.length >= 3 ? t : null;
+}
+
+/** Recherche depuis l'URL (?q=&statut=). */
+export function lireRecherche(params: Record<string, string | string[] | undefined>): RechercheColis {
+  const un = (k: string) => {
+    const v = params[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const statut = un("statut");
+  return { q: nettoyerRecherche(un("q")), statut: STATUTS_ARRET.includes(statut as StatutArret) ? (statut as StatutArret) : null };
+}
+
+export interface LigneColis {
+  id: string;
+  run_id: string;
+  run_date: string;
+  tournee: string | null;
+  chauffeur: string;
+  address: string;
+  recipient: string | null;
+  parcel_code: string | null;
+  parcel_count: number;
+  status: StatutArret;
+  kind: string | null;
+  delivered_place: string | null;
+  proof_code: string | null;
+  relay_name: string | null;
+  proof_photo_path: string | null;
+  failure_reason: string | null;
+  done_at: string | null;
+}
+
+export const RESULTATS_MAX = 200;
+
+/**
+ * Arrêts (colis) de la période correspondant à la recherche : code colis,
+ * destinataire ou adresse, et/ou statut. Encadrement : toute l'entreprise
+ * (filtre chauffeur respecté) ; chauffeur : ses tournées seulement.
+ */
+export async function rechercherColis(
+  supabase: SupabaseClient,
+  userId: string,
+  toutes: boolean,
+  filtres: FiltresHistorique,
+  recherche: RechercheColis,
+): Promise<{ lignes: LigneColis[]; tronque: boolean; erreur: string | null } | null> {
+  if (!recherche.q && !recherche.statut) return null;
+  let q = supabase
+    .from("delivery_stops")
+    .select(
+      "id, run_id, address, recipient, parcel_code, parcel_count, status, kind, delivered_place, proof_code, relay_name, proof_photo_path, failure_reason, done_at, delivery_runs!inner(run_date, name, driver_id)",
+    )
+    .gte("delivery_runs.run_date", filtres.du)
+    .lte("delivery_runs.run_date", filtres.au)
+    .order("done_at", { ascending: false, nullsFirst: false })
+    .limit(RESULTATS_MAX + 1);
+  if (!toutes) q = q.eq("delivery_runs.driver_id", userId);
+  else if (filtres.chauffeur) q = q.eq("delivery_runs.driver_id", filtres.chauffeur);
+  if (recherche.statut) q = q.eq("status", recherche.statut);
+  if (recherche.q) {
+    const motif = `%${recherche.q}%`;
+    q = q.or(`parcel_code.ilike.${motif},recipient.ilike.${motif},address.ilike.${motif},relay_name.ilike.${motif}`);
+  }
+  const { data, error } = await q;
+  if (error) return { lignes: [], tronque: false, erreur: error.message };
+  const brutes = (data ?? []) as any[];
+  const ids = [...new Set(brutes.map((s) => s.delivery_runs?.driver_id).filter(Boolean))] as string[];
+  const { data: noms } = ids.length ? await supabase.from("users").select("id, full_name").in("id", ids) : { data: [] };
+  const nom = new Map(((noms ?? []) as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name]));
+  const lignes: LigneColis[] = brutes.slice(0, RESULTATS_MAX).map(({ delivery_runs: r, ...s }) => ({
+    ...s,
+    run_date: r?.run_date ?? "",
+    tournee: r?.name ?? null,
+    chauffeur: nom.get(r?.driver_id) ?? "—",
+  }));
+  return { lignes, tronque: brutes.length > RESULTATS_MAX, erreur: null };
+}

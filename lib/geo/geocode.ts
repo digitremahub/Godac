@@ -79,3 +79,35 @@ export async function reverseGeocode(lat: number, lng: number, country = "FR"): 
   const data = (await response.json()) as { features?: { properties?: { label?: string } }[] };
   return data.features?.[0]?.properties?.label ?? null;
 }
+
+/** Coordonnées + commune et code postal (rangement des colis par village). */
+export interface GeocodeDetail extends GeocodeResult {
+  city: string | null;
+  postcode: string | null;
+}
+
+export async function geocodeAddressDetail(address: string, country = "FR"): Promise<GeocodeDetail | null> {
+  const trimmed = address.trim();
+  if (!trimmed) return null;
+  try {
+    if (country !== "FR") {
+      const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&addressdetails=1&countrycodes=${country.toLowerCase()}&q=${encodeURIComponent(trimmed)}`, {
+        headers: NOMINATIM_HEADERS,
+      });
+      if (!res.ok) return null;
+      const [hit] = (await res.json()) as { lat?: string; lon?: string; address?: Record<string, string> }[];
+      if (!hit?.lat || !hit.lon) return null;
+      const a = hit.address ?? {};
+      return { lat: Number(hit.lat), lng: Number(hit.lon), city: a.village ?? a.town ?? a.city ?? a.municipality ?? null, postcode: a.postcode ?? null };
+    }
+    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(trimmed)}&limit=1`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { features?: { geometry?: { coordinates?: [number, number] }; properties?: { city?: string; postcode?: string } }[] };
+    const f = data.features?.[0];
+    const c = f?.geometry?.coordinates;
+    if (!c || c.length !== 2) return null;
+    return { lat: c[1], lng: c[0], city: f?.properties?.city ?? null, postcode: f?.properties?.postcode ?? null };
+  } catch {
+    return null;
+  }
+}

@@ -20,6 +20,7 @@ import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, ty
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
+import { LancementTournee } from "@/components/colis/LancementTournee";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
@@ -49,7 +50,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
   const [confirmationLancement, setConfirmationLancement] = useState(false);
-  const [villagesConfirmes, setVillagesConfirmes] = useState<string[]>([]);
+  /** Recherche d'une adresse, d'un destinataire, d'une ville ou d'un code colis. */
+  const [recherche, setRecherche] = useState("");
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
@@ -286,19 +288,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
-  async function demanderDemarrage() {
-    setVillagesConfirmes([]);
+  function demanderDemarrage() {
     setConfirmationLancement(true);
   }
 
+  /** Après confirmation (tournée + villages) : ordre global calculé si besoin, puis départ. */
   async function demarrer() {
     if (!run) return;
-    const groupesAvantDepart = grouperParListe(stops, lists);
-    const idsVillages = groupesAvantDepart.map((g) => g.liste?.id ?? "__principale__");
-    if (idsVillages.some((id) => !villagesConfirmes.includes(id))) {
-      setToast({ ok: false, text: "Confirmez chaque village avant de lancer la tournée." });
-      return;
-    }
     setBusy(true);
     try {
       if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
@@ -345,7 +341,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const termines = stops.filter((s) => s.status !== "pending");
   // Premier arrêt non clôturé dans l'ordre, même si d'autres ont été clôturés avant leur tour.
   const prochain = prochainArret(stops) ?? undefined;
-  const suivants = pending.slice(1);
+  const terme = recherche.trim().toLocaleLowerCase("fr-FR");
+  const correspond = (st: Stop) =>
+    [st.address, st.recipient ?? "", st.phone ?? "", st.parcel_code ?? "", st.relay_name ?? "", st.business_name ?? "", lists.find((l) => l.id === st.list_id)?.name ?? ""].some((v) =>
+      v.toLocaleLowerCase("fr-FR").includes(terme),
+    );
+  // Recherche : tous les arrêts restants qui correspondent (prochain compris) ; sinon les suivants.
+  const suivants = terme ? pending.filter(correspond) : pending.slice(1);
   const sansTelephone = arretsSansTelephone(suivants).length;
   const poidsRestant = formatPoids(sommePoids(pending));
   // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
@@ -583,29 +585,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         </div>
       )}
 
-      {confirmationLancement && run && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirmation-tournee-title">
-          <section className="w-full max-w-xl rounded-2xl bg-surface p-5 shadow-pop">
-            <h2 id="confirmation-tournee-title" className="font-display text-xl font-bold">Confirmation de la tournée</h2>
-            <p className="mt-1 text-sm text-navy/65">Vérifiez la tournée attribuée à votre planning et cochez chaque village dont vous prenez bien les colis avant le départ.</p>
-            <div className="mt-4 flex flex-col gap-2">
-              {grouperParListe(stops, lists).map((g) => {
-                const id = g.liste?.id ?? "__principale__";
-                const nom = nomGroupe(g);
-                const ok = villagesConfirmes.includes(id);
-                return <label key={id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${ok ? "border-teal bg-teal/5" : "border-navy/15"}`}>
-                  <input type="checkbox" className="mt-1 h-4 w-4 accent-teal" checked={ok} onChange={(e) => setVillagesConfirmes((anciens) => e.target.checked ? [...anciens, id] : anciens.filter((x) => x !== id))} />
-                  <span className="flex-1"><strong>{nom}</strong><span className="block text-xs text-navy/60">{g.arrets.length} adresse(s) · {g.arrets.reduce((n, s) => n + s.parcel_count, 0)} colis</span></span>
-                </label>;
-              })}
-            </div>
-            <div className="mt-5 flex gap-2">
-              <button type="button" className="btn-secondary flex-1" disabled={busy} onClick={() => setConfirmationLancement(false)}>Annuler</button>
-              <button type="button" className="btn-primary flex-1" disabled={busy || !grouperParListe(stops, lists).length || grouperParListe(stops, lists).some((g) => !villagesConfirmes.includes(g.liste?.id ?? "__principale__"))} onClick={demarrer}>{busy ? "Optimisation…" : "Je confirme et je démarre"}</button>
-            </div>
-          </section>
-        </div>
-      )}
+      {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}
 
       <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
@@ -711,11 +691,32 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
           </section>
         )}
 
+        {run && run.status !== "loading" && stops.length > 1 && (
+          <label className="relative block">
+            <span className="sr-only">Rechercher dans la tournée</span>
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45" aria-hidden="true">⌕</span>
+            <input
+              className="input !pl-9"
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Adresse, destinataire, ville ou n° de colis…"
+              aria-label="Rechercher une adresse, un destinataire, une ville ou un colis dans la tournée"
+            />
+            {recherche && (
+              <button type="button" className="absolute inset-y-0 right-2 px-2 text-sm text-navy/60" onClick={() => setRecherche("")}>
+                Effacer
+              </button>
+            )}
+          </label>
+        )}
+        {run && run.status !== "loading" && terme && suivants.length === 0 && <p className="text-center text-sm text-navy/60">Aucun arrêt restant ne correspond à « {recherche.trim()} ».</p>}
+
         {run && run.status !== "loading" && suivants.length > 0 && (
-          <section aria-label="Adresses suivantes">
+          <section aria-label={terme ? "Résultats de la recherche" : "Adresses suivantes"}>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-navy/60">
-                Ensuite · {suivants.length}
+                {terme ? "Résultats" : "Ensuite"} · {suivants.length}
                 {sansTelephone > 0 && (
                   <span className="ml-2 rounded-full bg-orange/15 px-2 py-0.5 text-[11px] normal-case tracking-normal text-orange-ink" title={ALERTE_SANS_TELEPHONE}>
                     {sansTelephone} sans téléphone
@@ -729,7 +730,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <ol className="flex flex-col gap-2">
               {suivants.map((s, k) => (
                 <Fragment key={s.id}>
-                  {multi && groupeDe(s) !== groupeDe(k ? suivants[k - 1]! : prochain!) && (
+                  {multi && (terme ? k === 0 || groupeDe(s) !== groupeDe(suivants[k - 1]!) : groupeDe(s) !== groupeDe(k ? suivants[k - 1]! : prochain!)) && (
                     <li className="mt-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-navy/60" aria-label={`Liste ${separateur(s)}`}>
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                       {separateur(s)}
@@ -796,9 +797,9 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               <span>Terminés · {termines.length}</span>
               <span aria-hidden="true">{voirTermines ? "▴" : "▾"}</span>
             </button>
-            {voirTermines && (
+            {(voirTermines || terme) && (
               <ol className="mt-1 flex flex-col gap-1.5">
-                {termines.map((s) => (
+                {(terme ? termines.filter(correspond) : termines).map((s) => (
                   <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estMarque(s) ? "pl-4" : "pl-3"}`}>
                     <EncocheArret stop={s} />
                     <span
