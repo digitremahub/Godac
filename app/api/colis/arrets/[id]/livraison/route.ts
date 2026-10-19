@@ -5,7 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 import { refusCloture } from "@/lib/colis/cloture";
-import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, photoObligatoire, qrObligatoire } from "@/lib/colis/livraison";
+import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, refusPreuve, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
+import { NOM_RELAIS_MAX, RETOURS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 
 const BUCKET = "delivery-proofs";
 const bodySchema = z.object({
@@ -15,12 +16,19 @@ const bodySchema = z.object({
   image: z.string().max(7_000_000).nullable().optional(),
   /** Livraison avec QR code : valeur lue sur le QR code (ou code de retrait) du destinataire. */
   code_qr: z.string().max(CODE_QR_MAX * 2).nullable().optional(),
+  /** Point relais : nom ou adresse du relais (celui de l'arrêt point relais par défaut). */
+  relais: z.string().max(NOM_RELAIS_MAX * 2).nullable().optional(),
+  /** Arrêt point relais : retours repris au relais. */
+  retours: z.number().int().min(0).max(RETOURS_MAX).nullable().optional(),
 });
 
 /**
  * Colis livré : lieu de dépôt + photo (obligatoire pour la boîte aux
  * lettres et le jardin), ou QR code du destinataire scanné (livraison
- * « avec QR code » : la valeur lue est la preuve de remise). L'accès à l'arrêt est vérifié par la RLS
+ * « avec QR code » : la valeur lue est la preuve de remise), ou dépôt au
+ * point relais (arrêt point relais, ou livraison remise au relais en cas
+ * d'absence) : nom du relais, photo ou code du relais scanné, retours
+ * repris pour un arrêt point relais. L'accès à l'arrêt est vérifié par la RLS
  * (chauffeur de la tournée ou encadrement) avant tout envoi de fichier.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,17 +38,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { lieu, precision, image } = parsed.data;
-  if (photoObligatoire(lieu as never) && !image) {
-    return NextResponse.json({ error: `Photo obligatoire pour une livraison « ${libelleLieu(lieu)} ».` }, { status: 400 });
-  }
-  const codeQr = qrObligatoire(lieu as never) ? normaliserCodeQr(parsed.data.code_qr) : null;
-  if (qrObligatoire(lieu as never) && !codeQr) {
-    return NextResponse.json({ error: "Scannez le QR code du destinataire (ou saisissez son code de retrait)." }, { status: 400 });
-  }
+  const { precision, image } = parsed.data;
+  const lieu = parsed.data.lieu as LieuLivraison;
 
-  const { data: stop } = await supabase.from("delivery_stops").select("id, status, notes, proof_photo_path, delivery_runs(run_date)").eq("id", id).maybeSingle();
+  const { data: stop } = await supabase.from("delivery_stops").select("id, status, notes, kind, relay_name, address, proof_photo_path, delivery_runs(run_date)").eq("id", id).maybeSingle();
   if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  const pointRelais = stop.kind === "point_relais";
+  // Un arrêt point relais se clôture par un dépôt au relais.
+  if (pointRelais && !relaisObligatoire(lieu)) return NextResponse.json({ error: "Arrêt point relais : validez le dépôt au relais." }, { status: 400 });
+  // Code scanné : QR code du destinataire, ou code / bordereau du relais (facultatif si photo).
+  const code = qrObligatoire(lieu) || relaisObligatoire(lieu) ? normaliserCodeQr(parsed.data.code_qr) : null;
+  const relais = relaisObligatoire(lieu) ? (normaliserNomRelais(parsed.data.relais) ?? (pointRelais ? normaliserNomRelais(stop.relay_name) : null)) : null;
+  // L'arrêt point relais est le relais lui-même : son nom n'est pas exigé.
+  const refusPreuveMsg = refusPreuve({ lieu, photo: Boolean(image), code, relais: relais ?? (pointRelais ? stop.address : null) });
+  if (refusPreuveMsg) return NextResponse.json({ error: refusPreuveMsg }, { status: 400 });
   // N'importe quel arrêt de la tournée peut être livré, mais une seule fois.
   const refus = refusCloture(stop.status, "delivered");
   if (refus) return NextResponse.json({ error: refus }, { status: 409 });
@@ -66,7 +77,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       done_at: new Date().toISOString(),
       delivered_place: lieu,
       proof_photo_path: path,
-      proof_code: codeQr,
+      proof_code: code,
+      ...(relaisObligatoire(lieu) ? { relay_name: relais } : pointRelais ? {} : { relay_name: null }),
+      returns_count: pointRelais ? (parsed.data.retours ?? null) : null,
       failure_reason: null,
       ...(note ? { notes: [stop.notes, note].filter(Boolean).join(" · ").slice(0, 500) } : {}),
     })
