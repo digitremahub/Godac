@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChoixRegroupement, lireChoixRequis, type ChoixRegroupementData } from "@/components/colis/ChoixRegroupement";
+import type { Regroupement } from "@/lib/colis/fiches-affectation";
 
 type Option = { id: string; name?: string; full_name?: string; registration?: string; service_id?: string };
 type TourOption = { id: string; tour_number: string; service_id: string | null };
@@ -16,6 +18,7 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
   const [number, setNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [choix, setChoix] = useState<ChoixRegroupementData | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -27,15 +30,22 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
     return () => { active = false; };
   }, []);
 
-  async function submit() {
+  // Changer de chauffeur, date, heure ou tournée annule la question en cours.
+  useEffect(() => { setChoix(null); }, [service, driver, vehicle, date, time, number]);
+
+  async function submit(regroupement?: Regroupement) {
     setBusy(true); setMessage("");
     try {
       const r = await fetch("/api/colis/affectations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_id: service, driver_id: driver, vehicle_id: vehicle, tour_number: number, date, time }),
+        body: JSON.stringify({ service_id: service, driver_id: driver, vehicle_id: vehicle, tour_number: number, date, time, ...(regroupement ? { regroupement } : {}) }),
       });
       const d = await r.json();
+      // Le chauffeur a déjà une tournée ce jour-là : séparées ou reliées ?
+      const question = lireChoixRequis(r.status, d);
+      if (question) { setChoix(question); return; }
+      setChoix(null);
       if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Création impossible");
       // Affectation = planning + fiche Tournée colis du chauffeur (créée ou complétée).
       const nom = data?.drivers.find((x) => x.id === driver)?.full_name ?? "le chauffeur";
@@ -51,7 +61,7 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
             <h2 id="creer-tournee-direction" className="text-lg font-semibold">Créer une tournée colis</h2>
-            <p className="mt-1 text-sm text-navy/65">Choisissez le service, la tournée habituelle, le chauffeur et le véhicule. La tournée est inscrite au planning et la fiche Tournée colis du chauffeur est préparée (villages, ramasses, points relais). Un chauffeur peut avoir plusieurs tournées dans la journée : elles sont regroupées sur sa fiche.</p>
+            <p className="mt-1 text-sm text-navy/65">Choisissez le service, la tournée habituelle, le chauffeur et le véhicule. La tournée est inscrite au planning et la fiche Tournée colis du chauffeur est préparée (villages, ramasses, points relais). Un chauffeur peut avoir plusieurs tournées dans la journée : chacune a sa fiche, sauf si vous choisissez de les relier.</p>
           </div>
           <button type="button" className="btn-ghost !px-2 !py-1" disabled={busy} onClick={onClose} aria-label="Fermer">✕</button>
         </div>
@@ -82,9 +92,10 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
               <label className="text-sm">Heure de départ<input className="input mt-1" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
             </div>
             {message && <p role="status" className="mt-3 rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">{message}</p>}
+            {choix && <ChoixRegroupement choix={choix} busy={busy} onChoisir={(r) => submit(r)} onAnnuler={() => setChoix(null)} />}
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Annuler</button>
-              <button type="button" className="btn-primary" disabled={busy || !service || !number || !driver || !vehicle || !date || !time} onClick={submit}>{busy ? "Création…" : "Créer et charger la tournée"}</button>
+              <button type="button" className="btn-primary" disabled={busy || Boolean(choix) || !service || !number || !driver || !vehicle || !date || !time} onClick={() => submit()}>{busy ? "Création…" : "Créer et charger la tournée"}</button>
             </div>
           </>
         )}

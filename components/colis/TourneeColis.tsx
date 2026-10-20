@@ -693,6 +693,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         >
           <span className="block leading-tight">
             {t.name ?? "Tournée"}
+            {t.planned_start && <span className="ml-1 text-xs font-normal text-navy/55">{String(t.planned_start).slice(0, 5)}</span>}
             {t.run_date !== today && <span className="ml-1 text-xs font-normal text-navy/55">({new Date(`${t.run_date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})</span>}
           </span>
           <span className="block text-xs font-normal text-navy/60">

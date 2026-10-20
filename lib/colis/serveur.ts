@@ -74,10 +74,23 @@ export async function planningDuJour(supabase: SupabaseClient, driverId: string,
   return { vehicleId: duJour.find((e) => e.vehicle_id)?.vehicle_id ?? null, serviceId: duJour.find((e) => e.service_id)?.service_id ?? null };
 }
 
-export async function creerTournee(supabase: SupabaseClient, appUser: Pick<AppUser, "id" | "organization_id">, name: string | null, date: string = aujourdhuiParis()) {
+export async function creerTournee(
+  supabase: SupabaseClient,
+  appUser: Pick<AppUser, "id" | "organization_id">,
+  name: string | null,
+  date: string = aujourdhuiParis(),
+  /**
+   * Fiche séparée d'une affectation (lib/colis/fiche-du-jour.ts) : véhicule
+   * et service de l'affectation, rattachement à son entrée de planning.
+   * `fiche_planifiee` n'existe qu'avec la migration 20261023000002.
+   */
+  affectation: { planningEntryId: string; vehicleId: string | null; serviceId: string | null } | null = null,
+) {
   const [start, jour, { data: liens }] = await Promise.all([
     depotDuChauffeur(supabase, appUser),
-    planningDuJour(supabase, appUser.id, date).catch(() => ({ vehicleId: null, serviceId: null })),
+    affectation
+      ? Promise.resolve({ vehicleId: affectation.vehicleId, serviceId: affectation.serviceId })
+      : planningDuJour(supabase, appUser.id, date).catch(() => ({ vehicleId: null, serviceId: null })),
     supabase.from("user_services").select("service_id").eq("user_id", appUser.id).limit(1),
   ]);
   const vehicule = jour.vehicleId;
@@ -95,10 +108,12 @@ export async function creerTournee(supabase: SupabaseClient, appUser: Pick<AppUs
       start_lng: start?.lng ?? null,
       ...(vehicule ? { vehicle_id: vehicule } : {}),
       ...(service ? { service_id: service } : {}),
+      ...(affectation ? { planning_entry_id: affectation.planningEntryId, fiche_planifiee: true } : {}),
     })
     .select(RUN_FIELDS)
     .single();
-  if (error) throw new Error(error.message);
+  // Code conservé (23505) : les appelants reprennent la fiche concurrente.
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   return data;
 }
 
