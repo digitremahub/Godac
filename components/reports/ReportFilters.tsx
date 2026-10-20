@@ -10,7 +10,7 @@ interface Option {
   full_name?: string;
 }
 
-/** Date range + service + driver filters for /reports — same pattern as TourHistoryFilters, kept in sync with the "view" tab. */
+/** Date range + service + driver filters for Exploitation › Historique › Rapports / Photos — same pattern as TourHistoryFilters. */
 export function ReportFilters({
   view,
   from,
@@ -34,7 +34,6 @@ export function ReportFilters({
 
   function apply(overrides: Record<string, string>) {
     const qs = new URLSearchParams({
-      view,
       from: localFrom,
       to: localTo,
       service: selectedService,
@@ -44,7 +43,7 @@ export function ReportFilters({
     for (const [key, value] of Array.from(qs.entries())) {
       if (!value) qs.delete(key);
     }
-    router.push(`/reports?${qs.toString()}`);
+    router.push(`${view === "photos" ? "/exploitation/historique/photos" : "/exploitation/historique/rapports"}?${qs.toString()}`);
   }
 
   return (

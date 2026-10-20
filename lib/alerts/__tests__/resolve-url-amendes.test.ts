@@ -3,8 +3,8 @@ import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 
 describe("lien de l'alerte d'amende (I21)", () => {
   it("le chauffeur destinataire ouvre ses amendes, pas /flotte/amendes", () => {
-    expect(resolveAlertUrl("fines", "fine_notification", "f1", { recipientUserId: "u1" })).toBe("/mes-amendes");
-    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "chauffeur" })).toBe("/mes-amendes");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1", { recipientUserId: "u1" })).toBe("/moi/amendes");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "chauffeur" })).toBe("/moi/amendes");
   });
   it("l'encadrement (contestation adressée à la direction) ouvre la gestion des amendes", () => {
     expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "direction" })).toBe("/flotte/amendes");

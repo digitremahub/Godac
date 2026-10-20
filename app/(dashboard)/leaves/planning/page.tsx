@@ -5,7 +5,7 @@ import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/d
 
 /**
  * Direction's own "qui couvre qui" view — separate from the work
- * planning (planning_entries, /planning): this is about absence
+ * planning (planning_entries, /exploitation/planning): this is about absence
  * coverage (leave_requests), not tours/vehicles. A manager approves a
  * leave on /leaves same as before; this page is only for assigning
  * who replaces them, across the whole organisation at a glance.

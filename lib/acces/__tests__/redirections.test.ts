@@ -75,6 +75,30 @@ const ANCIENNES = [
   "/loueurs",
   "/fines",
   "/qr-codes",
+  // Mon espace
+  "/tours/start",
+  "/tours/start?vehicle=123",
+  "/tours/end",
+  "/tours/help",
+  "/planning/mine",
+  "/planning/mine?entry=abc",
+  "/my-vehicle",
+  "/mes-amendes",
+  "/my-fines",
+  "/payslips",
+  "/time-clock",
+  "/leaves",
+  // Exploitation
+  "/planning",
+  "/planning?view=week&week=2026-10-19",
+  "/tours/routes",
+  "/colis",
+  "/colis?onglet=historique",
+  "/suivi",
+  "/tours/history",
+  "/reports",
+  "/reports?view=photos",
+  "/contestations",
 ];
 
 describe("redirections des anciennes adresses", () => {
@@ -90,6 +114,9 @@ describe("redirections des anciennes adresses", () => {
     expect(rediriger("/fuel?new=1&vehicle=123")).toBe("/carburant/pleins?new=1&vehicle=123");
     expect(rediriger("/tanks?tab=approvisionnements")?.startsWith("/carburant/approvisionnements")).toBe(true);
     expect(rediriger("/vehicles/new")).toBe("/flotte/vehicules/nouveau");
+    expect(rediriger("/colis?onglet=historique")?.startsWith("/exploitation/historique/colis")).toBe(true);
+    expect(rediriger("/reports?view=photos")?.startsWith("/exploitation/historique/photos")).toBe(true);
+    expect(rediriger("/planning/mine?entry=abc")).toBe("/moi/planning?entry=abc");
     expect(rediriger("/vehicles/abc")).toBe("/flotte/vehicules/abc");
     for (const [i, r] of REGLES.entries()) {
       if (r.has) continue;

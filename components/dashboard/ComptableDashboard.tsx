@@ -113,7 +113,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Vue d'ensemble exploitation & comptabilité." />
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Link href="/tours/history" className="block">
+        <Link href="/exploitation/historique" className="block">
           <StatTile label="Tournées en cours" value={String(ongoingTours.length)} accent="teal" />
         </Link>
         {/* La revue OCR est réservée à l'encadrement : le comptable consulte la liste filtrée des pleins. */}
@@ -121,7 +121,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           <StatTile label="Tickets OCR en attente" value={String(pendingOcrRes.count ?? 0)} accent="gold" />
         </Link>
         {leaveEnabled && (
-          <Link href="/leaves" className="block">
+          <Link href="/moi/conges" className="block">
             <StatTile label="Congés en attente" value={String(pendingLeaveRes.count ?? 0)} accent="gold" />
           </Link>
         )}

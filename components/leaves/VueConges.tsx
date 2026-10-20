@@ -1,26 +1,26 @@
-import { garderPage } from "@/lib/acces/garde-page";
-import { hasRole } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
 import { findOverlappingLeaves } from "@/lib/business/leave-overlap";
 import { PageHeader } from "@/components/ui";
 import { LeaveRequestForm } from "@/components/leaves/LeaveRequestForm";
 import { LeaveRequestsList } from "@/components/leaves/LeaveRequestsList";
 
-export default async function LeavesPage() {
-  const g = await garderPage("moi.conges");
-  if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-
-
-  const isDecisionMaker = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+/**
+ * Congés : Équipe › Congés (encadrement : décisions sur son service, avec
+ * détection de chevauchement) et Mon espace › Mes congés (ses demandes).
+ */
+export async function VueConges({ appUser, supabase, decision }: { appUser: AppUser; supabase: SupabaseClient; decision: boolean }) {
+  const isDecisionMaker = decision;
 
   const [{ data: myServices }, { data: leaves }] = await Promise.all([
     supabase.from("user_services").select("services(id, name)").eq("user_id", appUser.id),
     supabase
       .from("leave_requests")
       .select("id, driver_id, service_id, start_date, end_date, status, reason, created_at, users!leave_requests_driver_id_fkey(full_name), services(name)")
-      .order("start_date", { ascending: false }),
+      .order("start_date", { ascending: false })
+      // Mes congés : ses propres demandes, même pour un manager.
+      .match(decision ? {} : { driver_id: appUser.id }),
   ]);
 
   const serviceOptions = (myServices ?? [])
@@ -48,8 +48,8 @@ export default async function LeavesPage() {
   return (
     <div>
       <PageHeader
-        title="Congés & Absences"
-        description="Demandes de congés avec détection de chevauchement au sein d'un même service."
+        title={decision ? "Congés & absences" : "Mes congés"}
+        description={decision ? "Demandes de congés avec détection de chevauchement au sein d'un même service." : "Vos demandes de congés et leur statut."}
       />
 
       <div className="mb-6">

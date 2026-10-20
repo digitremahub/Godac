@@ -69,7 +69,7 @@ export function lireFiltres(params: Record<string, string | string[] | undefined
 
 /** Paramètres d'URL d'un jeu de filtres (période par défaut omise : liens courts). */
 export function versParams(f: Partial<FiltresHistorique>, aujourdhui: string, extra: Record<string, string | null | undefined> = {}): URLSearchParams {
-  const q = new URLSearchParams({ onglet: "historique" });
+  const q = new URLSearchParams();
   const defaut = lireFiltres({}, aujourdhui);
   if (f.du && f.du !== defaut.du) q.set("du", f.du);
   if (f.au && f.au !== defaut.au) q.set("au", f.au);

@@ -61,7 +61,7 @@ export function PlanningListView({
   function navTo(nextWeekStart: string) {
     const qs = new URLSearchParams({ view: "list", week: nextWeekStart });
     if (selectedService) qs.set("service", selectedService);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   function toDatetimeLocal(iso: string): string {

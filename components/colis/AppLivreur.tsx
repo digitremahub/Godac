@@ -377,7 +377,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
+          <Link href="/exploitation/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
             <span aria-hidden="true" className="text-lg leading-none">‹</span>
             <Wordmark inverted height={22} />
           </Link>
@@ -594,7 +594,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
           <section className="flex flex-col items-center gap-3 py-10 text-center">
             <p className="font-display text-xl font-bold">{prenom ? `Bonjour ${prenom}` : "Bonjour"}</p>
             <p className="text-sm text-navy/65">Aucune tournée colis en cours. Chargez vos colis pour commencer.</p>
-            <Link href="/colis" className="btn-primary !py-3">
+            <Link href="/exploitation/colis" className="btn-primary !py-3">
               Charger mes colis
             </Link>
           </section>
@@ -607,7 +607,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demanderDemarrage}>
               Vérifier les villages et démarrer
             </button>
-            <Link href="/colis" className="btn-ghost w-fit !px-2 text-sm">
+            <Link href="/exploitation/colis" className="btn-ghost w-fit !px-2 text-sm">
               Ajouter ou modifier des colis
             </Link>
           </section>

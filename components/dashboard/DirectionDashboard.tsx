@@ -163,11 +163,11 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const pendingTiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
     { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/driver-signups" },
   ];
-  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
+  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
   if (maintenanceEnabled)
     pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
   if (payslipsEnabled && missingPayslips !== null)
-    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/payslips" });
+    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/equipe/paie/fiches" });
 
   return (
     <div>
@@ -176,7 +176,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="Véhicules actifs" value={String((activeVehiclesRes.data ?? []).length)} />
         <StatTile label="Chauffeurs actifs" value={String(activeDriversRes.count ?? 0)} accent="gold" />
-        <Link href="/tours/history" className="block">
+        <Link href="/exploitation/historique" className="block">
           <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
         </Link>
         <Link href="/alerts" className="block">
@@ -195,7 +195,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
             <h2 className="text-lg">Tournées actuellement effectuées</h2>
             <p className="text-sm text-navy/60">Suivi des fiches chauffeur réellement démarrées.</p>
           </div>
-          <Link href="/tours/history" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
+          <Link href="/exploitation/historique" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
         </div>
         {ongoingRuns.length === 0 ? (
           <p className="text-sm text-navy/60">Aucune fiche chauffeur en cours pour le moment.</p>

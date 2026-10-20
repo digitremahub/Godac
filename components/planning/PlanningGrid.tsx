@@ -206,7 +206,7 @@ export function PlanningGrid({
     const qs = new URLSearchParams();
     qs.set("week", week);
     if (service) qs.set("service", service);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   function jumpToDate(value: string) {

@@ -1,4 +1,6 @@
-import { garderPage } from "@/lib/acces/garde-page";
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ClockButton } from "@/components/time-clock/ClockButton";
 import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/classify-location";
@@ -48,16 +50,12 @@ function mapLink(coords: Coordinates | null) {
  * classify-location.ts) so direction can cross-check "badged in at
  * the depot" vs "badged in from home" before trusting it for hours.
  */
-export default async function TimeClockPage() {
-  const g = await garderPage("moi.pointage");
-  if (!g.ok) return g.ecran;
-  const { appUser, supabase } = g;
-
-  // Décision client Q3 : vue d'équipe pour la direction (tous) et les
-  // managers (membres de leur service, filtrés par la RLS
-  // « time_clock: manager reads service »). Les autres : leur historique.
+export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppUser; supabase: SupabaseClient; equipe: boolean }) {
+  // Décision client Q3 : vue d'équipe (Équipe › Pointage) pour la direction
+  // (tous) et les managers (membres de leur service, filtrés par la RLS
+  // « time_clock: manager reads service »). Mon espace › Mon pointage : soi.
   const isDirection = appUser.role === "direction";
-  const vueEquipe = isDirection || appUser.role === "manager" || appUser.role === "manager_chauffeur";
+  const vueEquipe = equipe;
 
   const [{ data: openEntry }, { depotsFor }] = await Promise.all([
     supabase.from("time_clock_entries").select("id").eq("user_id", appUser.id).is("clocked_out_at", null).maybeSingle(),
@@ -83,7 +81,7 @@ export default async function TimeClockPage() {
         <ClockButton clockedIn={Boolean(openEntry)} />
       </div>
 
-      <h3 className="mb-2 text-base">{isDirection ? "Historique (tous les employés)" : vueEquipe ? "Historique (vous et votre service)" : "Mon historique"}</h3>
+      <h3 className="mb-2 text-base">{vueEquipe ? (isDirection ? "Historique (tous les employés)" : "Historique (vous et votre service)") : "Mon historique"}</h3>
       {(entries ?? []).length === 0 ? (
         <EmptyState title="Aucun badgeage enregistré." />
       ) : (

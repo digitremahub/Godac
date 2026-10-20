@@ -1,5 +1,5 @@
 import Link from "next/link";
-import HistoriqueCarte from "@/components/colis/HistoriqueCarte";
+import HistoriqueCarte from "@/components/colis/HistoriqueCarteDynamique";
 import { Card, EmptyState } from "@/components/ui";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
 import { versParams, type Historique, type detailTournee, type LigneColis, type RechercheColis, type rechercherColis } from "@/lib/colis/historique";
@@ -39,7 +39,7 @@ export function HistoriqueTournees({
 }) {
   const { filtres, lignes, page, pages, total } = historique;
   const garde = { q: recherche.q, statut: recherche.statut };
-  const lien = (extra: Record<string, string | null>, p = page) => `/colis?${versParams({ ...filtres, page: p }, aujourdhui, { ...garde, ...extra }).toString()}`;
+  const lien = (extra: Record<string, string | null>, p = page) => `/exploitation/historique/colis?${versParams({ ...filtres, page: p }, aujourdhui, { ...garde, ...extra }).toString()}`;
 
   return (
     <div className="flex flex-col gap-4">

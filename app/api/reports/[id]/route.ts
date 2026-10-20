@@ -29,7 +29,7 @@ const bodySchema = z.object({
 
 /**
  * Lets direction fill in whatever the OCR pass (lib/ocr/tour-report.ts)
- * missed or misread — /reports only ever displayed report_* fields
+ * missed or misread — /exploitation/historique/rapports only ever displayed report_* fields
  * read-only until now, with no way to correct a "—" without re-taking
  * the photo. Scoped to direction only (not manager-like) since this
  * edits numbers that feed TICPE export and fuel-profitability

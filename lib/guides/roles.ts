@@ -54,28 +54,28 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
         titre: "Pointer l'arrivée et le départ",
         texte:
           "En arrivant au dépôt, ouvrez GODAC : si le pointage assisté est actif, votre entrée est pointée toute seule (vous pouvez l'annuler). Sinon, touchez « Badger l'entrée ». En fin de journée, GODAC vous propose de badger la sortie.",
-        lien: { href: "/time-clock", label: "Pointeuse" },
+        lien: { href: "/moi/pointage", label: "Mon pointage" },
         module: "time_clock",
       },
       {
         titre: "Voir mon planning",
         texte:
           "« Mon planning » affiche vos tournées jour par jour. Les deux coches vertes indiquent votre présence : celle du haut pour le matin, celle du bas pour le soir.",
-        lien: { href: "/planning/mine", label: "Mon planning" },
+        lien: { href: "/moi/planning", label: "Mon planning" },
         module: "planning",
       },
       {
         titre: "Démarrer et terminer une tournée",
         texte:
           "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre de stops de ramasse (inscrit à la main sur la feuille) : ils sont déduits des stops du scan, les colis REMIS comptent comme stops livrés. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
-        lien: { href: "/tours/start", label: "Démarrer une tournée" },
+        lien: { href: "/moi/tournee/depart", label: "Démarrer une tournée" },
         module: "planning",
       },
       {
         titre: "Les villages de ma tournée",
         texte:
           "« Tournées & villages » donne, en liste, les villages des tournées de votre service (et de celles où vous êtes planifié), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
-        lien: { href: "/tours/routes", label: "Tournées & villages" },
+        lien: { href: "/exploitation/tournees", label: "Tournées & villages" },
         module: "planning",
       },
     ],
@@ -92,7 +92,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Mon véhicule et ses papiers",
         texte: "« Mon véhicule » regroupe la carte grise, l'assurance et les contrôles du camion que vous conduisez.",
-        lien: { href: "/my-vehicle", label: "Mon véhicule" },
+        lien: { href: "/moi/vehicule", label: "Mon véhicule" },
       },
       {
         titre: "Signaler un problème sur le véhicule",
@@ -109,7 +109,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
         titre: "Charger les colis",
         texte:
           "« Tournée colis » → scannez chaque colis (QR, Datamatrix ou code-barres), ou photographiez l'étiquette. Les adresses et le téléphone du client s'ajoutent tout seuls. Vous pouvez aussi importer un itinéraire Google Maps.",
-        lien: { href: "/colis", label: "Tournée colis" },
+        lien: { href: "/exploitation/colis", label: "Tournée colis" },
         module: "route_optimizer",
       },
       {
@@ -130,11 +130,11 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
   {
     titre: "Équipe et documents",
     etapes: [
-      { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
+      { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/moi/conges", label: "Mes congés" }, module: "leave_management" },
       { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/intranet", label: "Intranet" }, module: "intranet" },
       { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : le groupe de votre équipe, les Infos équipe épinglées, @prénom pour mentionner un collègue ; messages, photos et documents restent dans l'entreprise.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
-      { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/payslips", label: "Fiches de paie" }, module: "payslips" },
-      { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/contestations", label: "Contestations" }, module: "customer_disputes" },
+      { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/moi/fiches-de-paie", label: "Fiches de paie" }, module: "payslips" },
+      { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/exploitation/contestations", label: "Contestations" }, module: "customer_disputes" },
     ],
   },
 ];
@@ -156,16 +156,16 @@ const ENCADREMENT: SectionGuide[] = [
         titre: "Construire le planning",
         texte:
           "« Planning » affiche la semaine à l'horizontale : affectez chaque chauffeur à une tournée et un véhicule, dupliquez une case, suivez les présences (coche du haut = matin, du bas = soir). Les chauffeurs sont prévenus des changements.",
-        lien: { href: "/planning", label: "Planning" },
+        lien: { href: "/exploitation/planning", label: "Planning" },
         module: "planning",
       },
       {
         titre: "Tournées, villages et chefs d'équipe",
         texte:
           "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
-        lien: { href: "/tours/routes", label: "Tournées & villages" }, module: "planning" },
+        lien: { href: "/exploitation/tournees", label: "Tournées & villages" }, module: "planning" },
       { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
-      { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
+      { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/equipe/conges", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
       { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/flotte/badges", label: "Badges QR" } },
     ],
@@ -187,15 +187,15 @@ const ENCADREMENT: SectionGuide[] = [
         titre: "Suivre les tournées en direct",
         texte:
           "« Suivi des tournées » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 30 secondes.",
-        lien: { href: "/suivi", label: "Suivi des tournées" },
+        lien: { href: "/exploitation/suivi", label: "Suivi des tournées" },
         module: "route_optimizer",
       },
-      { titre: "Rapports de tournée", texte: "Kilométrages, horaires et rapports de chaque tournée terminée.", lien: { href: "/reports", label: "Rapports de tournée" }, module: "planning" },
+      { titre: "Rapports de tournée", texte: "Kilométrages, horaires et rapports de chaque tournée terminée.", lien: { href: "/exploitation/historique/rapports", label: "Rapports de tournée" }, module: "planning" },
       {
         titre: "Contestations clients",
         texte:
           "Déposez la réclamation (photo ou PDF) : GODAC la lit et propose le chauffeur concerné. Vous validez avant toute notification ; la photo de livraison s'affiche quand la livraison est retrouvée.",
-        lien: { href: "/contestations", label: "Contestations" },
+        lien: { href: "/exploitation/contestations", label: "Contestations" },
         module: "customer_disputes",
       },
       { titre: "Alertes", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Alertes ».", lien: { href: "/alerts", label: "Alertes" } },

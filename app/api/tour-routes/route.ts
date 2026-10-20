@@ -9,7 +9,7 @@ const bodySchema = z.object({
   service_id: z.string().uuid(),
 });
 
-/** Creates a tour's reference sheet (villages are added on /tours/routes). */
+/** Creates a tour's reference sheet (villages are added on /exploitation/tournees). */
 export async function POST(req: Request) {
   const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
   if (!g.ok) return g.reponse;

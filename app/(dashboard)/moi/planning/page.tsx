@@ -25,7 +25,7 @@ const timeFmt = (iso: string) =>
 /** One tour on one line: status dot, n°, truck, hours — readable at a glance on a phone. */
 function TourLine({ entry, day }: { entry: any; day: string }) {
   return (
-    <Link href={"/planning/mine?view=day&anchor=" + day + "&entry=" + entry.id} className="flex min-w-0 items-center gap-2 rounded-md text-sm hover:bg-teal/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-ink">
+    <Link href={"/moi/planning?view=day&anchor=" + day + "&entry=" + entry.id} className="flex min-w-0 items-center gap-2 rounded-md text-sm hover:bg-teal/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-ink">
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[entry.status] ?? "bg-navy/30"}`} />
       <span className="shrink-0 font-semibold tabular-nums">{libelleEntreePlanning(entry)}</span>
       <span className="min-w-0 truncate text-navy/70">{entry.vehicles?.registration ?? "—"}</span>
@@ -78,7 +78,7 @@ function windowFor(view: ViewMode, anchor: string): { start: string; end: string
 
 /**
  * Read-only, own-tours-only counterpart to the manager-facing
- * /planning grid — a chauffeur has no reason to see other drivers'
+ * /exploitation/planning grid — a chauffeur has no reason to see other drivers'
  * assignments or drag anything around, just "what am I doing". RLS
  * (planning_entries: read within org, driver_id =
  * current_app_user_id()) already scopes this correctly for any role,
@@ -106,7 +106,7 @@ export default async function MyPlanningPage({
 
   // Month view's calendar grid shows leading/trailing days from
   // adjacent months (to fill out the 7-column grid) — read those
-  // days' entries too, same as the manager-facing /planning month
+  // days' entries too, same as the manager-facing /exploitation/planning month
   // view, so a tour on e.g. the last Monday of the previous month
   // isn't silently missing from the grid.
   const calendarDays = view === "month" ? monthCalendarDays(anchor.slice(0, 7)) : null;
@@ -170,7 +170,7 @@ export default async function MyPlanningPage({
               <h2 className="mt-1 text-xl font-bold">Tournée n°{selectedEntry.tour_number}</h2>
               <p className="mt-1 text-sm text-navy/70">{new Date(selectedEntry.start_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" })} · {timeFmt(selectedEntry.start_at)}{selectedEntry.end_at ? "–" + timeFmt(selectedEntry.end_at) : ""}</p>
             </div>
-            <Link href={"/planning/mine?view=day&anchor=" + parisCalendarDate(selectedEntry.start_at)} className="btn-secondary !px-3 !py-1.5 text-sm">Fermer</Link>
+            <Link href={"/moi/planning?view=day&anchor=" + parisCalendarDate(selectedEntry.start_at)} className="btn-secondary !px-3 !py-1.5 text-sm">Fermer</Link>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-surface p-3">
@@ -207,7 +207,7 @@ export default async function MyPlanningPage({
         {(["month", "week", "day"] as const).map((v) => (
           <Link
             key={v}
-            href={`/planning/mine?view=${v}&anchor=${anchor}`}
+            href={`/moi/planning?view=${v}&anchor=${anchor}`}
             className={v === view ? "btn-primary !px-3 !py-1.5 text-sm" : "btn-secondary !px-3 !py-1.5 text-sm"}
           >
             {v === "day" ? "Jour" : v === "week" ? "Semaine" : "Mois"}
@@ -216,11 +216,11 @@ export default async function MyPlanningPage({
       </div>
 
       <div className="mb-4 flex items-center gap-3">
-        <Link href={`/planning/mine?view=${view}&anchor=${prevAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <Link href={`/moi/planning?view=${view}&anchor=${prevAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           ← Préc.
         </Link>
         <span className="text-sm capitalize text-navy/70">{label}</span>
-        <Link href={`/planning/mine?view=${view}&anchor=${nextAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <Link href={`/moi/planning?view=${view}&anchor=${nextAnchor}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           Suiv. →
         </Link>
       </div>
@@ -249,7 +249,7 @@ export default async function MyPlanningPage({
               return (
                 <Link
                   key={dayISO}
-                  href={`/planning/mine?view=day&anchor=${dayISO}`}
+                  href={`/moi/planning?view=day&anchor=${dayISO}`}
                   aria-label={`${Number(dayISO.slice(8, 10))} : ${dayEntries.length ? dayEntries.map((e) => (estPresence(e) ? "présence" : `tournée ${e.tour_number}`)).join(", ") : "repos"}`}
                   className={`flex min-h-[58px] flex-col gap-1 rounded-lg border p-1 sm:min-h-[78px] sm:p-1.5 ${
                     !inMonth ? "border-transparent opacity-40" : first ? "border-navy/10 bg-surface" : "border-navy/[0.06] bg-transparent"
@@ -274,13 +274,13 @@ export default async function MyPlanningPage({
             {monthTourDays.length === 0 ? (
               <p className="text-sm text-navy/65">Aucune tournée ce mois-ci.</p>
             ) : (
-              <DayStrip days={monthTourDays} toursByDay={toursByDay} today={today} dayHrefPrefix="/planning/mine?view=day&anchor=" />
+              <DayStrip days={monthTourDays} toursByDay={toursByDay} today={today} dayHrefPrefix="/moi/planning?view=day&anchor=" />
             )}
           </Card>
         </div>
       ) : view === "week" ? (
         <Card>
-          <DayStrip days={days} toursByDay={toursByDay} today={today} dayHrefPrefix="/planning/mine?view=day&anchor=" />
+          <DayStrip days={days} toursByDay={toursByDay} today={today} dayHrefPrefix="/moi/planning?view=day&anchor=" />
         </Card>
       ) : (
         <Card className="!p-0">

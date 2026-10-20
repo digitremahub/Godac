@@ -84,7 +84,7 @@ export default async function AccountPage() {
         <Card className="flex max-w-md flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Mes fiches de paie</p>
-            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+            <Link href="/moi/fiches-de-paie" className="text-xs text-teal-ink hover:underline">
               Voir tout →
             </Link>
           </div>

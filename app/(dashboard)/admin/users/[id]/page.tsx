@@ -353,7 +353,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <Card className="mb-6 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Fiches de paie</p>
-            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+            <Link href="/equipe/paie/fiches" className="text-xs text-teal-ink hover:underline">
               {isDirection ? "Générer / voir tout →" : "Voir tout →"}
             </Link>
           </div>
@@ -387,7 +387,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <Card className="mb-6 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Congés récents</p>
-            <Link href="/leaves" className="text-xs text-teal-ink hover:underline">
+            <Link href="/equipe/conges" className="text-xs text-teal-ink hover:underline">
               Voir tout →
             </Link>
           </div>
@@ -413,7 +413,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <div className="mb-6">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-base">Historique des tournées</h3>
-            <Link href={`/tours/history?driver=${id}`} className="text-sm text-teal-ink hover:underline">
+            <Link href={`/exploitation/historique?driver=${id}`} className="text-sm text-teal-ink hover:underline">
               Voir tout →
             </Link>
           </div>

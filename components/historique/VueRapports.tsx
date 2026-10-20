@@ -1,7 +1,8 @@
-import { garderPage } from "@/lib/acces/garde-page";
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { ReportsViewTabs } from "@/components/reports/ReportsViewTabs";
 import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable";
 import { addDays, todayISO } from "@/lib/planning/dates";
@@ -36,8 +37,7 @@ const REPORT_FIELDS_FILTER = [
   "report_return_time.not.is.null",
 ].join(",");
 
-interface ReportsSearchParams {
-  view?: string;
+export interface ReportsSearchParams {
   from?: string;
   to?: string;
   service?: string;
@@ -58,14 +58,8 @@ interface ReportsSearchParams {
  * — the service dropdown just lets them narrow further when they
  * manage more than one.
  */
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportsSearchParams> }) {
-  const params = await searchParams;
-  const view = params.view === "photos" ? "photos" : "table";
-  const g = await garderPage("exploitation.rapports");
-  if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-
+export async function VueRapports({ params, vue, appUser, supabase }: { params: ReportsSearchParams; vue: "table" | "photos"; appUser: AppUser; supabase: SupabaseClient }) {
+  const view = vue;
 
   const isDirection = appUser.role === "direction";
   const from = params.from && !Number.isNaN(Date.parse(params.from)) ? params.from : addDays(todayISO(), -30);
@@ -85,10 +79,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div>
       <PageHeader
-        title="Rapports de tournée"
+        title={view === "photos" ? "Photos de tournée" : "Rapports de tournée"}
         description="Données lues automatiquement sur les photos de feuille de tournée (départ/retour) — numéro de BL, horaires, arrêts, colis."
       />
-      <ReportsViewTabs view={view} />
       <ReportFilters
         view={view}
         from={from}

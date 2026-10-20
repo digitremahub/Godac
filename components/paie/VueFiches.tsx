@@ -1,8 +1,9 @@
-import { garderPage } from "@/lib/acces/garde-page";
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
 import { BadgeValidation } from "@/components/paie/ValidationBulletins";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import Link from "next/link";
-import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
 
@@ -13,15 +14,11 @@ const MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "num
  * generated PDF and the legality discussion that scoped this down).
  * Direction generates for anyone; everyone else sees only their own.
  */
-export default async function PayslipsPage() {
-  const g = await garderPage("moi.fiches_paie");
-  if (!g.ok) return g.ecran;
-  const { appUser, supabase } = g;
-
-  // Direction : tous les bulletins, avec leur statut de validation.
-  // Les autres (comptable compris, pour ses propres fiches) : leurs
+export async function VueFiches({ appUser, supabase, toutes }: { appUser: AppUser; supabase: SupabaseClient; toutes: boolean }) {
+  // Équipe › Paie › Fiches (direction, comptable) : tous les bulletins avec
+  // leur statut de validation. Mon espace › Mes fiches de paie : ses
   // bulletins VALIDÉS uniquement — la RLS l'impose aussi au salarié.
-  const isDirection = appUser.role === "direction";
+  const isDirection = toutes;
 
   const [{ data: payslipRows }] = await Promise.all([
     (() => {
@@ -45,15 +42,14 @@ export default async function PayslipsPage() {
   return (
     <div>
       <PageHeader
-        title={isDirection ? "Paie & salaires" : "Fiches de paie"}
+        title={isDirection ? "Fiches de paie" : "Mes fiches de paie"}
         description="Bulletins indicatifs générés à partir du salaire brut/net enregistré."
       />
-      {isDirection && <OngletsPaie actif="fiches" paie planning={g.modules.has("planning")} />}
 
       {isDirection && (
         <Card className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
           <span>Les bulletins se préparent salarié par salarié dans le moteur de paie (heures, primes, cotisations).</span>
-          <Link href="/paie" className="btn-primary !py-2 text-sm">
+          <Link href="/equipe/paie" className="btn-primary !py-2 text-sm">
             Préparer les bulletins
           </Link>
         </Card>
