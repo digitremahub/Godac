@@ -22,9 +22,30 @@ function secret(): string {
   return s;
 }
 
+/**
+ * Secret utilisé avant la création de PIN_PEPPER (repli sur la clé
+ * service) : les PIN convertis à cette époque sont encore acceptés, puis
+ * réécrits avec PIN_PEPPER à la première connexion réussie.
+ */
+function secretHerite(): string | null {
+  if (!process.env.PIN_PEPPER) return null;
+  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return s && s !== process.env.PIN_PEPPER ? s : null;
+}
+
+function empreinte(cle: string, userId: string, pin: string): string {
+  return createHmac("sha256", cle).update(`${userId}:${pin}`).digest("hex");
+}
+
 /** Mot de passe Supabase dérivé du PIN (jamais exposé au navigateur). */
 export function motDePassePin(userId: string, pin: string): string {
-  return createHmac("sha256", secret()).update(`${userId}:${pin}`).digest("hex");
+  return empreinte(secret(), userId, pin);
+}
+
+/** Mots de passe acceptés à la connexion, hors celui en vigueur : ancienne clé, puis PIN en clair (comptes historiques). */
+export function motsDePasseHerites(userId: string, pin: string): string[] {
+  const herite = secretHerite();
+  return [...(herite ? [empreinte(herite, userId, pin)] : []), pin];
 }
 
 /** État du verrou : minutes restantes si verrouillé. */
@@ -63,13 +84,16 @@ export async function verifierPin(
   const securise = motDePassePin(user.id, pin);
   let ok = !(await client.auth.signInWithPassword({ email: user.email, password: securise })).error;
   if (!ok) {
-    // Ancien compte : mot de passe = PIN. Converti dès qu'il est confirmé.
-    const sonde = sondeAnonyme();
-    const ancien = await sonde.auth.signInWithPassword({ email: user.email, password: pin });
-    if (!ancien.error) {
+    // Ancien compte (PIN chiffré avant PIN_PEPPER, ou mot de passe = PIN) :
+    // converti au mot de passe en vigueur dès qu'il est confirmé.
+    for (const ancienMotDePasse of motsDePasseHerites(user.id, pin)) {
+      const sonde = sondeAnonyme();
+      const ancien = await sonde.auth.signInWithPassword({ email: user.email, password: ancienMotDePasse });
+      if (ancien.error) continue;
       await sonde.auth.signOut({ scope: "local" });
       await admin.auth.admin.updateUserById(user.id, { password: securise });
       ok = !(await client.auth.signInWithPassword({ email: user.email, password: securise })).error;
+      break;
     }
   }
   if (!session && ok) await client.auth.signOut({ scope: "local" });
