@@ -190,7 +190,7 @@ export async function ChauffeurDashboard({
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         {maintenanceEnabled && (
-          <Link href="/maintenance" className="block">
+          <Link href="/moi/signaler" className="block">
             <StatTile label="Mes demandes d'entretien en cours" value={String(myMaintenanceRes.count ?? 0)} accent="gold" />
           </Link>
         )}

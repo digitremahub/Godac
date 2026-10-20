@@ -104,7 +104,7 @@ export function RentalRequestsList({ requests, showVehicle = true }: { requests:
                 <p className="font-semibold">
                   {showVehicle && (
                     <>
-                      <Link href={`/vehicles/${r.vehicleId}#location`} className="hover:underline">
+                      <Link href={`/flotte/vehicules/${r.vehicleId}#location`} className="hover:underline">
                         {r.registration}
                       </Link>{" "}
                       ·{" "}

@@ -141,7 +141,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
-      router.push(`/vehicles/${json.vehicle.id}`);
+      router.push(`/flotte/vehicules/${json.vehicle.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {

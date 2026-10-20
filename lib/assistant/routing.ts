@@ -4,7 +4,7 @@ import type { UserRole } from "@/lib/types/domain";
  * Lot B — pure classification + routing rules for the human relay,
  * kept separate from any AI call so they're deterministic and unit
  * tested. "Which specific manager" (service-scoped) is resolved at
- * query time on /support (same convention as /qr-codes and the
+ * query time on /support (same convention as /flotte/badges and the
  * dashboard's "tournées en cours" widget — see their own comments),
  * not stored as extra routing state here.
  */

@@ -143,7 +143,7 @@ export function Sidebar({
                 <span style={estActif ? { color: accent } : undefined} className={`shrink-0 transition-colors ${estActif ? "" : "text-white/55 group-hover:text-white/80"}`}>
                   <Icon className="h-[18px] w-[18px]" />
                 </span>
-                <span className="truncate">{item.libelle}</span>
+                <span className="truncate">{item.libelleOnglet ?? item.libelle}</span>
               </Link>
             );
           })}

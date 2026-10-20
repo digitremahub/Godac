@@ -28,7 +28,7 @@ export default async function RentalProvidersPage() {
         title="Loueurs & prestataires"
         description="Loueurs, garages et loueurs avec entretien inclus. Ils reçoivent les demandes d'entretien des véhicules loués après validation d'un responsable."
         actions={
-          <Link href="/loueurs/demandes" className="btn-secondary">
+          <Link href="/flotte/loueurs" className="btn-secondary">
             Demandes transmises →
           </Link>
         }

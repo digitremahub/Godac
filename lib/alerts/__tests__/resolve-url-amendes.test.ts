@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 
 describe("lien de l'alerte d'amende (I21)", () => {
-  it("le chauffeur destinataire ouvre ses amendes, pas /fines", () => {
+  it("le chauffeur destinataire ouvre ses amendes, pas /flotte/amendes", () => {
     expect(resolveAlertUrl("fines", "fine_notification", "f1", { recipientUserId: "u1" })).toBe("/mes-amendes");
     expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "chauffeur" })).toBe("/mes-amendes");
   });
   it("l'encadrement (contestation adressée à la direction) ouvre la gestion des amendes", () => {
-    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "direction" })).toBe("/fines");
-    expect(resolveAlertUrl("fines", "fine_notification", "f1")).toBe("/fines");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "direction" })).toBe("/flotte/amendes");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1")).toBe("/flotte/amendes");
   });
   it("bulletins en attente de validation → Paie", () => {
     expect(resolveAlertUrl("payslips", "payslip_validation", "p1")).toBe("/paie");

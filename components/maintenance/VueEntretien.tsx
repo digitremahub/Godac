@@ -1,7 +1,8 @@
-import { garderPage } from "@/lib/acces/garde-page";
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
 import Link from "next/link";
 import { hasRole } from "@/lib/auth/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
 import { MaintenanceRequestForm } from "@/components/maintenance/MaintenanceRequestForm";
@@ -9,18 +10,12 @@ import { MaintenanceRequestsList } from "@/components/maintenance/MaintenanceReq
 
 const URGENCY_RANK: Record<string, number> = { critical: 0, high: 1, normal: 2, low: 3 };
 
-export default async function MaintenancePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ vehicle?: string }>;
-}) {
-  const g = await garderPage("flotte.entretien");
-  if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  const { vehicle } = await searchParams;
-
-
+/**
+ * Demandes d'entretien : Flotte › Entretien (encadrement, traitement) et
+ * Mon espace › Signaler un problème (chauffeur, mêmes formulaire et liste
+ * filtrée par la RLS).
+ */
+export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demandes d'entretien" }: { appUser: AppUser; supabase: SupabaseClient; vehicle?: string; titre?: string }) {
   const [{ data: vehicles }, { data: requests }, { data: organization }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active").order("registration"),
     supabase
@@ -58,12 +53,12 @@ export default async function MaintenancePage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Demandes d'entretien"
+        title={titre}
         description="Signalement chauffeur → gestionnaire, avec niveau d'urgence."
       />
 
       {rentalToValidate > 0 && (
-        <Link href="/loueurs/demandes?statut=a_valider" className="card flex items-center justify-between gap-3 border-gold/50 text-sm hover:border-gold">
+        <Link href="/flotte/loueurs?statut=a_valider" className="card flex items-center justify-between gap-3 border-gold/50 text-sm hover:border-gold">
           <span>
             <strong>{rentalToValidate}</strong> demande{rentalToValidate > 1 ? "s" : ""} sur des véhicules loués à valider avant transmission au loueur.
           </span>

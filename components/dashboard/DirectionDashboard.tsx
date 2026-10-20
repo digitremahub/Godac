@@ -165,7 +165,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   ];
   if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
   if (maintenanceEnabled)
-    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/maintenance" });
+    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
   if (payslipsEnabled && missingPayslips !== null)
     pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/payslips" });
 

@@ -5,7 +5,7 @@ import { SupportRequestsList } from "@/components/assistant/SupportRequestsList"
 
 /**
  * Manager-like inbox for the assistant's human relay. Same
- * query-level service-scoping convention as /qr-codes and the
+ * query-level service-scoping convention as /flotte/badges and the
  * dashboard's "tournées en cours" widget (see their own comments) —
  * direction sees every request, manager/manager_chauffeur only those
  * from their own service(s) — rather than a new RLS policy, to avoid

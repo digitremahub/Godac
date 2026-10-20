@@ -45,7 +45,7 @@ export default async function TicpePage() {
           <ul className="flex flex-col gap-1 text-sm">
             {vehiclesToConfirm.map((v: any) => (
               <li key={v.id}>
-                <Link href={`/vehicles/${v.id}`} className="text-teal-ink hover:underline">
+                <Link href={`/flotte/vehicules/${v.id}`} className="text-teal-ink hover:underline">
                   {v.registration} ({v.type})
                 </Link>
               </li>

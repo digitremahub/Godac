@@ -51,7 +51,7 @@ export function VehicleActionsPanel({
       </Link>
 
       {enabled.has("maintenance_requests") && (
-        <Link href={`/maintenance?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
+        <Link href={`/moi/signaler?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
           <IconWrench className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Signaler un problème
         </Link>
       )}

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { JaugeQuota } from "@/components/acces/JaugeQuota";
 import { limiteVehicules } from "@/lib/acces/limites-serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { RoleGate } from "@/components/layout/RoleGate";
 import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
 import { VehicleFleetTable } from "@/components/vehicles/VehicleFleetTable";
 
@@ -24,11 +23,11 @@ export default async function VehiclesPage() {
         title="Flotte"
         description="Véhicules légers et poids lourds de votre organisation."
         actions={
-          <RoleGate role={appUser.role} allow={["manager", "manager_chauffeur", "direction"]}>
-            <Link href="/vehicles/new" className="btn-primary">
+          encadrement ? (
+            <Link href="/flotte/vehicules/nouveau" className="btn-primary">
               + Ajouter un véhicule
             </Link>
-          </RoleGate>
+          ) : undefined
         }
       />
 
@@ -43,11 +42,11 @@ export default async function VehiclesPage() {
         </div>
       )}
 
-      <RoleGate role={appUser.role} allow={["direction"]}>
+      {appUser.role === "direction" && (
         <div className="mb-4">
           <VehicleImportPanel />
         </div>
-      </RoleGate>
+      )}
 
       {!vehicles || vehicles.length === 0 ? (
         <EmptyState title="Aucun véhicule" description="Importez votre flotte depuis un fichier ou ajoutez un véhicule." />

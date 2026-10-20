@@ -99,7 +99,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     { label: "Nouveaux chauffeurs à valider", value: pendingSignups.length, accent: "teal", href: "/driver-signups" },
   ];
   if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
-  if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/maintenance" });
+  if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
 
   // Pointage assisté only concerns someone who also drives.
   const autoClockEnabled =

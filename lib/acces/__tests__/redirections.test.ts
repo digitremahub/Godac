@@ -64,6 +64,17 @@ const ANCIENNES = [
   "/tanks?tab=approvisionnements",
   "/ticpe",
   "/ticpe/42",
+  // Flotte
+  "/vehicles",
+  "/vehicles/new",
+  "/vehicles/123",
+  "/maintenance",
+  "/maintenance?vehicle=123",
+  "/loueurs/demandes",
+  "/loueurs/demandes?statut=a_valider",
+  "/loueurs",
+  "/fines",
+  "/qr-codes",
 ];
 
 describe("redirections des anciennes adresses", () => {
@@ -78,6 +89,8 @@ describe("redirections des anciennes adresses", () => {
   it("la requête est conservée et les règles `has` passent avant la règle générale", () => {
     expect(rediriger("/fuel?new=1&vehicle=123")).toBe("/carburant/pleins?new=1&vehicle=123");
     expect(rediriger("/tanks?tab=approvisionnements")?.startsWith("/carburant/approvisionnements")).toBe(true);
+    expect(rediriger("/vehicles/new")).toBe("/flotte/vehicules/nouveau");
+    expect(rediriger("/vehicles/abc")).toBe("/flotte/vehicules/abc");
     for (const [i, r] of REGLES.entries()) {
       if (r.has) continue;
       const tardive = REGLES.slice(i + 1).find((x) => x.source === r.source && x.has);

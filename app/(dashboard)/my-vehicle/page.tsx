@@ -15,7 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
  * A vehicle sits assigned to one driver between tours
  * (vehicles.assigned_driver_id) — distinct from the transient
  * "tournée en cours" concept. A manager assigns it from the fleet
- * fiche (/vehicles/[id]); here the driver can also self-claim any
+ * fiche (/flotte/vehicules/[id]); here the driver can also self-claim any
  * vehicle that's currently unassigned, or release their own.
  */
 export default async function MyVehiclePage() {

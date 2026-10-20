@@ -4,5 +4,13 @@
   {"source": "/tanks", "destination": "/carburant/approvisionnements", "has": [{"type": "query", "key": "tab", "value": "approvisionnements"}]},
   {"source": "/tanks", "destination": "/carburant/cuves"},
   {"source": "/ticpe", "destination": "/carburant/ticpe"},
-  {"source": "/ticpe/:id", "destination": "/carburant/ticpe/:id"}
+  {"source": "/ticpe/:id", "destination": "/carburant/ticpe/:id"},
+  {"source": "/vehicles", "destination": "/flotte/vehicules"},
+  {"source": "/vehicles/new", "destination": "/flotte/vehicules/nouveau"},
+  {"source": "/vehicles/:id", "destination": "/flotte/vehicules/:id"},
+  {"source": "/maintenance", "destination": "/flotte/entretien"},
+  {"source": "/loueurs/demandes", "destination": "/flotte/loueurs"},
+  {"source": "/loueurs", "destination": "/flotte/loueurs/prestataires"},
+  {"source": "/fines", "destination": "/flotte/amendes"},
+  {"source": "/qr-codes", "destination": "/flotte/badges"}
 ]

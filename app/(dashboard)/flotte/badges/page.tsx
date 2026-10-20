@@ -8,7 +8,7 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
  * everything else in the app only ever shows ONE badge at a time
  * (a driver's own on /account, a vehicle's own on /v/[id] for
  * whoever's on tour with it right now, a vehicle's on the manager
- * fiche /vehicles/[id]). Direction sees the whole organisation;
+ * fiche /flotte/vehicules/[id]). Direction sees the whole organisation;
  * manager/manager_chauffeur ("chefs d'équipe") see only the vehicles
  * and chauffeurs of their own service(s).
  *

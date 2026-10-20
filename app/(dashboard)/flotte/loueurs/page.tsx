@@ -35,7 +35,7 @@ export default async function RentalRequestsPage({
         title="Demandes transmises aux loueurs"
         description="Demandes d'entretien des véhicules loués : validation par un responsable, puis envoi au loueur ou au garage prestataire, qui répond par lien sécurisé."
         actions={
-          <Link href="/loueurs" className="btn-secondary">
+          <Link href="/flotte/loueurs/prestataires" className="btn-secondary">
             Loueurs & prestataires
           </Link>
         }
@@ -86,7 +86,7 @@ export default async function RentalRequestsPage({
           Filtrer
         </button>
         {(status || providerId || vehicleId) && (
-          <Link href="/loueurs/demandes" className="text-sm text-teal-ink hover:underline">
+          <Link href="/flotte/loueurs" className="text-sm text-teal-ink hover:underline">
             Réinitialiser
           </Link>
         )}

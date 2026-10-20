@@ -97,7 +97,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Signaler un problème sur le véhicule",
         texte: "« Demandes d'entretien » : décrivez le problème, ajoutez une photo et choisissez l'urgence. Votre responsable est prévenu.",
-        lien: { href: "/maintenance", label: "Demandes d'entretien" },
+        lien: { href: "/moi/signaler", label: "Demandes d'entretien" },
         module: "maintenance_requests",
       },
     ],
@@ -167,7 +167,7 @@ const ENCADREMENT: SectionGuide[] = [
       { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/leaves", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/driver-signups", label: "Chauffeurs à valider" } },
-      { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/qr-codes", label: "Badges QR" } },
+      { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/flotte/badges", label: "Badges QR" } },
     ],
   },
   {
@@ -176,8 +176,8 @@ const ENCADREMENT: SectionGuide[] = [
       { titre: "Contrôler les pleins", texte: "La page Carburant liste tous les pleins ; les surconsommations sont signalées dans les alertes.", lien: { href: "/carburant/pleins", label: "Carburant" } },
       { titre: "Vérifier les lectures automatiques", texte: "« Revue OCR » regroupe les tickets et compteurs lus par l'IA à vérifier.", lien: { href: "/carburant/revue-ocr", label: "Revue OCR" }, module: "ocr" },
       { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/carburant/cuves", label: "Cuves" } },
-      { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
-      { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/maintenance", label: "Demandes d'entretien" }, module: "maintenance_requests" },
+      { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
+      { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/flotte/entretien", label: "Demandes d'entretien" }, module: "maintenance_requests" },
     ],
   },
   {
@@ -233,7 +233,7 @@ export const GUIDES: GuideRole[] = [
         etapes: [
           { titre: "Carburant", texte: "Tous les pleins avec litres, montants et véhicules ; filtres par période et export.", lien: { href: "/carburant/pleins", label: "Carburant" } },
           { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/carburant/cuves", label: "Cuves" } },
-          { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
+          { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
           { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/carburant/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
           { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/paie", label: "Paie & salaires" }, module: "payslips" },
           { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/alerts", label: "Alertes" } },
@@ -272,7 +272,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Paie & salaires", texte: "Une seule page, quatre onglets : Bulletins du mois (heures des tournées, congés et frais préremplis ; vérifiez puis générez, France), Heures & salaires (heures et pointages par chauffeur), Fiches de paie (bulletins générés, à télécharger) et Réglages. Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/paie", label: "Paie & salaires" }, module: "payslips" },
           { titre: "Salaires et heures", texte: "Sans le module Fiches de paie : synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/payroll", label: "Salaires" }, module: "planning" },
           { titre: "Planning des congés", texte: "Vue d'ensemble des absences de l'équipe.", lien: { href: "/leaves/planning", label: "Planning congés" }, module: "leave_management" },
-          { titre: "Amendes", texte: "Enregistrez les avis de contravention et désignez le conducteur dans les délais.", lien: { href: "/fines", label: "Amendes" }, module: "fines" },
+          { titre: "Amendes", texte: "Enregistrez les avis de contravention et désignez le conducteur dans les délais.", lien: { href: "/flotte/amendes", label: "Amendes" }, module: "fines" },
         ],
       },
       ...ENCADREMENT,

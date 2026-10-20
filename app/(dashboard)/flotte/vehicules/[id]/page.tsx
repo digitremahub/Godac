@@ -7,7 +7,6 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import Link from "next/link";
 import { InterventionsPanel } from "@/components/vehicles/InterventionsPanel";
 import { VehicleEditPanel } from "@/components/vehicles/VehicleEditPanel";
-import { RoleGate } from "@/components/layout/RoleGate";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { OdometerHistory, type OdometerReading } from "@/components/vehicles/OdometerHistory";
 import { WashHistory, type WashRecord } from "@/components/vehicles/WashHistory";
@@ -188,7 +187,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         title={v.registration}
         description={`${v.type} · ${v.services?.name ?? "Sans service"}`}
         actions={
-          <RoleGate role={appUser.role} allow={["manager", "manager_chauffeur", "direction"]}>
+          ["manager", "manager_chauffeur", "direction"].includes(appUser.role) ? (
             <VehicleEditPanel
               vehicleId={v.id}
               registration={v.registration}
@@ -210,7 +209,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               referenceConsumption={v.reference_consumption_l_100km}
               specSources={v.spec_sources ?? {}}
             />
-          </RoleGate>
+          ) : undefined
         }
       />
 
