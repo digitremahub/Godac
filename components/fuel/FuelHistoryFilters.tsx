@@ -71,7 +71,7 @@ export function FuelHistoryFilters({
         au
         <input type="date" aria-label="Jusqu'au" className="input !w-auto" value={searchParams.get("to") ?? ""} onChange={(e) => setParam("to", e.target.value)} />
       </label>
-      {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page")) && (
+      {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page") || searchParams.get("plein")) && (
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/carburant/pleins")}>
           Réinitialiser
         </button>
