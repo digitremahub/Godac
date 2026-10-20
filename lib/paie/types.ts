@@ -78,6 +78,19 @@ export interface ParametresEntreprise {
   mutuelle: { salarial: number; patronal: number };
   /** Frais de déplacement conventionnels (montants unitaires, non soumis dans les limites URSSAF). */
   frais: { repas: number; repasUnique: number; cassecroute: number; grandDeplacement: number };
+  /**
+   * Complémentaire santé en % du PMSS (modèle transport : 2,01 % + 2,01 %).
+   * Renseigné, il remplace les forfaits `mutuelle`.
+   */
+  santePmss?: TauxPartage | null;
+  /** Cotisations conventionnelles de branche (IDCC 16 : 0,025 % + 0,525 % du brut). */
+  conventionnelles?: TauxPartage | null;
+  /**
+   * Déduction forfaitaire spécifique (DFS, « Abattement 17 % » des
+   * conducteurs). Toujours affichée pour mémoire ; appliquée aux bases
+   * seulement si `active`.
+   */
+  dfs?: { taux: number; active: boolean } | null;
 }
 
 export interface ProfilSalarie {
@@ -89,6 +102,18 @@ export interface ProfilSalarie {
   heuresContractuelles: number;
   /** Taux personnalisé de prélèvement à la source ; null = taux neutre. */
   tauxPas: number | null;
+  /** Groupe conventionnel (ex. 03 bis), affiché sur le bulletin. */
+  groupe?: string | null;
+  /** Taux du panier repas propre au salarié ; null = réglage de l'entreprise. */
+  tauxRepas?: number | null;
+}
+
+/** Une période de congés payés pris dans le mois (dates incluses). */
+export interface PeriodeConges {
+  du: string;
+  au: string;
+  /** Jours ouvrables décomptés. */
+  jours: number;
 }
 
 export interface Prime {
@@ -112,6 +137,11 @@ export interface Retenue {
   montant: number;
   /** Référence du dossier (n° d'acte, d'avis, créancier) — reprise sur le bulletin. */
   reference?: string;
+  /**
+   * Acompte venu d'une demande acceptée (salary_advance_requests.id) :
+   * ligne ajoutée et relue côté serveur, jamais saisie à la main.
+   */
+  demandeId?: string;
 }
 
 export interface VariablesMois {
@@ -131,6 +161,17 @@ export interface VariablesMois {
   retenues?: Retenue[];
   /** Personnes à charge, pour la part saisissable du salaire. */
   personnesACharge?: number;
+  /**
+   * Heures supplémentaires saisies (au-delà des heures du contrat). Dès
+   * que l'une est renseignée, elles remplacent celles déduites des
+   * heures travaillées.
+   */
+  heuresSup25?: number | null;
+  heuresSup50?: number | null;
+  /** Congés payés pris avec leurs dates (le total remplace joursCongesPris). */
+  periodesConges?: PeriodeConges[];
+  /** Taux du panier repas ce mois ; null = profil ou entreprise. */
+  tauxRepas?: number | null;
 }
 
 export type Section = "brut" | "sante" | "retraite" | "famille" | "chomage" | "autres" | "csg" | "exonerations" | "net";
@@ -169,5 +210,15 @@ export interface Bulletin {
   netAPayer: number;
   coutEmployeur: number;
   heuresSupExonerees: number;
+  /** Net + indemnités non soumises, avant retenues et impôt (« Total dû »). */
+  totalDu?: number;
+  /** Assiette CSG/CRDS (98,25 % du brut + parts employeur prévoyance et santé). */
+  assietteCsg?: number;
+  /** Part employeur de santé réintégrée au net imposable. */
+  reintegrationSante?: number;
+  /** DFS « Abattement 17 % » : montant pour mémoire, et s'il est appliqué. */
+  dfs?: { taux: number; montant: number; appliquee: boolean } | null;
+  /** Total des cotisations patronales avant réduction générale et déduction HS. */
+  totalPatronalHorsReduction?: number;
   avertissements: string[];
 }

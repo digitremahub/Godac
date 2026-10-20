@@ -5,6 +5,8 @@ import { findOverlappingLeaves } from "@/lib/business/leave-overlap";
 import { PageHeader } from "@/components/ui";
 import { LeaveRequestForm } from "@/components/leaves/LeaveRequestForm";
 import { LeaveRequestsList } from "@/components/leaves/LeaveRequestsList";
+import { soldesConges } from "@/lib/paie/conges-serveur";
+import { joursOuvrables } from "@/lib/paie/conges";
 
 /**
  * Congés : Équipe › Congés (encadrement : décisions sur son service, avec
@@ -45,6 +47,20 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
     }
   }
 
+  // Soldes de congés payés (N-1 / N) : le sien pour le formulaire, ceux
+  // des demandeurs pour la décision. Une demande en attente est comparée
+  // au solde sans elle (les autres demandes en attente comptent).
+  const aujourdhui = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+  const soldes = await soldesConges(supabase, appUser.organization_id, [appUser.id, ...(isDecisionMaker ? rows.map((r) => r.driver_id as string) : [])], aujourdhui);
+  const monSolde = soldes.get(appUser.id) ?? null;
+  const soldeLigne = (r: any) => {
+    const s = soldes.get(r.driver_id);
+    if (!s) return null;
+    const jours = joursOuvrables(r.start_date, r.end_date);
+    const sansElle = s.disponibleApresAttente + (r.status === "pending" ? jours : 0);
+    return { disponible: s.disponible, jours, insuffisant: r.status === "pending" && sansElle - jours < 0 };
+  };
+
   return (
     <div>
       <PageHeader
@@ -53,7 +69,7 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
       />
 
       <div className="mb-6">
-        <LeaveRequestForm services={serviceOptions} />
+        <LeaveRequestForm services={serviceOptions} solde={monSolde} />
       </div>
 
       <LeaveRequestsList
@@ -67,6 +83,7 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
           reason: r.reason,
           isOwn: r.driver_id === appUser.id,
           overlapWith: overlapsByLeaveId.get(r.id) ?? [],
+          solde: soldeLigne(r),
         }))}
         canDecide={isDecisionMaker}
       />

@@ -7,6 +7,7 @@ import { Card, PageHeader, EmptyState } from "@/components/ui";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { currentMonth } from "@/lib/planning/dates";
 import { PaieEditor } from "@/components/paie/PaieEditor";
+import { fusionnerRetenues } from "@/lib/paie/acomptes";
 
 export default async function PaieSalariePage({ params, searchParams }: { params: Promise<{ userId: string }>; searchParams: Promise<{ mois?: string }> }) {
   const g = await garderPage("equipe.paie_salarie");
@@ -26,7 +27,10 @@ export default async function PaieSalariePage({ params, searchParams }: { params
   const label = new Date(`${ctx.debut}T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
   const { joursTravailles, ...prefill } = ctx.prefill;
   // Un bulletin déjà généré ce mois-ci : on reprend ses variables.
-  const variables = ctx.bulletinExistant?.variables ? { ...prefill, ...ctx.bulletinExistant.variables } : prefill;
+  // Les acomptes acceptés sont toujours relus en base (ajoutés, retirés ou reportés).
+  const variables = ctx.bulletinExistant?.variables
+    ? { ...prefill, ...ctx.bulletinExistant.variables, retenues: fusionnerRetenues(ctx.bulletinExistant.variables.retenues, ctx.acomptes.retenues) }
+    : prefill;
 
   return (
     <div>
@@ -74,6 +78,8 @@ export default async function PaieSalariePage({ params, searchParams }: { params
         prefill={variables}
         joursTravailles={joursTravailles}
         dejaGenere={Boolean(ctx.bulletinExistant)}
+        avertissementsAcomptes={ctx.acomptes.avertissements}
+        repriseConges={ctx.repriseConges}
       />
     </div>
   );

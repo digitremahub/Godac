@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
+import { expliquerErreurPasskey } from "@/lib/auth/passkey-erreurs";
 import { Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { postLoginPath } from "@/lib/auth/post-login";
@@ -81,11 +82,8 @@ export function DriverPinFlow({
       if (attempted) { window.location.href = postLoginPath(); return; }
       setError("Aucune clé biométrique n'est enregistrée pour ce compte. Utilisez votre PIN.");
     } catch (e) {
-      if (e instanceof Error && e.name === "NotAllowedError") {
-        setError("La demande Face ID / empreinte a été annulée, a expiré ou n’a pas abouti. Réessayez en validant la demande biométrique, ou utilisez votre PIN.");
-      } else {
-        setError(e instanceof Error ? e.message : "Connexion biométrique impossible. Utilisez votre PIN.");
-      }
+      const { message, code } = expliquerErreurPasskey(e, { secours: "votre PIN" });
+      setError(`${message} (code : ${code})`);
     } finally { setBusy(false); }
   }
 

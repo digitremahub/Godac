@@ -17,9 +17,17 @@ export interface Reglages {
   single_meal_allowance: number | null;
   snack_allowance: number | null;
   overnight_allowance: number | null;
+  health_pmss_salarial_rate: number | null;
+  health_pmss_patronal_rate: number | null;
+  ccn_salarial_rate: number | null;
+  ccn_patronal_rate: number | null;
+  dfs_rate: number | null;
+  dfs_enabled: boolean;
 }
 
-const CHAMPS: { section: string; champs: { key: keyof Reglages; label: string; suffix: string; hint?: string; optional?: boolean }[] }[] = [
+type CleNumerique = Exclude<keyof Reglages, "dfs_enabled">;
+
+const CHAMPS: { section: string; champs: { key: CleNumerique; label: string; suffix: string; hint?: string; optional?: boolean }[] }[] = [
   {
     section: "Entreprise",
     champs: [
@@ -35,6 +43,16 @@ const CHAMPS: { section: string; champs: { key: keyof Reglages; label: string; s
       { key: "prevoyance_patronal_rate", label: "Prévoyance — part employeur", suffix: "% T1" },
       { key: "mutuelle_salarial_amount", label: "Mutuelle — part salarié", suffix: "€/mois" },
       { key: "mutuelle_patronal_amount", label: "Mutuelle — part employeur", suffix: "€/mois", hint: "Au moins 50 % de la cotisation." },
+      { key: "health_pmss_salarial_rate", label: "Santé au forfait — part salarié", suffix: "% PMSS", optional: true, hint: "Modèle transport : 2,01 % du PMSS. Renseigné, il remplace les montants de mutuelle." },
+      { key: "health_pmss_patronal_rate", label: "Santé au forfait — part employeur", suffix: "% PMSS", optional: true },
+    ],
+  },
+  {
+    section: "Convention collective des transports (IDCC 16)",
+    champs: [
+      { key: "ccn_salarial_rate", label: "Cotisations conventionnelles — salarié", suffix: "%", optional: true, hint: "Modèle : 0,025 % du brut." },
+      { key: "ccn_patronal_rate", label: "Cotisations conventionnelles — employeur", suffix: "%", optional: true, hint: "Modèle : 0,525 % du brut." },
+      { key: "dfs_rate", label: "Abattement DFS (conducteurs)", suffix: "%", optional: true, hint: "17 % : affiché pour mémoire sur le bulletin. Cochez ci-dessous pour l'appliquer aux bases." },
     ],
   },
   {
@@ -50,9 +68,10 @@ const CHAMPS: { section: string; champs: { key: keyof Reglages; label: string; s
 
 export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defauts: Record<string, number> }) {
   const router = useRouter();
-  const [v, setV] = useState<Record<keyof Reglages, string>>(
-    Object.fromEntries(Object.entries(initial).map(([k, x]) => [k, x === null ? "" : String(x)])) as Record<keyof Reglages, string>,
+  const [v, setV] = useState<Record<CleNumerique, string>>(
+    Object.fromEntries(Object.entries(initial).filter(([k]) => k !== "dfs_enabled").map(([k, x]) => [k, x === null ? "" : String(x)])) as Record<CleNumerique, string>,
   );
+  const [dfsActive, setDfsActive] = useState(initial.dfs_enabled);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -60,9 +79,10 @@ export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defa
     setBusy(true);
     setMessage(null);
     try {
-      const body = Object.fromEntries(
-        CHAMPS.flatMap((s) => s.champs).map((c) => [c.key, v[c.key] === "" ? (c.optional ? null : 0) : Number(v[c.key])]),
-      );
+      const body = {
+        ...Object.fromEntries(CHAMPS.flatMap((s) => s.champs).map((c) => [c.key, v[c.key] === "" ? (c.optional ? null : 0) : Number(v[c.key])])),
+        dfs_enabled: dfsActive,
+      };
       const res = await fetch("/api/paie/parametres", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Enregistrement impossible");
@@ -102,6 +122,10 @@ export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defa
           </div>
         </Card>
       ))}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={dfsActive} onChange={(e) => setDfsActive(e.target.checked)} />
+        Appliquer l&apos;abattement DFS aux bases de cotisations (sinon affiché pour mémoire seulement)
+      </label>
       {message && <p role="status" className={`rounded-lg px-3 py-2 text-sm ${message.ok ? "bg-teal/10 text-teal-ink" : "bg-orange/10 text-orange-ink"}`}>{message.text}</p>}
       <button type="button" className="btn-primary w-fit" disabled={busy} onClick={save}>
         {busy ? "Enregistrement…" : "Enregistrer"}

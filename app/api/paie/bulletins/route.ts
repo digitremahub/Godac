@@ -9,6 +9,8 @@ import { calculerBulletin } from "@/lib/paie/calcul";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { genererBulletinPdf } from "@/lib/paie/pdf";
 import { variablesSchema } from "@/lib/paie/schemas";
+import { fusionnerRetenues } from "@/lib/paie/acomptes";
+import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
 
 export const maxDuration = 60;
 
@@ -46,7 +48,12 @@ export async function POST(req: Request) {
   const ctx = await contextePaie(supabase, appUser.organization_id, userId, mois);
   if (!ctx.profilComplet) return NextResponse.json({ error: "Renseignez d'abord le profil de paie (taux horaire, heures) de ce salarié." }, { status: 422 });
 
-  const variables = { ...parsed.data.variables, cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees };
+  // Acomptes des demandes acceptées : relus en base, jamais repris du navigateur.
+  const variables = {
+    ...parsed.data.variables,
+    retenues: fusionnerRetenues(parsed.data.variables.retenues, ctx.acomptes.retenues),
+    cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees,
+  };
   const bulletin = calculerBulletin({ legal: ctx.legal, entreprise: ctx.entreprise, salarie: ctx.salarie, variables });
 
   let pdf: Buffer;
@@ -70,6 +77,7 @@ export async function POST(req: Request) {
         matricule: dossier?.matricule ?? null,
         secu: dossier?.social_security_number ?? null,
         coefficient: ctx.coefficient,
+        groupe: ctx.salarie.groupe ?? null,
         statut: ctx.salarie.cadre ? "Cadre" : "Non-cadre",
         entree: dossier?.hire_date ? jour(dossier.hire_date) : null,
         contrat: dossier?.contract_type ? (CONTRATS[dossier.contract_type] ?? dossier.contract_type) : null,
@@ -80,6 +88,20 @@ export async function POST(req: Request) {
         heuresSupExonerees: ctx.cumuls.heuresSupExonerees + bulletin.heuresSupExonerees,
       },
       conges: { pris: variables.joursCongesPris },
+      pied: {
+        totaux: [
+          { libelle: "Heures", mois: bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heures + bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
+          { libelle: "H. sup.", mois: bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heuresSup + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
+          { libelle: "Brut", mois: bulletin.brut, annee: ctx.cumulsPied.brut + bulletin.brut },
+          { libelle: "Plafond SS", mois: ctx.legal.pmss, annee: ctx.cumulsPied.plafondSs + ctx.legal.pmss },
+          { libelle: "Net imposable", mois: bulletin.netImposable, annee: ctx.cumulsPied.netImposable + bulletin.netImposable },
+          { libelle: "Ch. patronales", mois: bulletin.totalPatronal, annee: ctx.cumulsPied.chargesPatronales + bulletin.totalPatronal },
+          { libelle: "Coût global", mois: bulletin.coutEmployeur, annee: ctx.cumulsPied.coutGlobal + bulletin.coutEmployeur },
+          { libelle: "Total versé", mois: bulletin.netAPayer, annee: ctx.cumulsPied.totalVerse + bulletin.netAPayer },
+          { libelle: "Allègements", mois: bulletin.reductionGenerale, annee: ctx.cumulsPied.allegements + bulletin.reductionGenerale },
+        ],
+        conges: { n1: ctx.conges.n1, n: ctx.conges.n },
+      },
     });
   } catch (e) {
     console.error("paie: rendu PDF impossible", e);
@@ -124,13 +146,16 @@ export async function POST(req: Request) {
     payslipId = data.id;
   }
 
+  // Le bulletin référence les demandes d'acompte qu'il déduit.
+  await rattacherAcomptes(supabase, payslipId, ctx.acomptes.ids);
+
   await journaliser({
     organizationId: appUser.organization_id,
     userId: appUser.id,
     action: "paie_bulletin_genere",
     targetTable: "payslips",
     targetId: payslipId,
-    details: { salarie: userId, mois, regeneration: Boolean(ctx.bulletinExistant), par: appUser.role },
+    details: { salarie: userId, mois, regeneration: Boolean(ctx.bulletinExistant), par: appUser.role, acomptes: ctx.acomptes.ids.length },
   });
 
   // La direction qui génère elle-même valide dans la foulée (c'est elle qui

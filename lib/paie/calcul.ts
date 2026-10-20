@@ -64,11 +64,14 @@ export function calculerBulletin({
   // Mensualisation : le contrat est payé même si le mois réel est plus
   // court (les absences se déclarent à part) ; les heures en plus du
   // contrat s'ajoutent.
-  const heuresPayees = Math.max(salarie.heuresContractuelles, variables.heuresTravaillees ?? 0);
+  // Heures supplémentaires saisies (modèle transport) : elles s'ajoutent
+  // aux heures du contrat et remplacent celles déduites des heures travaillées.
+  const hsSaisies = (variables.heuresSup25 ?? null) !== null || (variables.heuresSup50 ?? null) !== null;
+  const heuresPayees = hsSaisies ? salarie.heuresContractuelles : Math.max(salarie.heuresContractuelles, variables.heuresTravaillees ?? 0);
   const heuresBase = Math.min(heuresPayees, HEURES_LEGALES);
   const equivalence = HEURES_EQUIVALENCE[salarie.regime];
-  const sup25 = r2(Math.max(0, Math.min(heuresPayees, SEUIL_HS_50) - HEURES_LEGALES));
-  const sup50 = r2(Math.max(0, heuresPayees - SEUIL_HS_50));
+  const sup25 = r2(Math.max(0, Math.min(heuresPayees, SEUIL_HS_50) - HEURES_LEGALES) + (hsSaisies ? Math.max(0, variables.heuresSup25 ?? 0) : 0));
+  const sup50 = r2(Math.max(0, heuresPayees - SEUIL_HS_50) + (hsSaisies ? Math.max(0, variables.heuresSup50 ?? 0) : 0));
   const t = salarie.tauxHoraire;
 
   if (salarie.tauxHoraire < legal.smicHoraire) {
@@ -79,7 +82,7 @@ export function calculerBulletin({
   add("brut", "Salaire de base", { base: heuresBase, tauxSalarial: t, montantSalarial: montantBase, gain: true });
 
   // Heures entre 35 h et la durée d'équivalence (conducteurs) puis au-delà.
-  const hEquiv = r2(Math.max(0, Math.min(sup25, equivalence - HEURES_LEGALES)));
+  const hEquiv = r2(Math.max(0, Math.min(sup25, Math.min(heuresPayees, equivalence) - HEURES_LEGALES)));
   const hSup25 = r2(sup25 - hEquiv);
   const montantEquiv = r2(hEquiv * t * 1.25);
   const montantSup25 = r2(hSup25 * t * 1.25);
@@ -90,6 +93,20 @@ export function calculerBulletin({
 
   const absence = r2(variables.heuresAbsenceNonPayee * t);
   if (absence > 0) add("brut", "Absence non rémunérée", { base: variables.heuresAbsenceNonPayee, tauxSalarial: t, montantSalarial: -absence, gain: true });
+
+  // Congés payés pris (maintien de salaire) : absence en jours ouvrables
+  // au 1/26 du salaire de base, compensée par l'indemnité de congés payés.
+  const periodes = (variables.periodesConges ?? []).filter((p) => p.jours > 0);
+  const joursCp = periodes.length ? r2(periodes.reduce((t, p) => t + p.jours, 0)) : variables.joursCongesPris;
+  if (joursCp > 0) {
+    const parJour = r2(montantBase / 26);
+    const fmt = (d: string) => `${d.slice(8, 10)}${d.slice(5, 7)}${d.slice(2, 4)}`;
+    const libelles = periodes.length
+      ? periodes.map((p) => ({ jours: p.jours, texte: `Congés payés pris ${fmt(p.du)}-${fmt(p.au)} (${p.jours} jour${p.jours > 1 ? "s" : ""})` }))
+      : [{ jours: joursCp, texte: `Congés payés pris (${joursCp} jour${joursCp > 1 ? "s" : ""})` }];
+    for (const l of libelles) add("brut", l.texte, { base: l.jours, tauxSalarial: parJour, montantSalarial: -r2(l.jours * parJour), gain: true });
+    add("brut", "Indemnité congés payés", { base: joursCp, tauxSalarial: parJour, montantSalarial: r2(joursCp * parJour), gain: true });
+  }
 
   let primesSoumises = 0;
   let primesNonSoumises = 0;
@@ -103,17 +120,27 @@ export function calculerBulletin({
   const montantHs = r2(montantEquiv + montantSup25 + montantSup50);
   const brut = r2(montantBase + montantHs - absence + primesSoumises);
 
+  // ── DFS « Abattement 17 % » ──────────────────────────────────────
+  // Affichée pour mémoire ; appliquée aux bases de cotisations (hors
+  // CSG/CRDS) seulement si l'entreprise l'a activée.
+  const dfs = entreprise.dfs && entreprise.dfs.taux > 0 ? { taux: entreprise.dfs.taux, montant: pct(brut, entreprise.dfs.taux), appliquee: entreprise.dfs.active } : null;
+  if (dfs) add("brut", `Abattement ${String(dfs.taux).replace(".", ",")} % (DFS)${dfs.appliquee ? "" : " — pour mémoire"}`, { base: brut, tauxSalarial: dfs.taux, montantSalarial: null });
+  const baseCot = dfs?.appliquee ? r2(brut - dfs.montant) : brut;
+
   // ── Assiettes ──────────────────────────────────────────────────
   const pmss = legal.pmss;
-  const t1 = Math.min(brut, pmss);
-  const t2 = Math.max(0, Math.min(brut, 8 * pmss) - pmss);
+  const t1 = Math.min(baseCot, pmss);
+  const t2 = Math.max(0, Math.min(baseCot, 8 * pmss) - pmss);
   const smicMensuel = legal.smicHoraire * HEURES_LEGALES;
   // SMIC de référence de la réduction générale (RGDU) : SMIC de la
   // formule × durée légale, porté à 45/35 (grands routiers) ou 40/35
   // (courte distance) pour les conducteurs en régime d'équivalence
   // (art. D241-10 CSS), diminué des absences non payées.
   const facteurEquivalence = salarie.regime === "grand_routier" ? 45 / 35 : salarie.regime === "courte_distance" ? 40 / 35 : 1;
-  const smicRef = legal.reductionGenerale.smicHoraireReference * Math.max(HEURES_LEGALES * facteurEquivalence - variables.heuresAbsenceNonPayee, 0);
+  // Le SMIC de référence est majoré des heures supplémentaires payées, sans
+  // leur majoration (art. D241-7 CSS) ; les heures d'équivalence sont déjà
+  // couvertes par le facteur ci-dessus.
+  const smicRef = legal.reductionGenerale.smicHoraireReference * Math.max(HEURES_LEGALES * facteurEquivalence + hSup25 + sup50 - variables.heuresAbsenceNonPayee, 0);
   const eligibleRgdu = brut > 0 && brut < legal.reductionGenerale.plafondSmic * smicRef;
 
   let totalSal = 0;
@@ -129,22 +156,32 @@ export function calculerBulletin({
 
   // ── Santé ──
   const maladieTaux = brut <= legal.maladie.seuilReduitSmic * smicMensuel ? legal.maladie.reduit : legal.maladie.normal;
-  const maladie = cot("sante", "Sécurité sociale — maladie, maternité, invalidité, décès", brut, null, maladieTaux);
-  const at = cot("sante", "Accidents du travail — maladies professionnelles", brut, null, entreprise.tauxAccidentTravail);
+  const maladie = cot("sante", "Sécurité sociale — maladie, maternité, invalidité, décès", baseCot, null, maladieTaux);
+  const at = cot("sante", "Accidents du travail — maladies professionnelles", baseCot, null, entreprise.tauxAccidentTravail);
   const prevoyanceTaux = salarie.cadre ? { salarial: entreprise.prevoyance.salarial, patronal: Math.max(entreprise.prevoyance.patronal, legal.prevoyanceCadreMinT1) } : entreprise.prevoyance;
   let prevoyancePatronale = 0;
   if (prevoyanceTaux.salarial || prevoyanceTaux.patronal) {
     prevoyancePatronale = cot("sante", salarie.cadre ? "Prévoyance cadre" : "Prévoyance conventionnelle", t1, prevoyanceTaux.salarial, prevoyanceTaux.patronal).mp;
   }
-  if (entreprise.mutuelle.salarial || entreprise.mutuelle.patronal) {
-    totalSal += entreprise.mutuelle.salarial;
-    totalPat += entreprise.mutuelle.patronal;
-    add("sante", "Complémentaire santé", { montantSalarial: r2(entreprise.mutuelle.salarial), montantPatronal: r2(entreprise.mutuelle.patronal) });
+  // Complémentaire santé : au forfait sur le PMSS (modèle transport) ou en montants fixes.
+  const sante = entreprise.santePmss && (entreprise.santePmss.salarial || entreprise.santePmss.patronal)
+    ? { salarial: pct(pmss, entreprise.santePmss.salarial), patronal: pct(pmss, entreprise.santePmss.patronal), taux: entreprise.santePmss }
+    : { salarial: r2(entreprise.mutuelle.salarial), patronal: r2(entreprise.mutuelle.patronal), taux: null };
+  if (sante.salarial || sante.patronal) {
+    totalSal += sante.salarial;
+    totalPat += sante.patronal;
+    add("sante", "Complémentaire santé", {
+      base: sante.taux ? pmss : null,
+      tauxSalarial: sante.taux?.salarial ?? null,
+      montantSalarial: sante.salarial,
+      tauxPatronal: sante.taux?.patronal ?? null,
+      montantPatronal: sante.patronal,
+    });
   }
 
   // ── Retraite ──
   const vp = cot("retraite", "Sécurité sociale plafonnée", t1, legal.vieillessePlafonnee.salarial, legal.vieillessePlafonnee.patronal);
-  const vd = cot("retraite", "Sécurité sociale déplafonnée", brut, legal.vieillesseDeplafonnee.salarial, legal.vieillesseDeplafonnee.patronal);
+  const vd = cot("retraite", "Sécurité sociale déplafonnée", baseCot, legal.vieillesseDeplafonnee.salarial, legal.vieillesseDeplafonnee.patronal);
   const aa1 = cot("retraite", "Complémentaire Agirc-Arrco tranche 1", t1, legal.agircArrcoT1.salarial, legal.agircArrcoT1.patronal);
   const ceg1 = cot("retraite", "Contribution d'équilibre général T1", t1, legal.cegT1.salarial, legal.cegT1.patronal);
   let salRetraiteT2 = 0;
@@ -153,31 +190,34 @@ export function calculerBulletin({
     salRetraiteT2 += cot("retraite", "Contribution d'équilibre général T2", t2, legal.cegT2.salarial, legal.cegT2.patronal).ms;
     salRetraiteT2 += cot("retraite", "Contribution d'équilibre technique", t1 + t2, legal.cet.salarial, legal.cet.patronal).ms;
   }
-  if (salarie.cadre) cot("retraite", "APEC", Math.min(brut, 4 * pmss), legal.apec.salarial, legal.apec.patronal);
+  if (salarie.cadre) cot("retraite", "APEC", Math.min(baseCot, 4 * pmss), legal.apec.salarial, legal.apec.patronal);
 
   // ── Famille ──
   const afTaux = brut <= legal.allocationsFamiliales.seuilReduitSmic * smicMensuel ? legal.allocationsFamiliales.reduit : legal.allocationsFamiliales.normal;
-  const af = cot("famille", "Allocations familiales", brut, null, afTaux);
+  const af = cot("famille", "Allocations familiales", baseCot, null, afTaux);
 
   // ── Chômage ──
-  const chomage = cot("chomage", "Assurance chômage", Math.min(brut, 4 * pmss), null, legal.chomage);
-  cot("chomage", "AGS", Math.min(brut, 4 * pmss), null, legal.ags);
+  const chomage = cot("chomage", "Assurance chômage", Math.min(baseCot, 4 * pmss), null, legal.chomage);
+  cot("chomage", "AGS", Math.min(baseCot, 4 * pmss), null, legal.ags);
 
   // ── Autres contributions employeur ──
   const fnal50 = entreprise.effectif >= 50;
-  const fnal = cot("autres", "FNAL", fnal50 ? brut : t1, null, fnal50 ? legal.fnal.auMoins50 : legal.fnal.moins50);
-  const csa = cot("autres", "Contribution solidarité autonomie", brut, null, legal.csa);
-  cot("autres", "Contribution au dialogue social", brut, null, legal.dialogueSocial);
-  cot("autres", "Formation professionnelle", brut, null, entreprise.effectif >= 11 ? legal.formationPro.auMoins11 : legal.formationPro.moins11);
-  cot("autres", "Taxe d'apprentissage", brut, null, legal.taxeApprentissage);
-  if (entreprise.effectif >= 11 && entreprise.tauxVersementMobilite > 0) cot("autres", "Versement mobilité", brut, null, entreprise.tauxVersementMobilite);
+  const fnal = cot("autres", "FNAL", fnal50 ? baseCot : t1, null, fnal50 ? legal.fnal.auMoins50 : legal.fnal.moins50);
+  const csa = cot("autres", "Contribution solidarité autonomie", baseCot, null, legal.csa);
+  cot("autres", "Contribution au dialogue social", baseCot, null, legal.dialogueSocial);
+  cot("autres", "Formation professionnelle", baseCot, null, entreprise.effectif >= 11 ? legal.formationPro.auMoins11 : legal.formationPro.moins11);
+  cot("autres", "Taxe d'apprentissage", baseCot, null, legal.taxeApprentissage);
+  if (entreprise.conventionnelles && (entreprise.conventionnelles.salarial || entreprise.conventionnelles.patronal)) {
+    cot("autres", "Cotisations conventionnelles (CCN)", baseCot, entreprise.conventionnelles.salarial, entreprise.conventionnelles.patronal);
+  }
+  if (entreprise.effectif >= 11 && entreprise.tauxVersementMobilite > 0) cot("autres", "Versement mobilité", baseCot, null, entreprise.tauxVersementMobilite);
 
   // ── CSG / CRDS ──
   // Assiette : 98,25 % du brut (dans la limite de 4 PMSS) + part patronale
   // de prévoyance et de complémentaire santé, à 100 %.
   const brutHorsHs = brut - montantHs;
   const abattu = (x: number) => Math.min(x, 4 * pmss) * (legal.assietteCsgPart / 100) + Math.max(0, x - 4 * pmss);
-  const assietteCsg = r2(abattu(brut) + prevoyancePatronale + entreprise.mutuelle.patronal);
+  const assietteCsg = r2(abattu(brut) + prevoyancePatronale + sante.patronal);
   // La CSG sur la part « heures sup » est entièrement non déductible.
   const assietteCsgHs = r2(abattu(brut) - abattu(brutHorsHs));
   const csgDed = cot("csg", "CSG déductible de l'impôt sur le revenu", assietteCsg - assietteCsgHs, legal.csgDeductible, null);
@@ -196,9 +236,11 @@ export function calculerBulletin({
     add("exonerations", "Réduction de cotisations salariales heures sup.", { base: montantHs, tauxSalarial: -legal.heuresSup.reductionSalariale, montantSalarial: -reductionHs });
   }
   const nbHs = r2(hEquiv + hSup25 + sup50);
+  let deductionHs = 0;
   if (nbHs > 0 && eligibleRgdu) {
     const parHeure = entreprise.effectif < 20 ? legal.heuresSup.deductionPatronaleParHeure.moins20 : legal.heuresSup.deductionPatronaleParHeure.de20a249;
     const deduction = r2(nbHs * parHeure);
+    deductionHs = deduction;
     if (deduction > 0) {
       totalPat -= deduction;
       add("exonerations", "Déduction forfaitaire patronale heures sup.", { base: nbHs, tauxPatronal: null, montantPatronal: -deduction });
@@ -222,6 +264,7 @@ export function calculerBulletin({
 
   totalSal = r2(totalSal);
   totalPat = r2(totalPat);
+  const totalPatronalHorsReduction = r2(totalPat + reductionGenerale + deductionHs);
 
   // ── Nets ───────────────────────────────────────────────────────
   const netAvantImpot = r2(brut - totalSal);
@@ -232,7 +275,9 @@ export function calculerBulletin({
   // Net imposable : le net, plus ce qui n'est pas déductible (CSG/CRDS non
   // déductibles, CSG sur HS, part patronale santé), moins les heures sup
   // exonérées d'impôt.
-  const netImposable = r2(netAvantImpot + csgNonDed.ms + csgHs.ms + entreprise.mutuelle.patronal - heuresSupExonerees);
+  // Réintégration fiscale : part employeur de la complémentaire santé.
+  const reintegrationSante = sante.patronal;
+  const netImposable = r2(netAvantImpot + csgNonDed.ms + csgHs.ms + reintegrationSante - heuresSupExonerees);
   // Montant net social : brut moins l'ensemble des cotisations et
   // contributions sociales salariales, réduction HS comprise.
   const netSocial = netAvantImpot;
@@ -241,7 +286,7 @@ export function calculerBulletin({
 
   const f = entreprise.frais;
   const frais: [string, number, number][] = [
-    ["Indemnité de repas", variables.nbRepas, f.repas],
+    ["Indemnité de repas", variables.nbRepas, variables.tauxRepas ?? salarie.tauxRepas ?? f.repas],
     ["Indemnité de repas unique", variables.nbRepasUnique, f.repasUnique],
     ["Indemnité de casse-croûte", variables.nbCasseCroute, f.cassecroute],
     ["Indemnité de grand déplacement", variables.nbGrandDeplacement, f.grandDeplacement],
@@ -268,7 +313,11 @@ export function calculerBulletin({
   const partSaisissable = partSaisissableMensuelle(baseSaisissable, variables.personnesACharge ?? 0);
   const retenues = (variables.retenues ?? []).filter((r) => r.montant > 0);
   for (const r of retenues) {
-    const libelle = [LIBELLE_RETENUE[r.type], r.libelle.trim(), r.reference?.trim() ? `réf. ${r.reference.trim()}` : ""].filter(Boolean).join(" — ");
+    // Acompte d'une demande : « Acompte du JJ/MM », déjà complet.
+    const libelle =
+      r.type === "acompte" && r.demandeId && r.libelle.trim()
+        ? r.libelle.trim()
+        : [LIBELLE_RETENUE[r.type], r.libelle.trim(), r.reference?.trim() ? `réf. ${r.reference.trim()}` : ""].filter(Boolean).join(" — ");
     add("net", libelle, { base: null, tauxSalarial: null, montantSalarial: r2(r.montant) });
   }
   const somme = (types: Retenue["type"][]) => r2(retenues.filter((r) => types.includes(r.type)).reduce((t, r) => t + r.montant, 0));
@@ -311,6 +360,11 @@ export function calculerBulletin({
     netAPayer,
     coutEmployeur,
     heuresSupExonerees,
+    totalDu: r2(netAvantImpot + fraisNonSoumis),
+    assietteCsg,
+    reintegrationSante,
+    dfs,
+    totalPatronalHorsReduction,
     avertissements,
   };
 }

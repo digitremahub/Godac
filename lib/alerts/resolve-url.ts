@@ -26,6 +26,7 @@ const ECRAN_PAR_TABLE: Record<string, string> = {
   meeting_requests: "communication.intranet",
   convocations: "communication.intranet",
   payslips: "equipe.paie",
+  salary_advance_requests: "equipe.paie_acomptes",
 };
 
 type Cible = { id: string; params?: Record<string, string>; suite?: string } | { url: string };
@@ -49,6 +50,9 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   rental_contract: (id) => (id ? { id: "flotte.vehicule_fiche", params: { id }, suite: "#location" } : { id: "flotte.vehicules" }),
   // Bulletins en attente de validation : Paie du mois (direction).
   payslip_validation: () => ({ id: "equipe.paie" }),
+  // Demande d'acompte : à traiter (direction, comptable ; un salarié est
+  // renvoyé à ses demandes par l'alternative du catalogue).
+  salary_advance: () => ({ id: "equipe.paie_acomptes" }),
   // Écart carburant (explication demandée au chauffeur, ou sa réponse) :
   // le plein ouvert dans l'historique, fiche dépliée.
   fuel_gap_explanation: (id) => ({ id: "carburant.pleins", suite: id ? `?plein=${encodeURIComponent(id)}` : "" }),

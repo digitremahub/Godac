@@ -4,7 +4,7 @@ import { generateRegistrationOptions } from "@simplewebauthn/server";
 import { isoUint8Array } from "@simplewebauthn/server/helpers";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { optionsCookieChallenge, webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
 
 /**
  * Step 1 of registering a passkey from /account (any role — see
@@ -14,7 +14,7 @@ import { webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
  * ../verify to check against (stateless — no server-side session
  * store needed between the two requests of one registration).
  */
-export async function POST() {
+export async function POST(req: Request) {
   const appUser = await requireAppUser();
   const supabase = await createServerSupabaseClient();
 
@@ -23,7 +23,7 @@ export async function POST() {
     .select("credential_id, transports")
     .eq("user_id", appUser.id);
 
-  const { rpName, rpID } = webauthnConfig();
+  const { rpName, rpID, origin } = webauthnConfig(req.headers.get("origin"));
   const options = await generateRegistrationOptions({
     rpName,
     rpID,
@@ -34,6 +34,9 @@ export async function POST() {
     authenticatorSelection: {
       authenticatorAttachment: "platform",
       userVerification: "required",
+      // « preferred » : les clés Android (Gestionnaire de mots de passe
+      // Google), iCloud et Windows Hello sont découvrables, ce qui permet la
+      // connexion sans e-mail ; « required » refuserait les appareils plus anciens.
       residentKey: "preferred",
     },
     excludeCredentials: (existing ?? []).map((c) => ({
@@ -43,13 +46,7 @@ export async function POST() {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, options.challenge, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 120,
-    path: "/",
-  });
+  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, options.challenge, optionsCookieChallenge(origin));
 
   return NextResponse.json(options);
 }

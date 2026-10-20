@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { calculerBulletin, HEURES_EQUIVALENCE, LIBELLE_RETENUE } from "@/lib/paie/calcul";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import type { ParametresEntreprise, ParametresLegaux, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
+import type { ParametresEntreprise, ParametresLegaux, PeriodeConges, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
+import { joursOuvrables } from "@/lib/paie/conges";
 
 const eur = (n: number | null) => (n === null ? "" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const REGIMES: { key: RegimeTransport; label: string }[] = [
@@ -60,6 +61,8 @@ export function PaieEditor({
   joursTravailles,
   dejaGenere,
   peutModifierProfil = true,
+  avertissementsAcomptes = [],
+  repriseConges = null,
 }: {
   userId: string;
   mois: string;
@@ -73,6 +76,10 @@ export function PaieEditor({
   dejaGenere: boolean;
   /** Comptable : le profil de paie se lit, seule la direction le modifie. */
   peutModifierProfil?: boolean;
+  /** Acomptes reportés (bulletin validé), venus d'un mois antérieur… */
+  avertissementsAcomptes?: string[];
+  /** Solde de congés de reprise (profil de paie). */
+  repriseConges?: { au: string; n1: number; n: number } | null;
 }) {
   const router = useRouter();
   const [regime, setRegime] = useState<RegimeTransport>(profil.regime);
@@ -82,6 +89,11 @@ export function PaieEditor({
   const [heuresContrat, setHeuresContrat] = useState<Num>(profil.heuresContractuelles);
   const [tauxPas, setTauxPas] = useState<Num>(profil.tauxPas ?? "");
   const [profilEnregistre, setProfilEnregistre] = useState(profilComplet);
+  const [groupe, setGroupe] = useState(profil.groupe ?? "");
+  const [tauxRepasProfil, setTauxRepasProfil] = useState<Num>(profil.tauxRepas ?? "");
+  const [repriseN1, setRepriseN1] = useState<Num>(repriseConges?.n1 ?? "");
+  const [repriseN, setRepriseN] = useState<Num>(repriseConges?.n ?? "");
+  const [repriseAu, setRepriseAu] = useState(repriseConges?.au ?? "");
 
   const [heures, setHeures] = useState<Num>(prefill.heuresTravaillees ?? "");
   const [absence, setAbsence] = useState<Num>(prefill.heuresAbsenceNonPayee);
@@ -93,15 +105,32 @@ export function PaieEditor({
   const [decoucher, setDecoucher] = useState<Num>(prefill.nbGrandDeplacement);
   const [retenues, setRetenues] = useState<Retenue[]>(prefill.retenues ?? []);
   const [personnesACharge, setPersonnesACharge] = useState<Num>(prefill.personnesACharge ?? 0);
+  const [hs25, setHs25] = useState<Num>(prefill.heuresSup25 ?? "");
+  const [hs50, setHs50] = useState<Num>(prefill.heuresSup50 ?? "");
+  const [periodes, setPeriodes] = useState<PeriodeConges[]>(prefill.periodesConges ?? []);
+  const [tauxRepasMois, setTauxRepasMois] = useState<Num>(prefill.tauxRepas ?? "");
 
   const [busy, setBusy] = useState<"profil" | "bulletin" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const salarie: ProfilSalarie = { regime, cadre, tauxHoraire: n(tauxHoraire), heuresContractuelles: n(heuresContrat) || HEURES_EQUIVALENCE[regime], tauxPas: tauxPas === "" ? null : tauxPas };
+  const salarie: ProfilSalarie = {
+    regime,
+    cadre,
+    tauxHoraire: n(tauxHoraire),
+    heuresContractuelles: n(heuresContrat) || HEURES_EQUIVALENCE[regime],
+    tauxPas: tauxPas === "" ? null : tauxPas,
+    groupe: groupe.trim() || null,
+    tauxRepas: tauxRepasProfil === "" ? null : tauxRepasProfil,
+  };
+  const periodesValides = periodes.filter((p) => p.du && p.au && p.jours > 0);
   const variables: VariablesMois = {
     heuresTravaillees: heures === "" ? null : heures,
     heuresAbsenceNonPayee: n(absence),
-    joursCongesPris: n(conges),
+    joursCongesPris: periodesValides.length ? periodesValides.reduce((t, p) => t + p.jours, 0) : n(conges),
+    periodesConges: periodesValides,
+    heuresSup25: hs25 === "" && hs50 === "" ? null : n(hs25),
+    heuresSup50: hs25 === "" && hs50 === "" ? null : n(hs50),
+    tauxRepas: tauxRepasMois === "" ? null : tauxRepasMois,
     primes: primes.filter((p) => p.montant),
     nbRepas: n(repas),
     nbRepasUnique: n(repasUnique),
@@ -135,6 +164,11 @@ export function PaieEditor({
         hourly_rate: n(tauxHoraire),
         contractual_hours: salarie.heuresContractuelles,
         pas_rate: tauxPas === "" ? null : tauxPas,
+        job_group: groupe.trim() || null,
+        meal_rate: tauxRepasProfil === "" ? null : tauxRepasProfil,
+        leave_balance_n1: repriseN1 === "" ? null : repriseN1,
+        leave_balance_n: repriseN === "" ? null : repriseN,
+        leave_balance_date: repriseAu || null,
       });
       setProfilEnregistre(true);
       setMessage({ ok: true, text: "Profil enregistré." });
@@ -203,7 +237,22 @@ export function PaieEditor({
               <input className="input" value={coefficient} onChange={(e) => (setCoefficient(e.target.value), setProfilEnregistre(false))} placeholder="ex. 138M" />
             </label>
             <Field label="Taux PAS" value={tauxPas} onChange={(v) => (setTauxPas(v), setProfilEnregistre(false))} suffix="%" hint="Vide = taux neutre" />
+            <label className="block">
+              <span className="label">Groupe</span>
+              <input className="input" value={groupe} onChange={(e) => (setGroupe(e.target.value), setProfilEnregistre(false))} placeholder="ex. 03 bis" />
+            </label>
+            <Field label="Taux du panier" value={tauxRepasProfil} onChange={(v) => (setTauxRepasProfil(v), setProfilEnregistre(false))} suffix="€" hint={`Vide = réglage (${eur(entreprise.frais.repas)} €)`} />
           </div>
+          <p className="label !mb-0">Solde de congés de reprise</p>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="N-1" value={repriseN1} onChange={(v) => (setRepriseN1(v), setProfilEnregistre(false))} step="0.5" suffix="j" />
+            <Field label="N" value={repriseN} onChange={(v) => (setRepriseN(v), setProfilEnregistre(false))} step="0.5" suffix="j" />
+            <label className="block">
+              <span className="label">Au</span>
+              <input className="input" type="date" value={repriseAu} onChange={(e) => (setRepriseAu(e.target.value), setProfilEnregistre(false))} />
+            </label>
+          </div>
+          <p className="-mt-1 text-xs text-navy/55">Soldes du dernier bulletin (ex. N-1 : 5, N : 5 au 30/09). Ensuite : + 2,5 j par mois, − congés validés.</p>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={cadre} onChange={(e) => (setCadre(e.target.checked), setProfilEnregistre(false))} />
             Statut cadre
@@ -224,11 +273,41 @@ export function PaieEditor({
           <div className="grid grid-cols-2 gap-3">
             <Field label="Heures travaillées" value={heures} onChange={setHeures} suffix="h" hint="Vide = heures du contrat" />
             <Field label="Absence non payée" value={absence} onChange={setAbsence} suffix="h" />
-            <Field label="Congés payés pris" value={conges} onChange={setConges} step="0.5" suffix="j" />
+            {periodesValides.length === 0 && <Field label="Congés payés pris" value={conges} onChange={setConges} step="0.5" suffix="j" />}
+            <Field label="Heures sup. 25 %" value={hs25} onChange={setHs25} suffix="h" hint="Saisies : remplacent celles des heures travaillées" />
+            <Field label="Heures sup. 50 %" value={hs50} onChange={setHs50} suffix="h" />
           </div>
+          <p className="label !mb-0">Congés payés pris (dates)</p>
+          {periodes.map((p, i) => {
+            const maj = (champ: Partial<PeriodeConges>) =>
+              setPeriodes(
+                periodes.map((x, j) => {
+                  if (j !== i) return x;
+                  const nouveau = { ...x, ...champ };
+                  // Jours ouvrables recalculés quand les dates changent.
+                  if ((champ.du !== undefined || champ.au !== undefined) && nouveau.du && nouveau.au) nouveau.jours = joursOuvrables(nouveau.du, nouveau.au);
+                  return nouveau;
+                }),
+              );
+            return (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <input className="input w-auto !py-1.5" type="date" value={p.du} onChange={(e) => maj({ du: e.target.value })} aria-label="Du" />
+                <input className="input w-auto !py-1.5" type="date" value={p.au} onChange={(e) => maj({ au: e.target.value })} aria-label="Au" />
+                <input className="input w-20 !py-1.5 tabular-nums" type="number" step="0.5" min="0" value={p.jours || ""} onChange={(e) => maj({ jours: Math.max(0, Number(e.target.value)) })} aria-label="Jours ouvrables" />
+                <span className="text-xs text-navy/55">j ouvr.</span>
+                <button type="button" className="btn-ghost !px-2 !py-1 text-xs text-orange-ink" onClick={() => setPeriodes(periodes.filter((_, j) => j !== i))}>
+                  Retirer
+                </button>
+              </div>
+            );
+          })}
+          <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setPeriodes([...periodes, { du: "", au: "", jours: 0 }])}>
+            + Période de congés
+          </button>
           <p className="label !mb-0">Frais de déplacement</p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={`Repas (${eur(entreprise.frais.repas)} €)`} value={repas} onChange={setRepas} step="1" />
+            <Field label={`Paniers repas (${eur(tauxRepasMois === "" ? (tauxRepasProfil === "" ? entreprise.frais.repas : tauxRepasProfil) : tauxRepasMois)} €)`} value={repas} onChange={setRepas} step="1" hint="Nombre de jours" />
+            <Field label="Taux du panier ce mois" value={tauxRepasMois} onChange={setTauxRepasMois} suffix="€" hint="Vide = profil ou réglage" />
             <Field label={`Repas unique (${eur(entreprise.frais.repasUnique)} €)`} value={repasUnique} onChange={setRepasUnique} step="1" />
             <Field label={`Casse-croûte (${eur(entreprise.frais.cassecroute)} €)`} value={casse} onChange={setCasse} step="1" />
             <Field label={`Découchers (${eur(entreprise.frais.grandDeplacement)} €)`} value={decoucher} onChange={setDecoucher} step="1" />
@@ -268,8 +347,25 @@ export function PaieEditor({
             Acompte déjà versé, saisie sur salaire, ATD / saisie administrative, pension alimentaire, remboursement de prêt. Les retenues
             récurrentes sont reprises le mois suivant.
           </p>
+          {avertissementsAcomptes.map((a) => (
+            <p key={a} role="note" className="rounded-lg bg-gold/20 px-3 py-2 text-xs text-navy">
+              {a}
+            </p>
+          ))}
           {retenues.map((r, i) => {
             const maj = (champ: Partial<Retenue>) => setRetenues(retenues.map((x, j) => (j === i ? { ...x, ...champ } : x)));
+            if (r.demandeId) {
+              // Acompte d'une demande acceptée : ajouté et recalculé par le serveur, non modifiable ici.
+              return (
+                <div key={r.demandeId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm">
+                  <span>
+                    <span className="font-semibold">{r.libelle}</span>
+                    <span className="ml-1 text-xs text-navy/60">demande acceptée, ajoutée automatiquement</span>
+                  </span>
+                  <span className="tabular-nums">− {eur(r.montant)} €</span>
+                </div>
+              );
+            }
             return (
               <div key={i} className="flex flex-wrap items-center gap-2">
                 <select className="input w-auto !py-1.5" value={r.type} onChange={(e) => maj({ type: e.target.value as TypeRetenue })} aria-label="Type de retenue">
@@ -377,6 +473,9 @@ export function PaieEditor({
                 ["Total cotisations patronales", bulletin.totalPatronal],
                 ["Réduction générale", bulletin.reductionGenerale],
                 ["Montant net social", bulletin.netSocial],
+                ["Total dû (net + indemnités)", bulletin.totalDu ?? 0],
+                ["Assiette CSG/CRDS", bulletin.assietteCsg ?? 0],
+                ["Réintégration fiscale santé", bulletin.reintegrationSante ?? 0],
                 ["Net imposable", bulletin.netImposable],
                 [`Prélèvement à la source (${eur(bulletin.tauxPas)} %)`, bulletin.montantPas],
                 ["Frais non soumis", bulletin.fraisNonSoumis],
