@@ -12,6 +12,8 @@ import { ServicesPanel } from "@/components/admin/ServicesPanel";
 import { TanksPanel } from "@/components/admin/TanksPanel";
 import { AssistantNotesPanel } from "@/components/admin/AssistantNotesPanel";
 import { JoinLinkCard } from "@/components/admin/JoinLinkCard";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { jetonInscription } from "@/lib/organization/lien-inscription";
 import { PayslipContributionLinesPanel } from "@/components/admin/PayslipContributionLinesPanel";
 
 export default async function OrganizationSettingsPage() {
@@ -20,12 +22,14 @@ export default async function OrganizationSettingsPage() {
   const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
+  // Audit M18 : jeton lu dans sa table réservée (page déjà limitée à la direction).
+  const jetonLien = isDirection ? await jetonInscription(createAdminSupabaseClient(), appUser.organization_id).catch(() => null) : null;
   const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }, { data: activeUsers }] =
     await Promise.all([
       supabase
         .from("organizations")
         .select(
-          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, driver_signup_token, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number, country, siren, legal_name, naf_label, idcc, effectif_tranche, company_created_on, siret_checked_at",
+          "name, logo_url, accent_color, require_odometer_photo, auto_clock_enabled, emergency_phone, consumption_anomaly_threshold_percent, depot_address, siret, legal_address, legal_form, ape_code, convention_collective, urssaf_number, country, siren, legal_name, naf_label, idcc, effectif_tranche, company_created_on, siret_checked_at",
         )
         .eq("id", appUser.organization_id)
         .single(),
@@ -113,8 +117,8 @@ export default async function OrganizationSettingsPage() {
         />
       )}
       {assistantEnabled && <AssistantNotesPanel notes={(notes ?? []) as any} />}
-      {appUser.role === "direction" && organization?.driver_signup_token && (
-        <JoinLinkCard token={organization.driver_signup_token} />
+      {jetonLien && (
+        <JoinLinkCard token={jetonLien} />
       )}
     </div>
   );

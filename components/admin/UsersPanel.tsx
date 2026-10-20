@@ -72,7 +72,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const [newBadge, setNewBadge] = useState<{ id: string; fullName: string } | null>(null);
+  const [newBadge, setNewBadge] = useState<{ id: string; fullName: string; activationCode: string | null } | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -131,7 +131,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
       });
       const json = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(json.error));
-      setNewBadge({ id: json.id, fullName });
+      setNewBadge({ id: json.id, fullName, activationCode: typeof json.activationCode === "string" ? json.activationCode : null });
       setFullName("");
       setPhone("");
       setRoleTitle("");
@@ -349,6 +349,14 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
             scanne pour créer son code PIN et se connecter.
           </p>
           <QrCodeBadge type="driver" id={newBadge.id} title={newBadge.fullName} subtitle="Scannez pour créer votre code PIN" />
+          {newBadge.activationCode && (
+            <p role="status" className="text-center text-sm text-navy/80">
+              Code d&apos;activation à remettre avec le badge :{" "}
+              <strong className="font-mono text-base tracking-wider">{newBadge.activationCode}</strong>
+              <br />
+              <span className="text-xs text-navy/60">Exigé pour créer le premier PIN. Valable 7 jours, il ne sera plus affiché (régénérable par « Réinitialiser l&apos;accès »).</span>
+            </p>
+          )}
           <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setNewBadge(null)}>
             Fermer
           </button>

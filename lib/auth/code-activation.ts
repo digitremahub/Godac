@@ -39,7 +39,7 @@ export function evaluerActivation(
 }
 
 export const MESSAGES_ACTIVATION: Record<Exclude<EtatActivation, { ok: true }>["raison"], string> = {
-  absent: "Votre accès a été réinitialisé : saisissez le code d'activation remis par votre responsable.",
+  absent: "Saisissez le code d'activation remis par votre responsable avec votre badge (ou après la réinitialisation de votre accès).",
   expire: "Ce code d'activation a expiré. Demandez-en un nouveau à votre responsable.",
   bloque: "Trop d'essais avec ce code d'activation. Demandez-en un nouveau à votre responsable.",
   incorrect: "Code d'activation incorrect.",

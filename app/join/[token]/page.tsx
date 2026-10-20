@@ -1,4 +1,5 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { organisationParJeton } from "@/lib/organization/lien-inscription";
 import { EmptyState } from "@/components/ui";
 import { JoinDriverForm } from "@/components/auth/JoinDriverForm";
 import { AuthLayout } from "@/components/auth/AuthLayout";
@@ -15,11 +16,10 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   const { token } = await params;
   const admin = createAdminSupabaseClient();
 
-  const { data: organization } = await admin
-    .from("organizations")
-    .select("id, name, services(id, name)")
-    .eq("driver_signup_token", token)
-    .maybeSingle();
+  const organizationId = await organisationParJeton(admin, token);
+  const { data: organization } = organizationId
+    ? await admin.from("organizations").select("id, name, services(id, name)").eq("id", organizationId).maybeSingle()
+    : { data: null };
 
   if (!organization) {
     return (

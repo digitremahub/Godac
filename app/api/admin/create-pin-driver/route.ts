@@ -2,6 +2,8 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createPinDriver } from "@/lib/auth/driver-pin";
+import { creerCodeActivation } from "@/lib/auth/code-activation-serveur";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const bodySchema = z.object({
   full_name: z.string().min(1),
@@ -16,6 +18,12 @@ const bodySchema = z.object({
  * chauffeur who can't be reached by a magic link. Direction only sets
  * name/role/service here — the driver chooses their own PIN at their
  * first scan of the printed badge (app/driver-pin/[id]).
+ *
+ * Audit M8 : un badge neuf exige aussi un code d'activation pour le
+ * premier PIN (même mécanisme que la réinitialisation,
+ * driver_pin_activations) : quelqu'un qui photographie ou intercepte le
+ * badge avant sa remise ne peut pas s'approprier le compte. Le code est
+ * renvoyé une seule fois, à remettre au chauffeur avec son badge.
  */
 export async function POST(req: Request) {
   const g = await garderApi({ roles: "tous" });
@@ -39,7 +47,14 @@ export async function POST(req: Request) {
       organizationId: appUser.organization_id,
       serviceId: parsed.data.service_id,
     });
-    return NextResponse.json({ id });
+    let activationCode: string | null = null;
+    try {
+      activationCode = await creerCodeActivation(createAdminSupabaseClient(), { userId: id, organizationId: appUser.organization_id, createdBy: appUser.id });
+    } catch (err) {
+      // Table absente (migration 20261019000005 non appliquée) : parcours historique, badge seul.
+      console.error("create-pin-driver: code d'activation non créé", err);
+    }
+    return NextResponse.json({ id, activationCode });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
