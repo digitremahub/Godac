@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut créer un modèle." }, { status: 403 });
   }
 
-  const parsed = createSchema.safeParse(await req.json());
+  const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const input = parsed.data;
@@ -82,6 +82,10 @@ export async function POST(req: Request) {
   if (input.default_vehicle_id && (!vehicle || (vehicle.service_id && vehicle.service_id !== input.service_id))) {
     return NextResponse.json({ error: "Le véhicule sélectionné n'est pas compatible avec ce service." }, { status: 400 });
   }
+  if (appUser.role !== "direction") {
+    const { data: lien } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id).eq("service_id", input.service_id).maybeSingle();
+    if (!lien) return NextResponse.json({ error: "Ce service ne fait pas partie de vos services autorisés." }, { status: 403 });
+  }
 
   const { data, error } = await supabase.from("planning_tour_templates").insert({
     organization_id: appUser.organization_id,
@@ -95,7 +99,26 @@ export async function POST(req: Request) {
   }).select("id, service_id, route_id, name, departure_time, weekdays, default_vehicle_id, active").single();
 
   if (error) {
-    if (error.code === "23505") return NextResponse.json({ error: "Un modèle porte déjà ce nom dans ce service." }, { status: 409 });
+    if (error.code === "23505") {
+      // Un modèle retiré (désactivé) portait ce nom : on le réactive avec les nouvelles valeurs.
+      const { data: reactive } = await supabase
+        .from("planning_tour_templates")
+        .update({
+          route_id: input.route_id,
+          departure_time: input.departure_time,
+          weekdays: [...new Set(input.weekdays)].sort((a, b) => a - b),
+          default_vehicle_id: input.default_vehicle_id ?? null,
+          active: true,
+        })
+        .eq("organization_id", appUser.organization_id)
+        .eq("service_id", input.service_id)
+        .eq("name", input.name)
+        .eq("active", false)
+        .select("id, service_id, route_id, name, departure_time, weekdays, default_vehicle_id, active")
+        .maybeSingle();
+      if (reactive) return NextResponse.json({ template: reactive }, { status: 201 });
+      return NextResponse.json({ error: "Un modèle porte déjà ce nom dans ce service." }, { status: 409 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ template: data }, { status: 201 });

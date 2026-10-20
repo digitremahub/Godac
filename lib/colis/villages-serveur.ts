@@ -46,21 +46,42 @@ const jourParis = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: 
  * `affecteesApres` (fiche supplémentaire) : seulement les tournées inscrites
  * au planning après cette date, celles d'avant ayant été chargées sur la
  * fiche déjà clôturée du jour.
+ *
+ * `runId` (fiche donnée) : avec la migration 20261023000002, seulement les
+ * entrées que porte cette fiche (séparée : une ; reliée : plusieurs ; libre
+ * sans planning : aucune, le chauffeur choisit une tournée-modèle). Sans la
+ * migration : toutes les entrées du jour (ancien fonctionnement, `affecteesApres`).
  */
-export async function planningEtVillages(supabase: SupabaseClient, organizationId: string, driverId: string, date: string, affecteesApres: string | null = null): Promise<{ passages: PassagePlanning[]; villages: VillageDuJour[] }> {
+export async function planningEtVillages(supabase: SupabaseClient, organizationId: string, driverId: string, date: string, affecteesApres: string | null = null, runId: string | null = null): Promise<{ passages: PassagePlanning[]; villages: VillageDuJour[] }> {
   const veille = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString();
   const lendemain = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString();
-  const { data: entries, error } = await supabase
-    .from("planning_entries")
-    .select("id, tour_number, service_id, vehicle_id, start_at, status, created_at, services(name), vehicles(registration)")
-    .eq("organization_id", organizationId)
-    .eq("driver_id", driverId)
-    .gte("start_at", veille)
-    .lt("start_at", lendemain)
-    .order("start_at");
+  const lire = (champs: string) =>
+    supabase
+      .from("planning_entries")
+      .select(champs)
+      .eq("organization_id", organizationId)
+      .eq("driver_id", driverId)
+      .gte("start_at", veille)
+      .lt("start_at", lendemain)
+      .order("start_at");
+  const CHAMPS = "id, tour_number, service_id, vehicle_id, start_at, status, created_at, services(name), vehicles(registration)";
+  let parFiche = false;
+  let res = runId ? await lire(`${CHAMPS}, delivery_run_id`) : await lire(CHAMPS);
+  if (runId && !res.error) parFiche = true;
+  else if (runId) res = await lire(CHAMPS); // colonne absente : ancien fonctionnement
+  const { data: entries, error } = res;
   if (error) return { passages: [], villages: [] };
+  let origine: string | null = null;
+  if (parFiche) {
+    const { data: fiche } = await supabase.from("delivery_runs").select("planning_entry_id").eq("id", runId!).maybeSingle();
+    origine = (fiche as { planning_entry_id?: string | null } | null)?.planning_entry_id ?? null;
+  }
   const duJour = ((entries ?? []) as any[]).filter(
-    (e) => e.tour_number && e.status !== "cancelled" && jourParis(e.start_at) === date && (!affecteesApres || Date.parse(e.created_at) > Date.parse(affecteesApres)),
+    (e) =>
+      e.tour_number && e.status !== "cancelled" && jourParis(e.start_at) === date &&
+      (parFiche
+        ? e.delivery_run_id === runId || (origine !== null && e.id === origine)
+        : !affecteesApres || Date.parse(e.created_at) > Date.parse(affecteesApres)),
   );
   if (!duJour.length) return { passages: [], villages: [] };
 

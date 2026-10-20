@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
-import { preparerFicheDuJour } from "@/lib/colis/fiche-du-jour";
+import { choixRegroupement, ficheDeLAffectation } from "@/lib/colis/fiche-du-jour";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
@@ -16,13 +16,19 @@ const schema = z.object({
   tour_number: z.string().trim().min(1).max(60),
   date: z.string().date(),
   time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+  /**
+   * Le chauffeur a déjà une autre affectation ou une fiche ouverte ce jour-là :
+   * fiches colis séparées (recommandé) ou reliées en une seule tournée.
+   * Absent dans ce cas : réponse 409 `choix_requis` sans rien inscrire.
+   */
+  regroupement: z.enum(["separee", "reliee"]).optional(),
 });
 
 /**
  * Affecter une tournée : entrée de planning ET fiche Tournée colis du
- * chauffeur pour ce jour (créée ou complétée : une fiche par chauffeur et
- * par jour regroupe toutes ses affectations, lib/colis/fiche-du-jour.ts).
- * Le chauffeur la retrouve prête, villages et ramasses compris.
+ * chauffeur (lib/colis/fiche-du-jour.ts) : une fiche par affectation
+ * (séparée, par défaut) ou, exceptionnellement, reliée à sa fiche ouverte
+ * du jour. Le chauffeur la retrouve prête, villages et ramasses compris.
  */
 export async function GET() {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -53,7 +59,7 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
 
-  const { service_id, driver_id, vehicle_id, tour_number, date, time } = parsed.data;
+  const { service_id, driver_id, vehicle_id, tour_number, date, time, regroupement } = parsed.data;
   const [{ data: driver }, { data: vehicle }, { data: service }, { data: route }] = await Promise.all([
     supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).or(FILTRE_CONDUCTEURS).maybeSingle(),
     supabase.from("vehicles").select("id,service_id").eq("id", vehicle_id).eq("organization_id", user.organization_id).maybeSingle(),
@@ -66,6 +72,23 @@ export async function POST(req: Request) {
   }
 
   const start_at = parisWallTimeToUtcISOString(date, time);
+  const conducteur = { id: driver_id, organization_id: user.organization_id };
+  const avecFiche = date >= aujourdhuiParis();
+
+  // Autre affectation ou fiche ouverte ce jour-là : demander séparées ou
+  // reliées avant d'inscrire quoi que ce soit (plusieurs affectations dans
+  // la journée restent normales, jamais bloquées).
+  if (avecFiche && !regroupement) {
+    try {
+      const choix = await choixRegroupement(supabase, conducteur, date);
+      if (choix?.requis) {
+        return NextResponse.json({ choix_requis: true, existantes: choix.existantes, fiches_ouvertes: choix.fiches_ouvertes }, { status: 409 });
+      }
+    } catch (e) {
+      console.warn("[colis/affectations] Choix séparée/reliée non vérifié", { driverId: driver_id, date, error: e instanceof Error ? e.message : e });
+    }
+  }
+
   const { data: assignment, error } = await supabase.from("planning_entries").insert({
     organization_id: user.organization_id,
     service_id,
@@ -74,7 +97,7 @@ export async function POST(req: Request) {
     tour_number,
     start_at,
     status: "planned",
-  }).select("id,organization_id,service_id,driver_id,vehicle_id,tour_number,start_at,status").single();
+  }).select("id,organization_id,service_id,driver_id,vehicle_id,tour_number,start_at,status,created_at").single();
 
   if (error) {
     if (error.code === "23505") {
@@ -94,9 +117,9 @@ export async function POST(req: Request) {
   // pas l'affectation : le chauffeur peut toujours créer sa fiche lui-même.
   let fiche: { id: string; name: string | null } | null = null;
   let ficheWarning: string | null = null;
-  if (date >= aujourdhuiParis()) {
+  if (avecFiche) {
     try {
-      const r = await preparerFicheDuJour(supabase, { id: driver_id, organization_id: user.organization_id }, date);
+      const r = await ficheDeLAffectation(supabase, conducteur, assignment, date, regroupement ?? "separee");
       fiche = { id: r.run.id, name: r.run.name ?? null };
       ficheWarning = r.warning ?? null;
     } catch (e) {
