@@ -6,7 +6,7 @@ import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import { genererJetonInvitation, hacherJetonInvitation } from "@/lib/go-navigation/jeton";
 import { expirationInvitation, normaliserNote } from "@/lib/go-navigation/offre";
 
-const bodySchema = z.object({ note: z.string().max(500).optional() });
+const bodySchema = z.object({ note: z.string().max(200).optional() });
 
 /**
  * Staff GODAC : génère un lien d'invitation GO Navigation. Seul le hash du
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Accès réservé au personnel GODAC" }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Note invalide (500 caractères maximum)." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Note invalide (200 caractères maximum)." }, { status: 400 });
 
   const jeton = genererJetonInvitation();
   const admin = createAdminSupabaseClient();
