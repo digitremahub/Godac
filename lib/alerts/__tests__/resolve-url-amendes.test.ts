@@ -14,7 +14,7 @@ describe("lien de l'alerte d'amende (I21)", () => {
     expect(resolveAlertUrl("payslips", "payslip_validation", "p1")).toBe("/paie");
   });
   it("les autres liens sont inchangés", () => {
-    expect(resolveAlertUrl("fuel_entries", "price_anomaly", null)).toBe("/fuel");
+    expect(resolveAlertUrl("fuel_entries", "price_anomaly", null)).toBe("/carburant/pleins");
     expect(resolveAlertUrl("messages", "new_message", "u2")).toBe("/messenger?with=u2");
   });
 });

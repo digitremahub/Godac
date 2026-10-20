@@ -95,7 +95,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
 
   const tiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
     { label: "Tournées en cours", value: ongoingTours.length, accent: "teal", href: "/tours/history" },
-    { label: "Tickets OCR en attente", value: pendingOcrRes.count ?? 0, accent: "gold", href: "/ocr-review" },
+    { label: "Tickets OCR en attente", value: pendingOcrRes.count ?? 0, accent: "gold", href: "/carburant/revue-ocr" },
     { label: "Nouveaux chauffeurs à valider", value: pendingSignups.length, accent: "teal", href: "/driver-signups" },
   ];
   if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });

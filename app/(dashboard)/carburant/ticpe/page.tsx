@@ -81,7 +81,7 @@ export default async function TicpePage() {
                   <td className="py-2">{Number(exp.total_liters).toLocaleString("fr-FR")} L</td>
                   <td className="py-2">
                     <div className="flex gap-3">
-                      <Link href={`/ticpe/${exp.id}`} className="text-teal-ink hover:underline">
+                      <Link href={`/carburant/ticpe/${exp.id}`} className="text-teal-ink hover:underline">
                         Vérifier
                       </Link>
                       <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">

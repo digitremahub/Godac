@@ -281,7 +281,7 @@ export async function ChauffeurDashboard({
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Mes derniers ravitaillements</h2>
-            <Link href="/fuel" className="text-sm text-teal-ink hover:underline">
+            <Link href="/carburant/pleins" className="text-sm text-teal-ink hover:underline">
               Voir tout
             </Link>
           </div>

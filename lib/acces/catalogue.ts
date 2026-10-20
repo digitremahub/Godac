@@ -169,8 +169,20 @@ export interface Ecran {
   saufModule?: CleModule;
   /** Formule à partir de laquelle le module est inclus (indicatif). */
   formuleMin?: FormuleMin;
-  /** "cache" : page accessible mais sans entrée de menu (fiche, formulaire…). */
-  menu?: "section" | "cache";
+  /**
+   * "cache" : page accessible mais sans entrée de menu ni onglet (fiche,
+   * formulaire…) ; "onglet" : onglet de sa section, sans entrée dans le
+   * menu latéral.
+   */
+  menu?: "section" | "onglet" | "cache";
+  /**
+   * Écran parent (sous-onglet) : quand le parent est visible, cet écran
+   * n'a ni entrée de menu ni onglet de section ; il apparaît dans la
+   * barre de sous-onglets du parent. Sinon il remonte à sa place.
+   */
+  parent?: string;
+  /** Libellé court de l'onglet (par défaut : `libelle`). */
+  libelleOnglet?: string;
   /** Visible dans le tiroir « Plus » de la barre mobile chauffeur. */
   mobile?: "barre" | "plus";
   icone: IconeId;
@@ -401,27 +413,35 @@ export const ECRANS: readonly Ecran[] = [
   E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/qr-codes", roles: ENCADREMENT, icone: "qr" }),
 
   // ── Carburant ────────────────────────────────────────────────────
-  E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/fuel", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
-  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Revue OCR", href: "/ocr-review", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
+  E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/carburant/pleins", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
+  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Revue OCR", href: "/carburant/revue-ocr", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
   E({
     id: "carburant.cuves",
     section: "carburant",
-    libelle: "Cuves & approvisionnements",
-    href: "/tanks",
+    libelle: "Cuves",
+    href: "/carburant/cuves",
     roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    icone: "cylinder",
+  }),
+  E({
+    id: "carburant.approvisionnements",
+    section: "carburant",
+    libelle: "Approvisionnements",
+    href: "/carburant/approvisionnements",
+    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    menu: "onglet",
     icone: "cylinder",
   }),
   E({
     id: "carburant.ticpe",
     section: "carburant",
     libelle: "Export TICPE",
-    href: "/ticpe",
+    href: "/carburant/ticpe",
     roles: ["direction", "comptable"],
     modules: ["ticpe_export"],
     icone: "file",
-    aussiActif: ["/ticpe/"],
   }),
-  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/ticpe/[id]", roles: ["direction", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
+  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
 
   // ── Équipe & RH ──────────────────────────────────────────────────
   E({
@@ -574,12 +594,85 @@ export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
   return { ok: true };
 }
 
-/** Entrée de menu visible pour ce rôle et ces modules. */
-export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+/** Onglet visible (barre de section ou sous-onglets), sans tenir compte du parent. */
+function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
   if (e.menu === "cache") return false;
   if (!(e.rolesMenu ?? e.roles).includes(role)) return false;
-  if (e.saufModule && modulesActifs.has(e.saufModule)) return false;
   return deciderAcces(e, role, modulesActifs).ok;
+}
+
+/** Le parent de cet écran est visible : l'écran n'est qu'un sous-onglet. */
+function estSousOngletVisible(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+  if (!e.parent) return false;
+  const p = PAR_ID.get(e.parent);
+  return Boolean(p && estOuvrableEnOnglet(p, role, modulesActifs));
+}
+
+/** Entrée de menu visible pour ce rôle et ces modules. */
+export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+  if (e.menu === "onglet") return false;
+  if (e.saufModule && modulesActifs.has(e.saufModule)) return false;
+  if (estSousOngletVisible(e, role, modulesActifs)) return false;
+  return estOuvrableEnOnglet(e, role, modulesActifs);
+}
+
+/** Préfixe d'URL de chaque section (les onglets hors préfixe, comme /account, n'y figurent pas). */
+export const PREFIXE_SECTION: Record<SectionId, string> = {
+  dashboard: "/dashboard",
+  moi: "/moi",
+  exploitation: "/exploitation",
+  flotte: "/flotte",
+  carburant: "/carburant",
+  equipe: "/equipe",
+  communication: "/communication",
+  admin: "/admin",
+  aide: "/aide",
+};
+
+export interface OngletEcran {
+  id: string;
+  href: string;
+  libelle: string;
+  /** Chemins qui allument aussi l'onglet (sous-onglets, fiches). */
+  prefixes: string[];
+}
+
+const chemin = (href: string) => href.split("?")[0]!;
+const dansSection = (e: Ecran) => {
+  const p = PREFIXE_SECTION[e.section];
+  const h = chemin(e.href);
+  return h === p || h.startsWith(`${p}/`);
+};
+
+function versOnglet(e: Ecran): OngletEcran {
+  const enfants = ECRANS.filter((x) => x.parent === e.id).map((x) => chemin(x.href));
+  return { id: e.id, href: e.href, libelle: e.libelleOnglet ?? e.libelle, prefixes: [...enfants, ...(e.aussiActif ?? []).map((a) => a.replace(/\/$/, ""))] };
+}
+
+/** Barre d'onglets d'une section, filtrée par rôle et modules. */
+export function ongletsSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>): OngletEcran[] {
+  const vus = new Set<string>();
+  return ECRANS.filter(
+    (e) => e.section === section && dansSection(e) && estOuvrableEnOnglet(e, role, modulesActifs) && !estSousOngletVisible(e, role, modulesActifs),
+  )
+    .filter((e) => (vus.has(chemin(e.href)) ? false : (vus.add(chemin(e.href)), true)))
+    .map(versOnglet);
+}
+
+/** Sous-onglets d'un écran parent (le parent en premier), filtrés par rôle et modules. */
+export function sousOnglets(parentId: string, role: UserRole, modulesActifs: ReadonlySet<string>): OngletEcran[] {
+  const p = ecran(parentId);
+  if (!estOuvrableEnOnglet(p, role, modulesActifs)) return [];
+  const enfants = ECRANS.filter((e) => e.parent === parentId && estOuvrableEnOnglet(e, role, modulesActifs));
+  return [{ id: p.id, href: p.href, libelle: p.libelleOnglet ?? p.libelle, prefixes: [] }, ...enfants.map(versOnglet)];
+}
+
+/** Premier onglet ouvrable d'une section (lien de section, URL nue /flotte…). */
+export function premierOngletSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>): string | null {
+  const o = ongletsSection(section, role, modulesActifs)[0];
+  if (o) return o.href;
+  const ouvrable = ECRANS.find((e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && deciderAcces(e, role, modulesActifs).ok);
+  return ouvrable?.href ?? null;
 }
 
 export interface SectionMenu {

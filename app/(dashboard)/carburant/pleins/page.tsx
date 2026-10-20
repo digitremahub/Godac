@@ -65,7 +65,7 @@ export default async function FuelPage({
           title="Nouveau ravitaillement"
           description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un ravitaillement oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
           actions={
-            <Link href="/fuel" className="btn-secondary">
+            <Link href="/carburant/pleins" className="btn-secondary">
               ← Historique
             </Link>
           }
@@ -122,7 +122,7 @@ export default async function FuelPage({
         description="Tous les ravitaillements — filtrez par véhicule ou par chauffeur pour voir qui a eu quoi, quand."
         actions={
           canCreate ? (
-            <Link href="/fuel?new=1" className="btn-primary">
+            <Link href="/carburant/pleins?new=1" className="btn-primary">
               + Nouveau ravitaillement
             </Link>
           ) : undefined
@@ -152,7 +152,7 @@ function FuelHistoryPager({ params, page, total }: { params: Record<string, stri
     for (const [k, v] of Object.entries(params)) if (v && k !== "page" && k !== "new") q.set(k, v);
     if (p > 1) q.set("page", String(p));
     const qs = q.toString();
-    return qs ? `/fuel?${qs}` : "/fuel";
+    return qs ? `/carburant/pleins?${qs}` : "/carburant/pleins";
   };
   return (
     <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm">

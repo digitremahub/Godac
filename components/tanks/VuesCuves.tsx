@@ -1,5 +1,4 @@
-import { garderPage } from "@/lib/acces/garde-page";
-import { hasRole } from "@/lib/auth/session";
+import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -9,36 +8,10 @@ import { AddTankForm } from "@/components/tanks/AddTankForm";
 import { TankDeliveryForm } from "@/components/tanks/TankDeliveryForm";
 import { TankPhotosTable } from "@/components/tanks/TankPhotosTable";
 import { TankDeliveriesTable } from "@/components/tanks/TankDeliveriesTable";
-import { TanksPageTabs } from "@/components/tanks/TanksPageTabs";
 
-/** "Cuves" et "Approvisionnements" (ex-/tanks/deliveries) réunis sur une seule page à onglets — une création d'approvisionnement vivait déjà sur l'onglet Cuves (TankDeliveryForm par cuve), l'ancien /tanks/deliveries n'était qu'un historique en lecture seule. */
-export default async function TanksPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const params = await searchParams;
-  const tab = params.tab === "approvisionnements" ? "approvisionnements" : "cuves";
-  const g = await garderPage("carburant.cuves");
-  if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  const canManage = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
 
-  return (
-    <div>
-      <PageHeader
-        title="Cuves & Approvisionnements"
-        description="Index totaliseur en temps réel et livraisons de carburant dans les cuves."
-      />
-      <TanksPageTabs tab={tab} />
-
-      {tab === "cuves" ? (
-        <TanksTab canManage={canManage} />
-      ) : (
-        <DeliveriesTab supabase={supabase} canManage={canManage} />
-      )}
-    </div>
-  );
-}
-
-async function TanksTab({ canManage }: { canManage: boolean }) {
+/** Onglets Carburant › Cuves et Carburant › Approvisionnements (ex-/tanks à onglets internes). */
+export async function TanksTab({ canManage }: { canManage: boolean }) {
   const supabase = await createServerSupabaseClient();
 
   const [{ data: tanks }, { data: services }, { data: photos }] = await Promise.all([
@@ -165,7 +138,7 @@ async function TanksTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-async function DeliveriesTab({
+export async function DeliveriesTab({
   supabase,
   canManage,
 }: {

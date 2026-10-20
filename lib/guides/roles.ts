@@ -87,7 +87,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
         titre: "Déclarer un plein",
         texte:
           "Page Carburant → nouveau ravitaillement : prenez le ticket en photo, GODAC lit les litres et le montant (à vérifier avant d'enregistrer), puis indiquez le kilométrage.",
-        lien: { href: "/fuel", label: "Carburant" },
+        lien: { href: "/carburant/pleins", label: "Carburant" },
       },
       {
         titre: "Mon véhicule et ses papiers",
@@ -173,9 +173,9 @@ const ENCADREMENT: SectionGuide[] = [
   {
     titre: "Carburant, flotte et entretien",
     etapes: [
-      { titre: "Contrôler les pleins", texte: "La page Carburant liste tous les pleins ; les surconsommations sont signalées dans les alertes.", lien: { href: "/fuel", label: "Carburant" } },
-      { titre: "Vérifier les lectures automatiques", texte: "« Revue OCR » regroupe les tickets et compteurs lus par l'IA à vérifier.", lien: { href: "/ocr-review", label: "Revue OCR" }, module: "ocr" },
-      { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/tanks", label: "Cuves" } },
+      { titre: "Contrôler les pleins", texte: "La page Carburant liste tous les pleins ; les surconsommations sont signalées dans les alertes.", lien: { href: "/carburant/pleins", label: "Carburant" } },
+      { titre: "Vérifier les lectures automatiques", texte: "« Revue OCR » regroupe les tickets et compteurs lus par l'IA à vérifier.", lien: { href: "/carburant/revue-ocr", label: "Revue OCR" }, module: "ocr" },
+      { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/carburant/cuves", label: "Cuves" } },
       { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
       { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/maintenance", label: "Demandes d'entretien" }, module: "maintenance_requests" },
     ],
@@ -231,10 +231,10 @@ export const GUIDES: GuideRole[] = [
       {
         titre: "Vos écrans",
         etapes: [
-          { titre: "Carburant", texte: "Tous les pleins avec litres, montants et véhicules ; filtres par période et export.", lien: { href: "/fuel", label: "Carburant" } },
-          { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/tanks", label: "Cuves" } },
+          { titre: "Carburant", texte: "Tous les pleins avec litres, montants et véhicules ; filtres par période et export.", lien: { href: "/carburant/pleins", label: "Carburant" } },
+          { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/carburant/cuves", label: "Cuves" } },
           { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/vehicles", label: "Flotte" }, module: "fleet" },
-          { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
+          { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/carburant/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
           { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/paie", label: "Paie & salaires" }, module: "payslips" },
           { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/alerts", label: "Alertes" } },
         ],

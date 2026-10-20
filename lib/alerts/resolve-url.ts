@@ -1,86 +1,79 @@
+import { ecran, urlDe } from "@/lib/acces/catalogue";
+import type { UserRole } from "@/lib/types/domain";
+
 /**
- * Maps an alert's related_table to the page where that problem
- * actually gets reviewed/corrected — shared between the in-app alert
- * center (components/alerts/AlertList.tsx, a "Voir →" link) and the
- * push notification payload (app/api/webhooks/supabase-alerts),
- * which opens the same page when the notification is tapped. No
- * per-row deep link yet (none of these pages accept one today).
+ * Lien d'une alerte : la page où le problème se traite. Partagé par le
+ * centre d'alertes (components/alerts/AlertList.tsx), la cloche
+ * (app/api/notifications) et les e-mails et notifications push
+ * (app/api/webhooks/supabase-alerts, une URL par rôle destinataire).
+ *
+ * Toutes les adresses viennent du catalogue (urlDe) : aucun lien ne passe
+ * par une redirection. Quand le rôle du destinataire est connu et qu'il ne
+ * peut pas ouvrir l'écran, on prend l'alternative prévue par le catalogue
+ * (ex. amendes → Mes amendes pour un chauffeur), sinon le centre d'alertes.
  */
-const RESOLVE_URL: Record<string, string> = {
-  fuel_entries: "/fuel",
-  vehicle_interventions: "/maintenance",
-  tank_deliveries: "/tanks?tab=approvisionnements",
-  fines: "/fines",
-  customer_disputes: "/contestations",
-  rental_maintenance_requests: "/loueurs/demandes",
-  planning_entries: "/tours/history",
-  support_requests: "/support",
-  meeting_requests: "/intranet",
-  convocations: "/intranet",
+
+/** Écran de traitement par table liée. */
+const ECRAN_PAR_TABLE: Record<string, string> = {
+  fuel_entries: "carburant.pleins",
+  vehicle_interventions: "flotte.entretien",
+  tank_deliveries: "carburant.approvisionnements",
+  fines: "flotte.amendes",
+  customer_disputes: "exploitation.contestations",
+  rental_maintenance_requests: "flotte.loueurs_demandes",
+  planning_entries: "exploitation.historique",
+  support_requests: "communication.assistance",
+  meeting_requests: "communication.intranet",
+  convocations: "communication.intranet",
+  payslips: "equipe.paie",
 };
 
-// Overrides keyed by alert `type`, checked before the related_table
-// fallback above — a validated-planning digest should open the
-// planning view itself, not /tours/history (every other
-// planning_entries alert — assignment, conflict, swap — is correctly
-// served by tour history, so this can't just change the table map).
-// A plain string is a fixed destination; a function gets `related_id`
-// (messages.sender_id for new_message) to deep-link to the right row —
-// no other alert type has needed a per-row link yet.
-const RESOLVE_URL_BY_TYPE: Record<string, string | ((relatedId: string | null) => string)> = {
-  planning_validated: "/planning/mine",
-  planning_assignment: (relatedId) => (relatedId ? `/planning/mine?entry=${relatedId}` : "/planning/mine"),
-  new_message: (relatedId) => (relatedId ? `/messenger?with=${relatedId}` : "/messenger"),
-  // Groupe d'équipe du Messenger (mention @prénom ou Info équipe) :
-  // related_id est l'id du groupe (message_groups.id).
-  group_message: (relatedId) => (relatedId ? `/messenger?groupe=${relatedId}` : "/messenger"),
-  // The requester's own "your question was answered" alert — distinct
-  // from the "support_request" broadcast to managers/direction
-  // (related_table support_requests → /support above), which that
-  // requester can be any role, chauffeur included, and /support is
-  // gated to manager-like/direction. The answer lives in the floating
-  // assistant widget (every page, every role), not a page of its own —
-  // ?assistant=1 tells FloatingChatWidget to open on it.
-  support_request_resolved: "/dashboard?assistant=1",
-  // A driver asked for papers of this vehicle: open its fiche, where
-  // the documents are uploaded / made consultable.
-  vehicle_document_request: (relatedId) => (relatedId ? `/vehicles/${relatedId}#papiers` : "/vehicles"),
+type Cible = { id: string; params?: Record<string, string>; suite?: string } | { url: string };
+
+/**
+ * Surcharges par type d'alerte, avant la table liée. `relatedId` sert
+ * aux liens vers une ligne précise (expéditeur d'un message, véhicule…).
+ */
+const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
+  planning_validated: () => ({ id: "moi.planning" }),
+  planning_assignment: (id) => ({ id: "moi.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
+  new_message: (id) => ({ id: "communication.messenger", suite: id ? `?with=${encodeURIComponent(id)}` : "" }),
+  // Groupe d'équipe du Messenger : related_id = message_groups.id.
+  group_message: (id) => ({ id: "communication.messenger", suite: id ? `?groupe=${encodeURIComponent(id)}` : "" }),
+  // Réponse à la question posée à l'assistant : elle s'affiche dans le
+  // widget flottant (toutes les pages), ouvert par ?assistant=1.
+  support_request_resolved: () => ({ url: "/dashboard?assistant=1" }),
+  // Un chauffeur demande les papiers d'un véhicule : sa fiche, section papiers.
+  vehicle_document_request: (id) => (id ? { id: "flotte.vehicule_fiche", params: { id }, suite: "#papiers" } : { id: "flotte.vehicules" }),
   // Fin de contrat / forfait km d'un véhicule loué : sa fiche.
-  rental_contract: (relatedId) => (relatedId ? `/vehicles/${relatedId}#location` : "/vehicles"),
+  rental_contract: (id) => (id ? { id: "flotte.vehicule_fiche", params: { id }, suite: "#location" } : { id: "flotte.vehicules" }),
+  // Bulletins en attente de validation : Paie du mois (direction).
+  payslip_validation: () => ({ id: "equipe.paie" }),
 };
 
 /** Destinataire de l'alerte, quand le lien dépend de qui la lit. */
 export interface ContexteDestinataire {
   /** alerts.recipient_user_id : alerte personnelle. */
   recipientUserId?: string | null;
-  /** Rôle de la personne qui ouvre l'alerte (centre d'alertes, cloche). */
-  role?: string | null;
+  /** Rôle de la personne qui ouvre l'alerte (centre d'alertes, cloche, destinataire d'un e-mail). */
+  role?: UserRole | string | null;
 }
 
-/**
- * Alerte d'amende : le chauffeur à qui l'amende est attribuée
- * (recipient_user_id) ouvre ses propres amendes ; l'encadrement (alerte de
- * contestation adressée à la direction) ouvre la gestion des amendes.
- * Avant ce correctif, le chauffeur était renvoyé vers /fines, réservée.
- */
-function urlAmende(contexte?: ContexteDestinataire): string {
-  if (contexte?.recipientUserId) return "/mes-amendes";
-  if (contexte?.role === "chauffeur") return "/mes-amendes";
-  return "/fines";
-}
-
-export function resolveAlertUrl(
-  relatedTable: string | null,
-  type?: string | null,
-  relatedId?: string | null,
-  contexte?: ContexteDestinataire,
-): string | null {
-  if (type === "fine_notification" || (relatedTable === "fines" && !type)) return urlAmende(contexte);
-  // Bulletins en attente de validation : vue Paie du mois (direction).
-  if (type === "payslip_validation") return "/paie";
-  if (type && RESOLVE_URL_BY_TYPE[type]) {
-    const entry = RESOLVE_URL_BY_TYPE[type];
-    return typeof entry === "function" ? entry(relatedId ?? null) : entry;
+/** URL d'une cible pour ce rôle : l'écran, son alternative, ou le centre d'alertes. */
+function urlPour(cible: Cible, role?: string | null): string {
+  if ("url" in cible) return cible.url;
+  const e = ecran(cible.id);
+  if (role && !e.roles.includes(role as UserRole)) {
+    return e.alternative?.[role as UserRole] ?? urlDe("communication.alertes");
   }
-  return relatedTable ? (RESOLVE_URL[relatedTable] ?? null) : null;
+  return urlDe(cible.id, cible.params) + (cible.suite ?? "");
+}
+
+export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null, contexte?: ContexteDestinataire): string | null {
+  // Amende attribuée à un chauffeur (alerte personnelle) : ses amendes.
+  if ((type === "fine_notification" || (relatedTable === "fines" && !type)) && contexte?.recipientUserId) return urlDe("moi.amendes");
+  const parType = type ? CIBLE_PAR_TYPE[type] : undefined;
+  if (parType) return urlPour(parType(relatedId ?? null), contexte?.role);
+  const id = relatedTable ? ECRAN_PAR_TABLE[relatedTable] : undefined;
+  return id ? urlPour({ id }, contexte?.role) : null;
 }

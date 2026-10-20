@@ -448,7 +448,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-base">Historique des ravitaillements</h3>
-            <Link href={`/fuel?driver=${id}`} className="text-sm text-teal-ink hover:underline">
+            <Link href={`/carburant/pleins?driver=${id}`} className="text-sm text-teal-ink hover:underline">
               Voir tout l&apos;historique →
             </Link>
           </div>

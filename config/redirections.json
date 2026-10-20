@@ -1,0 +1,8 @@
+[
+  {"source": "/fuel", "destination": "/carburant/pleins"},
+  {"source": "/ocr-review", "destination": "/carburant/revue-ocr"},
+  {"source": "/tanks", "destination": "/carburant/approvisionnements", "has": [{"type": "query", "key": "tab", "value": "approvisionnements"}]},
+  {"source": "/tanks", "destination": "/carburant/cuves"},
+  {"source": "/ticpe", "destination": "/carburant/ticpe"},
+  {"source": "/ticpe/:id", "destination": "/carburant/ticpe/:id"}
+]

@@ -117,7 +117,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           <StatTile label="Tournées en cours" value={String(ongoingTours.length)} accent="teal" />
         </Link>
         {/* La revue OCR est réservée à l'encadrement : le comptable consulte la liste filtrée des pleins. */}
-        <Link href="/fuel?status=awaiting_validation" className="block">
+        <Link href="/carburant/pleins?status=awaiting_validation" className="block">
           <StatTile label="Tickets OCR en attente" value={String(pendingOcrRes.count ?? 0)} accent="gold" />
         </Link>
         {leaveEnabled && (
@@ -131,7 +131,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           value={`${Math.round(fuelTotals.gazoleLiters).toLocaleString("fr-FR")} L`}
           accent="gold"
         />
-        <Link href="/tanks?tab=approvisionnements" className="block">
+        <Link href="/carburant/approvisionnements" className="block">
           <StatTile
             label="Factures d'approvisionnement manquantes"
             value={String(missingInvoicesRes.count ?? 0)}
@@ -139,7 +139,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
           />
         </Link>
         {ticpeEnabled && (
-          <Link href="/ticpe" className="block">
+          <Link href="/carburant/ticpe" className="block">
             <StatTile label="Export TICPE du trimestre" value={ticpeUpToDate ? "À jour" : "À faire"} accent={ticpeUpToDate ? "teal" : "orange"} />
           </Link>
         )}
@@ -187,7 +187,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Approvisionnements sans facture</h2>
-            <Link href="/tanks?tab=approvisionnements" className="text-sm text-teal-ink hover:underline">
+            <Link href="/carburant/approvisionnements" className="text-sm text-teal-ink hover:underline">
               Voir tout
             </Link>
           </div>

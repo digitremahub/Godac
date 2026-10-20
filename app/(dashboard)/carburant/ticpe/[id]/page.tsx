@@ -47,7 +47,7 @@ export default async function TicpeExportDetailPage({ params }: { params: Promis
         }
       />
 
-      <Link href="/ticpe" className="mb-4 inline-block text-sm text-teal-ink hover:underline">
+      <Link href="/carburant/ticpe" className="mb-4 inline-block text-sm text-teal-ink hover:underline">
         ← Retour aux exports
       </Link>
 

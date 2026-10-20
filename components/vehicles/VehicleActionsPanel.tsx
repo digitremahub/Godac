@@ -46,7 +46,7 @@ export function VehicleActionsPanel({
         </Link>
       )}
 
-      <Link href={`/fuel?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
+      <Link href={`/carburant/pleins?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
         <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein
       </Link>
 

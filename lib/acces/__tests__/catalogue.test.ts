@@ -6,7 +6,12 @@ import {
   MODULES_AVEC_CODE,
   MODULES_SANS_CODE,
   PAGES_ALIAS,
+  PREFIXE_SECTION,
+  SECTIONS,
   TOUS_LES_ROLES,
+  ongletsSection,
+  sousOnglets,
+  type SectionId,
   deciderAcces,
   ecran,
   entreeActive,
@@ -50,8 +55,14 @@ describe("catalogue des écrans", () => {
     expect(toutes.length).toBeGreaterThanOrEqual(52);
     for (const p of toutes) {
       const source = readFileSync(p, "utf8");
-      const m = source.match(/garderPage\("([\w.]+)"\)/);
       const route = routeDe(p);
+      // URL nue d'une section (/flotte…) : renvoie vers son premier onglet.
+      const s = source.match(/redirigerSection\("(\w+)"\)/);
+      if (s) {
+        expect(PREFIXE_SECTION[s[1] as SectionId], `${route} : section`).toBe(route);
+        continue;
+      }
+      const m = source.match(/garderPage\("([\w.]+)"\)/);
       expect(m, `${route} doit appeler garderPage()`).not.toBeNull();
       const e = ecran(m![1]!);
       const attendu = PAGES_ALIAS[route] ?? null;
@@ -147,49 +158,49 @@ describe("menu par rôle", () => {
 
   it("une seule « Mes amendes » pour le chauffeur, jamais /my-fines", () => {
     const h = hrefs("chauffeur");
-    expect(h.filter((x) => x === "/mes-amendes")).toHaveLength(1);
+    expect(h.filter((x) => x === urlDe("moi.amendes"))).toHaveLength(1);
     expect(h).not.toContain("/my-fines");
-    expect(h).not.toContain("/fines");
+    expect(h).not.toContain(urlDe("flotte.amendes"));
   });
 
   it("chauffeur : Mon espace, Exploitation (limitée), Carburant, Communication, Aide", () => {
     expect(sections("chauffeur")).toEqual(["dashboard", "moi", "exploitation", "carburant", "communication", "aide"]);
-    expect(hrefs("chauffeur")).not.toContain("/planning");
-    expect(hrefs("chauffeur")).toContain("/planning/mine");
+    expect(hrefs("chauffeur")).not.toContain(urlDe("exploitation.planning"));
+    expect(hrefs("chauffeur")).toContain(urlDe("moi.planning"));
   });
 
   it("direction : pas de Mon espace, Administration présente", () => {
     expect(sections("direction")).not.toContain("moi");
     expect(sections("direction")).toContain("admin");
-    expect(hrefs("direction")).toContain("/paie");
-    expect(hrefs("direction")).not.toContain("/payroll");
-    expect(hrefs("direction", new Set(["planning"]))).toContain("/payroll");
+    expect(hrefs("direction")).toContain(urlDe("equipe.paie"));
+    expect(hrefs("direction")).not.toContain(urlDe("equipe.heures"));
+    expect(hrefs("direction", new Set(["planning"]))).toContain(urlDe("equipe.heures"));
   });
 
   it("comptable : paie, TICPE, congés et pointage personnels, pas d'Administration", () => {
     const h = hrefs("comptable");
-    expect(h).toEqual(expect.arrayContaining(["/paie", "/ticpe", "/leaves", "/time-clock", "/payslips", "/fines", "/tours/history"]));
+    expect(h).toEqual(expect.arrayContaining([urlDe("equipe.paie"), urlDe("carburant.ticpe"), urlDe("moi.conges"), urlDe("moi.pointage"), urlDe("moi.fiches_paie"), urlDe("flotte.amendes"), urlDe("exploitation.historique")]));
     expect(sections("comptable")).not.toContain("admin");
-    expect(h).not.toContain("/planning");
+    expect(h).not.toContain(urlDe("exploitation.planning"));
   });
 
   it("manager : calendrier des congés et pointage d'équipe dans Équipe & RH", () => {
     const eq = menuPour("manager", tout).find((s) => s.id === "equipe")!;
-    expect(eq.ecrans.map((e) => e.href)).toEqual(expect.arrayContaining(["/admin/users", "/leaves/planning", "/time-clock", "/leaves"]));
+    expect(eq.ecrans.map((e) => e.href)).toEqual(expect.arrayContaining([urlDe("equipe.utilisateurs"), urlDe("equipe.conges_calendrier"), urlDe("moi.pointage"), urlDe("moi.conges")]));
   });
 
   it("module coupé → entrée retirée, section vide masquée", () => {
-    expect(hrefs("chauffeur", new Set())).not.toContain("/mes-amendes");
+    expect(hrefs("chauffeur", new Set())).not.toContain(urlDe("moi.amendes"));
     expect(sections("comptable", new Set())).not.toContain("equipe");
   });
 
   it("état actif : la plus longue URL, puis les préfixes aussiActif", () => {
     const e = menuPour("direction", tout).flatMap((s) => s.ecrans);
-    expect(entreeActive(e, "/planning")?.id).toBe("exploitation.planning");
+    expect(entreeActive(e, urlDe("exploitation.planning"))?.id).toBe("exploitation.planning");
     expect(entreeActive(e, "/vehicles/123")?.id).toBe("flotte.vehicules");
     expect(entreeActive(e, "/paie/abc")?.id).toBe("equipe.paie");
     expect(entreeActive(e, "/suivi")?.id).toBe("exploitation.colis");
     const c = menuPour("chauffeur", tout).flatMap((s) => s.ecrans);
-    expect(entreeActive(c, "/planning/mine")?.id).toBe("moi.planning");
+    expect(entreeActive(c, urlDe("moi.planning"))?.id).toBe("moi.planning");
   });
 });

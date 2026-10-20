@@ -569,7 +569,7 @@ export function NewFuelEntryWizard({
       <Card className="flex flex-col items-center gap-4 py-10 text-center">
         <p className="text-lg"><IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ravitaillement enregistré</p>
         {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-        <button className="btn-primary" onClick={() => router.push("/fuel")}>
+        <button className="btn-primary" onClick={() => router.push("/carburant/pleins")}>
           Voir l&apos;historique
         </button>
       </Card>
