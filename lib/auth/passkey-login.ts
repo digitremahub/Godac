@@ -17,7 +17,9 @@ export async function tryPasskeyLogin(identify: { user_id?: string; email?: stri
   if (!verifyRes.ok) throw new Error(typeof verifyJson?.error === "string" ? verifyJson.error : `La vérification Face ID a échoué (réponse serveur ${verifyRes.status}). Utilisez votre badge + PIN.`);
   if (!verifyJson?.email || !verifyJson?.token) throw new Error("Réponse de connexion incomplète. Utilisez votre badge + PIN ou réessayez.");
   const supabase = createBrowserSupabaseClient();
-  const { error } = await supabase.auth.verifyOtp({ email: verifyJson.email, token: verifyJson.token, type: "magiclink" });
+  // Le serveur renvoie le jeton haché du lien magique (generateLink) : il se
+  // valide en token_hash, pas en code à 6 chiffres avec l'e-mail.
+  const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.token, type: "email" });
   if (error) throw error;
   return { attempted: true };
 }
