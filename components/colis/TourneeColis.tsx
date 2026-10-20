@@ -706,7 +706,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     </div>
   );
 
-  const modalAffectation = affectationOuverte ? <AffecterTournee onClose={() => setAffectationOuverte(false)} onCreated={async (runId) => { setAffectationOuverte(false); try { localStorage.setItem("godac-tournee-colis", runId); } catch { /* stockage indisponible */ } await recharger(runId); setToast({ ok: true, text: "Tournée créée : vous pouvez scanner les colis." }); }} /> : null;
+  const modalAffectation = affectationOuverte ? <AffecterTournee onClose={() => setAffectationOuverte(false)} onCreated={async (runId, message) => { setAffectationOuverte(false); await recharger(runId); setToast({ ok: true, text: message }); }} /> : null;
 
   if (!runs) return <>{modalAffectation}<p className="text-sm text-navy/60">Chargement des tournées…</p></>;
   if (!run) {

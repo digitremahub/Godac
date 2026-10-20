@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
+import { preparerFicheDuJour } from "@/lib/colis/fiche-du-jour";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
@@ -18,9 +19,10 @@ const schema = z.object({
 });
 
 /**
- * Affecter une tournée signifie créer une entrée de planning, pas une fiche
- * Tournée colis. La fiche quotidienne est créée par le chauffeur et regroupe
- * ensuite toutes ses affectations de la journée.
+ * Affecter une tournée : entrée de planning ET fiche Tournée colis du
+ * chauffeur pour ce jour (créée ou complétée : une fiche par chauffeur et
+ * par jour regroupe toutes ses affectations, lib/colis/fiche-du-jour.ts).
+ * Le chauffeur la retrouve prête, villages et ramasses compris.
  */
 export async function GET() {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -88,5 +90,20 @@ export async function POST(req: Request) {
     excludeEntryId: assignment.id,
   });
 
-  return NextResponse.json({ assignment, warning }, { status: 201 });
+  // Fiche colis du chauffeur (jour même ou à venir). Un échec ici n'annule
+  // pas l'affectation : le chauffeur peut toujours créer sa fiche lui-même.
+  let fiche: { id: string; name: string | null } | null = null;
+  let ficheWarning: string | null = null;
+  if (date >= aujourdhuiParis()) {
+    try {
+      const r = await preparerFicheDuJour(supabase, { id: driver_id, organization_id: user.organization_id }, date);
+      fiche = { id: r.run.id, name: r.run.name ?? null };
+      ficheWarning = r.warning ?? null;
+    } catch (e) {
+      console.error("[colis/affectations] Fiche colis non créée", { driverId: driver_id, date, error: e instanceof Error ? e.message : e });
+      ficheWarning = "Tournée inscrite au planning, mais la fiche Tournée colis n'a pas pu être préparée : le chauffeur peut la créer avec « Nouvelle tournée ».";
+    }
+  }
+
+  return NextResponse.json({ assignment, fiche, warning: [warning, ficheWarning].filter(Boolean).join(" ") || null }, { status: 201 });
 }
