@@ -141,7 +141,7 @@ export function GoNavigation({
       },
       center: [2.35, 46.6] as LngLatLike,
       zoom: 5,
-      attributionControl: true,
+      attributionControl: { compact: true },
     });
     mapRef.current = map;
 
@@ -266,7 +266,7 @@ export function GoNavigation({
         ...destinations.map((point) => `${point.longitude},${point.latitude}`),
       ].join(";");
       const url =
-        `${routingUrl.replace(/\\/$/, "")}/route/v1/driving/${coordinates}` +
+        `${routingUrl.replace(/\/$/, "")}/route/v1/driving/${coordinates}` +
         "?overview=full&geometries=geojson&steps=true";
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Le service d’itinéraire répond ${response.status}.`);
@@ -407,7 +407,7 @@ export function GoNavigation({
       setError("La tournée est terminée : aucun arrêt restant.");
       return;
     }
-    const lastStop = remainingStops[remainingStops.length - 1];
+    const lastStop = remainingStops[remainingStops.length - 1] ?? null;
     setDestinationState(lastStop);
     destinationRef.current = lastStop;
     if (currentPositionRef.current) void calculateRoute(currentPositionRef.current, remainingStops);
@@ -515,7 +515,7 @@ export function GoNavigation({
                   }
                   fullTourRef.current = true;
                   routeStopsRef.current = remainingStops;
-                  const lastStop = remainingStops[remainingStops.length - 1];
+                  const lastStop = remainingStops[remainingStops.length - 1] ?? null;
                   setDestinationState(lastStop);
                   destinationRef.current = lastStop;
                   if (currentPositionRef.current) {
