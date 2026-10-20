@@ -82,7 +82,12 @@ const AUTO = "__auto__";
 
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
-export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean }) {
+/**
+ * `encadrement` : manager / direction. `conduit` : il fait aussi des
+ * tournées (chauffeur, ou manager qui conduit) : « Nouvelle tournée » crée
+ * alors sa propre fiche au lieu d'ouvrir l'affectation à un chauffeur.
+ */
+export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false, conduit = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean; conduit?: boolean }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -197,7 +202,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   async function nouvelleTournee() {
-    if (encadrement) { setAffectationOuverte(true); return; }
+    if (encadrement && !conduit) { setAffectationOuverte(true); return; }
     setBusy("nouvelle");
     try {
       const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
