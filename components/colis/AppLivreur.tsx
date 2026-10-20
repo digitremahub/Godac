@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -22,6 +22,8 @@ import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
+import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
+import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
@@ -292,6 +294,24 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
+  /**
+   * Glisser-déposer (appui long sur la poignée) ou boutons ↑/↓ : ordre local
+   * tout de suite, puis enregistrement (événement « reordered ») et
+   * rechargement (prochain arrêt, heures estimées et suivi recalculés).
+   */
+  async function deposer(id: string, cible: CibleDepot) {
+    if (!run) return;
+    const changements = reordonner(stops, id, cible);
+    if (changements.length === 0) return;
+    setStops((all) => appliquerChangements(all, changements));
+    try {
+      await api(`/api/colis/arrets/${id}`, { method: "PATCH", body: JSON.stringify({ run_id: run.id, deposer: cible }) });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
+    await charger(run.id);
+  }
+
   function demanderDemarrage() {
     setConfirmationLancement(true);
   }
@@ -357,6 +377,18 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
   const groupes = grouperParListe(stops, lists);
   const multi = groupes.length > 1 || groupes[0]?.liste != null;
+  // Glisser-déposer des adresses suivantes (le prochain arrêt reste en tête
+  // tant qu'il n'est pas déplacé depuis la liste) ; pas pendant une recherche.
+  const triActif = Boolean(run && run.status !== "done" && !terme && suivants.length > 1);
+  const ordreTri = suivants.map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
+  /** Repli clavier / sans glisser : échange avec l'adresse voisine affichée. */
+  function deplacerRang(s: Stop, sens: -1 | 1) {
+    const i = suivants.indexOf(s);
+    const voisin = suivants[i + sens];
+    if (!voisin) return;
+    const cible = cibleDepuisSurvol(ordreTri, s.id, voisin.id);
+    if (cible) void deposer(s.id, cible);
+  }
   const groupeDe = (s: Stop) => groupes.find((g) => g.arrets.includes(s)) ?? groupes[0]!;
   const separateur = (s: Stop) => {
     const g = groupeDe(s);
@@ -732,6 +764,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                 {busy ? "Calcul…" : "Recalculer depuis ici"}
               </button>
             </div>
+            <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
             <ol className="flex flex-col gap-2">
               {suivants.map((s, k) => (
                 <Fragment key={s.id}>
@@ -742,8 +775,11 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                     </li>
                   )}
-                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
+                  {(() => {
+                  const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
+                  <li ref={props?.ref} style={props?.style} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
                     <EncocheArret stop={s} />
+                    {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
                       {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
@@ -767,6 +803,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                         >
                           Clôturer ›
                         </button>
+                        {triActif && (
+                          <>
+                            <button type="button" className="rounded-full border border-navy/15 px-2.5 py-1.5 text-xs font-semibold text-navy/70" disabled={k === 0} onClick={() => deplacerRang(s, -1)} aria-label={`Monter ${s.recipient ?? s.address}`}>
+                              ↑
+                            </button>
+                            <button type="button" className="rounded-full border border-navy/15 px-2.5 py-1.5 text-xs font-semibold text-navy/70" disabled={k === suivants.length - 1} onClick={() => deplacerRang(s, 1)} aria-label={`Descendre ${s.recipient ?? s.address}`}>
+                              ↓
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <button
@@ -790,9 +836,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <IconNavigation className="h-5 w-5" />
                     </a>
                   </li>
+                  );
+                  return triActif ? <ArretTriable id={s.id} rendu={rendu} /> : rendu(null, null);
+                  })()}
                 </Fragment>
               ))}
             </ol>
+            </ZoneTri>
           </section>
         )}
 

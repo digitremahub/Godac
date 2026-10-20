@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
@@ -22,6 +22,8 @@ import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from "@/components/colis/Triable";
+import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
@@ -614,6 +616,19 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     }
   }
 
+  /** Glisser-déposer : ordre local tout de suite, puis enregistrement (événement « reordered »). */
+  async function deposer(id: string, cible: CibleDepot) {
+    const changements = reordonner(stops, id, cible);
+    if (changements.length === 0) return;
+    setStops((all) => appliquerChangements(all, changements));
+    try {
+      await api(`/api/colis/arrets/${id}`, { method: "PATCH", body: JSON.stringify({ deposer: cible }) });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
+    await recharger(run?.id);
+  }
+
   async function phase(status: Run["status"]) {
     if (!run) return;
     await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
@@ -699,6 +714,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   const groupes = termeAdresse
     ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
     : groupesComplets;
+  // Glisser-déposer : arrêts à livrer, hors recherche et hors tournée terminée.
+  const triActif = Boolean(run && run.status !== "done" && !termeAdresse && edition === null);
+  const ordreTri = groupes.flatMap((g) => g.arrets).filter((s) => s.status === "pending").map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
   const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
   const cibles = [{ id: AUTO, nom: "Automatique (village / Hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
@@ -1228,6 +1246,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               <ResumeOptimisationCarte resume={resume} stops={stops} onFermer={() => setResume(null)} />
             </div>
           )}
+          <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
           <ol className="mt-2 divide-y divide-navy/[0.07]">
             {rechercheAdresse && groupes.length === 0 && <li className="px-4 py-6 text-center text-sm text-navy/60">Aucune adresse ne correspond à « {rechercheAdresse} ».</li>}
             {groupes.map((g, k) => (
@@ -1236,10 +1255,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                 {multi && g.arrets.length === 0 && <li className="px-4 py-2.5 text-xs text-navy/55 sm:px-5">Liste vide : choisissez-la dans « Ajouter dans » pour y charger des colis.</li>}
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
-                  return (
-                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                  const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
+                    <li key={s.id} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
                       <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
+                        {triActif && <span className="-my-2.5 -ml-2 flex items-center">{poignee ? <BoutonPoignee poignee={poignee} libelle={s.address} /> : <span className="w-8" aria-hidden="true" />}</span>}
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
                             s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-marine text-teal"
@@ -1430,10 +1450,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                       )}
                     </li>
                   );
+                  return triActif && s.status === "pending" ? <ArretTriable key={s.id} id={s.id} rendu={rendu} /> : rendu(null, null);
                 })}
+                {triActif && multi && <ZoneFinListe listId={g.liste?.id ?? null} className="h-2" />}
               </Fragment>
             ))}
           </ol>
+          </ZoneTri>
         </Card>
       )}
 

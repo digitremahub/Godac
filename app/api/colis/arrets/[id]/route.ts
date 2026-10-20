@@ -11,6 +11,7 @@ import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { MOTIFS_ECHEC, libelleMotif, refusCloture } from "@/lib/colis/cloture";
 import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
+import { reordonner } from "@/lib/colis/reordonner";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
@@ -35,6 +36,12 @@ const patchSchema = z.object({
   packages_delivered: z.number().int().min(0).max(500).nullable().optional(),
   /** Fait passer l'arrêt avant / après son voisin encore à livrer. */
   deplacer: z.enum(["haut", "bas"]).optional(),
+  /**
+   * Glisser-déposer : place l'arrêt devant `avant_id` (ou en fin de la liste
+   * `list_id` si avant_id est null), dans sa liste ou dans une autre liste de
+   * la même tournée. Positions renumérotées (lib/colis/reordonner.ts).
+   */
+  deposer: z.object({ list_id: z.string().uuid().nullable(), avant_id: z.string().uuid().nullable() }).optional(),
   /** Range l'arrêt dans une autre liste de la même tournée (en fin de liste). */
   list_id: z.string().uuid().optional(),
   /**
@@ -60,7 +67,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, deposer, list_id, creneau } = parsed.data;
+
+  if (deposer) {
+    const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+    if (deposer.list_id && deposer.list_id !== stop.list_id && !(await listeDeLaTournee(supabase, stop.run_id, deposer.list_id))) {
+      return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
+    }
+    const { data: arrets, error: lectureError } = await supabase.from("delivery_stops").select("id, position, list_id").eq("run_id", stop.run_id).order("position");
+    if (lectureError) return NextResponse.json({ error: "Réorganisation impossible." }, { status: 500 });
+    const changements = reordonner(arrets ?? [], id, deposer);
+    if (changements.length === 0) return NextResponse.json({ ok: true, changements });
+    const resultats = await Promise.all(
+      changements.map((c) =>
+        supabase.from("delivery_stops").update({ position: c.position, list_id: c.list_id }).eq("id", c.id).eq("run_id", stop.run_id).eq("organization_id", appUser.organization_id),
+      ),
+    );
+    if (resultats.some((r) => r.error)) return NextResponse.json({ error: "Réorganisation impossible." }, { status: 500 });
+    const moi = changements.find((c) => c.id === id);
+    await journaliserArret(supabase, {
+      organization_id: appUser.organization_id, run_id: stop.run_id, stop_id: id, actor_id: appUser.id,
+      event_type: "reordered", previous_value: { position: stop.position, list_id: stop.list_id }, new_value: { position: moi?.position ?? stop.position, list_id: moi?.list_id ?? stop.list_id },
+      details: moi && moi.list_id !== stop.list_id ? "Arrêt glissé dans une autre liste de la tournée" : "Ordre de tournée modifié (glisser-déposer)",
+    });
+    return NextResponse.json({ ok: true, changements });
+  }
 
   if (list_id) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, organization_id").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
