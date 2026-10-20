@@ -17,7 +17,11 @@ export async function GET() {
 
 const bodySchema = z.object({ name: z.string().trim().max(60).nullable().optional() });
 
-/** Une seule fiche Colis par chauffeur et par jour, regroupant toutes ses tournées planifiées. */
+/**
+ * « Nouvelle tournée » : une fiche séparée par tournée planifiée du jour
+ * encore sans fiche (la première est renvoyée), sinon reprise de la fiche
+ * ouverte, sinon fiche libre (lib/colis/fiche-du-jour.ts › preparerFicheDuJour).
+ */
 export async function POST(req: Request) {
   const g2 = await garderApi({ modules: ["route_optimizer"] });
   if (!g2.ok) return g2.reponse;

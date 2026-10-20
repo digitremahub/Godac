@@ -62,6 +62,8 @@ export interface RunResume {
   name: string | null;
   run_date: string;
   status: Run["status"];
+  /** Heure prévue (HH:MM:SS) : distingue plusieurs fiches du même jour. */
+  planned_start?: string | null;
   nbArrets: number;
   nbColis: number;
   nbRestants: number;

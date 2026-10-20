@@ -442,7 +442,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
                 >
                   {actives.map((t) => (
                     <option key={t.id} value={t.id} className="text-navy">
-                      {t.name ?? "Tournée"}
+                      {/* Plusieurs fiches le même jour (une par affectation) : l'heure prévue les distingue. */}
+                      {t.name ?? "Tournée"}{t.planned_start ? ` · ${String(t.planned_start).slice(0, 5)}` : ""}
                     </option>
                   ))}
                 </select>
