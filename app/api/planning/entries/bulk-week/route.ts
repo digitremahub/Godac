@@ -21,7 +21,7 @@ const bodySchema = z.object({
 /**
  * "Ajouter tous les jours d'une semaine d'un chauffeur directement" —
  * the week-at-once counterpart to the single-day form already in
- * PlanningGrid. Same driver/vehicle/tour number every day, only the
+ * planning (aujourd'hui la fiche chauffeur, DriverWeekSheet). Same driver/vehicle/tour number every day, only the
  * date changes — skips any day that already has an entry for this
  * service/tour_number/time (same real-constraint shape as
  * duplicate-week and duplicate-entry) instead of letting the DB

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { todayISO, currentMonth } from "@/lib/planning/dates";
 import { grouperParPole } from "@/lib/organization/poles";
 
 interface ServiceOption {
@@ -14,15 +13,12 @@ const VIEWS: { key: string; label: string }[] = [
   { key: "week", label: "Semaine" },
   { key: "day", label: "Jour" },
   { key: "month", label: "Mois" },
-  { key: "kanban", label: "Kanban" },
-  { key: "list", label: "Liste" },
 ];
 
 /**
- * Shared view switcher + "Aujourd'hui" reset + service filter, rendered
- * once above whichever view component is active — the single place the
- * service filter lives, so all five views get it instead of each
- * reimplementing their own <select> (only the week grid used to have one).
+ * Choix de la vue (Semaine, Jour, Mois) et filtre par service, une seule
+ * fois au-dessus de la vue active. Les boutons « Cette semaine » /
+ * « Aujourd'hui » / « Ce mois-ci » sont dans chaque vue, à côté des flèches.
  */
 export function PlanningViewTabs({
   view,
@@ -36,26 +32,15 @@ export function PlanningViewTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Changer de vue garde la date regardée (semaine, jour, mois) et le service.
   function goTo(nextView: string) {
-    const qs = new URLSearchParams();
+    const qs = new URLSearchParams(searchParams.toString());
     qs.set("view", nextView);
     if (selectedService) qs.set("service", selectedService);
     router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
-  function goToday() {
-    const qs = new URLSearchParams();
-    qs.set("view", view);
-    qs.set("week", todayISO());
-    qs.set("day", todayISO());
-    qs.set("month", currentMonth());
-    if (selectedService) qs.set("service", selectedService);
-    router.push(`/exploitation/planning?${qs.toString()}`);
-  }
-
-  // Changing the service filter keeps whatever date the user is
-  // currently looking at (week/day/month) instead of resetting it —
-  // unlike goTo/goToday, which intentionally jump to a fresh default.
+  // Changer de service garde aussi la date regardée.
   function setService(serviceId: string) {
     const qs = new URLSearchParams(searchParams.toString());
     if (serviceId) qs.set("service", serviceId);
@@ -65,12 +50,15 @@ export function PlanningViewTabs({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <div className="flex rounded-lg bg-navy/[0.04] p-1">
+      <div className="flex rounded-lg bg-navy/[0.04] p-1" role="tablist" aria-label="Vue du planning">
         {VIEWS.map((v) => (
           <button
             key={v.key}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              view === v.key ? "bg-surface shadow-sm" : "text-navy/65 hover:text-navy"
+            type="button"
+            role="tab"
+            aria-selected={view === v.key}
+            className={`min-h-[44px] rounded-md px-4 text-sm transition-colors ${
+              view === v.key ? "bg-surface font-semibold shadow-sm" : "text-navy/65 hover:text-navy"
             }`}
             onClick={() => goTo(v.key)}
           >
@@ -78,11 +66,8 @@ export function PlanningViewTabs({
           </button>
         ))}
       </div>
-      <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={goToday}>
-        Aujourd&apos;hui
-      </button>
       {services.length > 0 && (
-        <select aria-label="Filtrer par service" className="input !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
+        <select aria-label="Filtrer par service" className="input min-h-[44px] !w-auto" value={selectedService} onChange={(e) => setService(e.target.value)}>
           <option value="">Tous les services</option>
           {grouperParPole(services).map(({ pole, services: groupe }) => (
             <optgroup key={pole.key} label={pole.operationnel ? pole.label : `${pole.label} — présence`}>

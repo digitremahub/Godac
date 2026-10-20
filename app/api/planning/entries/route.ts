@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { parisCalendarDate } from "@/lib/planning/dates";
+import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -10,6 +12,8 @@ const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
   tour_number: z.string().min(1),
   start_at: z.string().datetime(),
+  /** Réponse à la question « fiches colis séparées ou reliées » (409 choix_requis). */
+  regroupement: z.enum(["separee", "reliee"]).optional(),
 });
 
 /**
@@ -21,6 +25,11 @@ const bodySchema = z.object({
  * error rather than something this route needs to pre-check.
  * Inserting/updating a 'planned' row also fires the
  * after_planning_entry_upsert trigger, which notifies the driver.
+ *
+ * Tournée colis active pour l'organisation : même comportement que
+ * POST /api/colis/affectations (lib/colis/fiche-a-l-affectation.ts) —
+ * question « séparées ou reliées » si le chauffeur a déjà une tournée ce
+ * jour-là, puis fiche colis du chauffeur préparée (jour même ou à venir).
  */
 export async function POST(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
@@ -35,6 +44,14 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createServerSupabaseClient();
+  const colis = g.modules.has("route_optimizer");
+  const date = parisCalendarDate(parsed.data.start_at);
+  const conducteur = { id: parsed.data.driver_id, organization_id: appUser.organization_id };
+  if (colis) {
+    const choix = await questionAvantAffectation(supabase, conducteur, date, parsed.data.regroupement, "planning/entries");
+    if (choix) return NextResponse.json({ choix_requis: true, ...choix }, { status: 409 });
+  }
+
   const { data, error } = await supabase
     .from("planning_entries")
     .insert({
@@ -46,7 +63,7 @@ export async function POST(req: Request) {
       start_at: parsed.data.start_at,
       status: "planned",
     })
-    .select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at")
+    .select("id, organization_id, service_id, driver_id, vehicle_id, tour_number, start_at, status, created_at")
     .single();
 
   if (error) {
@@ -67,5 +84,9 @@ export async function POST(req: Request) {
     excludeEntryId: data.id,
   });
 
-  return NextResponse.json({ id: data.id, warning });
+  const { fiche, warning: ficheWarning } = colis
+    ? await ficheApresAffectation(supabase, conducteur, data, date, parsed.data.regroupement, "planning/entries")
+    : { fiche: null, warning: null };
+
+  return NextResponse.json({ id: data.id, fiche, warning: [warning, ficheWarning].filter(Boolean).join(" ") || null });
 }
