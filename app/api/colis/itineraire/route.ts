@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { ligneDroite, troncons, type Itineraire, type Point } from "@/lib/colis/itineraire";
+import { manoeuvresOsrm, type EtapeOsrm } from "@/lib/colis/manoeuvres";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -19,21 +20,30 @@ const bodySchema = z.object({
 const ROUTING_URL = process.env.ROUTING_URL ?? "https://router.project-osrm.org";
 const cache = new Map<string, Itineraire>();
 
-async function troncon(points: Point[]): Promise<Itineraire> {
+/**
+ * Un tronçon routier. `etapes` : GO Navigation demande aussi les manœuvres
+ * (steps=true) pour les indications de direction.
+ */
+async function troncon(points: Point[], etapes = false): Promise<Itineraire> {
   const coords = points.map((p) => `${p.lng.toFixed(5)},${p.lat.toFixed(5)}`).join(";");
-  const enCache = cache.get(coords);
+  const cle = etapes ? `${coords}|etapes` : coords;
+  const enCache = cache.get(cle);
   if (enCache) return enCache;
   try {
-    const res = await fetch(`${ROUTING_URL}/route/v1/driving/${coords}?overview=full&geometries=geojson`, {
+    const res = await fetch(`${ROUTING_URL}/route/v1/driving/${coords}?overview=full&geometries=geojson${etapes ? "&steps=true" : ""}`, {
       headers: { "User-Agent": "GODAC (https://godac.app)" },
       signal: AbortSignal.timeout(8000),
     });
-    const data = (await res.json()) as { code?: string; routes?: { geometry: { coordinates: [number, number][] }; distance: number; duration: number }[] };
+    const data = (await res.json()) as {
+      code?: string;
+      routes?: { geometry: { coordinates: [number, number][] }; distance: number; duration: number; legs?: { steps?: EtapeOsrm[] }[] }[];
+    };
     const r = data.routes?.[0];
     if (!res.ok || data.code !== "Ok" || !r) return ligneDroite(points);
     const it: Itineraire = { ligne: r.geometry.coordinates, distanceKm: Math.round(r.distance / 100) / 10, dureeMin: Math.round(r.duration / 60), approx: false };
+    if (etapes) it.manoeuvres = manoeuvresOsrm(r.legs);
     if (cache.size > 100) cache.delete(cache.keys().next().value!);
-    cache.set(coords, it);
+    cache.set(cle, it);
     return it;
   } catch {
     return ligneDroite(points);
@@ -61,7 +71,7 @@ export async function POST(req: Request) {
     if (!arret) return NextResponse.json({ error: "Arrêt introuvable dans cette tournée." }, { status: 404 });
     const depart = parsed.data.depuis ?? depot;
     if (!depart || arret.lat === null || arret.lng === null) return NextResponse.json({ ligne: [], distanceKm: 0, dureeMin: 0, approx: false } satisfies Itineraire);
-    return NextResponse.json(await troncon([depart, { lat: Number(arret.lat), lng: Number(arret.lng) }]));
+    return NextResponse.json(await troncon([depart, { lat: Number(arret.lat), lng: Number(arret.lng) }], true));
   }
 
   const { data: stops } = await supabase
@@ -78,7 +88,7 @@ export async function POST(req: Request) {
   ];
   if (points.length < 2) return NextResponse.json({ ligne: [], distanceKm: 0, dureeMin: 0, approx: false });
 
-  const parties = await Promise.all(troncons(points).map(troncon));
+  const parties = await Promise.all(troncons(points).map((t) => troncon(t)));
   return NextResponse.json({
     ligne: parties.flatMap((p, i) => (i === 0 ? p.ligne : p.ligne.slice(1))),
     distanceKm: Math.round(parties.reduce((t, p) => t + p.distanceKm, 0) * 10) / 10,

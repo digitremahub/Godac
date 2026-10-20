@@ -15,6 +15,27 @@ export interface Itineraire {
   dureeMin: number | null;
   /** true si le tracé est approximatif (segments droits). */
   approx: boolean;
+  /**
+   * GO Navigation (trajet vers un seul arrêt) : manœuvres OSRM, dans
+   * l'ordre. Absentes ou vides si le service ne les donne pas.
+   */
+  manoeuvres?: Manoeuvre[];
+}
+
+/** Manœuvre compacte tirée d'une étape OSRM (voir lib/colis/manoeuvres.ts). */
+export interface Manoeuvre {
+  /** Type OSRM : depart, turn, new name, continue, merge, fork, end of road, roundabout, rotary, arrive… */
+  type: string;
+  /** Sens OSRM : uturn, sharp right, right, slight right, straight, slight left, left, sharp left. */
+  modifier?: string;
+  /** Rue empruntée après la manœuvre (nom, sinon numéro de route) ; vide si inconnue. */
+  rue: string;
+  /** Rond-point : numéro de la sortie à prendre. */
+  sortie?: number;
+  /** Longueur (m) de l'étape qui suit la manœuvre. */
+  distanceM: number;
+  /** Point de la manœuvre [lng, lat]. */
+  lieu: [number, number];
 }
 
 /** OSRM limite le nombre d'étapes par requête : au-delà, on découpe. */

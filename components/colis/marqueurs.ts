@@ -30,43 +30,30 @@ export function pastille(numero: string, statut: Stop["status"], actif: boolean,
 }
 
 /**
- * Position du chauffeur : rond marine cerclé de teal, avec une flèche de
- * cap (orientée par `orienterChauffeur`) quand le téléphone la donne.
+ * Véhicule du chauffeur (GO Navigation) : flèche de navigation marine à
+ * contour blanc sur un petit halo teal, qui pointe vers l'avant. Posée à
+ * plat sur la carte (marqueur aligné sur la carte) : son orientation suit
+ * `setRotation(cap)`, donc elle reste vers le haut en vue conduite (la carte
+ * tourne avec le cap) et pivote en vue d'ensemble. Sans cap connu : un
+ * simple rond (`etatVehicule`).
  */
-export function marqueurChauffeur(): HTMLElement {
+export function marqueurVehicule(): HTMLElement {
   const el = document.createElement("div");
   el.setAttribute("aria-label", "Votre position");
-  Object.assign(el.style, { width: "30px", height: "30px", position: "relative", pointerEvents: "none" });
-  const halo = document.createElement("div");
-  Object.assign(halo.style, { position: "absolute", inset: "-10px", borderRadius: "999px", background: "rgba(27,228,193,.22)" });
-  const fleche = document.createElement("div");
-  fleche.dataset.cap = "1";
-  Object.assign(fleche.style, {
-    position: "absolute",
-    left: "50%",
-    top: "-9px",
-    width: "0",
-    height: "0",
-    marginLeft: "-7px",
-    borderLeft: "7px solid transparent",
-    borderRight: "7px solid transparent",
-    borderBottom: `11px solid ${NAVY}`,
-    transformOrigin: "7px 24px",
-    display: "none",
-  });
-  const rond = document.createElement("div");
-  Object.assign(rond.style, { position: "absolute", inset: "0", borderRadius: "999px", background: NAVY, border: `4px solid ${TEAL}`, boxShadow: "0 2px 8px rgba(10,15,30,.45)" });
-  el.append(halo, fleche, rond);
+  el.setAttribute("role", "img");
+  Object.assign(el.style, { width: "44px", height: "44px", position: "relative", pointerEvents: "none" });
+  el.innerHTML =
+    `<div style="position:absolute;inset:2px;border-radius:999px;background:rgba(27,228,193,.28);box-shadow:0 0 0 1px rgba(27,228,193,.45)"></div>` +
+    `<svg data-fleche="1" viewBox="0 0 24 24" width="34" height="34" style="position:absolute;left:5px;top:4px;filter:drop-shadow(0 2px 3px rgba(10,15,30,.45))" aria-hidden="true">` +
+    `<path d="M12 2.5 L19.5 20.5 L12 16.6 L4.5 20.5 Z" fill="${NAVY}" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/></svg>` +
+    `<div data-rond="1" style="display:none;position:absolute;left:12px;top:12px;width:20px;height:20px;border-radius:999px;background:${NAVY};border:3px solid #FFFFFF;box-shadow:0 2px 6px rgba(10,15,30,.45)"></div>`;
   return el;
 }
 
-/** Oriente la flèche de cap (degrés, nord = 0) ; null la masque. */
-export function orienterChauffeur(el: HTMLElement, cap: number | null) {
-  const fleche = el.querySelector<HTMLElement>("[data-cap]");
-  if (!fleche) return;
-  if (cap === null || !Number.isFinite(cap)) fleche.style.display = "none";
-  else {
-    fleche.style.display = "block";
-    fleche.style.transform = `rotate(${cap}deg)`;
-  }
+/** Flèche si le cap est connu, rond sinon. */
+export function etatVehicule(el: HTMLElement, capConnu: boolean) {
+  const fleche = el.querySelector<SVGElement>("[data-fleche]");
+  const rond = el.querySelector<HTMLElement>("[data-rond]");
+  if (fleche) fleche.style.display = capConnu ? "block" : "none";
+  if (rond) rond.style.display = capConnu ? "none" : "block";
 }

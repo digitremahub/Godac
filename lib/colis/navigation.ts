@@ -176,3 +176,51 @@ export function resteSurTrace(position: Point, ligne: readonly [number, number][
   for (let i = meilleur + 1; i < ligne.length; i++) reste += distanceM(pt(ligne[i - 1]!), pt(ligne[i]!));
   return reste;
 }
+
+/** Projection d'un point sur un segment : distance (m) et position relative t ∈ [0, 1]. */
+function projectionSegment(p: Point, a: [number, number], b: [number, number]): { ecartM: number; t: number } {
+  const kx = 111_320 * Math.cos((p.lat * Math.PI) / 180);
+  const ky = 110_540;
+  const ax = (a[0] - p.lng) * kx;
+  const ay = (a[1] - p.lat) * ky;
+  const dx = (b[0] - a[0]) * kx;
+  const dy = (b[1] - a[1]) * ky;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2));
+  return { ecartM: Math.hypot(ax + t * dx, ay + t * dy), t };
+}
+
+/** Longueurs cumulées (m) du tracé à chacun de ses sommets. */
+export function longueursCumulees(ligne: readonly [number, number][]): number[] {
+  const cumul = [0];
+  for (let i = 1; i < ligne.length; i++) {
+    const a = ligne[i - 1]!;
+    const b = ligne[i]!;
+    cumul.push(cumul[i - 1]! + distanceM({ lat: a[1], lng: a[0] }, { lat: b[1], lng: b[0] }));
+  }
+  return cumul;
+}
+
+/**
+ * Projection de la position sur le tracé : distance parcourue depuis le
+ * début du tracé (abscisse, m), segment le plus proche et écart (m). Le
+ * paramètre `apres` limite la recherche aux segments à partir de cet
+ * indice (manœuvres placées dans l'ordre, même si le tracé repasse au même
+ * endroit). null sans tracé.
+ */
+export function projeterSurTrace(
+  position: Point,
+  ligne: readonly [number, number][],
+  cumul: readonly number[] = longueursCumulees(ligne),
+  apres = 1,
+): { abscisseM: number; segment: number; ecartM: number } | null {
+  if (ligne.length < 2) return null;
+  let meilleur: { abscisseM: number; segment: number; ecartM: number } | null = null;
+  for (let i = Math.max(1, apres); i < ligne.length; i++) {
+    const { ecartM, t } = projectionSegment(position, ligne[i - 1]!, ligne[i]!);
+    if (!meilleur || ecartM < meilleur.ecartM - 1e-6) {
+      meilleur = { abscisseM: cumul[i - 1]! + t * (cumul[i]! - cumul[i - 1]!), segment: i, ecartM };
+    }
+  }
+  return meilleur;
+}
