@@ -9,6 +9,11 @@ const bodySchema = z
   .object({ user_id: z.string().uuid().optional(), email: z.string().email().optional() })
   .refine((v) => v.user_id || v.email, { message: "user_id ou email requis" });
 
+/** Échappe % et _ (jokers de ilike) : comparaison exacte, casse ignorée. */
+function echapperMotif(valeur: string): string {
+  return valeur.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 /**
  * Public (pre-session) — step 1 of "Se connecter avec Face ID /
  * empreinte", called from either /driver-pin/[id] (user_id already
@@ -29,7 +34,8 @@ export async function POST(req: Request) {
     const { data: user } = await admin
       .from("users")
       .select("id")
-      .eq("email", parsed.data.email)
+      // Casse ignorée : un téléphone met souvent une majuscule à l'e-mail saisi.
+      .ilike("email", echapperMotif(parsed.data.email.trim()))
       .eq("active", true)
       .maybeSingle();
     userId = user?.id ?? null;
