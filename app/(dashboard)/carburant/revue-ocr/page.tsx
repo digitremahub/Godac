@@ -1,6 +1,7 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { OcrReviewCard } from "@/components/fuel/OcrReviewCard";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 export default async function OcrReviewPage() {
   const g = await garderPage("carburant.revue_ocr");
@@ -31,6 +32,7 @@ export default async function OcrReviewPage() {
         title="Revue OCR"
         description="Tickets en attente de validation humaine — la donnée n'est jamais enregistrée sans confirmation."
       />
+      <JaugesQuotas organizationId={g.appUser.organization_id} role={g.appUser.role} fonctions={["ocr_ticket", "ocr_totalizer", "ocr_counter"]} />
 
       {withPhotoUrls.length === 0 ? (
         <EmptyState title="Aucun ticket en attente" description="Tous les tickets OCR ont été validés." />

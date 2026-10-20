@@ -5,6 +5,8 @@ import { ChauffeurDashboard } from "@/components/dashboard/ChauffeurDashboard";
 import { ManagerDashboard } from "@/components/dashboard/ManagerDashboard";
 import { ComptableDashboard } from "@/components/dashboard/ComptableDashboard";
 import { DirectionDashboard } from "@/components/dashboard/DirectionDashboard";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
+import { USAGE_FEATURES } from "@/lib/usage/quotas";
 
 /**
  * The one page every role lands on after sign-in (see middleware.ts).
@@ -28,6 +30,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     case "comptable":
       return <ComptableDashboard appUser={appUser} enabledModules={enabledModules} />;
     case "direction":
-      return <DirectionDashboard appUser={appUser} enabledModules={enabledModules} />;
+      return (
+        <>
+          {/* Quotas d'IA : seulement ceux qui dépassent 80 % du volume inclus. */}
+          <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={USAGE_FEATURES} seuil={80} />
+          <DirectionDashboard appUser={appUser} enabledModules={enabledModules} />
+        </>
+      );
   }
 }

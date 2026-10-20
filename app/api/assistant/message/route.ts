@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 
   const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "assistant");
   if (!quota.ok) {
-    return NextResponse.json({ error: quota.raison }, { status: 429 });
+    return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
   }
 
   const result = await askAssistant({

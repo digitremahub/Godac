@@ -20,6 +20,7 @@ export function JaugeQuota({
   unite,
   direction = false,
   compact = false,
+  type = "limite",
 }: {
   libelle: string;
   utilise: number;
@@ -29,13 +30,25 @@ export function JaugeQuota({
   /** Affiche le lien « Changer de formule » quand la limite est atteinte. */
   direction?: boolean;
   compact?: boolean;
+  /**
+   * "limite" : limite de formule (véhicules), blocage au-delà de 110 % ;
+   * "quota" : volume d'IA inclus par mois, au-delà facturé en dépassement
+   * (ou refusé si l'entreprise l'a désactivé).
+   */
+  type?: "limite" | "quota";
 }) {
   const etat = etatLimite(utilise, inclus);
   if (etat.inclus === null) return null;
   const pct = Math.min(100, Math.round((utilise / etat.inclus) * 100));
   const c = COULEURS[etat.niveau];
   const message =
-    etat.niveau === "bloque"
+    type === "quota"
+      ? utilise >= etat.inclus
+        ? "Volume inclus atteint : la suite est facturée en dépassement, ou refusée si le dépassement est désactivé."
+        : etat.niveau === "proche"
+          ? "Plus de 80 % du volume inclus ce mois."
+          : null
+      : etat.niveau === "bloque"
       ? `Limite dépassée : au-delà de ${etat.plafond}, l'ajout est bloqué.`
       : etat.niveau === "avertissement"
         ? `Limite de la formule atteinte (blocage à ${etat.plafond}).`

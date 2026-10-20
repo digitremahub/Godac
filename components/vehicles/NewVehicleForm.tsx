@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import type { AiVehicleSpecs } from "@/lib/vehicles/ai-specs";
 import { IconSparkles } from "@/components/layout/icons";
+import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
+import { BandeauRefus } from "@/components/acces/BandeauRefus";
 
 interface ServiceOption {
   id: string;
@@ -16,7 +18,8 @@ const CONFIDENCE_LABELS: Record<string, string> = { élevé: "confiance élevée
 /** Per-field AI provenance tracked client-side until submit, mirrors `vehicles.spec_sources`. */
 type AiFieldState = Partial<Record<string, { confidence: string | null; confirmed: boolean }>>;
 
-export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
+export function NewVehicleForm({ services, direction = false }: { services: ServiceOption[]; direction?: boolean }) {
+  const [refus, setRefus] = useState<Refus | null>(null);
   const router = useRouter();
   const [registration, setRegistration] = useState("");
   const [brand, setBrand] = useState("");
@@ -114,12 +117,13 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
   async function submit() {
     setBusy(true);
     setError(null);
+    setRefus(null);
     try {
       const specSources: Record<string, { origin: "ia"; confirmed: boolean }> = {};
       for (const [field, state] of Object.entries(aiFields)) {
         if (state) specSources[field] = { origin: "ia", confirmed: state.confirmed };
       }
-      const res = await fetch("/api/vehicles", {
+      const res = await fetchGodac<{ vehicle: { id: string } }>("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,9 +143,12 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
           spec_sources: Object.keys(specSources).length > 0 ? specSources : undefined,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
-      router.push(`/flotte/vehicules/${json.vehicle.id}`);
+      // Refus homogène (limite de formule, rôle, module) : bandeau avec l'action adaptée.
+      if (!res.ok) {
+        setRefus(res.refus);
+        return;
+      }
+      router.push(`/flotte/vehicules/${res.data.vehicle.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
     } finally {
@@ -167,6 +174,7 @@ export function NewVehicleForm({ services }: { services: ServiceOption[] }) {
   return (
     <Card className="flex max-w-lg flex-col gap-4">
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      <BandeauRefus refus={refus} direction={direction} onFermer={() => setRefus(null)} />
 
       <div>
         <label className="block"><span className="label">Immatriculation</span>

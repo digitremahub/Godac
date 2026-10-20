@@ -41,7 +41,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   ] as const;
   if (!etapes.some(([, chemin]) => chemin)) return NextResponse.json({ error: "Aucun scan à relire." }, { status: 422 });
   const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "tour_report_reread");
-  if (!quota.ok) return NextResponse.json({ error: quota.raison }, { status: 429 });
+  if (!quota.ok) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
 
   const lectures: Partial<Record<(typeof etapes)[number][0], TourReportFields>> = {};
   const echecs: string[] = [];

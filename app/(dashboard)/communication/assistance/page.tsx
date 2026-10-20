@@ -2,6 +2,7 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { SupportRequestsList } from "@/components/assistant/SupportRequestsList";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 /**
  * Manager-like inbox for the assistant's human relay. Same
@@ -34,6 +35,7 @@ export default async function SupportPage() {
   return (
     <div>
       <PageHeader title="Demandes d'assistance" description="Questions relayées par l'assistant vers un humain." />
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={["assistant"]} />
       <SupportRequestsList
         requests={(requests ?? []).map((r: any) => ({
           id: r.id,

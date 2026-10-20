@@ -2,6 +2,7 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { NewFineForm } from "@/components/fines/NewFineForm";
 import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 /**
  * Direction-only — same sensitivity class as /equipe/paie/heures (attributing a
@@ -46,6 +47,7 @@ export default async function FinesPage() {
         title="Amendes"
         description="Rattachement suggéré au chauffeur via le planning du véhicule — à confirmer avant notification."
       />
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={["ocr_fine"]} />
       {!lectureSeule && (
         <div className="mb-4">
           <NewFineForm vehicles={vehicles ?? []} />

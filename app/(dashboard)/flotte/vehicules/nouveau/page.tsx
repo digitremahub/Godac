@@ -32,7 +32,7 @@ export default async function NewVehiclePage() {
           <JaugeQuota libelle="Véhicules inclus dans votre formule" utilise={limite.utilise} inclus={limite.inclus} direction={direction} />
         </div>
       )}
-      <NewVehicleForm services={services ?? []} />
+      <NewVehicleForm services={services ?? []} direction={direction} />
     </div>
   );
 }

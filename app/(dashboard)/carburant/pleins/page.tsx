@@ -8,6 +8,7 @@ import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { FuelHistoryFilters } from "@/components/fuel/FuelHistoryFilters";
 import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 const PAGE_SIZE = 50;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -128,6 +129,7 @@ export default async function FuelPage({
           ) : undefined
         }
       />
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={["ocr_ticket"]} />
 
       <FuelHistoryFilters
         vehicles={(vehicles ?? []).map((v) => ({ id: v.id, label: v.registration }))}

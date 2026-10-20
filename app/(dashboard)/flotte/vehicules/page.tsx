@@ -5,6 +5,7 @@ import { limiteVehicules } from "@/lib/acces/limites-serveur";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { VehicleImportPanel } from "@/components/vehicles/VehicleImportPanel";
 import { VehicleFleetTable } from "@/components/vehicles/VehicleFleetTable";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 export default async function VehiclesPage() {
   const g = await garderPage("flotte.vehicules");
@@ -30,6 +31,7 @@ export default async function VehiclesPage() {
           ) : undefined
         }
       />
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={["vehicle_ai_specs", "import_ai"]} />
 
       {limite && limite.inclus !== null && (
         <div className="mb-4 max-w-md">

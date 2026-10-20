@@ -6,6 +6,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable";
 import { addDays, todayISO } from "@/lib/planning/dates";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 
 interface PhotoRow {
   id: string;
@@ -82,6 +83,7 @@ export async function VueRapports({ params, vue, appUser, supabase }: { params: 
         title={view === "photos" ? "Photos de tournée" : "Rapports de tournée"}
         description="Données lues automatiquement sur les photos de feuille de tournée (départ/retour) — numéro de BL, horaires, arrêts, colis."
       />
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={["ocr_tour_report", "tour_report_reread"]} />
       <ReportFilters
         view={view}
         from={from}
