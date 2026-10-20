@@ -31,8 +31,10 @@ export async function GET(req: Request) {
   // Choix manuel (sans planning) : villages de la tournée-modèle choisie.
   const routeId = url.searchParams.get("route_id");
   const planningOuModele = async () => {
-    // Fiche supplémentaire : seulement les tournées affectées après la fiche clôturée du jour.
-    const p = await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run));
+    // Seulement les tournées que porte cette fiche (séparée, reliée ; libre :
+    // aucune). Sans la migration 20261023000002 : fiche supplémentaire =
+    // tournées affectées après la fiche clôturée du jour.
+    const p = await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run), run.id);
     if (!routeId || !z.string().uuid().safeParse(routeId).success) return p;
     const { data: route } = await supabase.from("tour_routes").select("id").eq("id", routeId).eq("organization_id", appUser.organization_id).maybeSingle();
     return { passages: p.passages, villages: route ? await villagesDeRoute(supabase, route.id) : [] };
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
     if (!route) return NextResponse.json({ error: "Tournée-modèle introuvable." }, { status: 404 });
     villages = await villagesDeRoute(supabase, route.id);
   } else {
-    villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run))).villages;
+    villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run), run.id)).villages;
   }
   const coches = new Set(parsed.data.village_ids);
   const manquants = villages.filter((v) => !coches.has(v.id));
