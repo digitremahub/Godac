@@ -38,7 +38,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         {GUIDES.map((g) => (
           <Link
             key={g.role}
-            href={`/guide?role=${g.role}`}
+            href={`/aide/guide?role=${g.role}`}
             aria-current={g.role === guide.role ? "page" : undefined}
             className={`rounded-full border px-3 py-1.5 text-sm ${g.role === guide.role ? "border-teal bg-teal/10 font-semibold" : "border-navy/10 hover:border-navy/25"}`}
           >

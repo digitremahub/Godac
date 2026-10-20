@@ -64,7 +64,7 @@ export function JaugeQuota({
         <p className={`mt-1.5 text-xs ${c.texte}`}>
           {message}{" "}
           {direction && (
-            <Link href="/admin/billing" className="font-semibold underline">
+            <Link href="/admin/abonnement" className="font-semibold underline">
               Changer de formule
             </Link>
           )}

@@ -6,7 +6,7 @@ const FORMULES: Record<FormuleMin, string> = { essentiel: "Essentiel", starter: 
 
 /** Lien vers l'onglet Modules de l'administration, ancré sur le module. */
 export function lienActivationModule(cle: string): string {
-  return `/admin/billing?vue=modules#module-${cle}`;
+  return `/admin/abonnement?vue=modules#module-${cle}`;
 }
 
 type Props =
@@ -70,7 +70,7 @@ export function EtatAcces(props: Props) {
       );
       if (props.direction) {
         action = (
-          <Link href="/admin/billing" className="btn-primary !py-2 text-sm">
+          <Link href="/admin/abonnement" className="btn-primary !py-2 text-sm">
             Changer de formule
           </Link>
         );

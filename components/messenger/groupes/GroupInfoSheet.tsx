@@ -78,7 +78,7 @@ export function GroupInfoSheet({
     setBusy(true);
     const res = await fetch(`/api/messenger/groupes/${groupId}`, { method: "DELETE" });
     setBusy(false);
-    if (res.ok) router.push("/messenger");
+    if (res.ok) router.push("/communication/messenger");
     else setError("Suppression impossible.");
   }
 

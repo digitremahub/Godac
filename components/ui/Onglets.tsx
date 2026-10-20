@@ -15,8 +15,11 @@ export interface Onglet {
 export function ongletActif(onglets: readonly Onglet[], pathname: string): Onglet | undefined {
   let meilleur: { o: Onglet; n: number } | undefined;
   for (const o of onglets) {
-    for (const p of [o.href.split("?")[0]!, ...(o.prefixes ?? [])]) {
-      if ((pathname === p || pathname.startsWith(`${p}/`)) && (!meilleur || p.length > meilleur.n)) meilleur = { o, n: p.length };
+    const propre = o.href.split("?")[0]!;
+    for (const p of [propre, ...(o.prefixes ?? [])]) {
+      // Le plus long préfixe gagne ; à égalité, l'adresse propre de l'onglet.
+      const n = p.length * 2 + (p === propre ? 1 : 0);
+      if ((pathname === p || pathname.startsWith(`${p}/`)) && (!meilleur || n > meilleur.n)) meilleur = { o, n };
     }
   }
   return meilleur?.o;

@@ -30,8 +30,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     <nav aria-label="Abonnement" className="mb-5 flex gap-1 overflow-x-auto border-b border-navy/10">
       {(
         [
-          ["formule", "/admin/billing", "Formule & consommation"],
-          ["modules", "/admin/billing?vue=modules", "Modules"],
+          ["formule", "/admin/abonnement", "Formule & consommation"],
+          ["modules", "/admin/abonnement?vue=modules", "Modules"],
         ] as const
       ).map(([cle, href, label]) => (
         <Link

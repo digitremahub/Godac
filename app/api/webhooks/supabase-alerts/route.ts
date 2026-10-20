@@ -69,7 +69,7 @@ export async function POST(req: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const parLien = new Map<string, typeof recipients>();
   for (const r of recipients ?? []) {
-    const lien = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: r.role }) ?? "/alerts";
+    const lien = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: r.role }) ?? "/communication/alertes";
     parLien.set(lien, [...(parLien.get(lien) ?? []), r]);
   }
 

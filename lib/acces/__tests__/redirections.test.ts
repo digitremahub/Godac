@@ -109,6 +109,19 @@ const ANCIENNES = [
   "/paie/parametres",
   "/paie/abc",
   "/payroll",
+  // Communication
+  "/messenger",
+  "/messenger?with=u2",
+  "/intranet",
+  "/alerts",
+  "/support",
+  // Administration, Aide, Tableau de bord
+  "/admin/organizations",
+  "/admin/billing",
+  "/reporting",
+  "/guide",
+  "/guide?role=chauffeur",
+  "/faq",
 ];
 
 describe("redirections des anciennes adresses", () => {

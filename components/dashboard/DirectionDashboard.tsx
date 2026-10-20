@@ -14,7 +14,7 @@ import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCo
 /**
  * Direction sees the whole organization: fleet + headcount KPIs,
  * pending approvals across every service, and (when BI reporting is
- * enabled) the same consolidated charts as the dedicated /reporting
+ * enabled) the same consolidated charts as the dedicated /dashboard/reporting
  * page, surfaced here so the big picture doesn't require a second
  * click every morning.
  */
@@ -179,7 +179,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         <Link href="/exploitation/historique" className="block">
           <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
         </Link>
-        <Link href="/alerts" className="block">
+        <Link href="/communication/alertes" className="block">
           <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         </Link>
       </div>
@@ -231,7 +231,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Reporting (30 jours)</h2>
-            <Link href="/reporting" className="text-sm text-teal-ink hover:underline">
+            <Link href="/dashboard/reporting" className="text-sm text-teal-ink hover:underline">
               Voir le reporting complet →
             </Link>
           </div>

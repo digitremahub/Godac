@@ -203,8 +203,8 @@ const E = (e: Ecran) => e;
 
 export const ECRANS: readonly Ecran[] = [
   // ── Tableau de bord ──────────────────────────────────────────────
-  E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
-  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/reporting", roles: ["direction"], modules: ["bi_reporting"], icone: "chart" }),
+  E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", libelleOnglet: "Aujourd'hui", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
+  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction"], modules: ["bi_reporting"], icone: "chart" }),
 
   // ── Mon espace ───────────────────────────────────────────────────
   E({
@@ -323,6 +323,7 @@ export const ECRANS: readonly Ecran[] = [
     roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
+    aussiActif: ["/exploitation/suivi"],
     note: "chauffeur : sa tournée",
   }),
   E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/exploitation/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map", menu: "onglet" }),
@@ -478,6 +479,7 @@ export const ECRANS: readonly Ecran[] = [
     href: "/carburant/cuves",
     roles: ["direction", "manager", "manager_chauffeur", "comptable"],
     icone: "cylinder",
+    aussiActif: ["/carburant/approvisionnements"],
   }),
   E({
     id: "carburant.approvisionnements",
@@ -591,23 +593,23 @@ export const ECRANS: readonly Ecran[] = [
   E({ id: "equipe.paie_salarie", section: "equipe", libelle: "Bulletin d'un salarié", href: "/equipe/paie/[userId]", roles: ["direction", "comptable"], modules: ["payslips"], icone: "coins", menu: "cache" }),
 
   // ── Communication ────────────────────────────────────────────────
-  E({ id: "communication.messenger", section: "communication", libelle: "Messenger", href: "/messenger", roles: TOUS_LES_ROLES, modules: ["messenger"], icone: "chat", mobile: "barre" }),
+  E({ id: "communication.messenger", section: "communication", libelle: "Messenger", href: "/communication/messenger", roles: TOUS_LES_ROLES, modules: ["messenger"], icone: "chat", mobile: "barre" }),
   E({
     id: "communication.intranet",
     section: "communication",
     libelle: "Intranet & convocations",
-    href: "/intranet",
+    href: "/communication/intranet",
     roles: TOUS_LES_ROLES,
     modules: ["intranet"],
     icone: "megaphone",
     mobile: "plus",
   }),
-  E({ id: "communication.alertes", section: "communication", libelle: "Alertes", href: "/alerts", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
-  E({ id: "communication.assistance", section: "communication", libelle: "Demandes d'assistance", href: "/support", roles: ENCADREMENT, modules: ["assistant"], icone: "lifebuoy" }),
+  E({ id: "communication.alertes", section: "communication", libelle: "Alertes", href: "/communication/alertes", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
+  E({ id: "communication.assistance", section: "communication", libelle: "Demandes d'assistance", libelleOnglet: "Assistance", href: "/communication/assistance", roles: ENCADREMENT, modules: ["assistant"], icone: "lifebuoy" }),
 
   // ── Administration ───────────────────────────────────────────────
-  E({ id: "admin.organisation", section: "admin", libelle: "Organisation", href: "/admin/organizations", roles: ["direction"], icone: "building" }),
-  E({ id: "admin.abonnement", section: "admin", libelle: "Abonnement & modules", href: "/admin/billing", roles: ["direction"], icone: "card" }),
+  E({ id: "admin.organisation", section: "admin", libelle: "Organisation", href: "/admin/organisation", roles: ["direction"], icone: "building" }),
+  E({ id: "admin.abonnement", section: "admin", libelle: "Abonnement & modules", href: "/admin/abonnement", roles: ["direction"], icone: "card" }),
   E({ id: "admin.journal", section: "admin", libelle: "Journal d'audit", href: "/admin/journal", roles: ["direction"], icone: "shield" }),
   E({
     id: "admin.faq",
@@ -621,8 +623,8 @@ export const ECRANS: readonly Ecran[] = [
   }),
 
   // ── Aide ─────────────────────────────────────────────────────────
-  E({ id: "aide.guide", section: "aide", libelle: "Guide d'utilisation", href: "/guide", roles: TOUS_LES_ROLES, icone: "file", mobile: "plus" }),
-  E({ id: "aide.faq", section: "aide", libelle: "Questions fréquentes", href: "/faq", roles: TOUS_LES_ROLES, icone: "lifebuoy" }),
+  E({ id: "aide.guide", section: "aide", libelle: "Guide d'utilisation", href: "/aide/guide", roles: TOUS_LES_ROLES, icone: "file", mobile: "plus" }),
+  E({ id: "aide.faq", section: "aide", libelle: "Questions fréquentes", href: "/aide/faq", roles: TOUS_LES_ROLES, icone: "lifebuoy" }),
   E({ id: "aide.compte", section: "aide", libelle: "Mon compte", href: "/account", roles: TOUS_LES_ROLES, icone: "user", mobile: "plus" }),
 ];
 
@@ -790,7 +792,14 @@ export function entreeActive(ecrans: readonly Ecran[], pathname: string): Ecran 
   };
   const directes = ecrans.filter((e) => correspond(e.href)).sort((a, b) => chemin(b.href).length - chemin(a.href).length);
   if (directes[0]) return directes[0];
-  return ecrans.find((e) => e.aussiActif?.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`))));
+  const parPrefixe = ecrans.find((e) => e.aussiActif?.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`))));
+  if (parPrefixe) return parPrefixe;
+  // Onglet sans entrée de menu (Suivi en direct, Approvisionnements…) :
+  // première entrée de la même section.
+  return ecrans.find((e) => {
+    const p = PREFIXE_SECTION[e.section];
+    return p !== "/dashboard" && (pathname === p || pathname.startsWith(`${p}/`));
+  });
 }
 
 export function libelleRoles(roles: readonly UserRole[]): string {

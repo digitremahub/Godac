@@ -13,7 +13,7 @@ export interface MessageRow {
 }
 
 /**
- * The bubble list for a conversation — shared by the full /messenger
+ * The bubble list for a conversation — shared by the full /communication/messenger
  * page (server-rendered data, router.refresh() on change) and the
  * floating widget (client-fetched data, an onChanged refetch callback
  * instead), so delete/photo rendering logic only lives in one place.

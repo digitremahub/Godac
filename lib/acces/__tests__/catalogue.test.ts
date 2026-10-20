@@ -74,7 +74,7 @@ describe("catalogue des écrans", () => {
   });
 
   it("urlDe remplace les segments dynamiques", () => {
-    expect(urlDe("flotte.vehicule_fiche", { id: "abc" })).toBe("/vehicles/abc");
+    expect(urlDe("flotte.vehicule_fiche", { id: "abc" })).toBe("/flotte/vehicules/abc");
     expect(() => urlDe("flotte.vehicule_fiche")).toThrow();
   });
 
@@ -91,7 +91,7 @@ describe("décision d'accès", () => {
   const actifs = new Set(["planning", "fines"]);
 
   it("refuse par rôle avant le module, avec redirection prévue", () => {
-    expect(deciderAcces(ecran("flotte.amendes"), "chauffeur", actifs)).toMatchObject({ ok: false, motif: "role", redirection: "/mes-amendes" });
+    expect(deciderAcces(ecran("flotte.amendes"), "chauffeur", actifs)).toMatchObject({ ok: false, motif: "role", redirection: "/moi/amendes" });
     expect(deciderAcces(ecran("admin.abonnement"), "manager", actifs)).toMatchObject({ ok: false, motif: "role" });
   });
 
@@ -186,7 +186,9 @@ describe("menu par rôle", () => {
 
   it("manager : calendrier des congés et pointage d'équipe dans Équipe & RH", () => {
     const eq = menuPour("manager", tout).find((s) => s.id === "equipe")!;
-    expect(eq.ecrans.map((e) => e.href)).toEqual(expect.arrayContaining([urlDe("equipe.utilisateurs"), urlDe("equipe.conges_calendrier"), urlDe("moi.pointage"), urlDe("moi.conges")]));
+    expect(eq.ecrans.map((e) => e.href)).toEqual(expect.arrayContaining([urlDe("equipe.utilisateurs"), urlDe("equipe.pointage"), urlDe("equipe.conges")]));
+    // Le calendrier est un sous-onglet des congés.
+    expect(sousOnglets("equipe.conges", "manager", tout).map((o) => o.href)).toEqual([urlDe("equipe.conges"), urlDe("equipe.conges_calendrier")]);
   });
 
   it("module coupé → entrée retirée, section vide masquée", () => {
@@ -197,10 +199,70 @@ describe("menu par rôle", () => {
   it("état actif : la plus longue URL, puis les préfixes aussiActif", () => {
     const e = menuPour("direction", tout).flatMap((s) => s.ecrans);
     expect(entreeActive(e, urlDe("exploitation.planning"))?.id).toBe("exploitation.planning");
-    expect(entreeActive(e, "/vehicles/123")?.id).toBe("flotte.vehicules");
-    expect(entreeActive(e, "/paie/abc")?.id).toBe("equipe.paie");
-    expect(entreeActive(e, "/suivi")?.id).toBe("exploitation.colis");
+    expect(entreeActive(e, "/flotte/vehicules/123")?.id).toBe("flotte.vehicules");
+    expect(entreeActive(e, "/equipe/paie/abc")?.id).toBe("equipe.paie");
+    expect(entreeActive(e, "/equipe/paie/heures")?.id).toBe("equipe.paie");
+    expect(entreeActive(e, "/exploitation/historique/rapports")?.id).toBe("exploitation.historique");
+    expect(entreeActive(e, "/carburant/approvisionnements")?.id).toBe("carburant.cuves");
+    expect(entreeActive(e, "/exploitation/suivi")?.id).toBe("exploitation.colis");
     const c = menuPour("chauffeur", tout).flatMap((s) => s.ecrans);
     expect(entreeActive(c, urlDe("moi.planning"))?.id).toBe("moi.planning");
+  });
+});
+
+describe("onglets de section (lot 4)", () => {
+  const tout = new Set<string>(MODULES_AVEC_CODE);
+
+  it("chaque section a un layout avec sa barre d'onglets et une page qui renvoie au premier onglet", () => {
+    for (const s of SECTIONS) {
+      const dir = path.join(DASHBOARD, PREFIXE_SECTION[s.id]);
+      const layout = readFileSync(path.join(dir, "layout.tsx"), "utf8");
+      expect(layout, s.id).toContain(`section="${s.id}"`);
+      if (s.id !== "dashboard") expect(readFileSync(path.join(dir, "page.tsx"), "utf8"), s.id).toContain(`redirigerSection("${s.id}")`);
+    }
+  });
+
+  it("chaque écran (hors /v et /account) vit sous le préfixe de sa section", () => {
+    for (const e of ECRANS) {
+      const h = e.href.split("?")[0]!;
+      if (h.startsWith("/v/") || h === "/account") continue;
+      const p = PREFIXE_SECTION[e.section];
+      expect(h === p || h.startsWith(`${p}/`), `${e.id} → ${h}`).toBe(true);
+    }
+  });
+
+  it("onglets filtrés par rôle et module, sous-onglets regroupés sous leur parent", () => {
+    const hrefs = (o: { href: string }[]) => o.map((x) => x.href);
+    expect(hrefs(ongletsSection("carburant", "chauffeur", tout))).toEqual([urlDe("carburant.pleins")]);
+    expect(hrefs(ongletsSection("carburant", "direction", tout))).toEqual([
+      urlDe("carburant.pleins"),
+      urlDe("carburant.revue_ocr"),
+      urlDe("carburant.cuves"),
+      urlDe("carburant.approvisionnements"),
+      urlDe("carburant.ticpe"),
+    ]);
+    const exploitation = hrefs(ongletsSection("exploitation", "direction", tout));
+    expect(exploitation).toContain(urlDe("exploitation.suivi"));
+    expect(exploitation).toContain(urlDe("exploitation.historique"));
+    expect(exploitation).not.toContain(urlDe("exploitation.rapports"));
+    expect(hrefs(sousOnglets("exploitation.historique", "direction", tout))).toEqual([
+      urlDe("exploitation.historique"),
+      urlDe("exploitation.rapports"),
+      urlDe("exploitation.rapports_photos"),
+      urlDe("exploitation.historique_colis"),
+    ]);
+    // Le chauffeur : tournées et tournées colis, pas les rapports.
+    expect(hrefs(sousOnglets("exploitation.historique", "chauffeur", tout))).toEqual([urlDe("exploitation.historique"), urlDe("exploitation.historique_colis")]);
+    // Sans planning, l'historique colis remonte en onglet de section.
+    expect(hrefs(ongletsSection("exploitation", "manager", new Set(["route_optimizer"])))).toContain(urlDe("exploitation.historique_colis"));
+    // Sans fiches de paie, Heures & salaires devient un onglet d'Équipe.
+    expect(hrefs(ongletsSection("equipe", "direction", new Set(["planning"])))).toContain(urlDe("equipe.heures"));
+    expect(hrefs(ongletsSection("equipe", "direction", tout))).not.toContain(urlDe("equipe.heures"));
+    expect(hrefs(sousOnglets("equipe.paie", "comptable", tout))).not.toContain(urlDe("equipe.paie_reglages"));
+  });
+
+  it("une seule barre d'onglets sur la tournée colis", () => {
+    const source = readFileSync(path.join(DASHBOARD, "exploitation/colis/page.tsx"), "utf8");
+    expect(source).not.toMatch(/role="tablist"|TourneesTabs/);
   });
 });

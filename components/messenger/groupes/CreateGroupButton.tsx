@@ -48,7 +48,7 @@ export function CreateGroupButton({ teams, currentUserId }: { teams: TeamOption[
       setOpen(false);
       setName("");
       setSelected(new Set());
-      router.push(`/messenger?groupe=${json.groupId}`);
+      router.push(`/communication/messenger?groupe=${json.groupId}`);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");

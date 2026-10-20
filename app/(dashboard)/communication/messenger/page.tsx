@@ -138,7 +138,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
             (colleagues ?? []).map((c) => (
               <Link
                 key={c.id}
-                href={`/messenger?with=${c.id}`}
+                href={`/communication/messenger?with=${c.id}`}
                 className={`rounded-lg px-3 py-2 text-sm ${c.id === contactId ? "bg-teal/10 font-medium" : "hover:bg-navy/[0.04]"}`}
               >
                 {c.full_name}
@@ -165,7 +165,7 @@ function GroupLink({ g, active, unread }: { g: GroupListRow; active: boolean; un
   const count = g.message_group_members.length;
   return (
     <Link
-      href={`/messenger?groupe=${g.id}`}
+      href={`/communication/messenger?groupe=${g.id}`}
       className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${active ? "bg-teal/10 font-medium" : "hover:bg-navy/[0.04]"}`}
     >
       <IconUsers className="h-4 w-4 shrink-0 text-navy/50" />
@@ -182,7 +182,7 @@ function GroupLink({ g, active, unread }: { g: GroupListRow; active: boolean; un
 }
 
 const RetourListe = () => (
-  <Link href="/messenger" className="text-sm text-teal-ink underline md:hidden">
+  <Link href="/communication/messenger" className="text-sm text-teal-ink underline md:hidden">
     ← Conversations
   </Link>
 );

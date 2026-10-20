@@ -1,7 +1,7 @@
 import type { UserRole } from "@/lib/types/domain";
 
 /**
- * Guides d'utilisation par rôle : une seule source pour la page /guide de
+ * Guides d'utilisation par rôle : une seule source pour la page /aide/guide de
  * l'application (réservée aux entreprises clientes) et pour les pages
  * Notion. Une étape liée à un module n'est affichée que si l'entreprise a
  * activé ce module.
@@ -131,8 +131,8 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
     titre: "Équipe et documents",
     etapes: [
       { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/moi/conges", label: "Mes congés" }, module: "leave_management" },
-      { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/intranet", label: "Intranet" }, module: "intranet" },
-      { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : le groupe de votre équipe, les Infos équipe épinglées, @prénom pour mentionner un collègue ; messages, photos et documents restent dans l'entreprise.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
+      { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/communication/intranet", label: "Intranet" }, module: "intranet" },
+      { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : le groupe de votre équipe, les Infos équipe épinglées, @prénom pour mentionner un collègue ; messages, photos et documents restent dans l'entreprise.", lien: { href: "/communication/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/moi/fiches-de-paie", label: "Fiches de paie" }, module: "payslips" },
       { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/exploitation/contestations", label: "Contestations" }, module: "customer_disputes" },
     ],
@@ -142,7 +142,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
 const AIDE: SectionGuide = {
   titre: "Besoin d'aide ?",
   etapes: [
-    { titre: "Questions fréquentes", texte: "Les réponses aux questions les plus posées.", lien: { href: "/faq", label: "Questions fréquentes" } },
+    { titre: "Questions fréquentes", texte: "Les réponses aux questions les plus posées.", lien: { href: "/aide/faq", label: "Questions fréquentes" } },
     { titre: "Assistant", texte: "La bulle d'aide en bas de l'écran répond à vos questions sur GODAC et transmet à un responsable si besoin.", module: "assistant" },
     { titre: "Mon compte", texte: "Nom, téléphone, mode sombre et taille du texte se règlent dans « Mon compte ».", lien: { href: "/account", label: "Mon compte" } },
   ],
@@ -164,7 +164,7 @@ const ENCADREMENT: SectionGuide[] = [
         texte:
           "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
         lien: { href: "/exploitation/tournees", label: "Tournées & villages" }, module: "planning" },
-      { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/messenger", label: "Messenger" }, module: "messenger" },
+      { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/communication/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/equipe/conges", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/equipe/inscriptions", label: "Chauffeurs à valider" } },
       { titre: "Imprimer les badges QR", texte: "« Badges QR » génère les badges de connexion des chauffeurs et des véhicules.", lien: { href: "/flotte/badges", label: "Badges QR" } },
@@ -198,8 +198,8 @@ const ENCADREMENT: SectionGuide[] = [
         lien: { href: "/exploitation/contestations", label: "Contestations" },
         module: "customer_disputes",
       },
-      { titre: "Alertes", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Alertes ».", lien: { href: "/alerts", label: "Alertes" } },
-      { titre: "Demandes d'assistance", texte: "Les questions transmises par l'assistant à un humain arrivent ici.", lien: { href: "/support", label: "Demandes d'assistance" }, module: "assistant" },
+      { titre: "Alertes", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Alertes ».", lien: { href: "/communication/alertes", label: "Alertes" } },
+      { titre: "Demandes d'assistance", texte: "Les questions transmises par l'assistant à un humain arrivent ici.", lien: { href: "/communication/assistance", label: "Demandes d'assistance" }, module: "assistant" },
     ],
   },
 ];
@@ -236,7 +236,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
           { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/carburant/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
           { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/equipe/paie", label: "Paie & salaires" }, module: "payslips" },
-          { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/alerts", label: "Alertes" } },
+          { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/communication/alertes", label: "Alertes" } },
         ],
       },
       AIDE,
@@ -254,7 +254,7 @@ export const GUIDES: GuideRole[] = [
             titre: "Régler l'organisation",
             texte:
               "Organisation : pays de l'entreprise (règles légales appliquées), logo et couleur, adresse du dépôt, identité légale, services et leurs dépôts, cuves, pointage assisté par géolocalisation (actif par défaut, à annoncer aux salariés).",
-            lien: { href: "/admin/organizations", label: "Organisation" },
+            lien: { href: "/admin/organisation", label: "Organisation" },
           },
           {
             titre: "Inviter les utilisateurs et choisir leur rôle",
@@ -262,7 +262,7 @@ export const GUIDES: GuideRole[] = [
               "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, manager-chauffeur, comptable, direction). Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
             lien: { href: "/equipe/utilisateurs", label: "Utilisateurs" },
           },
-          { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/billing", label: "Abonnement" } },
+          { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/abonnement", label: "Abonnement" } },
           { titre: "Lien d'inscription des chauffeurs", texte: "Partagez le lien d'inscription (page Organisation) : les chauffeurs s'inscrivent et vous les validez.", lien: { href: "/equipe/inscriptions", label: "Chauffeurs à valider" } },
         ],
       },
@@ -278,7 +278,7 @@ export const GUIDES: GuideRole[] = [
       ...ENCADREMENT,
       {
         titre: "Pilotage",
-        etapes: [{ titre: "Reporting BI", texte: "Indicateurs consolidés : coûts carburant, consommation, activité.", lien: { href: "/reporting", label: "Reporting BI" }, module: "bi_reporting" }],
+        etapes: [{ titre: "Reporting BI", texte: "Indicateurs consolidés : coûts carburant, consommation, activité.", lien: { href: "/dashboard/reporting", label: "Reporting BI" }, module: "bi_reporting" }],
       },
       AIDE,
     ],

@@ -39,5 +39,14 @@
   {"source": "/paie", "destination": "/equipe/paie"},
   {"source": "/paie/parametres", "destination": "/equipe/paie/reglages"},
   {"source": "/paie/:userId", "destination": "/equipe/paie/:userId"},
-  {"source": "/payroll", "destination": "/equipe/paie/heures"}
+  {"source": "/payroll", "destination": "/equipe/paie/heures"},
+  {"source": "/messenger", "destination": "/communication/messenger"},
+  {"source": "/intranet", "destination": "/communication/intranet"},
+  {"source": "/alerts", "destination": "/communication/alertes"},
+  {"source": "/support", "destination": "/communication/assistance"},
+  {"source": "/admin/organizations", "destination": "/admin/organisation"},
+  {"source": "/admin/billing", "destination": "/admin/abonnement"},
+  {"source": "/reporting", "destination": "/dashboard/reporting"},
+  {"source": "/guide", "destination": "/aide/guide"},
+  {"source": "/faq", "destination": "/aide/faq"}
 ]
