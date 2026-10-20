@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
-import { choixRegroupement, ficheDeLAffectation } from "@/lib/colis/fiche-du-jour";
+import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
@@ -73,21 +73,12 @@ export async function POST(req: Request) {
 
   const start_at = parisWallTimeToUtcISOString(date, time);
   const conducteur = { id: driver_id, organization_id: user.organization_id };
-  const avecFiche = date >= aujourdhuiParis();
 
   // Autre affectation ou fiche ouverte ce jour-là : demander séparées ou
   // reliées avant d'inscrire quoi que ce soit (plusieurs affectations dans
   // la journée restent normales, jamais bloquées).
-  if (avecFiche && !regroupement) {
-    try {
-      const choix = await choixRegroupement(supabase, conducteur, date);
-      if (choix?.requis) {
-        return NextResponse.json({ choix_requis: true, existantes: choix.existantes, fiches_ouvertes: choix.fiches_ouvertes }, { status: 409 });
-      }
-    } catch (e) {
-      console.warn("[colis/affectations] Choix séparée/reliée non vérifié", { driverId: driver_id, date, error: e instanceof Error ? e.message : e });
-    }
-  }
+  const choix = await questionAvantAffectation(supabase, conducteur, date, regroupement, "colis/affectations");
+  if (choix) return NextResponse.json({ choix_requis: true, ...choix }, { status: 409 });
 
   const { data: assignment, error } = await supabase.from("planning_entries").insert({
     organization_id: user.organization_id,
@@ -115,18 +106,7 @@ export async function POST(req: Request) {
 
   // Fiche colis du chauffeur (jour même ou à venir). Un échec ici n'annule
   // pas l'affectation : le chauffeur peut toujours créer sa fiche lui-même.
-  let fiche: { id: string; name: string | null } | null = null;
-  let ficheWarning: string | null = null;
-  if (avecFiche) {
-    try {
-      const r = await ficheDeLAffectation(supabase, conducteur, assignment, date, regroupement ?? "separee");
-      fiche = { id: r.run.id, name: r.run.name ?? null };
-      ficheWarning = r.warning ?? null;
-    } catch (e) {
-      console.error("[colis/affectations] Fiche colis non créée", { driverId: driver_id, date, error: e instanceof Error ? e.message : e });
-      ficheWarning = "Tournée inscrite au planning, mais la fiche Tournée colis n'a pas pu être préparée : le chauffeur peut la créer avec « Nouvelle tournée ».";
-    }
-  }
+  const { fiche, warning: ficheWarning } = await ficheApresAffectation(supabase, conducteur, assignment, date, regroupement, "colis/affectations");
 
   return NextResponse.json({ assignment, fiche, warning: [warning, ficheWarning].filter(Boolean).join(" ") || null }, { status: 201 });
 }

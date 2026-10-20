@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { monthCalendarDays, addMonths } from "@/lib/planning/dates";
+import { monthCalendarDays, addMonths, currentMonth, parisCalendarDate } from "@/lib/planning/dates";
 
 interface PlanningEntry {
   id: string;
@@ -14,7 +14,7 @@ interface PlanningEntry {
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const MAX_VISIBLE_PER_DAY = 3;
 
-/** Calendar-grid month overview — read-only (click a day to drill into the day view), good for spotting gaps/overload at a glance. */
+/** Vue d'ensemble du mois, en lecture : un clic sur un jour ouvre la vue Jour (où l'on ajoute et duplique). */
 export function PlanningMonthView({
   entries,
   month,
@@ -38,7 +38,7 @@ export function PlanningMonthView({
 
   const entriesByDay = new Map<string, PlanningEntry[]>();
   for (const e of entries) {
-    const day = e.start_at.slice(0, 10);
+    const day = parisCalendarDate(e.start_at);
     entriesByDay.set(day, [...(entriesByDay.get(day) ?? []), e]);
   }
 
@@ -53,6 +53,9 @@ export function PlanningMonthView({
         </span>
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(addMonths(month, 1))}>
           Mois suiv. →
+        </button>
+        <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => navTo(currentMonth())} disabled={month === currentMonth()}>
+          Ce mois-ci
         </button>
       </div>
 
