@@ -2,7 +2,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { estFicheSupplementaire, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { ficheClotureeDuJour, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { assurerListesVillages, listesAvecVillages, planningEtVillages, villagesDeRoute, type VillageDuJour } from "@/lib/colis/villages-serveur";
 
 async function contexte(runId: string | null) {
@@ -31,10 +31,8 @@ export async function GET(req: Request) {
   // Choix manuel (sans planning) : villages de la tournée-modèle choisie.
   const routeId = url.searchParams.get("route_id");
   const planningOuModele = async () => {
-    // Fiche supplémentaire : le planning du jour est déjà fait sur la fiche clôturée.
-    const p = (await estFicheSupplementaire(supabase, appUser, run))
-      ? { passages: [], villages: [] as VillageDuJour[] }
-      : await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date);
+    // Fiche supplémentaire : seulement les tournées affectées après la fiche clôturée du jour.
+    const p = await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run));
     if (!routeId || !z.string().uuid().safeParse(routeId).success) return p;
     const { data: route } = await supabase.from("tour_routes").select("id").eq("id", routeId).eq("organization_id", appUser.organization_id).maybeSingle();
     return { passages: p.passages, villages: route ? await villagesDeRoute(supabase, route.id) : [] };
@@ -109,10 +107,8 @@ export async function POST(req: Request) {
     const { data: route } = await supabase.from("tour_routes").select("id").eq("id", parsed.data.route_id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!route) return NextResponse.json({ error: "Tournée-modèle introuvable." }, { status: 404 });
     villages = await villagesDeRoute(supabase, route.id);
-  } else if (await estFicheSupplementaire(supabase, appUser, run)) {
-    villages = [];
   } else {
-    villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date)).villages;
+    villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run))).villages;
   }
   const coches = new Set(parsed.data.village_ids);
   const manquants = villages.filter((v) => !coches.has(v.id));

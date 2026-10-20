@@ -18,7 +18,7 @@ export async function moduleActif(supabase: SupabaseClient, organizationId: stri
 }
 
 /** Point de départ par défaut : dépôt du premier service du chauffeur, sinon celui de l'entreprise. */
-async function depotDuChauffeur(supabase: SupabaseClient, appUser: AppUser) {
+async function depotDuChauffeur(supabase: SupabaseClient, appUser: Pick<AppUser, "id" | "organization_id">) {
   const [{ data: services }, { data: org }] = await Promise.all([
     supabase.from("user_services").select("services(name, depot_address, depot_lat, depot_lng)").eq("user_id", appUser.id),
     supabase.from("organizations").select("depot_address, depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
@@ -44,7 +44,8 @@ export async function listerTournees(supabase: SupabaseClient, appUser: AppUser)
     .order("run_date")
     .order("created_at");
   return ((data ?? []) as any[])
-    .filter((r) => r.run_date === today || r.status !== "done")
+    // Une tournée clôturée quitte l'écran du jour : elle est dans l'historique.
+    .filter((r) => r.status !== "done")
     .map(({ delivery_stops, ...r }) => ({
       ...r,
       nbArrets: (delivery_stops ?? []).length,
@@ -73,8 +74,7 @@ export async function planningDuJour(supabase: SupabaseClient, driverId: string,
   return { vehicleId: duJour.find((e) => e.vehicle_id)?.vehicle_id ?? null, serviceId: duJour.find((e) => e.service_id)?.service_id ?? null };
 }
 
-export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, name: string | null) {
-  const date = aujourdhuiParis();
+export async function creerTournee(supabase: SupabaseClient, appUser: Pick<AppUser, "id" | "organization_id">, name: string | null, date: string = aujourdhuiParis()) {
   const [start, jour, { data: liens }] = await Promise.all([
     depotDuChauffeur(supabase, appUser),
     planningDuJour(supabase, appUser.id, date).catch(() => ({ vehicleId: null, serviceId: null })),
@@ -105,19 +105,21 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
 /** Une tournée du chauffeur connecté (jamais celle d'un autre). */
 /**
  * Fiche supplémentaire : le chauffeur a déjà clôturé une autre fiche ce
- * jour-là. Ses tournées planifiées (et leurs villages) ont été chargées et
- * confirmées sur cette première fiche ; la suivante part sans planning.
+ * jour-là. Renvoie la date de création de la dernière (les tournées
+ * planifiées avant elle y ont été chargées ; seules celles affectées
+ * ensuite viennent sur la nouvelle fiche), ou null s'il n'y en a pas.
  */
-export async function estFicheSupplementaire(supabase: SupabaseClient, appUser: AppUser, run: { id: string; run_date: string }): Promise<boolean> {
+export async function ficheClotureeDuJour(supabase: SupabaseClient, appUser: Pick<AppUser, "id">, run: { id: string; run_date: string }): Promise<string | null> {
   const { data } = await supabase
     .from("delivery_runs")
-    .select("id")
+    .select("created_at")
     .eq("driver_id", appUser.id)
     .eq("run_date", run.run_date)
     .eq("status", "done")
     .neq("id", run.id)
+    .order("created_at", { ascending: false })
     .limit(1);
-  return (data ?? []).length > 0;
+  return ((data ?? []) as { created_at: string }[])[0]?.created_at ?? null;
 }
 
 export async function tourneeParId(supabase: SupabaseClient, appUser: AppUser, id: string) {

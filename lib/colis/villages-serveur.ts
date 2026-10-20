@@ -42,20 +42,26 @@ const jourParis = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: 
  * Passages planifiés du chauffeur ce jour-là (avec un numéro de tournée) et
  * villages correspondants, dans l'ordre des passages puis des villages.
  * Ne lève jamais : planning indisponible = aucun passage.
+ *
+ * `affecteesApres` (fiche supplémentaire) : seulement les tournées inscrites
+ * au planning après cette date, celles d'avant ayant été chargées sur la
+ * fiche déjà clôturée du jour.
  */
-export async function planningEtVillages(supabase: SupabaseClient, organizationId: string, driverId: string, date: string): Promise<{ passages: PassagePlanning[]; villages: VillageDuJour[] }> {
+export async function planningEtVillages(supabase: SupabaseClient, organizationId: string, driverId: string, date: string, affecteesApres: string | null = null): Promise<{ passages: PassagePlanning[]; villages: VillageDuJour[] }> {
   const veille = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString();
   const lendemain = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString();
   const { data: entries, error } = await supabase
     .from("planning_entries")
-    .select("id, tour_number, service_id, vehicle_id, start_at, status, services(name), vehicles(registration)")
+    .select("id, tour_number, service_id, vehicle_id, start_at, status, created_at, services(name), vehicles(registration)")
     .eq("organization_id", organizationId)
     .eq("driver_id", driverId)
     .gte("start_at", veille)
     .lt("start_at", lendemain)
     .order("start_at");
   if (error) return { passages: [], villages: [] };
-  const duJour = ((entries ?? []) as any[]).filter((e) => e.tour_number && e.status !== "cancelled" && jourParis(e.start_at) === date);
+  const duJour = ((entries ?? []) as any[]).filter(
+    (e) => e.tour_number && e.status !== "cancelled" && jourParis(e.start_at) === date && (!affecteesApres || Date.parse(e.created_at) > Date.parse(affecteesApres)),
+  );
   if (!duJour.length) return { passages: [], villages: [] };
 
   const numeros = [...new Set(duJour.map((e) => String(e.tour_number)))];

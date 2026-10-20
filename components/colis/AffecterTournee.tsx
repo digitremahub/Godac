@@ -6,7 +6,7 @@ type Option = { id: string; name?: string; full_name?: string; registration?: st
 type TourOption = { id: string; tour_number: string; service_id: string | null };
 type Data = { services: Option[]; drivers: Option[]; vehicles: Option[]; tours: TourOption[]; today: string };
 
-export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; onCreated: (runId: string) => void }) {
+export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; onCreated: (runId: string | null, message: string) => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [service, setService] = useState("");
   const [driver, setDriver] = useState("");
@@ -37,9 +37,10 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
       });
       const d = await r.json();
       if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Création impossible");
-      if (!d.run?.id) throw new Error(d.pickupWarning || "La tournée a été créée, mais son identifiant est manquant. Rechargez la page.");
-      onCreated(d.run.id);
-      if (d.pickupWarning) setMessage(d.pickupWarning);
+      // Affectation = planning + fiche Tournée colis du chauffeur (créée ou complétée).
+      const nom = data?.drivers.find((x) => x.id === driver)?.full_name ?? "le chauffeur";
+      const avertissement = typeof d.warning === "string" && d.warning ? ` ${d.warning}` : "";
+      onCreated(d.fiche?.id ?? null, d.fiche?.id ? `Tournée n°${number} affectée à ${nom} : sa fiche colis est prête.${avertissement}` : `Tournée n°${number} inscrite au planning de ${nom}.${avertissement}`);
     } catch (e) { setMessage(e instanceof Error ? e.message : "Création impossible"); }
     finally { setBusy(false); }
   }
@@ -50,7 +51,7 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
             <h2 id="creer-tournee-direction" className="text-lg font-semibold">Créer une tournée colis</h2>
-            <p className="mt-1 text-sm text-navy/65">Choisissez le service, la tournée habituelle, le chauffeur et le véhicule. Cette affectation ponctuelle ne modifie pas le Planning.</p>
+            <p className="mt-1 text-sm text-navy/65">Choisissez le service, la tournée habituelle, le chauffeur et le véhicule. La tournée est inscrite au planning et la fiche Tournée colis du chauffeur est préparée (villages, ramasses, points relais). Un chauffeur peut avoir plusieurs tournées dans la journée : elles sont regroupées sur sa fiche.</p>
           </div>
           <button type="button" className="btn-ghost !px-2 !py-1" disabled={busy} onClick={onClose} aria-label="Fermer">✕</button>
         </div>
