@@ -15,7 +15,20 @@ export const parametresEntrepriseSchema = z.object({
   single_meal_allowance: montant.nullable(),
   snack_allowance: montant.nullable(),
   overnight_allowance: montant.nullable(),
+  // Modèle transport (migration 20261024000003) : facultatifs.
+  ccn_salarial_rate: taux.nullable().optional(),
+  ccn_patronal_rate: taux.nullable().optional(),
+  health_pmss_salarial_rate: taux.nullable().optional(),
+  health_pmss_patronal_rate: taux.nullable().optional(),
+  dfs_enabled: z.boolean().optional(),
+  dfs_rate: taux.nullable().optional(),
 });
+
+/** Colonnes ajoutées par 20261024000003 : retirées si la migration n'est pas encore passée. */
+export const COLONNES_MODELE_TRANSPORT = {
+  reglages: ["ccn_salarial_rate", "ccn_patronal_rate", "health_pmss_salarial_rate", "health_pmss_patronal_rate", "dfs_enabled", "dfs_rate"],
+  profil: ["job_group", "meal_rate", "leave_balance_n1", "leave_balance_n", "leave_balance_date"],
+} as const;
 
 export const profilSchema = z.object({
   regime: z.enum(["grand_routier", "courte_distance", "sedentaire"]),
@@ -24,6 +37,12 @@ export const profilSchema = z.object({
   hourly_rate: z.coerce.number().positive().max(1000),
   contractual_hours: z.coerce.number().positive().max(300),
   pas_rate: taux.nullable(),
+  // Modèle transport (migration 20261024000003) : facultatifs.
+  job_group: z.string().trim().max(20).nullable().optional(),
+  meal_rate: montant.nullable().optional(),
+  leave_balance_n1: z.coerce.number().min(0).max(100).nullable().optional(),
+  leave_balance_n: z.coerce.number().min(0).max(100).nullable().optional(),
+  leave_balance_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 export const variablesSchema = z.object({
@@ -49,4 +68,11 @@ export const variablesSchema = z.object({
     .max(20)
     .default([]),
   personnesACharge: z.coerce.number().int().min(0).max(20).default(0),
+  heuresSup25: z.coerce.number().min(0).max(200).nullable().optional(),
+  heuresSup50: z.coerce.number().min(0).max(200).nullable().optional(),
+  periodesConges: z
+    .array(z.object({ du: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), au: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), jours: z.coerce.number().min(0).max(31) }))
+    .max(10)
+    .optional(),
+  tauxRepas: z.coerce.number().min(0).max(100).nullable().optional(),
 });

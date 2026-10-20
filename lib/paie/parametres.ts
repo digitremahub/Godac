@@ -111,6 +111,29 @@ export function parametresLegauxAu(date: string): ParametresLegaux {
 }
 
 /**
+ * Modèle de paie par défaut d'une entreprise de transport (IDCC 16),
+ * repris de bulletins réels de chauffeur livreur VL (taux et structure
+ * seulement) : prévoyance 0,63 % + 0,63 %, complémentaire santé 2,01 % +
+ * 2,01 % du PMSS, cotisations conventionnelles 0,025 % + 0,525 %, AT
+ * 5,40 %, repas 16,36 €, DFS 17 % affichée pour mémoire (non appliquée).
+ * Sert quand l'entreprise n'a pas encore enregistré ses réglages de paie,
+ * et de valeurs proposées dans les réglages.
+ */
+export const MODELE_TRANSPORT = {
+  entreprise: {
+    effectif: 1,
+    tauxAccidentTravail: 5.4,
+    tauxVersementMobilite: 0,
+    prevoyance: { salarial: 0.63, patronal: 0.63 },
+    mutuelle: { salarial: 0, patronal: 0 },
+    santePmss: { salarial: 2.01, patronal: 2.01 },
+    conventionnelles: { salarial: 0.025, patronal: 0.525 },
+    dfs: { taux: 17, active: false },
+    frais: { repas: 16.36, repasUnique: 10.07, cassecroute: 8.87, grandDeplacement: 52.31 },
+  },
+} as const satisfies { entreprise: import("@/lib/paie/types").ParametresEntreprise };
+
+/**
  * Frais de déplacement de la convention des transports routiers
  * (IDCC 16, protocole frais de déplacement) — valeurs par défaut,
  * remplaçables par l'entreprise dans les réglages de paie.

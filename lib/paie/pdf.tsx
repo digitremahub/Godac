@@ -70,12 +70,67 @@ export interface BulletinPdfData {
     matricule: string | null;
     secu: string | null;
     coefficient: string | null;
+    groupe?: string | null;
     statut: string;
     entree: string | null;
     contrat: string | null;
   };
   cumuls: { brut: number; netImposable: number; heuresSupExonerees: number };
   conges: { pris: number };
+  /** Pied de bulletin : totaux du mois et de l'année, compteurs de congés N-1 / N. */
+  pied?: {
+    totaux: { libelle: string; mois: number; annee: number; heures?: boolean }[];
+    conges: { n1: { acquis: number; pris: number; solde: number }; n: { acquis: number; pris: number; solde: number } } | null;
+  };
+}
+
+const sp = StyleSheet.create({
+  wrap: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
+  box: { borderWidth: 1, borderColor: "#B8BEC9", borderRadius: 3, padding: 5 },
+  row: { flexDirection: "row" },
+  th: { fontSize: 6.6, fontWeight: 700, paddingVertical: 1, paddingHorizontal: 2 },
+  td: { fontSize: 6.6, paddingVertical: 0.8, paddingHorizontal: 2 },
+});
+
+function Pied({ pied }: { pied: NonNullable<BulletinPdfData["pied"]> }) {
+  const largeur = `${Math.floor(78 / Math.max(pied.totaux.length, 1))}%`;
+  return (
+    <View style={sp.wrap} wrap={false}>
+      <View style={[sp.box, { width: pied.conges ? "70%" : "100%" }]}>
+        <View style={sp.row}>
+          <Text style={[sp.th, { width: "22%" }]}>Totaux</Text>
+          {pied.totaux.map((t) => (
+            <Text key={t.libelle} style={[sp.th, { width: largeur, textAlign: "right" }]}>{t.libelle}</Text>
+          ))}
+        </View>
+        {(["mois", "annee"] as const).map((k) => (
+          <View key={k} style={sp.row}>
+            <Text style={[sp.td, { width: "22%" }]}>{k === "mois" ? "Mois" : "Année"}</Text>
+            {pied.totaux.map((t) => (
+              <Text key={t.libelle} style={[sp.td, { width: largeur, textAlign: "right" }]}>{t.heures ? num(t[k]) : eur(t[k])}</Text>
+            ))}
+          </View>
+        ))}
+      </View>
+      {pied.conges && (
+        <View style={[sp.box, { width: "28.5%" }]}>
+          <View style={sp.row}>
+            {["Congés", "Acquis", "Pris", "Solde"].map((h) => (
+              <Text key={h} style={[sp.th, { width: "25%", textAlign: h === "Congés" ? "left" : "right" }]}>{h}</Text>
+            ))}
+          </View>
+          {([["N-1", pied.conges.n1], ["N", pied.conges.n]] as const).map(([l, c]) => (
+            <View key={l} style={sp.row}>
+              <Text style={[sp.td, { width: "25%" }]}>{l}</Text>
+              <Text style={[sp.td, { width: "25%", textAlign: "right" }]}>{num(c.acquis)}</Text>
+              <Text style={[sp.td, { width: "25%", textAlign: "right" }]}>{num(c.pris)}</Text>
+              <Text style={[sp.td, { width: "25%", textAlign: "right" }]}>{num(c.solde)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 }
 
 function Ligne({ l }: { l: LigneBulletin }) {
@@ -113,7 +168,7 @@ function BulletinDoc({ d }: { d: BulletinPdfData }) {
             <Text style={[s.strong, { marginTop: 4 }]}>{d.salarie.nom}</Text>
             {d.salarie.adresse && <Text style={s.line}>{d.salarie.adresse}</Text>}
             <Text style={s.line}>
-              {[d.salarie.emploi, d.salarie.statut, d.salarie.coefficient && `Coef. ${d.salarie.coefficient}`].filter(Boolean).join(" · ")}
+              {[d.salarie.emploi, d.salarie.statut, d.salarie.groupe && `Groupe ${d.salarie.groupe}`, d.salarie.coefficient && `Coef. ${d.salarie.coefficient}`].filter(Boolean).join(" · ")}
             </Text>
             <Text style={s.line}>
               {[d.salarie.matricule && `Matricule ${d.salarie.matricule}`, d.salarie.secu && `N° SS ${d.salarie.secu}`].filter(Boolean).join(" · ")}
@@ -172,7 +227,9 @@ function BulletinDoc({ d }: { d: BulletinPdfData }) {
             <View style={s.infoLine}><Text>Montant net social</Text><Text>{eur(b.netSocial)} €</Text></View>
             <View style={s.infoLine}><Text>Net imposable</Text><Text>{eur(b.netImposable)} €</Text></View>
             <View style={s.infoLine}><Text>Impôt sur le revenu (taux {num(b.tauxPas)} %)</Text><Text>− {eur(b.montantPas)} €</Text></View>
+            {(b.reintegrationSante ?? 0) > 0 && <View style={s.infoLine}><Text>dont réintégration fiscale santé (part employeur)</Text><Text>{eur(b.reintegrationSante ?? 0)} €</Text></View>}
             {b.fraisNonSoumis > 0 && <View style={s.infoLine}><Text>Frais et indemnités non soumis</Text><Text>+ {eur(b.fraisNonSoumis)} €</Text></View>}
+            {b.totalDu !== undefined && <View style={s.infoLine}><Text>Total dû (net + indemnités non soumises)</Text><Text>{eur(b.totalDu)} €</Text></View>}
             {(b.totalRetenues ?? 0) > 0 && <View style={s.infoLine}><Text>Acomptes et saisies (détail ci-dessus)</Text><Text>− {eur(b.totalRetenues)} €</Text></View>}
             {b.heuresSupExonerees > 0 && <View style={s.infoLine}><Text>Heures supplémentaires exonérées d'impôt</Text><Text>{eur(b.heuresSupExonerees)} €</Text></View>}
             <View style={s.infoLine}><Text>Total versé par l'employeur</Text><Text>{eur(b.coutEmployeur)} €</Text></View>
@@ -185,6 +242,7 @@ function BulletinDoc({ d }: { d: BulletinPdfData }) {
             <Text style={s.netValue}>{eur(b.netAPayer)} €</Text>
           </View>
         </View>
+        {d.pied && <Pied pied={d.pied} />}
 
         <Text style={s.footer} fixed>
           Dans votre intérêt et pour vous aider à faire valoir vos droits, conservez ce bulletin de paie sans limitation de durée.

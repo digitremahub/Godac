@@ -15,6 +15,8 @@ interface LeaveRow {
   reason: string | null;
   isOwn: boolean;
   overlapWith: string[];
+  /** Solde de congés du demandeur et effet de cette demande. */
+  solde?: { disponible: number; jours: number; insuffisant: boolean } | null;
 }
 
 const STATUS_LABELS: Record<LeaveRow["status"], string> = {
@@ -135,6 +137,11 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                   >
                     {STATUS_LABELS[leave.status]}
                   </span>
+                  {leave.solde && (
+                    <p className={`mt-1 text-xs ${leave.solde.insuffisant ? "font-semibold text-orange-ink" : "text-navy/60"}`}>
+                      {leave.solde.jours} j ouvr. · solde {leave.solde.disponible} j{leave.solde.insuffisant ? " · solde insuffisant" : ""}
+                    </p>
+                  )}
                   {leave.overlapWith.length > 0 && (
                     <p className="mt-1 text-xs text-orange-ink">
                       <IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Chevauche le congé de {leave.overlapWith.join(", ")}

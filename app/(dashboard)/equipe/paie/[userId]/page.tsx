@@ -79,6 +79,7 @@ export default async function PaieSalariePage({ params, searchParams }: { params
         joursTravailles={joursTravailles}
         dejaGenere={Boolean(ctx.bulletinExistant)}
         avertissementsAcomptes={ctx.acomptes.avertissements}
+        repriseConges={ctx.repriseConges}
       />
     </div>
   );

@@ -1,12 +1,13 @@
 import "server-only";
 import { statutValide, type StatutValidation } from "@/lib/paie/validation";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parametresLegauxAu, FRAIS_CONVENTIONNELS } from "@/lib/paie/parametres";
+import { parametresLegauxAu, FRAIS_CONVENTIONNELS, MODELE_TRANSPORT } from "@/lib/paie/parametres";
 import { HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
 import { countWeekdays } from "@/lib/business/payroll";
 import { PRESENCE_STATUS } from "@/lib/organization/poles";
 import { acomptesDuBulletin, type AcomptesDuBulletin } from "@/lib/paie/acomptes";
 import { acomptesJusquAu } from "@/lib/paie/acomptes-serveur";
+import { periodesDuMois, soldeConges, type Reprise, type SoldeConges } from "@/lib/paie/conges";
 import type { ParametresEntreprise, ParametresLegaux, ProfilSalarie, RegimeTransport, VariablesMois } from "@/lib/paie/types";
 
 /** "2026-10" → bornes du mois (fin incluse). */
@@ -22,7 +23,18 @@ export function moisValide(mois: string | undefined): mois is string {
 
 export async function parametresEntreprise(supabase: SupabaseClient, organizationId: string): Promise<ParametresEntreprise> {
   const { data: p } = await supabase.from("payroll_settings").select("*").eq("organization_id", organizationId).maybeSingle();
+  // Pas encore de réglages : modèle transport (IDCC 16) par défaut.
+  if (!p) return { ...MODELE_TRANSPORT.entreprise, prevoyance: { ...MODELE_TRANSPORT.entreprise.prevoyance }, mutuelle: { ...MODELE_TRANSPORT.entreprise.mutuelle }, santePmss: { ...MODELE_TRANSPORT.entreprise.santePmss }, conventionnelles: { ...MODELE_TRANSPORT.entreprise.conventionnelles }, dfs: { ...MODELE_TRANSPORT.entreprise.dfs }, frais: { ...MODELE_TRANSPORT.entreprise.frais } };
+  const nombre = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  // Colonnes du modèle transport (migration 20261024000003) : absentes = modèle par défaut.
+  const ccnSal = "ccn_salarial_rate" in p ? nombre(p.ccn_salarial_rate) : MODELE_TRANSPORT.entreprise.conventionnelles.salarial;
+  const ccnPat = "ccn_patronal_rate" in p ? nombre(p.ccn_patronal_rate) : MODELE_TRANSPORT.entreprise.conventionnelles.patronal;
+  const santeSal = nombre(p.health_pmss_salarial_rate);
+  const santePat = nombre(p.health_pmss_patronal_rate);
   return {
+    conventionnelles: ccnSal !== null || ccnPat !== null ? { salarial: ccnSal ?? 0, patronal: ccnPat ?? 0 } : null,
+    santePmss: santeSal !== null || santePat !== null ? { salarial: santeSal ?? 0, patronal: santePat ?? 0 } : null,
+    dfs: { taux: nombre(p.dfs_rate) ?? MODELE_TRANSPORT.entreprise.dfs.taux, active: Boolean(p.dfs_enabled) },
     effectif: p?.headcount ?? 1,
     tauxAccidentTravail: Number(p?.accident_rate ?? 0),
     tauxVersementMobilite: Number(p?.mobility_rate ?? 0),
@@ -54,6 +66,12 @@ export interface ContextePaie {
    * JJ/MM »), relus en base : jamais saisis ni repris du navigateur.
    */
   acomptes: AcomptesDuBulletin;
+  /** Compteurs de congés payés N-1 / N à la fin du mois (pied de bulletin). */
+  conges: SoldeConges;
+  /** Solde de reprise saisi au profil (N-1, N, date). */
+  repriseConges: Reprise | null;
+  /** Cumuls de l'année pour le pied de bulletin (bulletins validés antérieurs). */
+  cumulsPied: { heures: number; heuresSup: number; brut: number; plafondSs: number; netImposable: number; chargesPatronales: number; coutGlobal: number; totalVerse: number; allegements: number };
   bulletinExistant: {
     id: string;
     variables: VariablesMois | null;
@@ -101,7 +119,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .gte("end_date", debut),
     supabase
       .from("payslips")
-      .select("gross_amount, net_taxable, overtime_exempt")
+      .select("gross_amount, net_taxable, overtime_exempt, net_amount, employer_cost, details")
       .eq("user_id", userId)
       // Cumuls annuels : seuls les bulletins validés par la direction comptent.
       .eq("validation_status", "valide")
@@ -128,6 +146,14 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     // Demandes d'acompte acceptées jusqu'à ce mois (lib/paie/acomptes.ts).
     acomptesJusquAu(supabase, userId, debut),
   ]);
+  // Congés validés des deux dernières périodes : compteurs N-1 / N.
+  const { data: congesValides } = await supabase
+    .from("leave_requests")
+    .select("start_date, end_date")
+    .eq("driver_id", userId)
+    .eq("status", "approved")
+    .gte("end_date", `${Number(mois.slice(0, 4)) - 2}-06-01`)
+    .lte("start_date", fin);
 
   const regime = (profil?.regime ?? "courte_distance") as RegimeTransport;
   const heuresContrat = Number(profil?.contractual_hours ?? contrat?.contractual_monthly_hours ?? HEURES_EQUIVALENCE[regime]);
@@ -156,6 +182,31 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     return n + countWeekdays(s, e);
   }, 0);
 
+  type Details = { heures?: { base?: number; sup25?: number; sup50?: number }; reductionGenerale?: number; totalPatronal?: number; brut?: number } | null;
+  const cumulsPied = (anterieurs ?? []).reduce(
+    (c, p) => {
+      const d = (p.details ?? null) as Details;
+      return {
+        heures: c.heures + Number(d?.heures?.base ?? 0) + Number(d?.heures?.sup25 ?? 0) + Number(d?.heures?.sup50 ?? 0),
+        heuresSup: c.heuresSup + Number(d?.heures?.sup25 ?? 0) + Number(d?.heures?.sup50 ?? 0),
+        brut: c.brut + Number(p.gross_amount ?? 0),
+        plafondSs: c.plafondSs + parametresLegauxAu(debut).pmss,
+        netImposable: c.netImposable + Number(p.net_taxable ?? 0),
+        chargesPatronales: c.chargesPatronales + Number(d?.totalPatronal ?? 0),
+        coutGlobal: c.coutGlobal + Number(p.employer_cost ?? 0),
+        totalVerse: c.totalVerse + Number(p.net_amount ?? 0),
+        allegements: c.allegements + Number(d?.reductionGenerale ?? 0),
+      };
+    },
+    { heures: 0, heuresSup: 0, brut: 0, plafondSs: 0, netImposable: 0, chargesPatronales: 0, coutGlobal: 0, totalVerse: 0, allegements: 0 },
+  );
+  const repriseConges: Reprise | null =
+    profil?.leave_balance_date && (profil.leave_balance_n1 !== null || profil.leave_balance_n !== null)
+      ? { au: String(profil.leave_balance_date), n1: Number(profil.leave_balance_n1 ?? 0), n: Number(profil.leave_balance_n ?? 0) }
+      : null;
+  const listeConges = (congesValides ?? []).map((c) => ({ du: String(c.start_date), au: String(c.end_date) }));
+  const compteursConges = soldeConges({ reprise: repriseConges, aujourdhui: fin, valides: listeConges.filter((c) => c.du <= fin) });
+
   const cumuls = (anterieurs ?? []).reduce(
     (c, p) => ({
       brut: c.brut + Number(p.gross_amount ?? 0),
@@ -180,6 +231,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     salarie: {
       regime,
       cadre: Boolean(profil?.is_cadre),
+      groupe: (profil?.job_group as string | null | undefined) ?? null,
+      tauxRepas: profil?.meal_rate === null || profil?.meal_rate === undefined ? null : Number(profil.meal_rate),
       tauxHoraire: Math.round(tauxHoraire * 10000) / 10000,
       heuresContractuelles: heuresContrat,
       tauxPas: profil?.pas_rate !== null && profil?.pas_rate !== undefined ? Number(profil.pas_rate) : null,
@@ -190,7 +243,14 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       heuresTravaillees: toursMois.length ? Math.round(heuresTours * 100) / 100 : null,
       heuresAbsenceNonPayee: 0,
       joursCongesPris: joursConges,
-      primes: [],
+      // Reprises du mois précédent (bulletin validé), à vérifier : primes
+      // et taux du panier. Les heures sup. et les congés sont propres au mois.
+      primes: ((precedent?.variables as VariablesMois | null)?.primes ?? []).filter((p) => p.montant),
+      tauxRepas: (precedent?.variables as VariablesMois | null)?.tauxRepas ?? null,
+      heuresSup25: null,
+      heuresSup50: null,
+      // Congés validés du mois, avec leurs dates, en jours ouvrables.
+      periodesConges: periodesDuMois(listeConges, debut, fin),
       nbRepas: joursTravailles,
       nbRepasUnique: 0,
       nbCasseCroute: 0,
@@ -202,6 +262,9 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     },
     cumuls,
     acomptes,
+    conges: compteursConges,
+    repriseConges,
+    cumulsPied,
     bulletinExistant: existant
       ? {
           id: existant.id,

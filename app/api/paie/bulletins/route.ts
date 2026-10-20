@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         matricule: dossier?.matricule ?? null,
         secu: dossier?.social_security_number ?? null,
         coefficient: ctx.coefficient,
+        groupe: ctx.salarie.groupe ?? null,
         statut: ctx.salarie.cadre ? "Cadre" : "Non-cadre",
         entree: dossier?.hire_date ? jour(dossier.hire_date) : null,
         contrat: dossier?.contract_type ? (CONTRATS[dossier.contract_type] ?? dossier.contract_type) : null,
@@ -87,6 +88,20 @@ export async function POST(req: Request) {
         heuresSupExonerees: ctx.cumuls.heuresSupExonerees + bulletin.heuresSupExonerees,
       },
       conges: { pris: variables.joursCongesPris },
+      pied: {
+        totaux: [
+          { libelle: "Heures", mois: bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heures + bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
+          { libelle: "H. sup.", mois: bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heuresSup + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
+          { libelle: "Brut", mois: bulletin.brut, annee: ctx.cumulsPied.brut + bulletin.brut },
+          { libelle: "Plafond SS", mois: ctx.legal.pmss, annee: ctx.cumulsPied.plafondSs + ctx.legal.pmss },
+          { libelle: "Net imposable", mois: bulletin.netImposable, annee: ctx.cumulsPied.netImposable + bulletin.netImposable },
+          { libelle: "Ch. patronales", mois: bulletin.totalPatronal, annee: ctx.cumulsPied.chargesPatronales + bulletin.totalPatronal },
+          { libelle: "Coût global", mois: bulletin.coutEmployeur, annee: ctx.cumulsPied.coutGlobal + bulletin.coutEmployeur },
+          { libelle: "Total versé", mois: bulletin.netAPayer, annee: ctx.cumulsPied.totalVerse + bulletin.netAPayer },
+          { libelle: "Allègements", mois: bulletin.reductionGenerale, annee: ctx.cumulsPied.allegements + bulletin.reductionGenerale },
+        ],
+        conges: { n1: ctx.conges.n1, n: ctx.conges.n },
+      },
     });
   } catch (e) {
     console.error("paie: rendu PDF impossible", e);

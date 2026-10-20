@@ -1,7 +1,7 @@
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { profilSchema } from "@/lib/paie/schemas";
+import { COLONNES_MODELE_TRANSPORT, profilSchema } from "@/lib/paie/schemas";
 
 /** Profil de paie d'un salarié (régime, statut, taux horaire, heures, taux PAS). Direction uniquement. */
 export async function PUT(req: Request, { params }: { params: Promise<{ userId: string }> }) {
@@ -15,9 +15,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ userId: 
   const supabase = await createServerSupabaseClient();
   const { data: user } = await supabase.from("users").select("id").eq("id", userId).eq("organization_id", appUser.organization_id).maybeSingle();
   if (!user) return NextResponse.json({ error: "Salarié introuvable." }, { status: 404 });
-  const { error } = await supabase
-    .from("payroll_profiles")
-    .upsert({ user_id: userId, organization_id: appUser.organization_id, ...parsed.data, updated_at: new Date().toISOString() });
+  const ligne = { user_id: userId, organization_id: appUser.organization_id, ...parsed.data, updated_at: new Date().toISOString() };
+  let { error } = await supabase.from("payroll_profiles").upsert(ligne);
+  // Colonnes du modèle transport absentes (migration 20261024000003 pas encore passée) : on enregistre le reste.
+  if (error && COLONNES_MODELE_TRANSPORT.profil.some((c) => error!.message.includes(c))) {
+    const sans = Object.fromEntries(Object.entries(ligne).filter(([k]) => !(COLONNES_MODELE_TRANSPORT.profil as readonly string[]).includes(k)));
+    ({ error } = await supabase.from("payroll_profiles").upsert(sans));
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
