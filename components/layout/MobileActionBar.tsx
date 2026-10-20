@@ -24,18 +24,20 @@ const ICONES: Record<IconeBarre, (props: { className?: string }) => React.ReactN
  */
 export function MobileActionBar({
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   hasActiveTour,
   onPlus,
 }: {
   role: UserRole;
+  conduit?: boolean;
   enabledModuleKeys: string[];
   hasActiveTour: boolean;
   /** Ouvre le tiroir du menu. */
   onPlus: () => void;
 }) {
   const pathname = usePathname() ?? "";
-  const items = boutonsBarreMobile(role, new Set(enabledModuleKeys), hasActiveTour);
+  const items = boutonsBarreMobile(role, new Set(enabledModuleKeys), hasActiveTour, conduit);
   if (items.length === 0) return null;
 
   const classe = (active: boolean) =>

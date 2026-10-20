@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["route_optimizer"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur", "manager", "direction"])) return NextResponse.json({ error: "Réservé aux chauffeurs et à l'encadrement." }, { status: 403 });
+  if (!hasRole(appUser.role, ["chauffeur", "manager", "direction"])) return NextResponse.json({ error: "Réservé aux chauffeurs et à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

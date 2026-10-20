@@ -11,18 +11,21 @@ export function VehicleActionsPanel({
   vehicleId,
   vehicleType,
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   hasActiveTourHere,
 }: {
   vehicleId: string;
   vehicleType: VehicleType;
   role: UserRole;
+  /** Chauffeur, ou manager qui conduit aussi. */
+  conduit?: boolean;
   enabledModuleKeys: string[];
   hasActiveTourHere: boolean;
 }) {
   const [showWash, setShowWash] = useState(false);
   const enabled = new Set(enabledModuleKeys);
-  const canDriveTours = role === "chauffeur" || role === "manager_chauffeur";
+  const canDriveTours = conduit;
 
   if (showWash) {
     return (

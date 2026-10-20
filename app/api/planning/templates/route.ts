@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-const writeRoles = ["direction", "manager", "manager_chauffeur"] as const;
+const writeRoles = ["direction", "manager"] as const;
 
 const createSchema = z.object({
   service_id: z.string().uuid(),

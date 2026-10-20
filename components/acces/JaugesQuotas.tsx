@@ -22,7 +22,7 @@ export async function JaugesQuotas({
   seuil?: number;
   className?: string;
 }) {
-  if (!["direction", "manager", "manager_chauffeur"].includes(role)) return null;
+  if (!["direction", "manager"].includes(role)) return null;
   const etats = (await etatQuotas(organizationId, fonctions)).filter((e) => e.inclus !== null && e.inclus > 0 && (e.utilise / e.inclus) * 100 >= seuil);
   if (etats.length === 0) return null;
   return (

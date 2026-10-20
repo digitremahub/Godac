@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["rental_providers"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Réservé aux responsables et à la direction." }, { status: 403 });
   }
   const supabase = await createServerSupabaseClient();

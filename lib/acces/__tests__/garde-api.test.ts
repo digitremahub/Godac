@@ -9,7 +9,7 @@ vi.mock("@/lib/organization/modules", () => ({ getEnabledModuleKeys: () => modul
 
 import { garderApi, regleEffective, refusPour } from "@/lib/acces/garde-api";
 
-const u = (role: string) => ({ id: "u1", organization_id: "o1", role, full_name: "X", email: "x@y", active: true, pending_approval: false });
+const u = (role: string, conduit = role === "chauffeur") => ({ id: "u1", organization_id: "o1", role, full_name: "X", email: "x@y", active: true, pending_approval: false, can_drive: conduit, conduit });
 
 beforeEach(() => {
   utilisateur.mockReset();
@@ -73,6 +73,18 @@ describe("règle effective", () => {
     expect(refusPour(r, "direction", new Set(["fines", "ocr"]))).toBeNull();
   });
   it("sans écran ni rôles : tout membre", () => {
-    expect(regleEffective({}).roles).toHaveLength(5);
+    expect(regleEffective({}).roles).toHaveLength(4);
+  });
+});
+
+describe("écrans de conduite côté API", () => {
+  it("manager sans « conduit aussi » refusé, manager qui conduit accepté", async () => {
+    utilisateur.mockResolvedValue(u("manager"));
+    modules.mockResolvedValue(["planning"]);
+    const r = await garderApi({ ecran: "moi.tournee_depart" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(await r.reponse.json()).toMatchObject({ code: "ROLE_REFUSE" });
+    utilisateur.mockResolvedValue(u("manager", true));
+    expect((await garderApi({ ecran: "moi.tournee_depart" })).ok).toBe(true);
   });
 });

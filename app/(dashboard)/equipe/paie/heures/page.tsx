@@ -9,6 +9,7 @@ import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } fro
 import { computeHourlyRates } from "@/lib/business/payroll";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 interface BadgeEntry {
   user_id: string;
@@ -96,7 +97,7 @@ export default async function PayrollPage({
 
   const [{ data: drivers }, { data: contracts }, { data: badgeData }, { data: toursData }, { data: planningSpans }, { data: existingPayslips }, { depotsFor }] =
     await Promise.all([
-      supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+      supabase.from("users").select("id, full_name").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
       // Separate table (not a column on `users`, whose RLS lets any org
       // member read any row) — see 20260101000077.
       supabase.from("user_contracts").select("user_id, monthly_gross_salary, monthly_net_salary, contractual_monthly_hours"),

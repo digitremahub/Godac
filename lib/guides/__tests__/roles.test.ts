@@ -3,7 +3,7 @@ import { GUIDES, guideDe, guideFiltre } from "@/lib/guides/roles";
 
 describe("guides par rôle", () => {
   it("un guide pour chacun des 5 rôles", () => {
-    expect(GUIDES.map((g) => g.role).sort()).toEqual(["chauffeur", "comptable", "direction", "manager", "manager_chauffeur"]);
+    expect(GUIDES.map((g) => g.role).sort()).toEqual(["chauffeur", "comptable", "direction", "manager"]);
   });
   it("masque les étapes des modules non souscrits", () => {
     const sans = guideFiltre(guideDe("chauffeur"), []);

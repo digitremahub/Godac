@@ -22,7 +22,7 @@ const bodySchema = z.object({
  * trip; still just a suggestion until PATCH .../confirm.
  */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
 

@@ -11,7 +11,7 @@ export type ExpectedBehavior = "répond" | "relaie" | "refuse";
 
 export interface AssistantFixture {
   question: string;
-  role: "chauffeur" | "manager" | "manager_chauffeur" | "comptable" | "direction";
+  role: "chauffeur" | "manager" | "comptable" | "direction";
   expected: ExpectedBehavior;
   note: string;
 }

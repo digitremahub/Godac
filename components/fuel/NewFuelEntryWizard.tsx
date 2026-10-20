@@ -67,7 +67,7 @@ export function NewFuelEntryWizard({
 }: {
   vehicles: VehicleOption[];
   tanks: TankOption[];
-  /** Tous les chauffeurs/manager_chauffeur actifs — fourni uniquement aux rôles autorisés à saisir un plein pour quelqu'un d'autre (manager/manager_chauffeur/direction), pour une saisie de secours (téléphone en panne, urgence) sans badge à scanner. */
+  /** Tous les chauffeurs/manager_chauffeur actifs — fourni uniquement aux rôles autorisés à saisir un plein pour quelqu'un d'autre (manager/direction), pour une saisie de secours (téléphone en panne, urgence) sans badge à scanner. */
   employees?: EmployeeOption[];
   ocrEnabled: boolean;
   initialVehicleId?: string;

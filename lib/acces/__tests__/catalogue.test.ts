@@ -135,7 +135,7 @@ describe("décision d'accès", () => {
     expect(deciderAcces(ecran("flotte.amendes"), "manager", tout).ok).toBe(true);
     expect(deciderAcces(ecran("flotte.amendes"), "comptable", tout).ok).toBe(true);
     expect(deciderAcces(ecran("equipe.pointage"), "manager", tout).ok).toBe(true);
-    expect(deciderAcces(ecran("equipe.conges_calendrier"), "manager_chauffeur", tout).ok).toBe(true);
+    expect(deciderAcces(ecran("equipe.conges_calendrier"), "manager", tout).ok).toBe(true);
     expect(deciderAcces(ecran("equipe.utilisateurs"), "manager", tout).ok).toBe(true);
     expect(deciderAcces(ecran("equipe.paie"), "comptable", tout).ok).toBe(true);
     expect(deciderAcces(ecran("equipe.paie_salarie"), "comptable", tout).ok).toBe(true);
@@ -207,6 +207,34 @@ describe("menu par rôle", () => {
     expect(entreeActive(e, "/exploitation/suivi")?.id).toBe("exploitation.colis");
     const c = menuPour("chauffeur", tout).flatMap((s) => s.ecrans);
     expect(entreeActive(c, urlDe("moi.planning"))?.id).toBe("moi.planning");
+  });
+});
+
+describe("manager qui conduit (décision client du 20/10/2026)", () => {
+  const tout = new Set<string>(MODULES_AVEC_CODE);
+
+  it("plus aucun rôle manager_chauffeur dans le catalogue", () => {
+    expect(TOUS_LES_ROLES).toEqual(["chauffeur", "manager", "comptable", "direction"]);
+    for (const e of ECRANS) expect(e.roles as readonly string[], e.id).not.toContain("manager_chauffeur");
+  });
+
+  it("les écrans de conduite exigent de conduire", () => {
+    expect(deciderAcces(ecran("moi.tournee_depart"), "manager", tout)).toMatchObject({ ok: false, motif: "role", conducteur: true });
+    expect(deciderAcces(ecran("moi.tournee_depart"), "manager", tout, true).ok).toBe(true);
+    expect(deciderAcces(ecran("moi.tournee_depart"), "chauffeur", tout).ok).toBe(true);
+    expect(deciderAcces(ecran("moi.tournee_depart"), "direction", tout, true).ok).toBe(false);
+  });
+
+  it("menu du manager qui conduit : Mon espace de conduite en plus de l'encadrement", () => {
+    const sans = menuPour("manager", tout).flatMap((s) => s.ecrans.map((e) => e.id));
+    const avec = menuPour("manager", tout, true).flatMap((s) => s.ecrans.map((e) => e.id));
+    for (const id of ["moi.tournee_depart", "moi.planning", "moi.vehicule", "moi.amendes"]) {
+      expect(sans, id).not.toContain(id);
+      expect(avec, id).toContain(id);
+    }
+    expect(avec).toContain("moi.fiches_paie");
+    expect(avec).toContain("exploitation.planning");
+    expect(avec).toContain("equipe.utilisateurs");
   });
 });
 

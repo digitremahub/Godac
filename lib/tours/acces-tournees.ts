@@ -3,14 +3,14 @@ import type { UserRole } from "@/lib/types/domain";
 /**
  * Qui voit quoi sur « Tournées & villages ».
  *
- * - Chefs d'équipe (manager, manager_chauffeur) et direction : toutes les
+ * - Chefs d'équipe (manager) et direction : toutes les
  *   tournées, la carte, les incohérences, et la modification des fiches.
  * - Tous les autres rôles (chauffeurs en tête) : une liste en lecture
  *   seule des tournées de leurs services (et des tournées « tous
  *   services »), plus celles sur lesquelles ils sont planifiés. Ni carte,
  *   ni modification, ni tournées d'autres services.
  */
-export const GESTION_TOURNEES: UserRole[] = ["manager", "manager_chauffeur", "direction"];
+export const GESTION_TOURNEES: UserRole[] = ["manager", "direction"];
 
 export function peutGererTournees(role: UserRole): boolean {
   return GESTION_TOURNEES.includes(role);

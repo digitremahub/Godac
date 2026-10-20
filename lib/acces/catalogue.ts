@@ -15,9 +15,14 @@
 
 import type { UserRole } from "@/lib/types/domain";
 
-export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"];
-export const ENCADREMENT: readonly UserRole[] = ["manager", "manager_chauffeur", "direction"];
-export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager_chauffeur"];
+export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
+export const ENCADREMENT: readonly UserRole[] = ["manager", "direction"];
+/**
+ * Rôles « terrain » : chauffeur, et manager qui conduit aussi
+ * (users.can_drive). Les écrans marqués `conducteur` exigent en plus que la
+ * personne conduise : un manager sans can_drive en est exclu.
+ */
+export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager"];
 
 /** Clés réelles de la table `modules` qui correspondent à du code. */
 export const MODULES_AVEC_CODE = [
@@ -159,6 +164,11 @@ export interface Ecran {
   href: string;
   /** Rôles autorisés à ouvrir l'écran (garde de page). */
   roles: readonly UserRole[];
+  /**
+   * Réservé aux personnes qui conduisent : chauffeur, ou manager avec
+   * can_drive (lib/roles/conducteurs.ts).
+   */
+  conducteur?: boolean;
   /** Rôles qui voient l'entrée dans le menu (par défaut : `roles`). */
   rolesMenu?: readonly UserRole[];
   /** Modules tous requis (ET). */
@@ -215,6 +225,7 @@ export const ECRANS: readonly Ecran[] = [
     libelleSousOnglet: "Départ",
     href: "/moi/tournee/depart",
     roles: TERRAIN,
+    conducteur: true,
     modules: ["planning"],
     icone: "clock",
     mobile: "barre",
@@ -226,6 +237,7 @@ export const ECRANS: readonly Ecran[] = [
     libelleSousOnglet: "Retour",
     href: "/moi/tournee/retour",
     roles: TERRAIN,
+    conducteur: true,
     modules: ["planning"],
     icone: "flag",
     mobile: "barre",
@@ -237,34 +249,34 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "J'entre pour un collègue",
     libelleSousOnglet: "Pour un collègue",
     href: "/moi/tournee/collegue",
-    roles: ["chauffeur", "manager_chauffeur", "manager", "direction"],
-    rolesMenu: ["chauffeur", "manager_chauffeur", "manager"],
+    roles: ["chauffeur", "manager", "direction"],
+    rolesMenu: ["chauffeur", "manager"],
     modules: ["planning"],
     icone: "users",
     mobile: "plus",
     parent: "moi.tournee_depart",
   }),
-  E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/moi/planning", roles: TERRAIN, modules: ["planning"], icone: "calendar", mobile: "plus" }),
-  E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/moi/vehicule", roles: TERRAIN, icone: "truck", mobile: "plus" }),
+  E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/moi/planning", roles: TERRAIN, conducteur: true, modules: ["planning"], icone: "calendar", mobile: "plus" }),
+  E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/moi/vehicule", roles: TERRAIN, conducteur: true, icone: "truck", mobile: "plus" }),
   E({
     id: "moi.signaler",
     section: "moi",
     libelle: "Signaler un problème",
     href: "/moi/signaler",
     // Tout rôle qui conduit ou reçoit un véhicule peut signaler (QR véhicule).
-    roles: ["chauffeur", "manager_chauffeur", "manager", "direction"],
+    roles: ["chauffeur", "manager", "direction"],
     rolesMenu: ["chauffeur"],
     modules: ["maintenance_requests"],
     icone: "wrench",
     mobile: "plus",
   }),
-  E({ id: "moi.amendes", section: "moi", libelle: "Mes amendes", href: "/moi/amendes", roles: TERRAIN, modules: ["fines"], icone: "file", mobile: "plus" }),
+  E({ id: "moi.amendes", section: "moi", libelle: "Mes amendes", href: "/moi/amendes", roles: TERRAIN, conducteur: true, modules: ["fines"], icone: "file", mobile: "plus" }),
   E({
     id: "moi.fiches_paie",
     section: "moi",
     libelle: "Mes fiches de paie",
     href: "/moi/fiches-de-paie",
-    roles: ["chauffeur", "manager", "manager_chauffeur", "comptable"],
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["payslips"],
     icone: "coins",
     mobile: "plus",
@@ -276,7 +288,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Mon pointage",
     href: "/moi/pointage",
-    roles: ["chauffeur", "manager", "manager_chauffeur", "comptable"],
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["time_clock"],
     icone: "clock",
     mobile: "plus",
@@ -287,7 +299,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Mes congés",
     href: "/moi/conges",
-    roles: ["chauffeur", "manager", "manager_chauffeur", "comptable"],
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["leave_management"],
     icone: "calendar",
     mobile: "plus",
@@ -310,7 +322,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "exploitation",
     libelle: "Tournées & villages",
     href: "/exploitation/tournees",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    roles: ["direction", "manager", "chauffeur"],
     modulesAuMoinsUn: ["planning", "route_optimizer"],
     icone: "map",
     note: "chauffeur : lecture",
@@ -320,7 +332,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "exploitation",
     libelle: "Tournée colis",
     href: "/exploitation/colis",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    roles: ["direction", "manager", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
     aussiActif: ["/exploitation/suivi"],
@@ -345,7 +357,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Rapports de tournée",
     libelleSousOnglet: "Rapports",
     href: "/exploitation/historique/rapports",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     modules: ["planning"],
     icone: "file",
     parent: "exploitation.historique",
@@ -358,7 +370,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Photos de tournée",
     libelleSousOnglet: "Photos",
     href: "/exploitation/historique/photos",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     modules: ["planning"],
     icone: "camera",
     parent: "exploitation.historique",
@@ -370,7 +382,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Tournées colis passées",
     libelleSousOnglet: "Tournées colis",
     href: "/exploitation/historique/colis",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    roles: ["direction", "manager", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
     parent: "exploitation.historique",
@@ -382,7 +394,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Contestations clients",
     libelleOnglet: "Contestations",
     href: "/exploitation/contestations",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    roles: ["direction", "manager", "chauffeur"],
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
@@ -394,7 +406,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Véhicules",
     href: "/flotte/vehicules",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     modules: ["fleet"],
     icone: "truck",
     alternative: { chauffeur: "/moi/vehicule" },
@@ -405,7 +417,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Fiche véhicule",
     href: "/flotte/vehicules/[id]",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     modules: ["fleet"],
     icone: "truck",
     menu: "cache",
@@ -461,7 +473,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Amendes",
     href: "/flotte/amendes",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     modules: ["fines"],
     icone: "file",
     alternative: { chauffeur: "/moi/amendes" },
@@ -477,7 +489,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "carburant",
     libelle: "Cuves",
     href: "/carburant/cuves",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     icone: "cylinder",
     aussiActif: ["/carburant/approvisionnements"],
   }),
@@ -486,7 +498,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "carburant",
     libelle: "Approvisionnements",
     href: "/carburant/approvisionnements",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     menu: "onglet",
     icone: "cylinder",
   }),
@@ -516,7 +528,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "equipe",
     libelle: "Fiche salarié",
     href: "/equipe/utilisateurs/[id]",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    roles: ["direction", "manager", "comptable"],
     icone: "users",
     menu: "cache",
   }),
@@ -656,16 +668,19 @@ export type MotifRefus = "role" | "module";
 
 export type DecisionAcces =
   | { ok: true }
-  | { ok: false; motif: "role"; rolesAutorises: readonly UserRole[]; redirection?: string }
+  | { ok: false; motif: "role"; rolesAutorises: readonly UserRole[]; redirection?: string; conducteur?: boolean }
   | { ok: false; motif: "module"; modules: readonly CleModule[] };
 
 /**
  * Décision pure : rôle d'abord, puis modules. Partagée par la garde de
  * page, la garde d'API et le menu.
  */
-export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): DecisionAcces {
+export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): DecisionAcces {
   if (!e.roles.includes(role)) {
     return { ok: false, motif: "role", rolesAutorises: e.roles, redirection: e.alternative?.[role] };
+  }
+  if (e.conducteur && !conduit) {
+    return { ok: false, motif: "role", rolesAutorises: e.roles, redirection: e.alternative?.[role], conducteur: true };
   }
   const manquants = (e.modules ?? []).filter((m) => !modulesActifs.has(m));
   if (manquants.length > 0) return { ok: false, motif: "module", modules: manquants };
@@ -676,25 +691,25 @@ export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
 }
 
 /** Onglet visible (barre de section ou sous-onglets), sans tenir compte du parent. */
-function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
   if (e.menu === "cache") return false;
   if (!(e.rolesMenu ?? e.roles).includes(role)) return false;
-  return deciderAcces(e, role, modulesActifs).ok;
+  return deciderAcces(e, role, modulesActifs, conduit).ok;
 }
 
 /** Le parent de cet écran est visible : l'écran n'est qu'un sous-onglet. */
-function estSousOngletVisible(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+function estSousOngletVisible(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
   if (!e.parent) return false;
   const p = PAR_ID.get(e.parent);
-  return Boolean(p && estOuvrableEnOnglet(p, role, modulesActifs));
+  return Boolean(p && estOuvrableEnOnglet(p, role, modulesActifs, conduit));
 }
 
 /** Entrée de menu visible pour ce rôle et ces modules. */
-export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
   if (e.menu === "onglet") return false;
   if (e.saufModule && modulesActifs.has(e.saufModule)) return false;
-  if (estSousOngletVisible(e, role, modulesActifs)) return false;
-  return estOuvrableEnOnglet(e, role, modulesActifs);
+  if (estSousOngletVisible(e, role, modulesActifs, conduit)) return false;
+  return estOuvrableEnOnglet(e, role, modulesActifs, conduit);
 }
 
 /** Préfixe d'URL de chaque section (les onglets hors préfixe, comme /account, n'y figurent pas). */
@@ -731,28 +746,28 @@ function versOnglet(e: Ecran): OngletEcran {
 }
 
 /** Barre d'onglets d'une section, filtrée par rôle et modules. */
-export function ongletsSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>): OngletEcran[] {
+export function ongletsSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): OngletEcran[] {
   const vus = new Set<string>();
   return ECRANS.filter(
-    (e) => e.section === section && dansSection(e) && estOuvrableEnOnglet(e, role, modulesActifs) && !estSousOngletVisible(e, role, modulesActifs),
+    (e) => e.section === section && dansSection(e) && estOuvrableEnOnglet(e, role, modulesActifs, conduit) && !estSousOngletVisible(e, role, modulesActifs, conduit),
   )
     .filter((e) => (vus.has(chemin(e.href)) ? false : (vus.add(chemin(e.href)), true)))
     .map(versOnglet);
 }
 
 /** Sous-onglets d'un écran parent (le parent en premier), filtrés par rôle et modules. */
-export function sousOnglets(parentId: string, role: UserRole, modulesActifs: ReadonlySet<string>): OngletEcran[] {
+export function sousOnglets(parentId: string, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): OngletEcran[] {
   const p = ecran(parentId);
-  if (!estOuvrableEnOnglet(p, role, modulesActifs)) return [];
-  const enfants = ECRANS.filter((e) => e.parent === parentId && estOuvrableEnOnglet(e, role, modulesActifs));
+  if (!estOuvrableEnOnglet(p, role, modulesActifs, conduit)) return [];
+  const enfants = ECRANS.filter((e) => e.parent === parentId && estOuvrableEnOnglet(e, role, modulesActifs, conduit));
   return [{ id: p.id, href: p.href, libelle: p.libelleSousOnglet ?? p.libelle, prefixes: [] }, ...enfants.map((e) => ({ ...versOnglet(e), libelle: e.libelleSousOnglet ?? e.libelle }))];
 }
 
 /** Premier onglet ouvrable d'une section (lien de section, URL nue /flotte…). */
-export function premierOngletSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>): string | null {
-  const o = ongletsSection(section, role, modulesActifs)[0];
+export function premierOngletSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): string | null {
+  const o = ongletsSection(section, role, modulesActifs, conduit)[0];
   if (o) return o.href;
-  const ouvrable = ECRANS.find((e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && deciderAcces(e, role, modulesActifs).ok);
+  const ouvrable = ECRANS.find((e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && deciderAcces(e, role, modulesActifs, conduit).ok);
   return ouvrable?.href ?? null;
 }
 
@@ -767,10 +782,10 @@ export interface SectionMenu {
  * Une même URL n'apparaît qu'une fois (première section gagnante), pour
  * qu'aucun rôle n'ait deux entrées vers la même page.
  */
-export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>): SectionMenu[] {
+export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
   const vus = new Set<string>();
   return SECTIONS.map((s) => {
-    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs)).filter((e) => {
+    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
       if (vus.has(e.href)) return false;
       vus.add(e.href);
       return true;
@@ -779,8 +794,8 @@ export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>): Se
   }).filter((s) => s.ecrans.length > 0);
 }
 
-export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>): Ecran[] {
-  return menuPour(role, modulesActifs).flatMap((s) => s.ecrans);
+export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): Ecran[] {
+  return menuPour(role, modulesActifs, conduit).flatMap((s) => s.ecrans);
 }
 
 /** Entrée active : la plus longue URL qui correspond, sinon un préfixe `aussiActif`. */
@@ -806,7 +821,6 @@ export function libelleRoles(roles: readonly UserRole[]): string {
   const L: Record<UserRole, string> = {
     direction: "Direction",
     manager: "Manager",
-    manager_chauffeur: "Manager-chauffeur",
     chauffeur: "Chauffeur",
     comptable: "Comptable",
   };
@@ -817,7 +831,7 @@ export function libelleRoles(roles: readonly UserRole[]): string {
 export function titreReserve(roles: readonly UserRole[]): string {
   const set = new Set(roles);
   if (set.size === 1 && set.has("direction")) return "Réservé à la direction";
-  if (set.size === 3 && ENCADREMENT.every((r) => set.has(r))) return "Réservé à l'encadrement";
+  if (set.size === ENCADREMENT.length && ENCADREMENT.every((r) => set.has(r))) return "Réservé à l'encadrement";
   if (set.size === 2 && set.has("direction") && set.has("comptable")) return "Réservé à la direction et à la comptabilité";
   return `Réservé à : ${libelleRoles(roles)}`;
 }

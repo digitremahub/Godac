@@ -28,7 +28,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   }
 
   const { role } = await searchParams;
-  const guide = guideFiltre(guideDe(role ?? appUser.role), modules);
+  const guide = guideFiltre(guideDe(role ?? appUser.role, (role ?? appUser.role) === appUser.role && appUser.conduit), modules);
 
   return (
     <div className="flex flex-col gap-6">

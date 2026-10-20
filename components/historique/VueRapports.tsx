@@ -7,6 +7,7 @@ import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable";
 import { addDays, todayISO } from "@/lib/planning/dates";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 interface PhotoRow {
   id: string;
@@ -70,7 +71,7 @@ export async function VueRapports({ params, vue, appUser, supabase }: { params: 
   const [{ data: allServices }, { data: myServiceRows }, { data: drivers }] = await Promise.all([
     isDirection ? supabase.from("services").select("id, name").order("name") : Promise.resolve({ data: null }),
     isDirection ? Promise.resolve({ data: null }) : supabase.from("user_services").select("services(id, name)").eq("user_id", appUser.id),
-    supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    supabase.from("users").select("id, full_name").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
   ]);
 
   const services = isDirection ? (allServices ?? []) : ((myServiceRows ?? []) as any[]).map((r) => r.services).filter(Boolean);

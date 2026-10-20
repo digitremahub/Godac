@@ -2,6 +2,7 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 /**
  * Bulk view of vehicle/driver QR badges for printing or reference —
@@ -9,7 +10,7 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
  * (a driver's own on /account, a vehicle's own on /v/[id] for
  * whoever's on tour with it right now, a vehicle's on the manager
  * fiche /flotte/vehicules/[id]). Direction sees the whole organisation;
- * manager/manager_chauffeur ("chefs d'équipe") see only the vehicles
+ * manager ("chefs d'équipe") see only the vehicles
  * and chauffeurs of their own service(s).
  *
  * This is a narrower read than what RLS itself allows (vehicles/users
@@ -53,7 +54,7 @@ export default async function QrCodesPage() {
   const driversQuery = supabase
     .from("users")
     .select("id, full_name, role, active")
-    .in("role", ["chauffeur", "manager_chauffeur"])
+    .or(FILTRE_CONDUCTEURS)
     .eq("active", true)
     .order("full_name");
   const { data: drivers } =

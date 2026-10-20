@@ -7,7 +7,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const bodySchema = z.object({
   full_name: z.string().min(1),
-  role: z.enum(["chauffeur", "manager_chauffeur"]),
+  // Badge + PIN : chauffeur, ou manager qui conduit aussi (can_drive).
+  role: z.enum(["chauffeur", "manager"]).default("chauffeur"),
   role_title: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
   service_id: z.string().uuid().optional(),

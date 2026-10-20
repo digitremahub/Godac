@@ -10,7 +10,7 @@ export function lienActivationModule(cle: string): string {
 }
 
 type Props =
-  | { motif: "role"; ecran?: string; rolesAutorises: readonly UserRole[] }
+  | { motif: "role"; ecran?: string; rolesAutorises: readonly UserRole[]; /** Écran réservé aux personnes qui conduisent. */ conducteur?: boolean }
   | { motif: "module"; ecran?: string; modules: readonly string[]; direction: boolean; formuleMin?: FormuleMin }
   | { motif: "limite"; titre?: string; utilise: number; inclus: number; unite: string; formule?: string; direction: boolean }
   | { motif: "pays"; ecran?: string; texte?: string };
@@ -31,6 +31,15 @@ export function EtatAcces(props: Props) {
 
   switch (props.motif) {
     case "role":
+      if (props.conducteur) {
+        titre = "Réservé aux personnes qui conduisent";
+        texte = (
+          <>
+            {props.ecran ? <>« {props.ecran} » </> : "Cet écran "}est réservé aux chauffeurs et aux managers qui conduisent aussi. La direction peut cocher « Conduit aussi » sur votre fiche.
+          </>
+        );
+        break;
+      }
       titre = titreReserve(props.rolesAutorises);
       texte = (
         <>

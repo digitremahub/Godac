@@ -17,7 +17,7 @@ const bodySchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur", "chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "chauffeur"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
   const parsed = bodySchema.safeParse(await req.json());
@@ -25,10 +25,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // Contestation par le chauffeur de sa propre amende (un manager-chauffeur
-  // peut aussi contester la sienne) ; sinon, gestion par l'encadrement.
+  // Contestation par le chauffeur de sa propre amende (un manager qui
+  // conduit peut aussi contester la sienne) ; sinon, gestion par l'encadrement.
   let contestationPersonnelle = appUser.role === "chauffeur";
-  if (appUser.role === "manager_chauffeur" && parsed.data.status === "contested" && !parsed.data.confirm && !parsed.data.notify) {
+  if (appUser.role === "manager" && appUser.conduit && parsed.data.status === "contested" && !parsed.data.confirm && !parsed.data.notify) {
     const { data: sienne } = await createAdminSupabaseClient()
       .from("fines")
       .select("id")

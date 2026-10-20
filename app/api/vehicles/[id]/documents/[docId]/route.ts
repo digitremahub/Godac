@@ -19,7 +19,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return forbidden();
+  if (!hasRole(appUser.role, ["manager", "direction"])) return forbidden();
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
@@ -39,7 +39,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const g2 = await garderApi({ roles: "tous" });
   if (!g2.ok) return g2.reponse;
   const appUser = g2.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return forbidden();
+  if (!hasRole(appUser.role, ["manager", "direction"])) return forbidden();
 
   const supabase = await createServerSupabaseClient();
   const { data: deleted, error } = await supabase

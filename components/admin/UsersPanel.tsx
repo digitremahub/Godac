@@ -23,7 +23,8 @@ interface UserRow {
   pin_set_at: string | null;
 }
 
-const PIN_DRIVER_ROLES: UserRole[] = ["chauffeur", "manager_chauffeur"];
+/** Badge + PIN : chauffeur, ou manager qui conduit aussi (créé avec « conduit aussi »). */
+const PIN_DRIVER_ROLES: UserRole[] = ["chauffeur", "manager"];
 interface ServiceOption {
   id: string;
   name: string;
@@ -47,7 +48,7 @@ function ServiceOptions({ services }: { services: ServiceOption[] }) {
   );
 }
 
-const ROLES: UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"];
+const ROLES: UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
 
 /** API routes return either a plain string (thrown Error) or a zod .flatten() object — never {message}. */
 function apiErrorMessage(error: unknown): string {

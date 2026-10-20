@@ -8,7 +8,7 @@ import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
  * Manager-like inbox for the assistant's human relay. Same
  * query-level service-scoping convention as /flotte/badges and the
  * dashboard's "tournées en cours" widget (see their own comments) —
- * direction sees every request, manager/manager_chauffeur only those
+ * direction sees every request, manager only those
  * from their own service(s) — rather than a new RLS policy, to avoid
  * widening support_requests' org-wide manager-like SELECT policy.
  */

@@ -30,7 +30,7 @@ function fauxClient(tables: Record<string, Resultat>) {
           appels.push({ table, methode, args });
           return chaine;
         };
-      for (const m of ["select", "eq", "in", "is", "update", "order", "limit"]) chaine[m] = enregistrer(m);
+      for (const m of ["select", "eq", "in", "is", "or", "update", "order", "limit"]) chaine[m] = enregistrer(m);
       chaine.then = (resolve: (r: Resultat) => unknown) => resolve({ error: null, ...tables[table] });
       return chaine;
     },
@@ -58,6 +58,8 @@ describe("compterUtilisateursLivreur", () => {
     const client = fauxClient({ users: { count: 7 } });
     expect(await compterUtilisateursLivreur(client as never, "org-1")).toBe(7);
     expect(client.appels.some((a) => a.methode === "is" && a.args[0] === "deleted_at")).toBe(false);
+    // Palier App Livreur : chauffeurs ET managers qui conduisent (can_drive).
+    expect(client.appels.some((a) => a.methode === "or" && String(a.args[0]).includes("can_drive.is.true"))).toBe(true);
   });
 
   it("lève une erreur au lieu de renvoyer 0", async () => {

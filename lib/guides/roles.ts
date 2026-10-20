@@ -218,12 +218,6 @@ export const GUIDES: GuideRole[] = [
     sections: [...ENCADREMENT, AIDE],
   },
   {
-    role: "manager_chauffeur",
-    titre: "Guide du manager-chauffeur",
-    intro: "Vous roulez et vous encadrez : vous avez à la fois les écrans du chauffeur (pointage, tournées, pleins, colis) et ceux du manager (planning, validations, flotte).",
-    sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...ENCADREMENT, AIDE],
-  },
-  {
     role: "comptable",
     titre: "Guide du comptable",
     intro: "Vous retrouvez dans GODAC les données utiles à la comptabilité : carburant, cuves, flotte, fiches de paie et export TICPE.",
@@ -259,7 +253,7 @@ export const GUIDES: GuideRole[] = [
           {
             titre: "Inviter les utilisateurs et choisir leur rôle",
             texte:
-              "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, manager-chauffeur, comptable, direction). Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
+              "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, comptable, direction) ; cochez « Conduit aussi » pour un manager qui roule, ou passez un chauffeur manager depuis sa fiche. Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
             lien: { href: "/equipe/utilisateurs", label: "Utilisateurs" },
           },
           { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/abonnement", label: "Abonnement" } },
@@ -285,7 +279,16 @@ export const GUIDES: GuideRole[] = [
   },
 ];
 
-export function guideDe(role: string | null | undefined): GuideRole {
+/** Manager qui conduit aussi (users.can_drive) : écrans du chauffeur et du manager. */
+export const GUIDE_MANAGER_CONDUCTEUR: GuideRole = {
+  role: "manager",
+  titre: "Guide du manager qui conduit",
+  intro: "Vous roulez et vous encadrez : vous avez à la fois les écrans du chauffeur (Mon espace : tournées, planning, véhicule ; pleins, colis) et ceux du manager (planning, validations, flotte).",
+  sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...ENCADREMENT, AIDE],
+};
+
+export function guideDe(role: string | null | undefined, conduit = false): GuideRole {
+  if (role === "manager" && conduit) return GUIDE_MANAGER_CONDUCTEUR;
   return GUIDES.find((g) => g.role === role) ?? GUIDES[0]!;
 }
 

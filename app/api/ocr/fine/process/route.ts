@@ -11,7 +11,7 @@ const bodySchema = z.object({ storagePath: z.string().min(1) });
 
 /** Reads a fine-notice photo already uploaded to fine-photos — same shape as app/api/ocr/tour-report/process. */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());

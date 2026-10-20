@@ -1,7 +1,6 @@
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -28,7 +27,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur"])) {
+  if (!appUser.conduit) {
     return NextResponse.json({ error: "Seuls les chauffeurs peuvent prendre ou libérer un véhicule." }, { status: 403 });
   }
 

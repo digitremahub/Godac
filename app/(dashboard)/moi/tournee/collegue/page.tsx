@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { HelpColleagueFlow } from "@/components/tours/HelpColleagueFlow";
 import { isModuleEnabled } from "@/lib/organization/modules";
 
-const HELPER_ROLES = ["chauffeur", "manager_chauffeur", "manager", "direction"];
+const HELPER_ROLES = ["chauffeur", "manager", "direction"];
 
 export default async function HelpColleaguePage({
   searchParams,

@@ -18,7 +18,7 @@ export const driverCsvRowSchema = z.object({
   full_name: z.string().min(1, "Nom requis"),
   email: z.string().email("Email invalide"),
   role: z
-    .enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"])
+    .enum(["chauffeur", "manager", "comptable", "direction"])
     .default("chauffeur"),
   phone: z.string().optional(),
   service: z.string().optional().default(""),

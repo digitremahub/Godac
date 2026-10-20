@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStripeClient } from "@/lib/stripe/client";
 import { MODULES_PAR_PALIER, prixPalier, type PalierUtilisateurs } from "@/lib/organization/paliers";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 /**
  * Utilisateurs de l'app Livreur : chauffeurs actifs et validés.
@@ -13,7 +14,7 @@ export async function compterUtilisateursLivreur(supabase: SupabaseClient, organ
     .from("users")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .in("role", ["chauffeur", "manager_chauffeur"])
+    .or(FILTRE_CONDUCTEURS)
     .eq("active", true)
     .eq("pending_approval", false);
   if (error) throw new Error(`Comptage des utilisateurs Livreur impossible : ${error.message}`);

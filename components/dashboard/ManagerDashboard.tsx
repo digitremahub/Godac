@@ -12,12 +12,12 @@ import type { AppUser } from "@/lib/auth/session";
  * A manager runs one or more services day-to-day: who's on the road
  * right now, what's waiting for a decision (OCR tickets, leave
  * requests, new drivers), and which vehicles are drinking too much
- * fuel. A manager_chauffeur additionally drives their own tours, so
+ * fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
  * they also get the same start/end-tour action a plain chauffeur has.
  */
 export async function ManagerDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
   const supabase = await createServerSupabaseClient();
-  const isManagerChauffeur = appUser.role === "manager_chauffeur";
+  const isManagerChauffeur = appUser.conduit;
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
 

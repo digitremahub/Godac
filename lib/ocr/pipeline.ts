@@ -126,7 +126,7 @@ async function markFailed(fuelEntryId: string, reason: string) {
       message: `Extraction OCR échouée pour un ticket : ${reason}. Bascule en saisie manuelle.`,
       related_table: "fuel_entries",
       related_id: fuelEntryId,
-      recipient_roles: ["manager", "manager_chauffeur"],
+      recipient_roles: ["manager"],
       service_id: vehicle?.service_id ?? null,
     });
   }

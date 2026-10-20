@@ -51,6 +51,7 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
         vehicleId={vehicle.id}
         vehicleType={vehicle.type}
         role={appUser.role}
+        conduit={appUser.conduit}
         enabledModuleKeys={enabledModuleKeys}
         hasActiveTourHere={hasActiveTourHere}
       />

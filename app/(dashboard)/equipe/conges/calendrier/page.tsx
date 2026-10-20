@@ -2,6 +2,7 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { PageHeader } from "@/components/ui";
 import { LeavePlanningCalendar } from "@/components/leaves/LeavePlanningCalendar";
 import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 /**
  * Direction's own "qui couvre qui" view — separate from the work
@@ -34,7 +35,7 @@ export default async function LeavePlanningPage({
       .lte("start_date", monthEnd)
       .gte("end_date", monthStart)
       .order("start_date"),
-    supabase.from("users").select("id, full_name, role").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    supabase.from("users").select("id, full_name, role").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
     supabase.from("user_services").select("user_id, service_id"),
   ]);
   // Décision client Q4 : les managers voient le calendrier de leur service

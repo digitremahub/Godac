@@ -1,5 +1,6 @@
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
+import { estConducteur } from "@/lib/roles/conducteurs";
 import { verifierPin } from "@/lib/auth/pin-securise";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -10,8 +11,7 @@ const bodySchema = z.object({
   pin: z.string().min(4).max(12),
 });
 
-const HELPER_ROLES = new Set(["chauffeur", "manager_chauffeur", "manager", "direction"]);
-const DRIVER_ROLES = new Set(["chauffeur", "manager_chauffeur"]);
+const HELPER_ROLES = new Set(["chauffeur", "manager", "direction"]);
 
 /**
  * « J'entre pour un collègue », step 1: the colleague's badge was scanned
@@ -55,7 +55,9 @@ export async function POST(req: Request) {
   if (!colleague.active || colleague.pending_approval) {
     return NextResponse.json({ error: "Le compte de ce collègue n'est pas actif." }, { status: 403 });
   }
-  if (!DRIVER_ROLES.has(colleague.role)) {
+  // Collègue qui conduit : chauffeur, ou manager « conduit aussi ».
+  const { data: conduite } = await admin.from("users").select("can_drive").eq("id", colleagueId).maybeSingle();
+  if (!estConducteur(colleague.role, (conduite as { can_drive?: boolean } | null)?.can_drive)) {
     return NextResponse.json({ error: "Ce badge n'est pas celui d'un chauffeur." }, { status: 422 });
   }
   if (colleague.auth_method !== "pin" || !colleague.pin_set_at || !colleague.email) {

@@ -7,7 +7,7 @@ import { TanksTab } from "@/components/tanks/VuesCuves";
 export default async function CuvesPage() {
   const g = await garderPage("carburant.cuves");
   if (!g.ok) return g.ecran;
-  const canManage = hasRole(g.appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const canManage = hasRole(g.appUser.role, ["manager", "direction"]);
   return (
     <div>
       <PageHeader title="Cuves" description="Index totaliseur en temps réel, stock et relevés photo." />

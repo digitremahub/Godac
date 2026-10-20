@@ -1,5 +1,4 @@
 import { garderPage } from "@/lib/acces/garde-page";
-import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { PageHeader, Card } from "@/components/ui";
@@ -21,7 +20,7 @@ export default async function AccountPage() {
   const g = await garderPage("aide.compte");
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
-  const isFieldRole = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
+  const isFieldRole = appUser.conduit;
 
   let pinAlreadySet = false;
   let driverCode: string | null = null;

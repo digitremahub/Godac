@@ -11,6 +11,7 @@ import { BandeauMenuReorganise } from "@/components/layout/BandeauMenuReorganise
 
 export function DashboardShell({
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   organizationName,
   logoUrl,
@@ -26,6 +27,8 @@ export function DashboardShell({
   children,
 }: {
   role: UserRole;
+  /** Chauffeur, ou manager qui conduit aussi (users.can_drive). */
+  conduit?: boolean;
   enabledModuleKeys: string[];
   organizationName?: string;
   logoUrl?: string | null;
@@ -54,7 +57,7 @@ export function DashboardShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
 
-  const showActionBar = role === "chauffeur" || role === "manager_chauffeur";
+  const showActionBar = conduit;
 
   return (
     <div className="flex min-h-screen">
@@ -73,6 +76,7 @@ export function DashboardShell({
       )}
       <Sidebar
         role={role}
+        conduit={conduit}
         enabledModuleKeys={enabledModuleKeys}
         organizationName={organizationName}
         logoUrl={logoUrl}
@@ -96,7 +100,7 @@ export function DashboardShell({
           <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus /><BandeauMenuReorganise userId={currentUserId} />{children}</div>
         </main>
       </div>
-      {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}
+      {showActionBar && <MobileActionBar role={role} conduit={conduit} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}
       <FloatingChatWidget
         assistantAvailable={assistantAvailable}
         messengerAvailable={messengerAvailable}

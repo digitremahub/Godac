@@ -7,7 +7,7 @@ import { DeliveriesTab } from "@/components/tanks/VuesCuves";
 export default async function ApprovisionnementsPage() {
   const g = await garderPage("carburant.approvisionnements");
   if (!g.ok) return g.ecran;
-  const canManage = hasRole(g.appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const canManage = hasRole(g.appUser.role, ["manager", "direction"]);
   return (
     <div>
       <PageHeader title="Approvisionnements" description="Livraisons de carburant dans les cuves." />

@@ -15,7 +15,7 @@ describe("validation des bulletins (Q1 révisée)", () => {
   });
 
   it("un non-direction ne peut ni valider ni refuser", () => {
-    for (const role of ["comptable", "manager", "chauffeur", "manager_chauffeur"] as const) {
+    for (const role of ["comptable", "manager", "chauffeur"] as const) {
       expect(deciderValidation({ role, decision: "valider", statutActuel: "en_attente" }).ok).toBe(false);
       expect(deciderValidation({ role, decision: "refuser", commentaire: "x", statutActuel: "en_attente" }).ok).toBe(false);
     }

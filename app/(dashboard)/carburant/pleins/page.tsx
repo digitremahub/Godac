@@ -9,6 +9,7 @@ import { FuelHistoryFilters } from "@/components/fuel/FuelHistoryFilters";
 import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 const PAGE_SIZE = 50;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -34,14 +35,14 @@ export default async function FuelPage({
   const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
-  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);
-  const canCreate = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
-  // Un manager_chauffeur est lui-même chauffeur — "soi-même" reste un
+  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "direction", "comptable"]);
+  const canCreate = hasRole(appUser.role, ["manager", "direction"]);
+  // Un manager qui conduit est lui-même chauffeur — "soi-même" reste un
   // choix valide par défaut. Un manager/la direction ne le sont jamais :
   // les laisser sur ce défaut soumettrait le plein au nom de leur
   // propre compte (jamais un vrai chauffeur), d'où le champ vide forcé
   // ci-dessous pour ces deux rôles tant qu'un employé n'est pas choisi.
-  const selfIsDriver = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
+  const selfIsDriver = appUser.conduit;
 
   if (wizardMode) {
     const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }, { data: driver }, { data: employees }] = await Promise.all([
@@ -56,7 +57,7 @@ export default async function FuelPage({
       // obligatoire. Les comptables ne créent jamais d'entrée (hors de
       // canCreate), donc pas de fetch pour eux.
       canCreate
-        ? supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name")
+        ? supabase.from("users").select("id, full_name").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name")
         : Promise.resolve({ data: null }),
     ]);
 

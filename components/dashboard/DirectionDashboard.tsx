@@ -10,6 +10,7 @@ import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/paris-time";
 import type { AppUser } from "@/lib/auth/session";
 import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 /**
  * Direction sees the whole organization: fleet + headcount KPIs,
@@ -44,7 +45,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     tourRowsRes,
   ] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active"),
-    supabase.from("users").select("id", { count: "exact", head: true }).in("role", ["chauffeur", "manager_chauffeur"]).eq("active", true),
+    supabase.from("users").select("id", { count: "exact", head: true }).or(FILTRE_CONDUCTEURS).eq("active", true),
     supabase
       .from("delivery_runs")
       .select("id, name, run_date, started_at, driver_id, service_id, vehicle_id")

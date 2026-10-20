@@ -54,6 +54,9 @@ export async function createPinDriver({
     phone: phone ?? null,
     auth_method: "pin",
     pending_approval: pendingApproval ?? false,
+    // Un manager créé avec badge + PIN conduit (users.can_drive) ; la colonne
+    // n'est écrite que dans ce cas (migration 20261021000002).
+    ...(role === "manager" ? { can_drive: true } : {}),
   });
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);

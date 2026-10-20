@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json());

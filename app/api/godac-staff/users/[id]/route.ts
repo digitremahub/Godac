@@ -5,7 +5,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 
 const bodySchema = z.object({
-  role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
+  role: z.enum(["chauffeur", "manager", "comptable", "direction"]).optional(),
   active: z.boolean().optional(),
 });
 

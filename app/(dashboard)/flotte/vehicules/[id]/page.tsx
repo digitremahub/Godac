@@ -19,6 +19,7 @@ import { VehicleRentalPanel, type KmSummary } from "@/components/rental/VehicleR
 import { RentalRequestsList } from "@/components/rental/RentalRequestsList";
 import { loadRentalRequests } from "@/lib/rental/load-requests";
 import { daysUntil, evaluateKmAllowance, formatKm, KM_LEVEL_LABELS } from "@/lib/rental/contract";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -90,7 +91,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         : Promise.resolve({ data: null }),
       getVehicleConsumption(supabase, id, 30),
       getVehicleConsumption(supabase, id, 90),
-      supabase.from("users").select("id, full_name").eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+      supabase.from("users").select("id, full_name").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
     ]);
   const kmActuel = await getVehicleLatestKmReading(supabase, id);
 
@@ -149,7 +150,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   ];
 
   // Module « Véhicules loués » : contrat, forfait km au prorata, demandes au loueur.
-  const canManageRental = rentalEnabled && hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const canManageRental = rentalEnabled && hasRole(appUser.role, ["manager", "direction"]);
   const today = parisCalendarDate(new Date().toISOString());
   const [rentalProviders, rentalRequests, linkedRequests] = canManageRental
     ? await Promise.all([
@@ -178,7 +179,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     .filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !requestedInterventionIds.has(i.id))
     .map((i) => ({ id: i.id as string, type: i.type as string, created_at: i.created_at as string }));
 
-  const canManageDocuments = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]);
+  const canManageDocuments = hasRole(appUser.role, ["manager", "direction"]);
   const vehicleDocuments = canManageDocuments ? await listVehicleDocuments(supabase, id) : [];
 
   return (
@@ -187,7 +188,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         title={v.registration}
         description={`${v.type} · ${v.services?.name ?? "Sans service"}`}
         actions={
-          ["manager", "manager_chauffeur", "direction"].includes(appUser.role) ? (
+          ["manager", "direction"].includes(appUser.role) ? (
             <VehicleEditPanel
               vehicleId={v.id}
               registration={v.registration}
@@ -229,7 +230,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <InterventionsPanel
             vehicleId={id}
             interventions={interventionsWithPhotos}
-            canManage={hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])}
+            canManage={hasRole(appUser.role, ["manager", "direction"])}
           />
 
           <div>

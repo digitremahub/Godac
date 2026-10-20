@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: `${appUser.full_name} demande des papiers du véhicule ${vehicle.registration}${note}`,
       related_table: "vehicles",
       related_id: vehicle.id,
-      recipient_roles: ["manager", "manager_chauffeur", "direction"],
+      recipient_roles: ["manager", "direction"],
     });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -1,4 +1,6 @@
 import { garderPage } from "@/lib/acces/garde-page";
+import { ConduiteCard } from "@/components/admin/ConduiteCard";
+import { estConducteur } from "@/lib/roles/conducteurs";
 import { PRESENCE_STATUS, estPoleBureau, libelleServiceAvecPole } from "@/lib/organization/poles";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -31,7 +33,7 @@ const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", ye
  *  - chauffeur (soi-même) : identité, son propre historique tournées/
  *    carburant et ses propres fiches de paie — jamais la rémunération
  *    (le brut/net du contrat) ni le dossier RH.
- *  - manager/manager_chauffeur (quelqu'un d'autre) : identité, congés et
+ *  - manager (quelqu'un d'autre) : identité, congés et
  *    historiques tournées/carburant — RLS les scope déjà à leur(s)
  *    service(s), pas besoin de refiltrer ici. Jamais la rémunération,
  *    les coordonnées ou le dossier RH.
@@ -52,7 +54,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const g = await garderPage("equipe.utilisateur_fiche");
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
-  const canViewOthers = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction", "comptable"]);
+  const canViewOthers = hasRole(appUser.role, ["manager", "direction", "comptable"]);
   if (!canViewOthers && id !== appUser.id) {
     redirect("/dashboard");
   }
@@ -61,7 +63,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const isSelf = id === appUser.id;
   const isDirection = appUser.role === "direction";
   const isComptable = appUser.role === "comptable";
-  const isManagerLike = hasRole(appUser.role, ["manager", "manager_chauffeur"]) && !isSelf;
+  const isManagerLike = hasRole(appUser.role, ["manager"]) && !isSelf;
   const canSeeOperational = isDirection || isManagerLike || isSelf;
   const canSeePayrollAndHr = isDirection || isComptable;
   // Rémunération/dossier RH stay direction+comptable only — but a
@@ -197,8 +199,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const qualificationBadge =
     qualificationCount >= 2 ? { label: "Polyvalent", className: "badge-gold" } : qualificationCount === 1 ? { label: "Titulaire", className: "badge-neutral" } : null;
 
-  const isFieldRole = u.role === "chauffeur" || u.role === "manager_chauffeur";
-  const canConvene = hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"]) && !isSelf;
+  // users.can_drive lu à part : la fiche reste affichable tant que la
+  // migration 20261021000002 n'est pas appliquée.
+  const { data: conduite } = await supabase.from("users").select("can_drive").eq("id", id).maybeSingle();
+  const canDrive = Boolean((conduite as { can_drive?: boolean } | null)?.can_drive);
+  const isFieldRole = estConducteur(u.role, canDrive);
+  const canConvene = hasRole(appUser.role, ["manager", "direction"]) && !isSelf;
 
   return (
     <div>
@@ -207,6 +213,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         description={ROLE_LABELS[u.role as keyof typeof ROLE_LABELS]}
         actions={canConvene ? <ConvocationButton employeeId={u.id} /> : undefined}
       />
+
+      {isDirection && !isSelf && (u.role === "chauffeur" || u.role === "manager") && (
+        <div className="mb-4">
+          <ConduiteCard userId={u.id} role={u.role} canDrive={canDrive} nom={u.full_name} />
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

@@ -26,11 +26,11 @@ export async function garderPage(id: string): Promise<ResultatGarde> {
   const appUser = await utilisateurCourant();
   if (!appUser) redirect("/onboarding");
   const modules = await modulesActifs(appUser.organization_id);
-  const decision = deciderAcces(e, appUser.role, modules);
+  const decision = deciderAcces(e, appUser.role, modules, appUser.conduit);
   if (!decision.ok) {
     if (decision.motif === "role") {
       if (decision.redirection) redirect(decision.redirection);
-      return { ok: false, ecran: <EtatAcces motif="role" ecran={e.libelle} rolesAutorises={decision.rolesAutorises} /> };
+      return { ok: false, ecran: <EtatAcces motif="role" ecran={e.libelle} rolesAutorises={decision.rolesAutorises} conducteur={decision.conducteur} /> };
     }
     return {
       ok: false,

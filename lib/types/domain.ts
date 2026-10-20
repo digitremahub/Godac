@@ -5,10 +5,14 @@
 // and prefer importing table row types from there; these stay as the
 // stable shapes business logic and UI code are written against.
 
+/**
+ * Rôles attribuables. L'ancien rôle manager_chauffeur est retiré (décision
+ * client du 20/10/2026, contrainte users_role_sans_manager_chauffeur) :
+ * un manager qui conduit a users.can_drive = true (lib/roles/conducteurs.ts).
+ */
 export type UserRole =
   | "chauffeur"
   | "manager"
-  | "manager_chauffeur"
   | "comptable"
   | "direction";
 

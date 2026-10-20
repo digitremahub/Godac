@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { longueurParcours, type Point } from "@/lib/colis/optimisation";
 import { LISTE_PRINCIPALE, ordonnerParListe, type Liste } from "@/lib/colis/listes";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 export const PAR_PAGE = 25;
 /** Période proposée par défaut : les 30 derniers jours (aujourd'hui compris). */
@@ -231,7 +232,7 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
     supabase.from("services").select("id, name").order("name"),
     supabase.from("vehicles").select("id, registration").order("registration"),
     toutes
-      ? supabase.from("users").select("id, full_name").in("role", ["chauffeur", "manager_chauffeur"]).order("full_name")
+      ? supabase.from("users").select("id, full_name").or(FILTRE_CONDUCTEURS).order("full_name")
       : Promise.resolve({ data: null as { id: string; full_name: string }[] | null }),
   ]);
   const listeRuns = (runs ?? []) as {

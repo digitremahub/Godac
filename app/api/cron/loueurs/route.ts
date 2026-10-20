@@ -53,7 +53,7 @@ export async function GET(req: Request) {
       type: "rental_contract",
       related_table: "vehicles",
       related_id: v.id,
-      recipient_roles: ["manager", "manager_chauffeur", "direction"],
+      recipient_roles: ["manager", "direction"],
       service_id: v.service_id ?? null,
     };
 
