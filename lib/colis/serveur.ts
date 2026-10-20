@@ -103,6 +103,23 @@ export async function creerTournee(supabase: SupabaseClient, appUser: AppUser, n
 }
 
 /** Une tournée du chauffeur connecté (jamais celle d'un autre). */
+/**
+ * Fiche supplémentaire : le chauffeur a déjà clôturé une autre fiche ce
+ * jour-là. Ses tournées planifiées (et leurs villages) ont été chargées et
+ * confirmées sur cette première fiche ; la suivante part sans planning.
+ */
+export async function estFicheSupplementaire(supabase: SupabaseClient, appUser: AppUser, run: { id: string; run_date: string }): Promise<boolean> {
+  const { data } = await supabase
+    .from("delivery_runs")
+    .select("id")
+    .eq("driver_id", appUser.id)
+    .eq("run_date", run.run_date)
+    .eq("status", "done")
+    .neq("id", run.id)
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
 export async function tourneeParId(supabase: SupabaseClient, appUser: AppUser, id: string) {
   const { data } = await supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("driver_id", appUser.id).maybeSingle();
   return data;

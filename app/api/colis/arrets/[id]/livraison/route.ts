@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
-import { refusCloture } from "@/lib/colis/cloture";
+import { MESSAGE_TOURNEE_CLOTUREE, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
 import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, refusPreuve, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, RETOURS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 
@@ -51,10 +51,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { data: stop } = await supabase
     .from("delivery_stops")
-    .select("id, status, notes, kind, relay_name, address, proof_photo_path, proof_photo_paths, delivery_runs(run_date)")
+    .select("id, status, notes, kind, relay_name, address, proof_photo_path, proof_photo_paths, delivery_runs(run_date, status)")
     .eq("id", id)
     .maybeSingle();
   if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  if (tourneeCloturee(stop as never)) return NextResponse.json({ error: MESSAGE_TOURNEE_CLOTUREE }, { status: 409 });
   const pointRelais = stop.kind === "point_relais";
   // Un arrêt point relais se clôture par un dépôt au relais.
   if (pointRelais && !relaisObligatoire(lieu)) return NextResponse.json({ error: "Arrêt point relais : validez le dépôt au relais." }, { status: 400 });

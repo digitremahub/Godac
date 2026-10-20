@@ -8,7 +8,7 @@ import { normaliserTelephone } from "@/lib/colis/telephone";
 import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
-import { MOTIFS_ECHEC, libelleMotif, refusCloture } from "@/lib/colis/cloture";
+import { MESSAGE_TOURNEE_CLOTUREE, MOTIFS_ECHEC, libelleMotif, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
 import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 import { reordonner } from "@/lib/colis/reordonner";
@@ -68,6 +68,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, deposer, list_id, creneau } = parsed.data;
+
+  // Tournée clôturée : plus aucune modification de ses arrêts (ni annulation
+  // d'une livraison, ni réordonnancement). La base le refuse aussi
+  // (déclencheur delivery_stops_protect_done_run).
+  const { data: arret } = await supabase.from("delivery_stops").select("id, delivery_runs(status)").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+  if (!arret) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  if (tourneeCloturee(arret)) return NextResponse.json({ error: MESSAGE_TOURNEE_CLOTUREE }, { status: 409 });
 
   if (deposer) {
     const { data: stop } = await supabase.from("delivery_stops").select("id, run_id, list_id, position").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();

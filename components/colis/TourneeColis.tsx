@@ -1377,7 +1377,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                             📷 Photo
                           </a>
                         )}
-                        {s.status !== "pending" && (
+                        {s.status !== "pending" && run.status !== "done" && (
                           <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
                             Annuler
                           </button>
