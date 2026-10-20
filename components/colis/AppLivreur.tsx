@@ -30,6 +30,12 @@ const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").the
   ssr: false,
   loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la carte…</p>,
 });
+// GO Navigation : carte plein écran, trajet suivi et toute la tournée dans une feuille glissable.
+const GoNavigation = dynamic(() => import("@/components/colis/GoNavigation").then((m) => m.GoNavigation), {
+  ssr: false,
+  loading: () => <p className="fixed inset-0 z-40 grid place-items-center bg-paper text-sm text-navy/60">Chargement de GO Navigation…</p>,
+});
+type Vue = "liste" | "carte" | "navigation";
 const MEMO_VUE = "godac-livreur-vue";
 const MEMO_PARTAGE = "godac-partage-position";
 /** Fréquence d'envoi de la position à l'exploitation pendant la tournée. */
@@ -43,7 +49,7 @@ const MEMO = "godac-tournee-colis";
  * suivantes avec leur bouton d'appel. L'écran reste allumé pendant la
  * tournée quand le téléphone le permet.
  */
-export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pays?: string }) {
+export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: string | null; pays?: string; vueInitiale?: Vue }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -58,7 +64,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
-  const [vue, setVue] = useState<"liste" | "carte">("liste");
+  const [vue, setVue] = useState<Vue>(vueInitiale ?? "liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
@@ -111,17 +117,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   }
 
   useEffect(() => {
+    // Ouverture par /livreur/navigation : la vue demandée l'emporte.
+    if (vueInitiale) return;
     try {
-      // GO Navigation retirée (demande client) : une vue « navigation »
-      // mémorisée retombe sur la liste des arrêts.
       const vueMemorisee = localStorage.getItem(MEMO_VUE);
-      if (vueMemorisee === "carte") setVue("carte");
-      else if (vueMemorisee === "navigation") localStorage.setItem(MEMO_VUE, "liste");
+      if (vueMemorisee === "carte" || vueMemorisee === "navigation") setVue(vueMemorisee);
     } catch {
       /* stockage indisponible */
     }
-  }, []);
-  function changerVue(v: "liste" | "carte") {
+  }, [vueInitiale]);
+  function changerVue(v: Vue) {
     setVue(v);
     try {
       localStorage.setItem(MEMO_VUE, v);
@@ -407,10 +412,14 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     },
   );
   const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
+  // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
+  const enNavigation = vue === "navigation" && run !== null && run.status === "in_progress";
+  const rechargerRun = useCallback(() => charger(run?.id), [charger, run?.id]);
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
     <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
+      {!enNavigation && (
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
           <Link href="/exploitation/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
@@ -466,8 +475,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               </button>
             )}
             {run.status !== "loading" && stops.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
-                {(["liste", "carte"] as const).map((v) => (
+              <div className={`mt-3 grid ${run.status === "in_progress" ? "grid-cols-3" : "grid-cols-2"} rounded-full bg-white/10 p-1 text-sm font-semibold`} role="tablist" aria-label="Affichage">
+                {(run.status === "in_progress" ? (["liste", "carte", "navigation"] as const) : (["liste", "carte"] as const)).map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -476,7 +485,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     onClick={() => changerVue(v)}
                     className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
                   >
-                    {v === "liste" ? "Arrêts" : "Carte"}
+                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "Naviguer"}
                   </button>
                 ))}
               </div>
@@ -484,6 +493,31 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
           </div>
         )}
       </header>
+      )}
+
+      {enNavigation && run && (
+        <GoNavigation
+          run={run}
+          stops={stops}
+          lists={lists}
+          horaires={horaires}
+          avancement={avancement}
+          busy={busy}
+          onFermer={() => changerVue("liste")}
+          onRecharger={rechargerRun}
+          onToast={setToast}
+          onTerminer={terminer}
+          onCloture={(s, mode) => setCloture({ stop: s, mode })}
+          onTelephone={ajouterTelephone}
+          onHoraires={setHorairesStop}
+          onFiche={setDetailsStop}
+          onPasser={passerAdresseSuivante}
+          onDeposer={deposer}
+          onReoptimiser={reoptimiser}
+          onItineraire={setItineraire}
+          onPosition={setMaPosition}
+        />
+      )}
 
       {toast && (
         <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
@@ -624,7 +658,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
       {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}
 
-      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
+      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte || enNavigation ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
         ) : !run ? (
@@ -691,6 +725,11 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               </button>
             )}
 
+            {run.status === "in_progress" && (
+              <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={() => changerVue("navigation")}>
+                <IconNavigation className="h-5 w-5 text-teal" /> Naviguer avec GO
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <a href={waze(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
                 <IconNavigation className="h-4 w-4" /> Waze

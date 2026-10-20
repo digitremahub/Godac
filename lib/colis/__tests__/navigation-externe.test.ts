@@ -3,7 +3,7 @@ import { gmaps, waze, type Stop } from "@/components/colis/commun";
 
 const arret = (p: Partial<Stop>) => ({ address: "12 rue de la Paix, 75002 Paris", lat: null, lng: null, ...p }) as Stop;
 
-describe("ouverture de l'itinéraire dans Google Maps ou Waze (GO Navigation retirée)", () => {
+describe("ouverture de l'itinéraire dans Google Maps ou Waze (bouton de GO Navigation et de l’app chauffeur)", () => {
   it("coordonnées connues : destination exacte", () => {
     expect(gmaps(arret({ lat: 48.8687, lng: 2.3317 }))).toBe("https://www.google.com/maps/dir/?api=1&destination=48.8687%2C2.3317&travelmode=driving");
     expect(waze(arret({ lat: 48.8687, lng: 2.3317 }))).toBe("https://waze.com/ul?ll=48.8687,2.3317&navigate=yes");
