@@ -53,7 +53,7 @@ export function LeavePlanningCalendar({
   const [year, monthNum] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
 
   function navTo(nextMonth: string) {
-    router.push(`/leaves/planning?month=${nextMonth}`);
+    router.push(`/equipe/conges/calendrier?month=${nextMonth}`);
   }
 
   async function setReplacement(leaveId: string, replacementDriverId: string) {

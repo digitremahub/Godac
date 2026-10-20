@@ -1,11 +1,9 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { isModuleEnabled } from "@/lib/organization/modules";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
 import { FRAIS_CONVENTIONNELS, parametresLegauxAu } from "@/lib/paie/parametres";
-import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 export default async function ReglagesPaiePage() {
   const g = await garderPage("equipe.paie_reglages");
@@ -37,7 +35,6 @@ export default async function ReglagesPaiePage() {
         title="Paie & salaires"
         description={`Ce qui est propre à votre entreprise. Les taux légaux (SMIC ${legal.smicHoraire.toFixed(2).replace(".", ",")} €, plafond de la Sécurité sociale ${legal.pmss.toLocaleString("fr-FR")} €, cotisations) sont tenus à jour par GODAC.`}
       />
-      <OngletsPaie actif="reglages" paie planning={await isModuleEnabled(supabase, appUser.organization_id, "planning")} />
       <h2 className="mb-3 text-lg">Réglages de paie</h2>
       <ReglagesPaieForm
         initial={initial}

@@ -31,5 +31,13 @@
   {"source": "/tours/history", "destination": "/exploitation/historique"},
   {"source": "/reports", "destination": "/exploitation/historique/photos", "has": [{"type": "query", "key": "view", "value": "photos"}]},
   {"source": "/reports", "destination": "/exploitation/historique/rapports"},
-  {"source": "/contestations", "destination": "/exploitation/contestations"}
+  {"source": "/contestations", "destination": "/exploitation/contestations"},
+  {"source": "/admin/users", "destination": "/equipe/utilisateurs"},
+  {"source": "/admin/users/:id", "destination": "/equipe/utilisateurs/:id"},
+  {"source": "/driver-signups", "destination": "/equipe/inscriptions"},
+  {"source": "/leaves/planning", "destination": "/equipe/conges/calendrier"},
+  {"source": "/paie", "destination": "/equipe/paie"},
+  {"source": "/paie/parametres", "destination": "/equipe/paie/reglages"},
+  {"source": "/paie/:userId", "destination": "/equipe/paie/:userId"},
+  {"source": "/payroll", "destination": "/equipe/paie/heures"}
 ]

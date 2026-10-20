@@ -34,7 +34,7 @@ export default async function PaieSalariePage({ params, searchParams }: { params
         title={`${salarie.full_name} — ${label}`}
         description={salarie.role_title ?? undefined}
         actions={
-          <Link href={`/paie?mois=${mois}`} className="btn-secondary !py-2 text-sm">
+          <Link href={`/equipe/paie?mois=${mois}`} className="btn-secondary !py-2 text-sm">
             ← Tous les salariés
           </Link>
         }

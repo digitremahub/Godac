@@ -5,7 +5,6 @@ import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 import { bornesMois, moisValide } from "@/lib/paie/donnees";
 import { addMonths, currentMonth } from "@/lib/planning/dates";
-import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
@@ -17,16 +16,13 @@ const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", curren
 export default async function PaiePage({ searchParams }: { searchParams: Promise<{ mois?: string }> }) {
   const g = await garderPage("equipe.paie");
   if (!g.ok) return g.ecran;
-  const { appUser, supabase, modules } = g;
+  const { appUser, supabase } = g;
   const direction = appUser.role === "direction";
-  const planning = modules.has("planning");
-  const onglets = <OngletsPaie actif="bulletins" paie planning={planning} reglages={direction} />;
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur)
     return (
       <div>
         <PageHeader title="Paie & salaires" />
-        {onglets}
         <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />
       </div>
     );
@@ -57,7 +53,6 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
         title="Paie & salaires"
         description="Préparez et générez les bulletins du mois : heures des tournées, congés et frais sont préremplis, les cotisations calculées automatiquement."
       />
-      {onglets}
       {enAttente.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm">
           <span>
@@ -69,17 +64,17 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
       )}
       {!reglages && direction && (
         <p className="mb-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm">
-          Commencez par les <Link href="/paie/parametres" className="font-semibold underline">réglages de paie</Link> : effectif, taux accident du travail,
+          Commencez par les <Link href="/equipe/paie/reglages" className="font-semibold underline">réglages de paie</Link> : effectif, taux accident du travail,
           prévoyance et mutuelle.
         </p>
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Link href={`/paie?mois=${addMonths(mois, -1)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <Link href={`/equipe/paie?mois=${addMonths(mois, -1)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           ← Préc.
         </Link>
         <span className="text-sm font-semibold capitalize">{label}</span>
-        <Link href={`/paie?mois=${addMonths(mois, 1)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
+        <Link href={`/equipe/paie?mois=${addMonths(mois, 1)}`} className="btn-secondary !px-3 !py-1.5 text-sm">
           Suiv. →
         </Link>
       </div>
@@ -106,7 +101,7 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
             const b = bulletinDe.get(s.id);
             return (
               <li key={s.id}>
-                <Link href={`/paie/${s.id}?mois=${mois}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-navy/[0.03] sm:px-5">
+                <Link href={`/equipe/paie/${s.id}?mois=${mois}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-navy/[0.03] sm:px-5">
                   <span>
                     <span className="font-semibold">{s.full_name}</span>
                     <span className="ml-2 text-sm text-navy/55">{s.role_title ?? ""}</span>

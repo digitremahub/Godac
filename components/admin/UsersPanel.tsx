@@ -378,7 +378,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     {isEditing ? (
                       <input aria-label="Nom" className="input !py-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
                     ) : (
-                      <Link href={`/admin/users/${u.id}`} className="text-teal-ink hover:underline">
+                      <Link href={`/equipe/utilisateurs/${u.id}`} className="text-teal-ink hover:underline">
                         {u.full_name}
                       </Link>
                     )}

@@ -9,7 +9,7 @@ import type { Coordinates } from "@/lib/business/fuel-profitability";
  * (organizations.depot_lat/lng) always included too as a shared
  * fallback/extra candidate. Used by classifyLocation (badge history,
  * /time-clock) and the planning-start/badge-end payroll rule
- * (/payroll) — both need "did this badge happen at a depot", not
+ * (/equipe/paie/heures) — both need "did this badge happen at a depot", not
  * "which exact depot".
  */
 export async function buildDriverDepotsMap(

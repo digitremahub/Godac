@@ -48,7 +48,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   // Self-registered via app/join/[token] — can set their PIN (that
   // route only checks auth_method/active) but not actually use the
-  // app until a manager-like/direction approves from /driver-signups.
+  // app until a manager-like/direction approves from /equipe/inscriptions.
   if (data && data.pending_approval) {
     await supabase.auth.signOut();
     return null;

@@ -44,7 +44,7 @@ function mapLink(coords: Coordinates | null) {
 /**
  * Raw clock-in/out log (Module Pointeuse Électronique) — a direction-
  * visible badge button plus history, not yet wired into payroll
- * (/payroll still reads user_contracts directly) and deliberately so
+ * (/equipe/paie/heures still reads user_contracts directly) and deliberately so
  * for now: this is a comparison tool first. Each badge is tagged
  * against the depot and the driver's own home (lib/time-clock/
  * classify-location.ts) so direction can cross-check "badged in at

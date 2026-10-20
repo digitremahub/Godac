@@ -4,7 +4,7 @@ import { NewFineForm } from "@/components/fines/NewFineForm";
 import { FinesTable, type FineRow } from "@/components/fines/FinesTable";
 
 /**
- * Direction-only — same sensitivity class as /payroll (attributing a
+ * Direction-only — same sensitivity class as /equipe/paie/heures (attributing a
  * fine to a specific employee). See app/api/fines for the create/
  * confirm/notify routes this page's components call.
  */

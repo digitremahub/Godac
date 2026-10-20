@@ -9,7 +9,6 @@ import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } fro
 import { computeHourlyRates } from "@/lib/business/payroll";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
-import { OngletsPaie } from "@/components/paie/OngletsPaie";
 
 interface BadgeEntry {
   user_id: string;
@@ -79,7 +78,6 @@ export default async function PayrollPage({
     return (
       <div>
         <PageHeader title={paie ? "Paie & salaires" : "Salaires"} />
-        <OngletsPaie actif="salaires" paie={paie} planning={planningEnabled} />
         <EtatAcces motif="module" ecran="Heures & salaires" modules={["time_clock"]} direction={appUser.role === "direction"} />
       </div>
     );
@@ -260,10 +258,9 @@ export default async function PayrollPage({
   return (
     <div>
       <PageHeader
-        title={payslipsEnabled ? "Paie & salaires" : "Salaires"}
+        title="Heures & salaires"
         description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie, ou horaire de la tournée si aucun badge ce jour-là. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
       />
-      <OngletsPaie actif="salaires" paie={payslipsEnabled} planning={planningEnabled} />
       <PayrollFilters month={month} drivers={(drivers ?? []).map((d) => ({ id: d.id, full_name: d.full_name }))} selectedDriver={selectedDriver} />
       {rows.length === 0 ? (
         <EmptyState title="Aucun chauffeur" description="Aucun chauffeur actif à afficher." />

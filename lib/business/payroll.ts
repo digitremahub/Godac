@@ -2,7 +2,7 @@
  * Un taux horaire saisi à la main dérive vite (augmentation, avenant,
  * changement d'heures contractuelles...) — la direction lit le contrat
  * une fois (salaire mensuel brut/net + heures contractuelles, voir
- * /payroll) et le taux horaire s'en déduit à chaque calcul, plutôt que
+ * /equipe/paie/heures) et le taux horaire s'en déduit à chaque calcul, plutôt que
  * d'être une valeur figée qu'on oublie de remettre à jour.
  *
  * mensualisation standard française : heures contractuelles/mois =

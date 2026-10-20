@@ -31,7 +31,7 @@ const bodySchema = z.object({
   // offers "créez votre code" again instead of "entrez votre code".
   reset_pin: z.boolean().optional(),
   // Données du contrat, lues par la direction — le taux horaire s'en
-  // déduit (lib/business/payroll.ts), voir /payroll.
+  // déduit (lib/business/payroll.ts), voir /equipe/paie/heures.
   monthly_gross_salary: z.number().min(0).max(999999.99).nullable().optional(),
   monthly_net_salary: z.number().min(0).max(999999.99).nullable().optional(),
   contractual_monthly_hours: z.number().positive().max(999.99).optional(),

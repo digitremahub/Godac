@@ -161,7 +161,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   }
 
   const pendingTiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/driver-signups" },
+    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/equipe/inscriptions" },
   ];
   if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
   if (maintenanceEnabled)

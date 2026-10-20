@@ -8,7 +8,7 @@ interface DriverOption {
   full_name: string;
 }
 
-/** Month + driver filters for /payroll. */
+/** Month + driver filters for /equipe/paie/heures. */
 export function PayrollFilters({
   month,
   drivers,
@@ -25,7 +25,7 @@ export function PayrollFilters({
     for (const [key, value] of Array.from(qs.entries())) {
       if (!value) qs.delete(key);
     }
-    router.push(`/payroll?${qs.toString()}`);
+    router.push(`/equipe/paie/heures?${qs.toString()}`);
   }
 
   return (

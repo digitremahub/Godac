@@ -234,7 +234,7 @@ export function PayrollTable({
                       // l'ancien générateur au net figé est retiré (audit E8).
                       <Link
                         className="btn-secondary !h-7 !px-2 !py-0.5 !text-xs"
-                        href={`/paie/${row.driver_id}?mois=${periodStart.slice(0, 7)}`}
+                        href={`/equipe/paie/${row.driver_id}?mois=${periodStart.slice(0, 7)}`}
                       >
                         <IconCoins className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Préparer le bulletin
                       </Link>

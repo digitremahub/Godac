@@ -98,7 +98,7 @@ export interface PayslipPdfData {
   generatedAtLabel: string;
   grossSalary: number;
   netSalary: number;
-  /** Saisis au moment de la génération (voir /payroll) — pas de cotisation calculée dessus, ajoutés tels quels au net à payer. */
+  /** Saisis au moment de la génération (voir /equipe/paie/heures) — pas de cotisation calculée dessus, ajoutés tels quels au net à payer. */
   mealVouchersAmount?: number | null;
   bonusAmount?: number | null;
   /** Base horaire contractuelle (user_contracts) — informatif, ne sert pas à recalculer le salaire. */

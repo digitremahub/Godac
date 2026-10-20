@@ -48,7 +48,7 @@ export default async function AdminUsersPage() {
                 {membres.map((u) => (
                   <tr key={u.id} className="border-t border-navy/[0.07] [&>td]:px-4 [&>td]:py-2.5">
                     <td>
-                      <Link href={`/admin/users/${u.id}`} className="font-semibold text-teal-ink hover:underline">
+                      <Link href={`/equipe/utilisateurs/${u.id}`} className="font-semibold text-teal-ink hover:underline">
                         {u.full_name}
                       </Link>
                     </td>

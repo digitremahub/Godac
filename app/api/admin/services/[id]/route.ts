@@ -15,7 +15,7 @@ const bodySchema = z.object({
   // Dépôt propre à ce service — sert de repli le dépôt de
   // l'organisation (organizations.depot_address) pour la
   // classification "🏭 Dépôt" d'un badge pointeuse, le calcul des
-  // heures planning/badge de /payroll, et l'estimation de distance
+  // heures planning/badge de /equipe/paie/heures, et l'estimation de distance
   // "retour direct à domicile" (/exploitation/historique).
   depot_address: z.string().trim().min(1).nullable().optional(),
   // Chef d'équipe du service — affiché à chaque chauffeur rattaché.

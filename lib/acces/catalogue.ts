@@ -181,8 +181,10 @@ export interface Ecran {
    * barre de sous-onglets du parent. Sinon il remonte à sa place.
    */
   parent?: string;
-  /** Libellé court de l'onglet (par défaut : `libelle`). */
+  /** Libellé court de l'onglet de section et du menu (par défaut : `libelle`). */
   libelleOnglet?: string;
+  /** Libellé dans la barre de sous-onglets (par défaut : `libelle`). */
+  libelleSousOnglet?: string;
   /** Visible dans le tiroir « Plus » de la barre mobile chauffeur. */
   mobile?: "barre" | "plus";
   icone: IconeId;
@@ -210,6 +212,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Démarrer une tournée",
     libelleOnglet: "Ma tournée",
+    libelleSousOnglet: "Départ",
     href: "/moi/tournee/depart",
     roles: TERRAIN,
     modules: ["planning"],
@@ -220,6 +223,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "moi.tournee_retour",
     section: "moi",
     libelle: "Terminer une tournée",
+    libelleSousOnglet: "Retour",
     href: "/moi/tournee/retour",
     roles: TERRAIN,
     modules: ["planning"],
@@ -231,6 +235,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "moi.tournee_collegue",
     section: "moi",
     libelle: "J'entre pour un collègue",
+    libelleSousOnglet: "Pour un collègue",
     href: "/moi/tournee/collegue",
     roles: ["chauffeur", "manager_chauffeur", "manager", "direction"],
     rolesMenu: ["chauffeur", "manager_chauffeur", "manager"],
@@ -326,6 +331,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "exploitation",
     libelle: "Historique des tournées",
     libelleOnglet: "Historique",
+    libelleSousOnglet: "Tournées",
     href: "/exploitation/historique",
     roles: TOUS_LES_ROLES,
     modules: ["planning"],
@@ -336,6 +342,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "exploitation.rapports",
     section: "exploitation",
     libelle: "Rapports de tournée",
+    libelleSousOnglet: "Rapports",
     href: "/exploitation/historique/rapports",
     roles: ["direction", "manager", "manager_chauffeur", "comptable"],
     modules: ["planning"],
@@ -348,6 +355,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "exploitation.rapports_photos",
     section: "exploitation",
     libelle: "Photos de tournée",
+    libelleSousOnglet: "Photos",
     href: "/exploitation/historique/photos",
     roles: ["direction", "manager", "manager_chauffeur", "comptable"],
     modules: ["planning"],
@@ -359,6 +367,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "exploitation.historique_colis",
     section: "exploitation",
     libelle: "Tournées colis passées",
+    libelleSousOnglet: "Tournées colis",
     href: "/exploitation/historique/colis",
     roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
     modules: ["route_optimizer"],
@@ -427,6 +436,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Demandes aux loueurs",
     libelleOnglet: "Loueurs",
+    libelleSousOnglet: "Demandes",
     href: "/flotte/loueurs",
     roles: ENCADREMENT,
     modules: ["rental_providers"],
@@ -437,6 +447,7 @@ export const ECRANS: readonly Ecran[] = [
     id: "flotte.loueurs",
     section: "flotte",
     libelle: "Loueurs & prestataires",
+    libelleSousOnglet: "Prestataires",
     href: "/flotte/loueurs/prestataires",
     roles: ENCADREMENT,
     modules: ["rental_providers"],
@@ -493,66 +504,91 @@ export const ECRANS: readonly Ecran[] = [
     id: "equipe.utilisateurs",
     section: "equipe",
     libelle: "Utilisateurs",
-    href: "/admin/users",
+    href: "/equipe/utilisateurs",
     roles: ENCADREMENT,
     icone: "users",
-    aussiActif: ["/admin/users/"],
     note: "manager : lecture de son service",
   }),
   E({
     id: "equipe.utilisateur_fiche",
     section: "equipe",
     libelle: "Fiche salarié",
-    href: "/admin/users/[id]",
+    href: "/equipe/utilisateurs/[id]",
     roles: ["direction", "manager", "manager_chauffeur", "comptable"],
     icone: "users",
     menu: "cache",
   }),
-  E({ id: "equipe.inscriptions", section: "equipe", libelle: "Chauffeurs à valider", href: "/driver-signups", roles: ENCADREMENT, icone: "users" }),
+  E({ id: "equipe.inscriptions", section: "equipe", libelle: "Chauffeurs à valider", libelleOnglet: "Inscriptions", href: "/equipe/inscriptions", roles: ENCADREMENT, icone: "users" }),
   E({
     id: "equipe.pointage",
     section: "equipe",
     libelle: "Pointage",
-    href: "/time-clock",
+    href: "/equipe/pointage",
     roles: ENCADREMENT,
     modules: ["time_clock"],
     icone: "clock",
+    alternative: { chauffeur: "/moi/pointage", comptable: "/moi/pointage" },
     note: "manager : son service",
   }),
-  E({ id: "equipe.conges", section: "equipe", libelle: "Congés & absences", href: "/leaves", roles: ENCADREMENT, modules: ["leave_management"], icone: "calendar" }),
+  E({
+    id: "equipe.conges",
+    section: "equipe",
+    libelle: "Congés & absences",
+    libelleOnglet: "Congés",
+    libelleSousOnglet: "Demandes",
+    href: "/equipe/conges",
+    roles: ENCADREMENT,
+    modules: ["leave_management"],
+    icone: "calendar",
+    alternative: { chauffeur: "/moi/conges", comptable: "/moi/conges" },
+  }),
   E({
     id: "equipe.conges_calendrier",
     section: "equipe",
     libelle: "Calendrier des congés",
-    href: "/leaves/planning",
+    libelleSousOnglet: "Calendrier",
+    href: "/equipe/conges/calendrier",
     roles: ENCADREMENT,
     modules: ["leave_management"],
     icone: "calendar",
+    parent: "equipe.conges",
     note: "manager : son service",
   }),
   E({
     id: "equipe.paie",
     section: "equipe",
     libelle: "Paie & salaires",
-    href: "/paie",
+    libelleOnglet: "Paie",
+    libelleSousOnglet: "Bulletins du mois",
+    href: "/equipe/paie",
     roles: ["direction", "comptable"],
     modules: ["payslips"],
     icone: "coins",
-    aussiActif: ["/paie/", "/payroll"],
     note: "comptable : prépare, la direction valide",
   }),
-  E({ id: "equipe.paie_salarie", section: "equipe", libelle: "Bulletin d'un salarié", href: "/paie/[userId]", roles: ["direction", "comptable"], modules: ["payslips"], icone: "coins", menu: "cache" }),
-  E({ id: "equipe.paie_reglages", section: "equipe", libelle: "Réglages de paie", href: "/paie/parametres", roles: ["direction"], modules: ["payslips"], icone: "coins", menu: "cache" }),
   E({
     id: "equipe.heures",
     section: "equipe",
-    libelle: "Salaires",
-    href: "/payroll",
+    libelle: "Heures & salaires",
+    href: "/equipe/paie/heures",
     roles: ["direction", "comptable"],
     modulesAuMoinsUn: ["planning", "time_clock"],
     saufModule: "payslips",
     icone: "coins",
+    parent: "equipe.paie",
   }),
+  E({
+    id: "equipe.paie_fiches",
+    section: "equipe",
+    libelle: "Fiches de paie",
+    href: "/equipe/paie/fiches",
+    roles: ["direction", "comptable"],
+    modules: ["payslips"],
+    icone: "coins",
+    parent: "equipe.paie",
+  }),
+  E({ id: "equipe.paie_reglages", section: "equipe", libelle: "Réglages de paie", libelleSousOnglet: "Réglages", href: "/equipe/paie/reglages", roles: ["direction"], modules: ["payslips"], icone: "coins", parent: "equipe.paie" }),
+  E({ id: "equipe.paie_salarie", section: "equipe", libelle: "Bulletin d'un salarié", href: "/equipe/paie/[userId]", roles: ["direction", "comptable"], modules: ["payslips"], icone: "coins", menu: "cache" }),
 
   // ── Communication ────────────────────────────────────────────────
   E({ id: "communication.messenger", section: "communication", libelle: "Messenger", href: "/messenger", roles: TOUS_LES_ROLES, modules: ["messenger"], icone: "chat", mobile: "barre" }),
@@ -707,7 +743,7 @@ export function sousOnglets(parentId: string, role: UserRole, modulesActifs: Rea
   const p = ecran(parentId);
   if (!estOuvrableEnOnglet(p, role, modulesActifs)) return [];
   const enfants = ECRANS.filter((e) => e.parent === parentId && estOuvrableEnOnglet(e, role, modulesActifs));
-  return [{ id: p.id, href: p.href, libelle: p.libelle, prefixes: [] }, ...enfants.map((e) => ({ ...versOnglet(e), libelle: e.libelle }))];
+  return [{ id: p.id, href: p.href, libelle: p.libelleSousOnglet ?? p.libelle, prefixes: [] }, ...enfants.map((e) => ({ ...versOnglet(e), libelle: e.libelleSousOnglet ?? e.libelle }))];
 }
 
 /** Premier onglet ouvrable d'une section (lien de section, URL nue /flotte…). */

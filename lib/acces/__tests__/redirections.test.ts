@@ -99,6 +99,16 @@ const ANCIENNES = [
   "/reports",
   "/reports?view=photos",
   "/contestations",
+  // Équipe & RH
+  "/admin/users",
+  "/admin/users/abc",
+  "/driver-signups",
+  "/leaves/planning",
+  "/paie",
+  "/paie?mois=2026-09",
+  "/paie/parametres",
+  "/paie/abc",
+  "/payroll",
 ];
 
 describe("redirections des anciennes adresses", () => {
@@ -117,6 +127,8 @@ describe("redirections des anciennes adresses", () => {
     expect(rediriger("/colis?onglet=historique")?.startsWith("/exploitation/historique/colis")).toBe(true);
     expect(rediriger("/reports?view=photos")?.startsWith("/exploitation/historique/photos")).toBe(true);
     expect(rediriger("/planning/mine?entry=abc")).toBe("/moi/planning?entry=abc");
+    expect(rediriger("/paie/parametres")).toBe("/equipe/paie/reglages");
+    expect(rediriger("/paie/u1")).toBe("/equipe/paie/u1");
     expect(rediriger("/vehicles/abc")).toBe("/flotte/vehicules/abc");
     for (const [i, r] of REGLES.entries()) {
       if (r.has) continue;

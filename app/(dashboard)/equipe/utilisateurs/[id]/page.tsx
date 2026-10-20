@@ -260,7 +260,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Rémunération</p>
               {isDirection && (
-                <Link href="/payroll" className="text-xs text-teal-ink hover:underline">
+                <Link href="/equipe/paie/heures" className="text-xs text-teal-ink hover:underline">
                   Modifier →
                 </Link>
               )}

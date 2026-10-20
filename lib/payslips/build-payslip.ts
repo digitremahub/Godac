@@ -94,7 +94,7 @@ export async function buildPayslip({
 
   if (!employee) throw new PayslipBuildError("Employé introuvable.", 404);
   if (!contract?.monthly_gross_salary || !contract?.monthly_net_salary) {
-    throw new PayslipBuildError("Salaire brut/net non renseigné pour cet employé (voir /payroll).", 422);
+    throw new PayslipBuildError("Salaire brut/net non renseigné pour cet employé (voir /equipe/paie/heures).", 422);
   }
 
   const grossAmount = Number(contract.monthly_gross_salary) + bonusAmount;

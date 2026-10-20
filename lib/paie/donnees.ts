@@ -59,7 +59,7 @@ export interface ContextePaie {
 /**
  * Tout ce qu'il faut pour préparer le bulletin d'un salarié pour un mois :
  * paramètres légaux à la date, réglages entreprise, profil de paie (avec
- * des valeurs par défaut tirées de l'ancien contrat /payroll quand le
+ * des valeurs par défaut tirées de l'ancien contrat /equipe/paie/heures quand le
  * profil n'existe pas encore), heures des tournées du mois, congés
  * validés et cumuls des bulletins déjà calculés cette année.
  */

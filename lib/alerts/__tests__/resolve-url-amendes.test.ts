@@ -11,7 +11,7 @@ describe("lien de l'alerte d'amende (I21)", () => {
     expect(resolveAlertUrl("fines", "fine_notification", "f1")).toBe("/flotte/amendes");
   });
   it("bulletins en attente de validation → Paie", () => {
-    expect(resolveAlertUrl("payslips", "payslip_validation", "p1")).toBe("/paie");
+    expect(resolveAlertUrl("payslips", "payslip_validation", "p1")).toBe("/equipe/paie");
   });
   it("les autres liens sont inchangés", () => {
     expect(resolveAlertUrl("fuel_entries", "price_anomaly", null)).toBe("/carburant/pleins");
