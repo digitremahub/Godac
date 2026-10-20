@@ -24,10 +24,6 @@ import { LancementTournee } from "@/components/colis/LancementTournee";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
-const GoNavigation = dynamic(() => import("@/components/go-navigation").then((m) => m.GoNavigation), {
-  ssr: false,
-  loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de GO Navigation…</p>,
-});
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
   ssr: false,
   loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la carte…</p>,
@@ -60,7 +56,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
-  const [vue, setVue] = useState<"liste" | "carte" | "navigation">("liste");
+  const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
@@ -114,13 +110,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
   useEffect(() => {
     try {
+      // GO Navigation retirée (demande client) : une vue « navigation »
+      // mémorisée retombe sur la liste des arrêts.
       const vueMemorisee = localStorage.getItem(MEMO_VUE);
-      if (vueMemorisee === "carte" || vueMemorisee === "navigation") setVue(vueMemorisee);
+      if (vueMemorisee === "carte") setVue("carte");
+      else if (vueMemorisee === "navigation") localStorage.setItem(MEMO_VUE, "liste");
     } catch {
       /* stockage indisponible */
     }
   }, []);
-  function changerVue(v: "liste" | "carte" | "navigation") {
+  function changerVue(v: "liste" | "carte") {
     setVue(v);
     try {
       localStorage.setItem(MEMO_VUE, v);
@@ -376,11 +375,10 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     },
   );
   const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
-  const enNavigation = vue === "navigation" && run !== null && run.status !== "loading" && stops.length > 0;
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
-    <div className={`flex flex-col bg-paper ${enCarte || enNavigation ? "h-dvh" : "min-h-dvh"}`}>
+    <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
           <Link href="/exploitation/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
@@ -436,8 +434,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               </button>
             )}
             {run.status !== "loading" && stops.length > 0 && (
-              <div className="mt-3 grid grid-cols-3 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
-                {(["liste", "carte", "navigation"] as const).map((v) => (
+              <div className="mt-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
+                {(["liste", "carte"] as const).map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -446,7 +444,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     onClick={() => changerVue(v)}
                     className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
                   >
-                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
+                    {v === "liste" ? "Arrêts" : "Carte"}
                   </button>
                 ))}
               </div>
@@ -564,22 +562,6 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         </section>
       )}
 
-      {enNavigation && run && (
-        <section className="min-h-0 flex-1 overflow-y-auto" aria-label="GO Navigation">
-          <GoNavigation
-            stops={stops.map((s) => ({
-              id: s.id,
-              label: s.recipient ?? s.address,
-              address: s.address,
-              latitude: s.lat,
-              longitude: s.lng,
-              sequence: s.position,
-              completed: s.status !== "pending",
-              timeWindowLabel: s.window_start && s.window_end ? `${s.window_start}–${s.window_end}` : null,
-            }))}
-          />
-        </section>
-      )}
 
       {detailsStop && (
         <div className="fixed inset-0 z-[85] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="fiche-arret-title">
@@ -610,7 +592,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
       {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}
 
-      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte || enNavigation ? "hidden" : "flex"}`}>
+      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
         ) : !run ? (
