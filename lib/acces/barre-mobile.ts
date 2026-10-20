@@ -4,7 +4,7 @@
 // (Mon espace, Communication, Aide…). Section 3.3 du plan. Pur, testé.
 
 import type { UserRole } from "@/lib/types/domain";
-import { urlDe } from "@/lib/acces/catalogue";
+import { MARQUEUR_GO_NAVIGATION, urlDe } from "@/lib/acces/catalogue";
 
 export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler";
 
@@ -16,6 +16,15 @@ export interface BoutonBarre {
 
 export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>, tourneeEnCours: boolean, conduit: boolean = role === "chauffeur"): BoutonBarre[] {
   if (!conduit) return [];
+  // Essai GO Navigation : Tournée colis et navigation seulement.
+  if (modules.has(MARQUEUR_GO_NAVIGATION)) {
+    return modules.has("route_optimizer")
+      ? [
+          { href: urlDe("exploitation.colis"), libelle: "Tournée", icone: "colis" },
+          { href: "/livreur/navigation", libelle: "GO Nav", icone: "depart" },
+        ]
+      : [];
+  }
   const b: BoutonBarre[] = [];
   if (modules.has("planning")) {
     b.push(

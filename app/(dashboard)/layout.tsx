@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { modulesActifs, utilisateurCourant } from "@/lib/acces/modules-requete";
+import { etatModulesCourant, utilisateurCourant } from "@/lib/acces/modules-requete";
+import { EssaiTermine } from "@/components/go-navigation/EssaiTermine";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/DashboardShell";
@@ -29,13 +30,17 @@ export default async function DashboardLayout({
 
   const supabase = await createServerSupabaseClient();
   const isFieldRole = appUser.conduit;
-  const [enabledModuleKeys, { data: organization }, activeTour] = await Promise.all([
-    modulesActifs(appUser.organization_id).then((m) => [...m]),
+  const [{ modules, offre }, { data: organization }, activeTour] = await Promise.all([
+    etatModulesCourant(appUser.organization_id),
     supabase.from("organizations").select("name, logo_url, accent_color, is_demo").eq("id", appUser.organization_id).single(),
     isFieldRole
       ? supabase.from("planning_entries").select("id").eq("driver_id", appUser.id).eq("status", "in_progress").maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+
+  // Essai GO Navigation terminé : plus d'accès à l'espace, message clair.
+  if (offre.essaiTermine) return <EssaiTermine />;
+  const enabledModuleKeys = [...modules];
 
   // Lot B: absent (not just visually hidden) the moment either the
   // org hasn't enabled the module or the server has no Anthropic key

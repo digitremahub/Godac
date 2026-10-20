@@ -5,7 +5,7 @@ import {
   debutJourParis,
   deciderConsommation,
   messageRefus,
-  plafondJournalierParDefaut,
+  quotaEffectif,
   resoudreFormule,
   seuilsFranchis,
   LIBELLES_FONCTION,
@@ -22,7 +22,9 @@ export type ResultatConsommation =
  * client service (`createAdminSupabaseClient()`) — `usage_events` n'a
  * aucune policy d'écriture :
  *  1. vérifie le plafond journalier de sécurité et le volume mensuel
- *     inclus dans la formule (`usage_quotas`) ;
+ *     inclus dans la formule (`usage_quotas`), ou le plafond propre à
+ *     l'organisation (`usage_quota_overrides`, essai GO Navigation :
+ *     jamais de dépassement facturé) ;
  *  2. au-delà du volume inclus : autorise et compte le dépassement
  *     (facturé à la fin du mois, app/api/cron/usage-billing) si
  *     l'entreprise l'a accepté, sinon refuse avec un message clair ;
@@ -54,27 +56,33 @@ export async function consommer(
     return { ok: true, eventId: null, unitesDepassement: 0 };
   }
 
-  const formule = resoudreFormule(orgRes.data?.plan);
-  const { data: quota } = await admin
-    .from("usage_quotas")
-    .select("included_per_month, daily_cap")
-    .eq("plan_id", formule)
-    .eq("feature", feature)
-    .maybeSingle();
+  // Fonction pas encore déclarée en base (migration non appliquée) : on
+  // laisse passer sans compter plutôt que d'appliquer un quota nul.
+  if (!prixRes.data) {
+    console.error("consommer: fonction absente de usage_prices, appel autorisé", feature);
+    return { ok: true, eventId: null, unitesDepassement: 0 };
+  }
 
-  const inclusParMois = Number(quota?.included_per_month ?? 0);
-  const plafondJour = Number(quota?.daily_cap ?? plafondJournalierParDefaut(inclusParMois));
+  const formule = resoudreFormule(orgRes.data?.plan);
+  const [{ data: quota }, propre] = await Promise.all([
+    admin.from("usage_quotas").select("included_per_month, daily_cap").eq("plan_id", formule).eq("feature", feature).maybeSingle(),
+    // Plafond propre à l'organisation (essai GO Navigation), prioritaire et
+    // sans dépassement facturé. Table absente → plafond de la formule.
+    admin.from("usage_quota_overrides").select("included_per_month, daily_cap").eq("organization_id", organizationId).eq("feature", feature).maybeSingle(),
+  ]);
+
+  const { inclusParMois, plafondJour, depassementAutorise } = quotaEffectif(quota, propre.error ? null : propre.data, orgRes.data?.usage_overage_enabled ?? true);
   const totaux = (Array.isArray(totauxRes.data) ? totauxRes.data[0] : totauxRes.data) as { month_units: number; day_units: number } | null;
   const utiliseMois = Number(totaux?.month_units ?? 0);
   const utiliseJour = Number(totaux?.day_units ?? 0);
-  const prixUnitaire = prixRes.data ? Number(prixRes.data.unit_price_eur) : null;
+  const prixUnitaire = Number(prixRes.data.unit_price_eur);
 
   const decision = deciderConsommation(
-    { inclusParMois, plafondJour, utiliseMois, utiliseJour, depassementAutorise: orgRes.data?.usage_overage_enabled ?? true },
+    { inclusParMois, plafondJour, utiliseMois, utiliseJour, depassementAutorise },
     unites,
   );
   if (!decision.ok) {
-    return { ok: false, raison: messageRefus(decision.motif, feature, { inclusParMois, plafondJour, prixUnitaire }) };
+    return { ok: false, raison: messageRefus(decision.motif, feature, { inclusParMois, plafondJour, prixUnitaire, plafondPropre: Boolean(!propre.error && propre.data) }) };
   }
 
   const { data: event, error: insertError } = await admin
@@ -84,7 +92,7 @@ export async function consommer(
       user_id: userId,
       feature,
       units: unites,
-      cost_estimate_eur: decision.unitesDepassement * (prixUnitaire ?? 0),
+      cost_estimate_eur: decision.unitesDepassement * prixUnitaire,
     })
     .select("id")
     .single();
@@ -95,7 +103,7 @@ export async function consommer(
     const message =
       pct === 100
         ? `Volume mensuel inclus atteint pour ${libelle} (${inclusParMois}). ${
-            orgRes.data?.usage_overage_enabled === false
+            !depassementAutorise
               ? "Les prochaines utilisations sont bloquées jusqu'au mois prochain, sauf si vous autorisez le dépassement facturé."
               : "Les prochaines utilisations seront facturées à l'unité en fin de mois."
           }`

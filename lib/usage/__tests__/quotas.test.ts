@@ -144,3 +144,21 @@ describe("libellés", () => {
     expect(messageRefus("plafond_jour", "assistant", { inclusParMois: 200, plafondJour: 67, prixUnitaire: 0.05 })).toContain("67 par jour");
   });
 });
+
+describe("quotaEffectif (plafond propre à l'organisation)", () => {
+  it("le plafond propre l'emporte et interdit le dépassement", async () => {
+    const { quotaEffectif } = await import("@/lib/usage/quotas");
+    const formule = { included_per_month: 1000, daily_cap: 334 };
+    expect(quotaEffectif(formule, { included_per_month: 3000, daily_cap: 500 }, true)).toEqual({ inclusParMois: 3000, plafondJour: 500, depassementAutorise: false });
+    expect(quotaEffectif(formule, null, true)).toEqual({ inclusParMois: 1000, plafondJour: 334, depassementAutorise: true });
+    expect(quotaEffectif(null, null, false)).toEqual({ inclusParMois: 0, plafondJour: 20, depassementAutorise: false });
+  });
+
+  it("essai GO Navigation : 300 optimisations puis refus avec message d'essai", async () => {
+    const { quotaEffectif, deciderConsommation, messageRefus } = await import("@/lib/usage/quotas");
+    const q = quotaEffectif(null, { included_per_month: 300, daily_cap: 60 }, true);
+    expect(deciderConsommation({ ...q, utiliseMois: 299, utiliseJour: 0 }, 1).ok).toBe(true);
+    expect(deciderConsommation({ ...q, utiliseMois: 300, utiliseJour: 0 }, 1)).toEqual({ ok: false, motif: "quota_mensuel" });
+    expect(messageRefus("quota_mensuel", "route_optimization", { inclusParMois: 300, plafondJour: 60, prixUnitaire: 0, plafondPropre: true })).toContain("pendant votre essai");
+  });
+});

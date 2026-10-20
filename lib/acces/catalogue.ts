@@ -13,6 +13,7 @@
 // RLS. Il sert l'expérience (pas d'écran trompeur) et le revenu (module
 // payant) ; la RLS reste l'autorité sur les données.
 
+import { ECRANS_GO_NAVIGATION } from "@/lib/go-navigation/offre";
 import type { UserRole } from "@/lib/types/domain";
 
 export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
@@ -690,9 +691,22 @@ export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
   return { ok: true };
 }
 
+/**
+ * Pseudo-module ajouté à l'ensemble des modules actifs des comptes d'essai
+ * GO Navigation (lib/acces/modules-requete.ts) : seuls les écrans
+ * ECRANS_GO_NAVIGATION apparaissent au menu et s'ouvrent (garde de page).
+ */
+export const MARQUEUR_GO_NAVIGATION = "offre:go_navigation";
+
+/** Écran hors du périmètre GO Navigation pour cet ensemble de modules. */
+export function horsOffreGoNavigation(id: string, modulesActifs: ReadonlySet<string>): boolean {
+  return modulesActifs.has(MARQUEUR_GO_NAVIGATION) && !ECRANS_GO_NAVIGATION.includes(id);
+}
+
 /** Onglet visible (barre de section ou sous-onglets), sans tenir compte du parent. */
 function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
   if (e.menu === "cache") return false;
+  if (horsOffreGoNavigation(e.id, modulesActifs)) return false;
   if (!(e.rolesMenu ?? e.roles).includes(role)) return false;
   return deciderAcces(e, role, modulesActifs, conduit).ok;
 }
@@ -767,7 +781,9 @@ export function sousOnglets(parentId: string, role: UserRole, modulesActifs: Rea
 export function premierOngletSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): string | null {
   const o = ongletsSection(section, role, modulesActifs, conduit)[0];
   if (o) return o.href;
-  const ouvrable = ECRANS.find((e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && deciderAcces(e, role, modulesActifs, conduit).ok);
+  const ouvrable = ECRANS.find(
+    (e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && !horsOffreGoNavigation(e.id, modulesActifs) && deciderAcces(e, role, modulesActifs, conduit).ok,
+  );
   return ouvrable?.href ?? null;
 }
 
