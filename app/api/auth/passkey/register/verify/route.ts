@@ -26,14 +26,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Session d'inscription expirée, recommencez." }, { status: 400 });
   }
 
-  const { rpID, origin } = webauthnConfig();
+  const { rpIdsAdmis, originesAdmises } = webauthnConfig(req.headers.get("origin"));
   let verification;
   try {
     verification = await verifyRegistrationResponse({
       response: parsed.data.response,
       expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: originesAdmises,
+      expectedRPID: rpIdsAdmis,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Vérification échouée" }, { status: 400 });

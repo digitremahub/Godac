@@ -5,6 +5,8 @@ import { parametresLegauxAu, FRAIS_CONVENTIONNELS } from "@/lib/paie/parametres"
 import { HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
 import { countWeekdays } from "@/lib/business/payroll";
 import { PRESENCE_STATUS } from "@/lib/organization/poles";
+import { acomptesDuBulletin, type AcomptesDuBulletin } from "@/lib/paie/acomptes";
+import { acomptesJusquAu } from "@/lib/paie/acomptes-serveur";
 import type { ParametresEntreprise, ParametresLegaux, ProfilSalarie, RegimeTransport, VariablesMois } from "@/lib/paie/types";
 
 /** "2026-10" → bornes du mois (fin incluse). */
@@ -47,6 +49,11 @@ export interface ContextePaie {
   /** Variables préremplies depuis GODAC (tournées, congés) — modifiables avant calcul. */
   prefill: VariablesMois & { joursTravailles: number };
   cumuls: { brut: number; netImposable: number; heuresSupExonerees: number };
+  /**
+   * Acomptes acceptés à déduire de ce bulletin (lignes « Acompte du
+   * JJ/MM »), relus en base : jamais saisis ni repris du navigateur.
+   */
+  acomptes: AcomptesDuBulletin;
   bulletinExistant: {
     id: string;
     variables: VariablesMois | null;
@@ -71,7 +78,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   const avant = new Date(Date.parse(`${debut}T00:00:00Z`) - 86_400_000).toISOString();
   const apres = new Date(Date.parse(`${finExclue}T00:00:00Z`) + 86_400_000).toISOString();
 
-  const [entreprise, { data: profil }, { data: contrat }, { data: tours }, { data: conges }, { data: anterieurs }, { data: existant }, { data: precedent }] = await Promise.all([
+  const [entreprise, { data: profil }, { data: contrat }, { data: tours }, { data: conges }, { data: anterieurs }, { data: existant }, { data: precedent }, demandesAcompte] = await Promise.all([
     parametresEntreprise(supabase, organizationId),
     supabase.from("payroll_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("user_contracts").select("monthly_gross_salary, contractual_monthly_hours").eq("user_id", userId).maybeSingle(),
@@ -118,6 +125,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .order("period_start", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Demandes d'acompte acceptées jusqu'à ce mois (lib/paie/acomptes.ts).
+    acomptesJusquAu(supabase, userId, debut),
   ]);
 
   const regime = (profil?.regime ?? "courte_distance") as RegimeTransport;
@@ -156,6 +165,12 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     { brut: 0, netImposable: 0, heuresSupExonerees: 0 },
   );
 
+  const acomptes = acomptesDuBulletin({
+    demandes: demandesAcompte,
+    mois,
+    bulletin: existant ? { id: existant.id, valide: statutValide(existant.validation_status) === "valide" } : null,
+  });
+
   return {
     mois,
     debut,
@@ -180,12 +195,13 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       nbRepasUnique: 0,
       nbCasseCroute: 0,
       nbGrandDeplacement: 0,
-      retenues: ((precedent?.variables as VariablesMois | null)?.retenues ?? []).filter((r) => r.type !== "acompte"),
+      retenues: ((precedent?.variables as VariablesMois | null)?.retenues ?? []).filter((r) => r.type !== "acompte" && !r.demandeId).concat(acomptes.retenues),
       personnesACharge: (precedent?.variables as VariablesMois | null)?.personnesACharge ?? 0,
       cumulHeuresSupExonereesAnnee: cumuls.heuresSupExonerees,
       joursTravailles,
     },
     cumuls,
+    acomptes,
     bulletinExistant: existant
       ? {
           id: existant.id,

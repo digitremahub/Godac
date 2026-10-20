@@ -268,7 +268,11 @@ export function calculerBulletin({
   const partSaisissable = partSaisissableMensuelle(baseSaisissable, variables.personnesACharge ?? 0);
   const retenues = (variables.retenues ?? []).filter((r) => r.montant > 0);
   for (const r of retenues) {
-    const libelle = [LIBELLE_RETENUE[r.type], r.libelle.trim(), r.reference?.trim() ? `réf. ${r.reference.trim()}` : ""].filter(Boolean).join(" — ");
+    // Acompte d'une demande : « Acompte du JJ/MM », déjà complet.
+    const libelle =
+      r.type === "acompte" && r.demandeId && r.libelle.trim()
+        ? r.libelle.trim()
+        : [LIBELLE_RETENUE[r.type], r.libelle.trim(), r.reference?.trim() ? `réf. ${r.reference.trim()}` : ""].filter(Boolean).join(" — ");
     add("net", libelle, { base: null, tauxSalarial: null, montantSalarial: r2(r.montant) });
   }
   const somme = (types: Retenue["type"][]) => r2(retenues.filter((r) => types.includes(r.type)).reduce((t, r) => t + r.montant, 0));

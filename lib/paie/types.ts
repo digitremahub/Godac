@@ -112,6 +112,11 @@ export interface Retenue {
   montant: number;
   /** Référence du dossier (n° d'acte, d'avis, créancier) — reprise sur le bulletin. */
   reference?: string;
+  /**
+   * Acompte venu d'une demande acceptée (salary_advance_requests.id) :
+   * ligne ajoutée et relue côté serveur, jamais saisie à la main.
+   */
+  demandeId?: string;
 }
 
 export interface VariablesMois {

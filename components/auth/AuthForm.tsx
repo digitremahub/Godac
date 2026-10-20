@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { tryPasskeyLogin } from "@/lib/auth/passkey-login";
+import { expliquerErreurPasskey } from "@/lib/auth/passkey-erreurs";
 import { IconFingerprint } from "@/components/layout/icons";
 import { postLoginPath } from "@/lib/auth/post-login";
 
@@ -28,24 +29,23 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [error, setError] = useState<string | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyUnavailable, setPasskeyUnavailable] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<{ code: string; message: string } | null>(null);
 
-  async function usePasskey() {
+  /** Sans e-mail : clé « découvrable ». Avec e-mail : clés de ce compte (anciennes clés). */
+  async function usePasskey(avecEmail: boolean) {
     setPasskeyBusy(true);
     setError(null);
+    setPasskeyError(null);
     setPasskeyUnavailable(false);
     try {
-      const { attempted } = await tryPasskeyLogin({ email });
+      const { attempted } = await tryPasskeyLogin(avecEmail ? { email } : {});
       if (attempted) {
         window.location.href = postLoginPath();
         return;
       }
       setPasskeyUnavailable(true);
     } catch (e) {
-      if (e instanceof Error && e.name === "NotAllowedError") {
-        setError("La demande Face ID / empreinte a été annulée, a expiré ou n’a pas abouti. Réessayez en validant la demande biométrique, ou utilisez le lien de connexion par e-mail.");
-      } else {
-        setError(e instanceof Error ? e.message : "Connexion biométrique impossible. Réessayez ou utilisez le lien de connexion par e-mail.");
-      }
+      setPasskeyError(expliquerErreurPasskey(e, { avecEmail }));
     } finally {
       setPasskeyBusy(false);
     }
@@ -162,8 +162,15 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </div>
       )}
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {passkeyError && (
+        <p role="alert" className="text-sm text-orange-ink">
+          {passkeyError.message} <span className="whitespace-nowrap text-xs text-navy/60">Code : {passkeyError.code}</span>
+        </p>
+      )}
       {passkeyUnavailable && (
-        <p className="text-xs text-navy/60">Aucune clé Face ID / empreinte enregistrée pour cet email sur cet appareil.</p>
+        <p className="text-xs text-navy/60">
+          Aucune clé Face ID / empreinte enregistrée pour cette adresse. Vérifiez l&apos;e-mail, ou utilisez « Se connecter avec Face ID / empreinte » sans e-mail.
+        </p>
       )}
       <button
         type="submit"
@@ -173,9 +180,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         {busy ? "Connexion…" : driverPinMode || usePassword ? "Se connecter" : "Recevoir le lien de connexion"}
       </button>
       {mode === "sign-in" && (
-        <button type="button" className="btn-secondary" disabled={passkeyBusy || !email || driverPinMode} onClick={usePasskey}>
+        <button type="button" className="btn-secondary" disabled={passkeyBusy || driverPinMode} onClick={() => usePasskey(false)}>
           <IconFingerprint className="h-[18px] w-[18px]" />
-          {passkeyBusy ? "Vérification…" : "Face ID / empreinte"}
+          {passkeyBusy ? "Vérification…" : "Se connecter avec Face ID / empreinte"}
+        </button>
+      )}
+      {mode === "sign-in" && email && !driverPinMode && (
+        <button type="button" className="text-sm text-navy/65 hover:text-navy hover:underline" disabled={passkeyBusy} onClick={() => usePasskey(true)}>
+          Face ID / empreinte avec cette adresse e-mail (clé ancienne)
         </button>
       )}
       {mode === "sign-in" && (

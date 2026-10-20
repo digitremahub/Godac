@@ -42,6 +42,8 @@ export const variablesSchema = z.object({
         libelle: z.string().trim().max(80),
         montant: z.coerce.number().min(0).max(100000),
         reference: z.string().trim().max(60).optional(),
+        // Lignes d'acompte automatiques : écartées et relues en base par l'API.
+        demandeId: z.string().uuid().optional(),
       }),
     )
     .max(20)

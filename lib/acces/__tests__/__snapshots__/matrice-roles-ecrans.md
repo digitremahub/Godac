@@ -10,6 +10,7 @@
 | Mon espace | Signaler un problème | `/moi/signaler` | ✅ | 🔒 | — | 🔒 | maintenance_requests |
 | Mon espace | Mes amendes | `/moi/amendes` | ✅ | — | — | — | fines |
 | Mon espace | Mes fiches de paie | `/moi/fiches-de-paie` | ✅ | ✅ | ✅ | ↪ /equipe/paie/fiches | payslips |
+| Mon espace | Demander un acompte | `/moi/acomptes` | ✅ | ✅ | ✅ | ↪ /equipe/paie/acomptes | payslips |
 | Mon espace | Mon pointage | `/moi/pointage` | ✅ | ✅ | ✅ | ↪ /equipe/pointage | time_clock |
 | Mon espace | Mes congés | `/moi/conges` | ✅ | ✅ | ✅ | ↪ /equipe/conges | leave_management |
 | Exploitation | Planning | `/exploitation/planning` | ↪ /moi/planning | ✅ | — | ✅ | planning |
@@ -45,6 +46,7 @@
 | Équipe & RH | Paie & salaires | `/equipe/paie` | — | — | ✅ | ✅ | payslips |
 | Équipe & RH | Heures & salaires | `/equipe/paie/heures` | — | — | 🔒 | 🔒 | planning?, time_clock? |
 | Équipe & RH | Fiches de paie | `/equipe/paie/fiches` | — | — | 🔒 | 🔒 | payslips |
+| Équipe & RH | Demandes d'acompte | `/equipe/paie/acomptes` | ↪ /moi/acomptes | ↪ /moi/acomptes | 🔒 | 🔒 | payslips |
 | Équipe & RH | Réglages de paie | `/equipe/paie/reglages` | — | — | — | 🔒 | payslips |
 | Équipe & RH | Bulletin d'un salarié | `/equipe/paie/[userId]` | — | — | 🔒 | 🔒 | payslips |
 | Communication | Messenger | `/communication/messenger` | ✅ | ✅ | ✅ | ✅ | messenger |

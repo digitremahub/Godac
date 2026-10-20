@@ -1,25 +1,54 @@
-import { startAuthentication } from "@simplewebauthn/browser";
+import { browserSupportsWebAuthn, startAuthentication } from "@simplewebauthn/browser";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { ErreurServeurPasskey, texteErreurServeur } from "@/lib/auth/passkey-erreurs";
 
-export async function tryPasskeyLogin(identify: { user_id?: string; email?: string }): Promise<{ attempted: boolean }> {
+/**
+ * Connexion Face ID / empreinte. `identify` vide : clé « découvrable »,
+ * le téléphone propose les clés qu'il détient pour ce site, sans e-mail.
+ * Les échecs remontent avec leur code (ErreurServeurPasskey, ou l'erreur
+ * du navigateur : NotAllowedError, SecurityError…) pour
+ * expliquerErreurPasskey.
+ */
+export async function tryPasskeyLogin(identify: { user_id?: string; email?: string } = {}): Promise<{ attempted: boolean }> {
+  if (!browserSupportsWebAuthn()) {
+    const e = new Error("WebAuthn indisponible dans ce navigateur");
+    e.name = "NonPrisEnCharge";
+    throw e;
+  }
+  const corps = { ...(identify.user_id ? { user_id: identify.user_id } : {}), ...(identify.email?.trim() ? { email: identify.email.trim().toLowerCase() } : {}) };
   const optionsRes = await fetch("/api/auth/passkey/login/options", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(identify),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps), credentials: "same-origin",
   });
   const optionsJson = await optionsRes.json().catch(() => null);
-  if (!optionsRes.ok) throw new Error(typeof optionsJson?.error === "string" ? optionsJson.error : `Le serveur de connexion a répondu avec une erreur (${optionsRes.status}). Réessayez ou utilisez votre badge + PIN.`);
+  if (!optionsRes.ok) {
+    const { message, code } = texteErreurServeur(optionsJson, optionsRes.status, "Le serveur de connexion a répondu avec une erreur.");
+    throw new ErreurServeurPasskey(message, code, optionsRes.status);
+  }
   if (!optionsJson || !optionsJson.available) return { attempted: false };
 
   const assertion = await startAuthentication({ optionsJSON: optionsJson.options });
   const verifyRes = await fetch("/api/auth/passkey/login/verify", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ response: assertion }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ response: assertion }), credentials: "same-origin",
   });
   const verifyJson = await verifyRes.json().catch(() => null);
-  if (!verifyRes.ok) throw new Error(typeof verifyJson?.error === "string" ? verifyJson.error : `La vérification Face ID a échoué (réponse serveur ${verifyRes.status}). Utilisez votre badge + PIN.`);
-  if (!verifyJson?.email || !verifyJson?.token) throw new Error("Réponse de connexion incomplète. Utilisez votre badge + PIN ou réessayez.");
+  if (!verifyRes.ok) {
+    const { message, code } = texteErreurServeur(verifyJson, verifyRes.status, "La vérification de la clé a échoué.");
+    throw new ErreurServeurPasskey(message, code, verifyRes.status);
+  }
+  if (!verifyJson?.token) throw new ErreurServeurPasskey("Réponse de connexion incomplète.", "reponse_incomplete", verifyRes.status);
+
   const supabase = createBrowserSupabaseClient();
-  // Le serveur renvoie le jeton haché du lien magique (generateLink) : il se
-  // valide en token_hash, pas en code à 6 chiffres avec l'e-mail.
-  const { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.token, type: "email" });
+  // Jeton haché du lien magique (generateLink) : il se valide en
+  // token_hash. « email » est le type recommandé par supabase-js 2.x ;
+  // « magiclink » (ancien nom) en repli — un échec ne consomme pas le jeton.
+  let { error } = await supabase.auth.verifyOtp({ token_hash: verifyJson.token, type: "email" });
+  if (error) {
+    const repli = await supabase.auth.verifyOtp({ token_hash: verifyJson.token, type: "magiclink" });
+    if (!repli.error) error = null;
+  }
   if (error) throw error;
+  // La session doit être posée (cookies lus par le middleware) avant de quitter la page.
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new ErreurServeurPasskey("Clé reconnue, mais la session ne s'est pas enregistrée dans le navigateur (cookies bloqués ?).", "session_absente", 200);
   return { attempted: true };
 }

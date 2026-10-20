@@ -60,6 +60,7 @@ export function PaieEditor({
   joursTravailles,
   dejaGenere,
   peutModifierProfil = true,
+  avertissementsAcomptes = [],
 }: {
   userId: string;
   mois: string;
@@ -73,6 +74,8 @@ export function PaieEditor({
   dejaGenere: boolean;
   /** Comptable : le profil de paie se lit, seule la direction le modifie. */
   peutModifierProfil?: boolean;
+  /** Acomptes reportés (bulletin validé), venus d'un mois antérieur… */
+  avertissementsAcomptes?: string[];
 }) {
   const router = useRouter();
   const [regime, setRegime] = useState<RegimeTransport>(profil.regime);
@@ -268,8 +271,25 @@ export function PaieEditor({
             Acompte déjà versé, saisie sur salaire, ATD / saisie administrative, pension alimentaire, remboursement de prêt. Les retenues
             récurrentes sont reprises le mois suivant.
           </p>
+          {avertissementsAcomptes.map((a) => (
+            <p key={a} role="note" className="rounded-lg bg-gold/20 px-3 py-2 text-xs text-navy">
+              {a}
+            </p>
+          ))}
           {retenues.map((r, i) => {
             const maj = (champ: Partial<Retenue>) => setRetenues(retenues.map((x, j) => (j === i ? { ...x, ...champ } : x)));
+            if (r.demandeId) {
+              // Acompte d'une demande acceptée : ajouté et recalculé par le serveur, non modifiable ici.
+              return (
+                <div key={r.demandeId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm">
+                  <span>
+                    <span className="font-semibold">{r.libelle}</span>
+                    <span className="ml-1 text-xs text-navy/60">demande acceptée, ajoutée automatiquement</span>
+                  </span>
+                  <span className="tabular-nums">− {eur(r.montant)} €</span>
+                </div>
+              );
+            }
             return (
               <div key={i} className="flex flex-wrap items-center gap-2">
                 <select className="input w-auto !py-1.5" value={r.type} onChange={(e) => maj({ type: e.target.value as TypeRetenue })} aria-label="Type de retenue">

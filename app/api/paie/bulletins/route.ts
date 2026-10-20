@@ -9,6 +9,8 @@ import { calculerBulletin } from "@/lib/paie/calcul";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { genererBulletinPdf } from "@/lib/paie/pdf";
 import { variablesSchema } from "@/lib/paie/schemas";
+import { fusionnerRetenues } from "@/lib/paie/acomptes";
+import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
 
 export const maxDuration = 60;
 
@@ -46,7 +48,12 @@ export async function POST(req: Request) {
   const ctx = await contextePaie(supabase, appUser.organization_id, userId, mois);
   if (!ctx.profilComplet) return NextResponse.json({ error: "Renseignez d'abord le profil de paie (taux horaire, heures) de ce salarié." }, { status: 422 });
 
-  const variables = { ...parsed.data.variables, cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees };
+  // Acomptes des demandes acceptées : relus en base, jamais repris du navigateur.
+  const variables = {
+    ...parsed.data.variables,
+    retenues: fusionnerRetenues(parsed.data.variables.retenues, ctx.acomptes.retenues),
+    cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees,
+  };
   const bulletin = calculerBulletin({ legal: ctx.legal, entreprise: ctx.entreprise, salarie: ctx.salarie, variables });
 
   let pdf: Buffer;
@@ -124,13 +131,16 @@ export async function POST(req: Request) {
     payslipId = data.id;
   }
 
+  // Le bulletin référence les demandes d'acompte qu'il déduit.
+  await rattacherAcomptes(supabase, payslipId, ctx.acomptes.ids);
+
   await journaliser({
     organizationId: appUser.organization_id,
     userId: appUser.id,
     action: "paie_bulletin_genere",
     targetTable: "payslips",
     targetId: payslipId,
-    details: { salarie: userId, mois, regeneration: Boolean(ctx.bulletinExistant), par: appUser.role },
+    details: { salarie: userId, mois, regeneration: Boolean(ctx.bulletinExistant), par: appUser.role, acomptes: ctx.acomptes.ids.length },
   });
 
   // La direction qui génère elle-même valide dans la foulée (c'est elle qui
