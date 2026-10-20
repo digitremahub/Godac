@@ -7,7 +7,7 @@ import { blockInDemo } from "@/lib/demo/guard";
 const bodySchema = z.object({
   email: z.string().email(),
   full_name: z.string().min(1).optional(),
-  role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]),
+  role: z.enum(["chauffeur", "manager", "comptable", "direction"]),
   role_title: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
   service_id: z.string().uuid().optional(),

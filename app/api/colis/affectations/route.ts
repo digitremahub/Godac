@@ -5,8 +5,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { moduleActif, aujourdhuiParis } from "@/lib/colis/serveur";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
-const roles = ["direction", "manager", "manager_chauffeur"];
+const roles = ["direction", "manager"];
 const schema = z.object({
   service_id: z.string().uuid(),
   driver_id: z.string().uuid(),
@@ -30,7 +31,7 @@ export async function GET() {
   if (!(await moduleActif(supabase, user.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const [{ data: services, error: servicesError }, { data: drivers, error: driversError }, { data: vehicles, error: vehiclesError }, { data: routes, error: routesError }] = await Promise.all([
     supabase.from("services").select("id,name").eq("organization_id", user.organization_id).order("name"),
-    supabase.from("users").select("id,full_name").eq("organization_id", user.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).order("full_name"),
+    supabase.from("users").select("id,full_name").eq("organization_id", user.organization_id).eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
     supabase.from("vehicles").select("id,registration,service_id").eq("organization_id", user.organization_id).order("registration"),
     supabase.from("tour_routes").select("id,tour_number,service_id").eq("organization_id", user.organization_id).order("tour_number"),
   ]);
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
 
   const { service_id, driver_id, vehicle_id, tour_number, date, time } = parsed.data;
   const [{ data: driver }, { data: vehicle }, { data: service }, { data: route }] = await Promise.all([
-    supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).in("role", ["chauffeur", "manager_chauffeur"]).maybeSingle(),
+    supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", user.organization_id).eq("active", true).or(FILTRE_CONDUCTEURS).maybeSingle(),
     supabase.from("vehicles").select("id,service_id").eq("id", vehicle_id).eq("organization_id", user.organization_id).maybeSingle(),
     supabase.from("services").select("id").eq("id", service_id).eq("organization_id", user.organization_id).maybeSingle(),
     supabase.from("tour_routes").select("id").eq("organization_id", user.organization_id).eq("service_id", service_id).eq("tour_number", tour_number).maybeSingle(),

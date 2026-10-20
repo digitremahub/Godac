@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -22,12 +22,10 @@ import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
+import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
+import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
-const GoNavigation = dynamic(() => import("@/components/go-navigation").then((m) => m.GoNavigation), {
-  ssr: false,
-  loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de GO Navigation…</p>,
-});
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
   ssr: false,
   loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la carte…</p>,
@@ -60,7 +58,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
-  const [vue, setVue] = useState<"liste" | "carte" | "navigation">("liste");
+  const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [selection, setSelection] = useState<string | null>(null);
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
@@ -114,13 +112,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
   useEffect(() => {
     try {
+      // GO Navigation retirée (demande client) : une vue « navigation »
+      // mémorisée retombe sur la liste des arrêts.
       const vueMemorisee = localStorage.getItem(MEMO_VUE);
-      if (vueMemorisee === "carte" || vueMemorisee === "navigation") setVue(vueMemorisee);
+      if (vueMemorisee === "carte") setVue("carte");
+      else if (vueMemorisee === "navigation") localStorage.setItem(MEMO_VUE, "liste");
     } catch {
       /* stockage indisponible */
     }
   }, []);
-  function changerVue(v: "liste" | "carte" | "navigation") {
+  function changerVue(v: "liste" | "carte") {
     setVue(v);
     try {
       localStorage.setItem(MEMO_VUE, v);
@@ -293,6 +294,24 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     }
   }
 
+  /**
+   * Glisser-déposer (appui long sur la poignée) ou boutons ↑/↓ : ordre local
+   * tout de suite, puis enregistrement (événement « reordered ») et
+   * rechargement (prochain arrêt, heures estimées et suivi recalculés).
+   */
+  async function deposer(id: string, cible: CibleDepot) {
+    if (!run) return;
+    const changements = reordonner(stops, id, cible);
+    if (changements.length === 0) return;
+    setStops((all) => appliquerChangements(all, changements));
+    try {
+      await api(`/api/colis/arrets/${id}`, { method: "PATCH", body: JSON.stringify({ run_id: run.id, deposer: cible }) });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
+    await charger(run.id);
+  }
+
   function demanderDemarrage() {
     setConfirmationLancement(true);
   }
@@ -358,6 +377,18 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
   // Plusieurs listes : séparateurs avec le nom et les arrêts restants de chaque liste.
   const groupes = grouperParListe(stops, lists);
   const multi = groupes.length > 1 || groupes[0]?.liste != null;
+  // Glisser-déposer des adresses suivantes (le prochain arrêt reste en tête
+  // tant qu'il n'est pas déplacé depuis la liste) ; pas pendant une recherche.
+  const triActif = Boolean(run && run.status !== "done" && !terme && suivants.length > 1);
+  const ordreTri = suivants.map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
+  /** Repli clavier / sans glisser : échange avec l'adresse voisine affichée. */
+  function deplacerRang(s: Stop, sens: -1 | 1) {
+    const i = suivants.indexOf(s);
+    const voisin = suivants[i + sens];
+    if (!voisin) return;
+    const cible = cibleDepuisSurvol(ordreTri, s.id, voisin.id);
+    if (cible) void deposer(s.id, cible);
+  }
   const groupeDe = (s: Stop) => groupes.find((g) => g.arrets.includes(s)) ?? groupes[0]!;
   const separateur = (s: Stop) => {
     const g = groupeDe(s);
@@ -376,14 +407,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
     },
   );
   const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
-  const enNavigation = vue === "navigation" && run !== null && run.status !== "loading" && stops.length > 0;
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
-    <div className={`flex flex-col bg-paper ${enCarte || enNavigation ? "h-dvh" : "min-h-dvh"}`}>
+    <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
+          <Link href="/exploitation/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
             <span aria-hidden="true" className="text-lg leading-none">‹</span>
             <Wordmark inverted height={22} />
           </Link>
@@ -436,8 +466,8 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
               </button>
             )}
             {run.status !== "loading" && stops.length > 0 && (
-              <div className="mt-3 grid grid-cols-3 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
-                {(["liste", "carte", "navigation"] as const).map((v) => (
+              <div className="mt-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-semibold" role="tablist" aria-label="Affichage">
+                {(["liste", "carte"] as const).map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -446,7 +476,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     onClick={() => changerVue(v)}
                     className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
                   >
-                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
+                    {v === "liste" ? "Arrêts" : "Carte"}
                   </button>
                 ))}
               </div>
@@ -564,22 +594,6 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
         </section>
       )}
 
-      {enNavigation && run && (
-        <section className="min-h-0 flex-1 overflow-y-auto" aria-label="GO Navigation">
-          <GoNavigation
-            stops={stops.map((s) => ({
-              id: s.id,
-              label: s.recipient ?? s.address,
-              address: s.address,
-              latitude: s.lat,
-              longitude: s.lng,
-              sequence: s.position,
-              completed: s.status !== "pending",
-              timeWindowLabel: s.window_start && s.window_end ? `${s.window_start}–${s.window_end}` : null,
-            }))}
-          />
-        </section>
-      )}
 
       {detailsStop && (
         <div className="fixed inset-0 z-[85] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="fiche-arret-title">
@@ -610,14 +624,14 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
 
       {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}
 
-      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte || enNavigation ? "hidden" : "flex"}`}>
+      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte ? "hidden" : "flex"}`}>
         {runs === null ? (
           <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
         ) : !run ? (
           <section className="flex flex-col items-center gap-3 py-10 text-center">
             <p className="font-display text-xl font-bold">{prenom ? `Bonjour ${prenom}` : "Bonjour"}</p>
             <p className="text-sm text-navy/65">Aucune tournée colis en cours. Chargez vos colis pour commencer.</p>
-            <Link href="/colis" className="btn-primary !py-3">
+            <Link href="/exploitation/colis" className="btn-primary !py-3">
               Charger mes colis
             </Link>
           </section>
@@ -630,7 +644,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
             <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demanderDemarrage}>
               Vérifier les villages et démarrer
             </button>
-            <Link href="/colis" className="btn-ghost w-fit !px-2 text-sm">
+            <Link href="/exploitation/colis" className="btn-ghost w-fit !px-2 text-sm">
               Ajouter ou modifier des colis
             </Link>
           </section>
@@ -750,6 +764,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                 {busy ? "Calcul…" : "Recalculer depuis ici"}
               </button>
             </div>
+            <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
             <ol className="flex flex-col gap-2">
               {suivants.map((s, k) => (
                 <Fragment key={s.id}>
@@ -760,8 +775,11 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <span className="h-px flex-1 bg-navy/15" aria-hidden="true" />
                     </li>
                   )}
-                  <li className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
+                  {(() => {
+                  const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
+                  <li ref={props?.ref} style={props?.style} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
                     <EncocheArret stop={s} />
+                    {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
                       {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
@@ -785,6 +803,16 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                         >
                           Clôturer ›
                         </button>
+                        {triActif && (
+                          <>
+                            <button type="button" className="rounded-full border border-navy/15 px-2.5 py-1.5 text-xs font-semibold text-navy/70" disabled={k === 0} onClick={() => deplacerRang(s, -1)} aria-label={`Monter ${s.recipient ?? s.address}`}>
+                              ↑
+                            </button>
+                            <button type="button" className="rounded-full border border-navy/15 px-2.5 py-1.5 text-xs font-semibold text-navy/70" disabled={k === suivants.length - 1} onClick={() => deplacerRang(s, 1)} aria-label={`Descendre ${s.recipient ?? s.address}`}>
+                              ↓
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <button
@@ -808,9 +836,13 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                       <IconNavigation className="h-5 w-5" />
                     </a>
                   </li>
+                  );
+                  return triActif ? <ArretTriable id={s.id} rendu={rendu} /> : rendu(null, null);
+                  })()}
                 </Fragment>
               ))}
             </ol>
+            </ZoneTri>
           </section>
         )}
 

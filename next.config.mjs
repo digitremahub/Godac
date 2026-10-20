@@ -1,3 +1,14 @@
+import { readFileSync } from "node:fs";
+
+/**
+ * Anciennes adresses → nouvelles adresses par section (plan de
+ * réorganisation, § 4). Liste dans config/redirections.json, vérifiée par
+ * lib/acces/__tests__/redirections.test.ts. Temporaires (307) pendant le
+ * premier mois, puis permanentes ; à conserver au moins 13 mois (e-mails,
+ * notifications push, favoris). La chaîne de requête est transmise.
+ */
+const REDIRECTIONS = JSON.parse(readFileSync(new URL("./config/redirections.json", import.meta.url), "utf8"));
+
 /** @type {import('next').NextConfig} */
 const SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co";
 const CSP = [
@@ -57,6 +68,9 @@ const nextConfig = {
         hostname: "*.supabase.co",
       },
     ],
+  },
+  async redirects() {
+    return REDIRECTIONS.map((r) => ({ source: r.source, destination: r.destination, permanent: false, ...(r.has ? { has: r.has } : {}) }));
   },
   async headers() {
     return [

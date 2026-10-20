@@ -10,11 +10,12 @@ import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/paris-time";
 import type { AppUser } from "@/lib/auth/session";
 import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 /**
  * Direction sees the whole organization: fleet + headcount KPIs,
  * pending approvals across every service, and (when BI reporting is
- * enabled) the same consolidated charts as the dedicated /reporting
+ * enabled) the same consolidated charts as the dedicated /dashboard/reporting
  * page, surfaced here so the big picture doesn't require a second
  * click every morning.
  */
@@ -44,7 +45,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     tourRowsRes,
   ] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active"),
-    supabase.from("users").select("id", { count: "exact", head: true }).in("role", ["chauffeur", "manager_chauffeur"]).eq("active", true),
+    supabase.from("users").select("id", { count: "exact", head: true }).or(FILTRE_CONDUCTEURS).eq("active", true),
     supabase
       .from("delivery_runs")
       .select("id, name, run_date, started_at, driver_id, service_id, vehicle_id")
@@ -161,13 +162,13 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   }
 
   const pendingTiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/driver-signups" },
+    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/equipe/inscriptions" },
   ];
-  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
+  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
   if (maintenanceEnabled)
-    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/maintenance" });
+    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
   if (payslipsEnabled && missingPayslips !== null)
-    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/payslips" });
+    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/equipe/paie/fiches" });
 
   return (
     <div>
@@ -176,10 +177,10 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="Véhicules actifs" value={String((activeVehiclesRes.data ?? []).length)} />
         <StatTile label="Chauffeurs actifs" value={String(activeDriversRes.count ?? 0)} accent="gold" />
-        <Link href="/tours/history" className="block">
+        <Link href="/exploitation/historique" className="block">
           <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
         </Link>
-        <Link href="/alerts" className="block">
+        <Link href="/communication/alertes" className="block">
           <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         </Link>
       </div>
@@ -195,7 +196,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
             <h2 className="text-lg">Tournées actuellement effectuées</h2>
             <p className="text-sm text-navy/60">Suivi des fiches chauffeur réellement démarrées.</p>
           </div>
-          <Link href="/tours/history" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
+          <Link href="/exploitation/historique" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
         </div>
         {ongoingRuns.length === 0 ? (
           <p className="text-sm text-navy/60">Aucune fiche chauffeur en cours pour le moment.</p>
@@ -231,7 +232,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Reporting (30 jours)</h2>
-            <Link href="/reporting" className="text-sm text-teal-ink hover:underline">
+            <Link href="/dashboard/reporting" className="text-sm text-teal-ink hover:underline">
               Voir le reporting complet →
             </Link>
           </div>

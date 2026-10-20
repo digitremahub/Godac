@@ -6,12 +6,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const bodySchema = z.object({
   title: z.string().min(1).optional(),
   content: z.string().min(1).optional(),
-  roles: z.array(z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"])).optional(),
+  roles: z.array(z.enum(["chauffeur", "manager", "comptable", "direction"])).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"] });
+  const g = await garderApi({ roles: ["direction", "manager"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   if (appUser.role !== "direction") {
@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g2 = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"] });
+  const g2 = await garderApi({ roles: ["direction", "manager"] });
   if (!g2.ok) return g2.reponse;
   const appUser = g2.appUser;
   if (appUser.role !== "direction") {

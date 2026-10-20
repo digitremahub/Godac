@@ -14,7 +14,7 @@ import { Card } from "@/components/ui";
  * set at sign-up — it's what a manager's "Envoyer sur WhatsApp" link
  * on the planning grid needs (components/planning/PlanningGrid).
  *
- * Address is only shown for chauffeur/manager_chauffeur roles — it's
+ * Address is only shown for chauffeur (ou manager qui conduit) roles — it's
  * used exclusively to estimate the extra distance of a "retour à
  * domicile" vs. the habitual depot return (lib/business/
  * fuel-profitability.ts), never shown to anyone but the driver

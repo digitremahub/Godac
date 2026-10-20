@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       const rawText = await dumpRawTableText(file);
       const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "import_ai");
       if (!quota.ok) {
-        if (deterministicRows.length === 0) return NextResponse.json({ error: quota.raison }, { status: 429 });
+        if (deterministicRows.length === 0) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
         return NextResponse.json({ rows: deterministicRows, warning: quota.raison });
       }
       const aiResult = await extractRowsWithAI(rawText, kind);

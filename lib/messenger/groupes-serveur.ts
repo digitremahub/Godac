@@ -101,6 +101,6 @@ export async function notifierMessageGroupe(opts: {
   await sendPushToSubscriptions(admin, subscriptions ?? [], {
     title: group.name,
     body: `${prenom} : ${texte}`,
-    url: `/messenger?groupe=${group.id}`,
+    url: `/communication/messenger?groupe=${group.id}`,
   });
 }

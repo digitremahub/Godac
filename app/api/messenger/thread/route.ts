@@ -5,7 +5,7 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 
 /**
  * Powers the floating chat widget's conversation tabs (the full
- * /messenger page does this same fetch + sign + mark-read inline
+ * /communication/messenger page does this same fetch + sign + mark-read inline
  * server-side instead, since it already has a server-rendered page).
  * Opening a thread marks the other side's messages read — same
  * "reading it is marking it read" semantics either way in.

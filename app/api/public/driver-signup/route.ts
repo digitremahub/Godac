@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { dateNaissanceValide } from "@/lib/users/date-naissance";
 import { createPinDriver } from "@/lib/auth/driver-pin";
+import { organisationParJeton } from "@/lib/organization/lien-inscription";
 
 const bodySchema = z.object({
   token: z.string().uuid(),
@@ -42,11 +43,10 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminSupabaseClient();
-  const { data: organization } = await admin
-    .from("organizations")
-    .select("id, name")
-    .eq("driver_signup_token", parsed.data.token)
-    .maybeSingle();
+  const organizationId = await organisationParJeton(admin, parsed.data.token);
+  const { data: organization } = organizationId
+    ? await admin.from("organizations").select("id, name").eq("id", organizationId).maybeSingle()
+    : { data: null };
   if (!organization) {
     return NextResponse.json({ error: "Lien invalide." }, { status: 404 });
   }

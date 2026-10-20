@@ -32,7 +32,7 @@ function overlapsDay(leave: LeaveRow, day: string): boolean {
 /**
  * Month-grid overview (who's away, at a glance) plus a flat list
  * below for the actual work — assigning a replacement driver per
- * approved leave. Kept separate from /planning on purpose: this is
+ * approved leave. Kept separate from /exploitation/planning on purpose: this is
  * absence coverage, not tours/vehicles, and direction is the only
  * role that needs the org-wide picture (managers already decide
  * individual requests from /leaves).
@@ -53,7 +53,7 @@ export function LeavePlanningCalendar({
   const [year, monthNum] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
 
   function navTo(nextMonth: string) {
-    router.push(`/leaves/planning?month=${nextMonth}`);
+    router.push(`/equipe/conges/calendrier?month=${nextMonth}`);
   }
 
   async function setReplacement(leaveId: string, replacementDriverId: string) {

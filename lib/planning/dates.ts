@@ -96,7 +96,7 @@ export function parisWallTimeToUtcISOString(day: string, time: string): string {
  * read-side counterpart to parisWallTimeToUtcISOString above, needed
  * anywhere a stored UTC timestamp (clocked_in_at, start_at…) must be
  * grouped "by day" the way a French user would read it (e.g. pairing
- * a badge-in with that same day's planned tour start for /payroll —
+ * a badge-in with that same day's planned tour start for /equipe/paie/heures —
  * grouping by the UTC calendar day instead would occasionally put a
  * late-evening Paris badge into the next UTC day, same bug class
  * documented at the top of this file).

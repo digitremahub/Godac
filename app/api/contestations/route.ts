@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["customer_disputes"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
+  if (!hasRole(appUser.role, ["manager", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "customer_disputes"))) return NextResponse.json({ error: "Module Contestations clients non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());

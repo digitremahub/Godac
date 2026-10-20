@@ -8,7 +8,7 @@ interface Option {
 }
 
 /**
- * Vehicle/driver filters for /fuel — this is also the closest thing
+ * Vehicle/driver filters for /carburant/pleins — this is also the closest thing
  * GODAC has today to a "planning" view: sort by picking a vehicle to
  * see who's had it and when, or a driver to see which vehicles they
  * used each day (planning_entries would be the built-for-purpose
@@ -32,7 +32,7 @@ export function FuelHistoryFilters({
     else params.delete(key);
     // Nouveau filtre : on repart de la première page.
     params.delete("page");
-    router.push(`/fuel?${params.toString()}`);
+    router.push(`/carburant/pleins?${params.toString()}`);
   }
 
   return (
@@ -72,7 +72,7 @@ export function FuelHistoryFilters({
         <input type="date" aria-label="Jusqu'au" className="input !w-auto" value={searchParams.get("to") ?? ""} onChange={(e) => setParam("to", e.target.value)} />
       </label>
       {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page")) && (
-        <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/fuel")}>
+        <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/carburant/pleins")}>
           Réinitialiser
         </button>
       )}

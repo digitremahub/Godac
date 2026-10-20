@@ -1,7 +1,6 @@
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { hasRole } from "@/lib/auth/session";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
 import { motDePassePin } from "@/lib/auth/pin-securise";
@@ -13,7 +12,7 @@ const bodySchema = z.object({
 
 /**
  * Self-service upgrade of Lot 7's QR-badge login: a chauffeur /
- * manager_chauffeur who already has a normal email account can turn
+ * manager who also drives (can_drive) who already has a normal email account can turn
  * their own badge (shown on this same account page) into a working
  * login, same mechanism as the no-email path (lib/auth/driver-pin.ts)
  * but self-triggered from an authenticated session instead of
@@ -26,9 +25,9 @@ export async function PATCH(req: Request) {
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["chauffeur", "manager_chauffeur"])) {
+  if (!appUser.conduit) {
     return NextResponse.json(
-      { error: "Seuls les chauffeurs peuvent activer la connexion par badge." },
+      { error: "Seuls les chauffeurs et les managers qui conduisent peuvent activer la connexion par badge." },
       { status: 403 },
     );
   }

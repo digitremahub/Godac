@@ -1,5 +1,4 @@
 import { garderPage } from "@/lib/acces/garde-page";
-import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { PageHeader, Card } from "@/components/ui";
@@ -21,7 +20,7 @@ export default async function AccountPage() {
   const g = await garderPage("aide.compte");
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
-  const isFieldRole = hasRole(appUser.role, ["chauffeur", "manager_chauffeur"]);
+  const isFieldRole = appUser.conduit;
 
   let pinAlreadySet = false;
   let driverCode: string | null = null;
@@ -84,7 +83,7 @@ export default async function AccountPage() {
         <Card className="flex max-w-md flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Mes fiches de paie</p>
-            <Link href="/payslips" className="text-xs text-teal-ink hover:underline">
+            <Link href="/moi/fiches-de-paie" className="text-xs text-teal-ink hover:underline">
               Voir tout →
             </Link>
           </div>

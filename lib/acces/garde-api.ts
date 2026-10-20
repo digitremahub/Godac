@@ -48,7 +48,7 @@ export type ResultatGardeApi =
 /** Règle effective (fusion écran + options), pure. */
 export function regleEffective(opts: OptionsGarde): Ecran {
   const base = opts.ecran ? ecranDe(opts.ecran) : undefined;
-  const roles = opts.roles === "tous" || (!opts.roles && !base) ? (["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"] as const) : (opts.roles ?? base!.roles);
+  const roles = opts.roles === "tous" || (!opts.roles && !base) ? (["chauffeur", "manager", "comptable", "direction"] as const) : (opts.roles ?? base!.roles);
   return {
     id: base?.id ?? "api",
     section: base?.section ?? "dashboard",
@@ -58,13 +58,17 @@ export function regleEffective(opts: OptionsGarde): Ecran {
     roles,
     modules: [...(base?.modules ?? []), ...(opts.modules ?? [])],
     modulesAuMoinsUn: opts.modulesAuMoinsUn ?? base?.modulesAuMoinsUn,
+    conducteur: base?.conducteur,
   };
 }
 
 /** Décision pure → réponse de refus, ou null si l'accès est accordé. */
-export function refusPour(regle: Ecran, role: UserRole, modules: ReadonlySet<string>): NextResponse<CorpsRefus> | null {
-  const d = deciderAcces(regle, role, modules);
+export function refusPour(regle: Ecran, role: UserRole, modules: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): NextResponse<CorpsRefus> | null {
+  const d = deciderAcces(regle, role, modules, conduit);
   if (d.ok) return null;
+  if (d.motif === "role" && d.conducteur) {
+    return refus("ROLE_REFUSE", "Action réservée aux personnes qui conduisent (chauffeurs, managers qui conduisent aussi).", { rolesAutorises: [...d.rolesAutorises] });
+  }
   if (d.motif === "role") {
     return refus("ROLE_REFUSE", `Action réservée à : ${libelleRoles(d.rolesAutorises)}.`, { rolesAutorises: [...d.rolesAutorises] });
   }
@@ -86,11 +90,11 @@ export async function garderApi(opts: OptionsGarde = {}): Promise<ResultatGardeA
   if (!appUser) return { ok: false, reponse: refus("NON_CONNECTE", "Session expirée, reconnectez-vous.") };
   const regle = regleEffective(opts);
   // Rôle d'abord : un refus de rôle ne coûte aucune requête.
-  if (!regle.roles.includes(appUser.role)) return { ok: false, reponse: refusPour(regle, appUser.role, new Set())! };
+  if (!regle.roles.includes(appUser.role) || (regle.conducteur && !appUser.conduit)) return { ok: false, reponse: refusPour(regle, appUser.role, new Set(), appUser.conduit)! };
   const supabase = await createServerSupabaseClient();
   const besoinModules = (regle.modules?.length ?? 0) > 0 || (regle.modulesAuMoinsUn?.length ?? 0) > 0;
   const modules: ReadonlySet<string> = besoinModules ? new Set(await getEnabledModuleKeys(supabase, appUser.organization_id)) : new Set();
-  const r = refusPour(regle, appUser.role, modules);
+  const r = refusPour(regle, appUser.role, modules, appUser.conduit);
   if (r) return { ok: false, reponse: r };
   return { ok: true, appUser, supabase, modules };
 }

@@ -10,8 +10,11 @@ import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
 
 const bodySchema = z.object({
-  role: z.enum(["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"]).optional(),
+  role: z.enum(["chauffeur", "manager", "comptable", "direction"]).optional(),
   role_title: z.string().nullable().optional(),
+  // Manager qui conduit aussi (planning, tournées, pleins, app Livreur,
+  // badge + PIN) — migration 20261021000002.
+  can_drive: z.boolean().optional(),
   active: z.boolean().optional(),
   full_name: z.string().min(1).optional(),
   email: z.string().trim().email().optional(),
@@ -31,7 +34,7 @@ const bodySchema = z.object({
   // offers "créez votre code" again instead of "entrez votre code".
   reset_pin: z.boolean().optional(),
   // Données du contrat, lues par la direction — le taux horaire s'en
-  // déduit (lib/business/payroll.ts), voir /payroll.
+  // déduit (lib/business/payroll.ts), voir /equipe/paie/heures.
   monthly_gross_salary: z.number().min(0).max(999999.99).nullable().optional(),
   monthly_net_salary: z.number().min(0).max(999999.99).nullable().optional(),
   contractual_monthly_hours: z.number().positive().max(999.99).optional(),
@@ -83,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: target, error: targetError } = await supabase
       .from("users").select("id, organization_id, role").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (targetError || !target) return NextResponse.json({ error: "Utilisateur introuvable dans votre organisation." }, { status: 404 });
-    if (!["chauffeur", "manager_chauffeur"].includes(target.role)) return NextResponse.json({ error: "Modification réservée aux chauffeurs." }, { status: 403 });
+    if (target.role !== "chauffeur") return NextResponse.json({ error: "Modification réservée aux chauffeurs." }, { status: 403 });
     const { data: managedServices, error: servicesError } = await supabase
       .from("user_services").select("service_id").eq("user_id", appUser.id);
     if (servicesError) return NextResponse.json({ error: servicesError.message }, { status: 500 });
@@ -139,6 +142,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } = parsed.data;
   const { email, ...ordinaryUserFields } = userFields;
   const updateFields: Record<string, unknown> = { ...ordinaryUserFields };
+
+  // « Passer manager » un chauffeur : il garde la conduite (planning,
+  // tournées, badge + PIN) sauf si la direction décoche explicitement.
+  if (parsed.data.role === "manager" && parsed.data.can_drive === undefined) {
+    const { data: avant } = await supabase.from("users").select("role").eq("id", id).maybeSingle();
+    if (avant?.role === "chauffeur") updateFields.can_drive = true;
+  }
   /** E-mail Auth avant modification, pour compenser si l'écriture dans `users` échoue. */
   let emailAuthAncien: string | null = null;
 

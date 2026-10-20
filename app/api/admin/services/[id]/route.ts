@@ -15,8 +15,8 @@ const bodySchema = z.object({
   // Dépôt propre à ce service — sert de repli le dépôt de
   // l'organisation (organizations.depot_address) pour la
   // classification "🏭 Dépôt" d'un badge pointeuse, le calcul des
-  // heures planning/badge de /payroll, et l'estimation de distance
-  // "retour direct à domicile" (/tours/history).
+  // heures planning/badge de /equipe/paie/heures, et l'estimation de distance
+  // "retour direct à domicile" (/exploitation/historique).
   depot_address: z.string().trim().min(1).nullable().optional(),
   // Chef d'équipe du service — affiché à chaque chauffeur rattaché.
   team_leader_name: z.string().trim().max(120).nullable().optional(),
@@ -32,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour gérer les services" }, { status: 403 });
   }
 
@@ -87,7 +87,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const g2 = await garderApi({ roles: "tous" });
   if (!g2.ok) return g2.reponse;
   const appUser = g2.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour gérer les services" }, { status: 403 });
   }
 

@@ -53,50 +53,63 @@ export async function POST(req: Request) {
   const [{ data: organization }, { data: recipients }] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", alert.organization_id).single(),
     alert.recipient_user_id
-      ? supabase.from("users").select("id, email, contact_email, auth_method").eq("id", alert.recipient_user_id).eq("active", true)
+      ? supabase.from("users").select("id, role, email, contact_email, auth_method").eq("id", alert.recipient_user_id).eq("active", true)
       : supabase
           .from("users")
-          .select("id, email, contact_email, auth_method")
+          .select("id, role, email, contact_email, auth_method")
           .eq("organization_id", alert.organization_id)
           .eq("active", true)
           .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
   ]);
 
-  // Shared by both channels so an alert always opens the same page
-  // whether it's clicked from the email or from the push notification.
-  const linkPath = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id }) ?? "/alerts";
+  // Lien calculé PAR RÔLE destinataire (lib/alerts/resolve-url.ts) : une
+  // même alerte peut ouvrir la gestion pour l'encadrement et la vue
+  // personnelle pour un chauffeur. E-mail et push d'un même destinataire
+  // ouvrent toujours la même page.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const parLien = new Map<string, typeof recipients>();
+  for (const r of recipients ?? []) {
+    const lien = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: r.role }) ?? "/communication/alertes";
+    parLien.set(lien, [...(parLien.get(lien) ?? []), r]);
+  }
 
-  const { subject, html } = renderAlertEmail({
-    type: alert.type,
-    severity: alert.severity,
-    message: alert.message,
-    organizationName: organization?.name ?? "GODAC",
-    appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-    linkPath,
-  });
+  const resultats = await Promise.all(
+    [...parLien.entries()].map(async ([linkPath, groupe]) => {
+      const rendu = renderAlertEmail({
+        type: alert.type,
+        severity: alert.severity,
+        message: alert.message,
+        organizationName: organization?.name ?? "GODAC",
+        appUrl,
+        linkPath,
+      });
 
-  // A badge+PIN driver's own `email` is a fabricated address that's
-  // never delivered (see lib/auth/driver-pin.ts) — it only exists to
-  // serve as their Supabase Auth identifier. Without a contact_email
-  // on file, there's simply no address to send to; sending to the
-  // fabricated one would just bounce.
-  const addresses = (recipients ?? [])
-    .map((r) => r.contact_email ?? (r.auth_method === "pin" ? null : r.email))
-    .filter((email): email is string => Boolean(email));
+      // A badge+PIN driver's own `email` is a fabricated address that's
+      // never delivered (see lib/auth/driver-pin.ts) — it only exists to
+      // serve as their Supabase Auth identifier. Without a contact_email
+      // on file, there's simply no address to send to; sending to the
+      // fabricated one would just bounce.
+      const addresses = (groupe ?? [])
+        .map((r) => r.contact_email ?? (r.auth_method === "pin" ? null : r.email))
+        .filter((email): email is string => Boolean(email));
 
-  const recipientIds = (recipients ?? []).map((r) => r.id);
-  const { data: subscriptions } = recipientIds.length
-    ? await supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", recipientIds)
-    : { data: [] };
+      const recipientIds = (groupe ?? []).map((r) => r.id);
+      const { data: subscriptions } = recipientIds.length
+        ? await supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", recipientIds)
+        : { data: [] };
 
-  const [emailResult, pushResult] = await Promise.all([
-    sendTransactionalEmail({ to: addresses, subject, html }),
-    sendPushToSubscriptions(supabase, subscriptions ?? [], {
-      title: subject,
-      body: alert.message,
-      url: linkPath,
+      const [email, push] = await Promise.all([
+        addresses.length ? sendTransactionalEmail({ to: addresses, subject: rendu.subject, html: rendu.html }) : Promise.resolve<{ sent: boolean; reason?: string }>({ sent: false, reason: "no recipient address" }),
+        sendPushToSubscriptions(supabase, subscriptions ?? [], { title: rendu.subject, body: alert.message, url: linkPath }),
+      ]);
+      return { email, push };
     }),
-  ]);
+  );
+  const emailResult = {
+    sent: resultats.some((r) => r.email.sent),
+    reason: resultats.length ? resultats.map((r) => r.email.reason).find(Boolean) : "no recipient",
+  };
+  const pushResult = { sent: resultats.reduce((n, r) => n + r.push.sent, 0) };
 
   if (emailResult.sent || pushResult.sent > 0) {
     await supabase.from("alerts").update({ notified_at: new Date().toISOString() }).eq("id", alert.id);

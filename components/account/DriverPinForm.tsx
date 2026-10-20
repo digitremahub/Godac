@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 
 /**
- * Lets a chauffeur/manager_chauffeur turn their own QR badge (shown
+ * Lets a chauffeur (ou manager qui conduit) turn their own QR badge (shown
  * next to this card on /account) into a working login — the same
  * scan-while-signed-out flow Lot 7 built for no-email accounts
  * (app/driver-pin/[id]), just self-activated here instead of

@@ -24,10 +24,10 @@ const RATE_LIMIT_PER_HOUR = 30;
  * the request body: it carries no signal for these fields.
  */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fleet"] });
+  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fleet"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé." }, { status: 403 });
   }
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
   const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "vehicle_ai_specs");
   if (!quota.ok) {
-    return NextResponse.json({ error: quota.raison }, { status: 429 });
+    return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
   }
 
   const result = await fetchVehicleAiSpecs(parsed.data);

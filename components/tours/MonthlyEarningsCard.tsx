@@ -13,7 +13,7 @@ function formatEuros(value: number): string {
 
 /**
  * Le chauffeur voit son propre salaire estimé du mois en cours — à la
- * différence de /payroll (direction uniquement, tous les chauffeurs),
+ * différence de /equipe/paie/heures (direction uniquement, tous les chauffeurs),
  * ici c'est uniquement sa propre donnée, calculée depuis son propre
  * contrat (lib/business/payroll.ts). Grossit au fil des tournées
  * terminées dans le mois ; les jours d'absence approuvés comptent

@@ -40,7 +40,7 @@ export function PlanningViewTabs({
     const qs = new URLSearchParams();
     qs.set("view", nextView);
     if (selectedService) qs.set("service", selectedService);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   function goToday() {
@@ -50,7 +50,7 @@ export function PlanningViewTabs({
     qs.set("day", todayISO());
     qs.set("month", currentMonth());
     if (selectedService) qs.set("service", selectedService);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   // Changing the service filter keeps whatever date the user is
@@ -60,7 +60,7 @@ export function PlanningViewTabs({
     const qs = new URLSearchParams(searchParams.toString());
     if (serviceId) qs.set("service", serviceId);
     else qs.delete("service");
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   return (

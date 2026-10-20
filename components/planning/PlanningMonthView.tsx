@@ -33,7 +33,7 @@ export function PlanningMonthView({
   function navTo(nextMonth: string) {
     const qs = new URLSearchParams({ view: "month", month: nextMonth });
     if (selectedService) qs.set("service", selectedService);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   const entriesByDay = new Map<string, PlanningEntry[]>();
@@ -68,7 +68,7 @@ export function PlanningMonthView({
           return (
             <Link
               key={day}
-              href={`/planning?view=day&day=${day}${selectedService ? `&service=${selectedService}` : ""}`}
+              href={`/exploitation/planning?view=day&day=${day}${selectedService ? `&service=${selectedService}` : ""}`}
               className={`flex min-h-[72px] flex-col gap-0.5 rounded-lg border border-navy/10 p-1.5 ${
                 inMonth ? "bg-surface" : "bg-navy/[0.04] text-navy/60"
               }`}

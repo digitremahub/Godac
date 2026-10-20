@@ -121,7 +121,7 @@ export function PresencePlanning({
     const qs = new URLSearchParams();
     qs.set("week", week);
     qs.set("service", service.id);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   return (

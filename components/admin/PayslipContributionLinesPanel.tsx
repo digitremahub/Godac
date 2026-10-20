@@ -13,7 +13,7 @@ interface ContributionLineRow {
 
 /**
  * Grille de cotisations appliquée au brut de chaque bulletin généré
- * (voir lib/payslips/build-payslip.ts et generate-pdf.tsx) — direction
+ * (voir lib/payslips/generate-pdf.tsx) — direction
  * uniquement, les taux viennent du logiciel de l'expert-comptable ou
  * de la convention collective, GODAC ne les invente pas.
  */

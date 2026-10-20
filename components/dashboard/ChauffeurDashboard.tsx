@@ -190,7 +190,7 @@ export async function ChauffeurDashboard({
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
         {maintenanceEnabled && (
-          <Link href="/maintenance" className="block">
+          <Link href="/moi/signaler" className="block">
             <StatTile label="Mes demandes d'entretien en cours" value={String(myMaintenanceRes.count ?? 0)} accent="gold" />
           </Link>
         )}
@@ -204,7 +204,7 @@ export async function ChauffeurDashboard({
                 <h2 className="text-lg">
                   {todayIsRenfort ? `Villages du renfort ${todayTourNumber}` : `Villages de la tournée ${todayTourNumber}`}
                 </h2>
-                <Link href="/tours/routes" className="text-sm text-teal-ink hover:underline">
+                <Link href="/exploitation/tournees" className="text-sm text-teal-ink hover:underline">
                   Détails
                 </Link>
               </div>
@@ -265,7 +265,7 @@ export async function ChauffeurDashboard({
           <Card className="lg:col-span-2">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg">Mon planning cette semaine</h2>
-              <Link href="/planning/mine?view=week" className="text-sm text-teal-ink hover:underline">
+              <Link href="/moi/planning?view=week" className="text-sm text-teal-ink hover:underline">
                 Voir tout
               </Link>
             </div>
@@ -273,7 +273,7 @@ export async function ChauffeurDashboard({
               days={weekDays}
               toursByDay={weekToursByDay}
               today={todayParis}
-              dayHrefPrefix="/planning/mine?view=day&anchor="
+              dayHrefPrefix="/moi/planning?view=day&anchor="
             />
           </Card>
         )}
@@ -281,7 +281,7 @@ export async function ChauffeurDashboard({
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg">Mes derniers ravitaillements</h2>
-            <Link href="/fuel" className="text-sm text-teal-ink hover:underline">
+            <Link href="/carburant/pleins" className="text-sm text-teal-ink hover:underline">
               Voir tout
             </Link>
           </div>

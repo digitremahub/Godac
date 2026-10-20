@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabaseClient();
-  const isFieldRole = appUser.role === "chauffeur" || appUser.role === "manager_chauffeur";
+  const isFieldRole = appUser.conduit;
   const [enabledModuleKeys, { data: organization }, activeTour] = await Promise.all([
     modulesActifs(appUser.organization_id).then((m) => [...m]),
     supabase.from("organizations").select("name, logo_url, accent_color, is_demo").eq("id", appUser.organization_id).single(),
@@ -48,6 +48,7 @@ export default async function DashboardLayout({
     <DashboardShell
       isDemo={Boolean((organization as { is_demo?: boolean } | null)?.is_demo)}
       role={appUser.role}
+      conduit={appUser.conduit}
       enabledModuleKeys={enabledModuleKeys}
       organizationName={organization?.name ?? "GODAC"}
       logoUrl={organization?.logo_url ?? null}

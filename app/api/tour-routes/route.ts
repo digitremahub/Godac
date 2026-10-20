@@ -9,12 +9,12 @@ const bodySchema = z.object({
   service_id: z.string().uuid(),
 });
 
-/** Creates a tour's reference sheet (villages are added on /tours/routes). */
+/** Creates a tour's reference sheet (villages are added on /exploitation/tournees). */
 export async function POST(req: Request) {
   const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Réservé à la direction et aux chefs d'équipe." }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json());

@@ -15,9 +15,14 @@
 
 import type { UserRole } from "@/lib/types/domain";
 
-export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "manager_chauffeur", "comptable", "direction"];
-export const ENCADREMENT: readonly UserRole[] = ["manager", "manager_chauffeur", "direction"];
-export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager_chauffeur"];
+export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
+export const ENCADREMENT: readonly UserRole[] = ["manager", "direction"];
+/**
+ * Rôles « terrain » : chauffeur, et manager qui conduit aussi
+ * (users.can_drive). Les écrans marqués `conducteur` exigent en plus que la
+ * personne conduise : un manager sans can_drive en est exclu.
+ */
+export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager"];
 
 /** Clés réelles de la table `modules` qui correspondent à du code. */
 export const MODULES_AVEC_CODE = [
@@ -159,6 +164,11 @@ export interface Ecran {
   href: string;
   /** Rôles autorisés à ouvrir l'écran (garde de page). */
   roles: readonly UserRole[];
+  /**
+   * Réservé aux personnes qui conduisent : chauffeur, ou manager avec
+   * can_drive (lib/roles/conducteurs.ts).
+   */
+  conducteur?: boolean;
   /** Rôles qui voient l'entrée dans le menu (par défaut : `roles`). */
   rolesMenu?: readonly UserRole[];
   /** Modules tous requis (ET). */
@@ -169,8 +179,22 @@ export interface Ecran {
   saufModule?: CleModule;
   /** Formule à partir de laquelle le module est inclus (indicatif). */
   formuleMin?: FormuleMin;
-  /** "cache" : page accessible mais sans entrée de menu (fiche, formulaire…). */
-  menu?: "section" | "cache";
+  /**
+   * "cache" : page accessible mais sans entrée de menu ni onglet (fiche,
+   * formulaire…) ; "onglet" : onglet de sa section, sans entrée dans le
+   * menu latéral.
+   */
+  menu?: "section" | "onglet" | "cache";
+  /**
+   * Écran parent (sous-onglet) : quand le parent est visible, cet écran
+   * n'a ni entrée de menu ni onglet de section ; il apparaît dans la
+   * barre de sous-onglets du parent. Sinon il remonte à sa place.
+   */
+  parent?: string;
+  /** Libellé court de l'onglet de section et du menu (par défaut : `libelle`). */
+  libelleOnglet?: string;
+  /** Libellé dans la barre de sous-onglets (par défaut : `libelle`). */
+  libelleSousOnglet?: string;
   /** Visible dans le tiroir « Plus » de la barre mobile chauffeur. */
   mobile?: "barre" | "plus";
   icone: IconeId;
@@ -189,81 +213,97 @@ const E = (e: Ecran) => e;
 
 export const ECRANS: readonly Ecran[] = [
   // ── Tableau de bord ──────────────────────────────────────────────
-  E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
-  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/reporting", roles: ["direction"], modules: ["bi_reporting"], icone: "chart" }),
+  E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", libelleOnglet: "Aujourd'hui", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
+  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction"], modules: ["bi_reporting"], icone: "chart" }),
 
   // ── Mon espace ───────────────────────────────────────────────────
   E({
     id: "moi.tournee_depart",
     section: "moi",
     libelle: "Démarrer une tournée",
-    href: "/tours/start",
+    libelleOnglet: "Ma tournée",
+    libelleSousOnglet: "Départ",
+    href: "/moi/tournee/depart",
     roles: TERRAIN,
+    conducteur: true,
     modules: ["planning"],
     icone: "clock",
     mobile: "barre",
   }),
-  E({ id: "moi.tournee_retour", section: "moi", libelle: "Terminer une tournée", href: "/tours/end", roles: TERRAIN, modules: ["planning"], icone: "flag", mobile: "barre" }),
+  E({
+    id: "moi.tournee_retour",
+    section: "moi",
+    libelle: "Terminer une tournée",
+    libelleSousOnglet: "Retour",
+    href: "/moi/tournee/retour",
+    roles: TERRAIN,
+    conducteur: true,
+    modules: ["planning"],
+    icone: "flag",
+    mobile: "barre",
+    parent: "moi.tournee_depart",
+  }),
   E({
     id: "moi.tournee_collegue",
     section: "moi",
     libelle: "J'entre pour un collègue",
-    href: "/tours/help",
-    roles: ["chauffeur", "manager_chauffeur", "manager", "direction"],
-    rolesMenu: ["chauffeur", "manager_chauffeur", "manager"],
+    libelleSousOnglet: "Pour un collègue",
+    href: "/moi/tournee/collegue",
+    roles: ["chauffeur", "manager", "direction"],
+    rolesMenu: ["chauffeur", "manager"],
     modules: ["planning"],
     icone: "users",
     mobile: "plus",
+    parent: "moi.tournee_depart",
   }),
-  E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/planning/mine", roles: TERRAIN, modules: ["planning"], icone: "calendar", mobile: "plus" }),
-  E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/my-vehicle", roles: TERRAIN, icone: "truck", mobile: "plus" }),
+  E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/moi/planning", roles: TERRAIN, conducteur: true, modules: ["planning"], icone: "calendar", mobile: "plus" }),
+  E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/moi/vehicule", roles: TERRAIN, conducteur: true, icone: "truck", mobile: "plus" }),
   E({
     id: "moi.signaler",
     section: "moi",
     libelle: "Signaler un problème",
-    href: "/maintenance",
-    roles: ["chauffeur"],
+    href: "/moi/signaler",
+    // Tout rôle qui conduit ou reçoit un véhicule peut signaler (QR véhicule).
+    roles: ["chauffeur", "manager", "direction"],
+    rolesMenu: ["chauffeur"],
     modules: ["maintenance_requests"],
     icone: "wrench",
     mobile: "plus",
   }),
-  E({ id: "moi.amendes", section: "moi", libelle: "Mes amendes", href: "/mes-amendes", roles: TERRAIN, modules: ["fines"], icone: "file", mobile: "plus" }),
+  E({ id: "moi.amendes", section: "moi", libelle: "Mes amendes", href: "/moi/amendes", roles: TERRAIN, conducteur: true, modules: ["fines"], icone: "file", mobile: "plus" }),
   E({
     id: "moi.fiches_paie",
     section: "moi",
     libelle: "Mes fiches de paie",
-    href: "/payslips",
-    // La direction ouvre la même page (onglet Fiches de paie de la Paie).
-    roles: TOUS_LES_ROLES,
-    rolesMenu: ["chauffeur", "manager", "manager_chauffeur", "comptable"],
+    href: "/moi/fiches-de-paie",
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["payslips"],
     icone: "coins",
     mobile: "plus",
-    note: "salarié : ses bulletins validés seulement",
+    alternative: { direction: "/equipe/paie/fiches" },
+    note: "ses bulletins validés seulement",
   }),
   E({
     id: "moi.pointage",
     section: "moi",
     libelle: "Mon pointage",
-    href: "/time-clock",
-    roles: TOUS_LES_ROLES,
-    rolesMenu: ["chauffeur", "comptable"],
+    href: "/moi/pointage",
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["time_clock"],
     icone: "clock",
     mobile: "plus",
-    note: "encadrement : vue d'équipe (service) ; autres : soi",
+    alternative: { direction: "/equipe/pointage" },
   }),
   E({
     id: "moi.conges",
     section: "moi",
     libelle: "Mes congés",
-    href: "/leaves",
-    roles: TOUS_LES_ROLES,
-    rolesMenu: ["chauffeur", "comptable"],
+    href: "/moi/conges",
+    roles: ["chauffeur", "manager", "comptable"],
     modules: ["leave_management"],
     icone: "calendar",
     mobile: "plus",
-    note: "encadrement : décisions (service)",
+    alternative: { direction: "/equipe/conges" },
   }),
 
   // ── Exploitation ─────────────────────────────────────────────────
@@ -271,18 +311,18 @@ export const ECRANS: readonly Ecran[] = [
     id: "exploitation.planning",
     section: "exploitation",
     libelle: "Planning",
-    href: "/planning",
+    href: "/exploitation/planning",
     roles: ENCADREMENT,
     modules: ["planning"],
     icone: "calendar",
-    alternative: { chauffeur: "/planning/mine" },
+    alternative: { chauffeur: "/moi/planning" },
   }),
   E({
     id: "exploitation.tournees",
     section: "exploitation",
     libelle: "Tournées & villages",
-    href: "/tours/routes",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    href: "/exploitation/tournees",
+    roles: ["direction", "manager", "chauffeur"],
     modulesAuMoinsUn: ["planning", "route_optimizer"],
     icone: "map",
     note: "chauffeur : lecture",
@@ -290,20 +330,22 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "exploitation.colis",
     section: "exploitation",
-    libelle: "Tournées colis",
-    href: "/colis",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    libelle: "Tournée colis",
+    href: "/exploitation/colis",
+    roles: ["direction", "manager", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
-    aussiActif: ["/suivi"],
+    aussiActif: ["/exploitation/suivi"],
     note: "chauffeur : sa tournée",
   }),
-  E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map", menu: "cache" }),
+  E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/exploitation/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map", menu: "onglet" }),
   E({
     id: "exploitation.historique",
     section: "exploitation",
     libelle: "Historique des tournées",
-    href: "/tours/history",
+    libelleOnglet: "Historique",
+    libelleSousOnglet: "Tournées",
+    href: "/exploitation/historique",
     roles: TOUS_LES_ROLES,
     modules: ["planning"],
     icone: "file",
@@ -313,19 +355,46 @@ export const ECRANS: readonly Ecran[] = [
     id: "exploitation.rapports",
     section: "exploitation",
     libelle: "Rapports de tournée",
-    href: "/reports",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    libelleSousOnglet: "Rapports",
+    href: "/exploitation/historique/rapports",
+    roles: ["direction", "manager", "comptable"],
     modules: ["planning"],
     icone: "file",
-    alternative: { chauffeur: "/tours/history" },
+    parent: "exploitation.historique",
+    alternative: { chauffeur: "/exploitation/historique" },
     note: "comptable : lecture",
+  }),
+  E({
+    id: "exploitation.rapports_photos",
+    section: "exploitation",
+    libelle: "Photos de tournée",
+    libelleSousOnglet: "Photos",
+    href: "/exploitation/historique/photos",
+    roles: ["direction", "manager", "comptable"],
+    modules: ["planning"],
+    icone: "camera",
+    parent: "exploitation.historique",
+    alternative: { chauffeur: "/exploitation/historique" },
+  }),
+  E({
+    id: "exploitation.historique_colis",
+    section: "exploitation",
+    libelle: "Tournées colis passées",
+    libelleSousOnglet: "Tournées colis",
+    href: "/exploitation/historique/colis",
+    roles: ["direction", "manager", "chauffeur"],
+    modules: ["route_optimizer"],
+    icone: "qr",
+    parent: "exploitation.historique",
+    note: "chauffeur : les siennes",
   }),
   E({
     id: "exploitation.contestations",
     section: "exploitation",
     libelle: "Contestations clients",
-    href: "/contestations",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
+    libelleOnglet: "Contestations",
+    href: "/exploitation/contestations",
+    roles: ["direction", "manager", "chauffeur"],
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
@@ -336,26 +405,25 @@ export const ECRANS: readonly Ecran[] = [
     id: "flotte.vehicules",
     section: "flotte",
     libelle: "Véhicules",
-    href: "/vehicles",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    href: "/flotte/vehicules",
+    roles: ["direction", "manager", "comptable"],
     modules: ["fleet"],
     icone: "truck",
-    aussiActif: ["/vehicles/"],
-    alternative: { chauffeur: "/my-vehicle" },
+    alternative: { chauffeur: "/moi/vehicule" },
     note: "comptable : lecture",
   }),
   E({
     id: "flotte.vehicule_fiche",
     section: "flotte",
     libelle: "Fiche véhicule",
-    href: "/vehicles/[id]",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    href: "/flotte/vehicules/[id]",
+    roles: ["direction", "manager", "comptable"],
     modules: ["fleet"],
     icone: "truck",
     menu: "cache",
-    alternative: { chauffeur: "/my-vehicle" },
+    alternative: { chauffeur: "/moi/vehicule" },
   }),
-  E({ id: "flotte.vehicule_nouveau", section: "flotte", libelle: "Nouveau véhicule", href: "/vehicles/new", roles: ENCADREMENT, modules: ["fleet"], icone: "truck", menu: "cache" }),
+  E({ id: "flotte.vehicule_nouveau", section: "flotte", libelle: "Nouveau véhicule", href: "/flotte/vehicules/nouveau", roles: ENCADREMENT, modules: ["fleet"], icone: "truck", menu: "cache" }),
   E({
     id: "flotte.actions_vehicule",
     section: "flotte",
@@ -369,144 +437,191 @@ export const ECRANS: readonly Ecran[] = [
     id: "flotte.entretien",
     section: "flotte",
     libelle: "Demandes d'entretien",
-    href: "/maintenance",
-    roles: ["direction", "manager", "manager_chauffeur", "chauffeur"],
-    rolesMenu: ENCADREMENT,
+    libelleOnglet: "Entretien",
+    href: "/flotte/entretien",
+    roles: ENCADREMENT,
     modules: ["maintenance_requests"],
     icone: "wrench",
-    note: "chauffeur : signale (Mon espace)",
+    alternative: { chauffeur: "/moi/signaler" },
   }),
   E({
     id: "flotte.loueurs_demandes",
     section: "flotte",
     libelle: "Demandes aux loueurs",
-    href: "/loueurs/demandes",
+    libelleOnglet: "Loueurs",
+    libelleSousOnglet: "Demandes",
+    href: "/flotte/loueurs",
     roles: ENCADREMENT,
     modules: ["rental_providers"],
     formuleMin: "pro",
-    icone: "wrench",
+    icone: "building",
   }),
-  E({ id: "flotte.loueurs", section: "flotte", libelle: "Loueurs & prestataires", href: "/loueurs", roles: ENCADREMENT, modules: ["rental_providers"], formuleMin: "pro", icone: "building" }),
+  E({
+    id: "flotte.loueurs",
+    section: "flotte",
+    libelle: "Loueurs & prestataires",
+    libelleSousOnglet: "Prestataires",
+    href: "/flotte/loueurs/prestataires",
+    roles: ENCADREMENT,
+    modules: ["rental_providers"],
+    formuleMin: "pro",
+    icone: "building",
+    parent: "flotte.loueurs_demandes",
+  }),
   E({
     id: "flotte.amendes",
     section: "flotte",
     libelle: "Amendes",
-    href: "/fines",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    href: "/flotte/amendes",
+    roles: ["direction", "manager", "comptable"],
     modules: ["fines"],
     icone: "file",
-    alternative: { chauffeur: "/mes-amendes" },
+    alternative: { chauffeur: "/moi/amendes" },
     note: "manager : son service ; comptable : lecture",
   }),
-  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/qr-codes", roles: ENCADREMENT, icone: "qr" }),
+  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr" }),
 
   // ── Carburant ────────────────────────────────────────────────────
-  E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/fuel", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
-  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Revue OCR", href: "/ocr-review", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
+  E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/carburant/pleins", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
+  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Revue OCR", href: "/carburant/revue-ocr", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
   E({
     id: "carburant.cuves",
     section: "carburant",
-    libelle: "Cuves & approvisionnements",
-    href: "/tanks",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    libelle: "Cuves",
+    href: "/carburant/cuves",
+    roles: ["direction", "manager", "comptable"],
+    icone: "cylinder",
+    aussiActif: ["/carburant/approvisionnements"],
+  }),
+  E({
+    id: "carburant.approvisionnements",
+    section: "carburant",
+    libelle: "Approvisionnements",
+    href: "/carburant/approvisionnements",
+    roles: ["direction", "manager", "comptable"],
+    menu: "onglet",
     icone: "cylinder",
   }),
   E({
     id: "carburant.ticpe",
     section: "carburant",
     libelle: "Export TICPE",
-    href: "/ticpe",
+    href: "/carburant/ticpe",
     roles: ["direction", "comptable"],
     modules: ["ticpe_export"],
     icone: "file",
-    aussiActif: ["/ticpe/"],
   }),
-  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/ticpe/[id]", roles: ["direction", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
+  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
 
   // ── Équipe & RH ──────────────────────────────────────────────────
   E({
     id: "equipe.utilisateurs",
     section: "equipe",
     libelle: "Utilisateurs",
-    href: "/admin/users",
+    href: "/equipe/utilisateurs",
     roles: ENCADREMENT,
     icone: "users",
-    aussiActif: ["/admin/users/"],
     note: "manager : lecture de son service",
   }),
   E({
     id: "equipe.utilisateur_fiche",
     section: "equipe",
     libelle: "Fiche salarié",
-    href: "/admin/users/[id]",
-    roles: ["direction", "manager", "manager_chauffeur", "comptable"],
+    href: "/equipe/utilisateurs/[id]",
+    roles: ["direction", "manager", "comptable"],
     icone: "users",
     menu: "cache",
   }),
-  E({ id: "equipe.inscriptions", section: "equipe", libelle: "Chauffeurs à valider", href: "/driver-signups", roles: ENCADREMENT, icone: "users" }),
+  E({ id: "equipe.inscriptions", section: "equipe", libelle: "Chauffeurs à valider", libelleOnglet: "Inscriptions", href: "/equipe/inscriptions", roles: ENCADREMENT, icone: "users" }),
   E({
     id: "equipe.pointage",
     section: "equipe",
     libelle: "Pointage",
-    href: "/time-clock",
+    href: "/equipe/pointage",
     roles: ENCADREMENT,
     modules: ["time_clock"],
     icone: "clock",
+    alternative: { chauffeur: "/moi/pointage", comptable: "/moi/pointage" },
     note: "manager : son service",
   }),
-  E({ id: "equipe.conges", section: "equipe", libelle: "Congés & absences", href: "/leaves", roles: ENCADREMENT, modules: ["leave_management"], icone: "calendar" }),
+  E({
+    id: "equipe.conges",
+    section: "equipe",
+    libelle: "Congés & absences",
+    libelleOnglet: "Congés",
+    libelleSousOnglet: "Demandes",
+    href: "/equipe/conges",
+    roles: ENCADREMENT,
+    modules: ["leave_management"],
+    icone: "calendar",
+    alternative: { chauffeur: "/moi/conges", comptable: "/moi/conges" },
+  }),
   E({
     id: "equipe.conges_calendrier",
     section: "equipe",
     libelle: "Calendrier des congés",
-    href: "/leaves/planning",
+    libelleSousOnglet: "Calendrier",
+    href: "/equipe/conges/calendrier",
     roles: ENCADREMENT,
     modules: ["leave_management"],
     icone: "calendar",
+    parent: "equipe.conges",
     note: "manager : son service",
   }),
   E({
     id: "equipe.paie",
     section: "equipe",
     libelle: "Paie & salaires",
-    href: "/paie",
+    libelleOnglet: "Paie",
+    libelleSousOnglet: "Bulletins du mois",
+    href: "/equipe/paie",
     roles: ["direction", "comptable"],
     modules: ["payslips"],
     icone: "coins",
-    aussiActif: ["/paie/", "/payroll"],
     note: "comptable : prépare, la direction valide",
   }),
-  E({ id: "equipe.paie_salarie", section: "equipe", libelle: "Bulletin d'un salarié", href: "/paie/[userId]", roles: ["direction", "comptable"], modules: ["payslips"], icone: "coins", menu: "cache" }),
-  E({ id: "equipe.paie_reglages", section: "equipe", libelle: "Réglages de paie", href: "/paie/parametres", roles: ["direction"], modules: ["payslips"], icone: "coins", menu: "cache" }),
   E({
     id: "equipe.heures",
     section: "equipe",
-    libelle: "Salaires",
-    href: "/payroll",
+    libelle: "Heures & salaires",
+    href: "/equipe/paie/heures",
     roles: ["direction", "comptable"],
     modulesAuMoinsUn: ["planning", "time_clock"],
     saufModule: "payslips",
     icone: "coins",
+    parent: "equipe.paie",
   }),
+  E({
+    id: "equipe.paie_fiches",
+    section: "equipe",
+    libelle: "Fiches de paie",
+    href: "/equipe/paie/fiches",
+    roles: ["direction", "comptable"],
+    modules: ["payslips"],
+    icone: "coins",
+    parent: "equipe.paie",
+  }),
+  E({ id: "equipe.paie_reglages", section: "equipe", libelle: "Réglages de paie", libelleSousOnglet: "Réglages", href: "/equipe/paie/reglages", roles: ["direction"], modules: ["payslips"], icone: "coins", parent: "equipe.paie" }),
+  E({ id: "equipe.paie_salarie", section: "equipe", libelle: "Bulletin d'un salarié", href: "/equipe/paie/[userId]", roles: ["direction", "comptable"], modules: ["payslips"], icone: "coins", menu: "cache" }),
 
   // ── Communication ────────────────────────────────────────────────
-  E({ id: "communication.messenger", section: "communication", libelle: "Messenger", href: "/messenger", roles: TOUS_LES_ROLES, modules: ["messenger"], icone: "chat", mobile: "barre" }),
+  E({ id: "communication.messenger", section: "communication", libelle: "Messenger", href: "/communication/messenger", roles: TOUS_LES_ROLES, modules: ["messenger"], icone: "chat", mobile: "barre" }),
   E({
     id: "communication.intranet",
     section: "communication",
     libelle: "Intranet & convocations",
-    href: "/intranet",
+    href: "/communication/intranet",
     roles: TOUS_LES_ROLES,
     modules: ["intranet"],
     icone: "megaphone",
     mobile: "plus",
   }),
-  E({ id: "communication.alertes", section: "communication", libelle: "Alertes", href: "/alerts", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
-  E({ id: "communication.assistance", section: "communication", libelle: "Demandes d'assistance", href: "/support", roles: ENCADREMENT, modules: ["assistant"], icone: "lifebuoy" }),
+  E({ id: "communication.alertes", section: "communication", libelle: "Alertes", href: "/communication/alertes", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
+  E({ id: "communication.assistance", section: "communication", libelle: "Demandes d'assistance", libelleOnglet: "Assistance", href: "/communication/assistance", roles: ENCADREMENT, modules: ["assistant"], icone: "lifebuoy" }),
 
   // ── Administration ───────────────────────────────────────────────
-  E({ id: "admin.organisation", section: "admin", libelle: "Organisation", href: "/admin/organizations", roles: ["direction"], icone: "building" }),
-  E({ id: "admin.abonnement", section: "admin", libelle: "Abonnement & modules", href: "/admin/billing", roles: ["direction"], icone: "card" }),
+  E({ id: "admin.organisation", section: "admin", libelle: "Organisation", href: "/admin/organisation", roles: ["direction"], icone: "building" }),
+  E({ id: "admin.abonnement", section: "admin", libelle: "Abonnement & modules", href: "/admin/abonnement", roles: ["direction"], icone: "card" }),
   E({ id: "admin.journal", section: "admin", libelle: "Journal d'audit", href: "/admin/journal", roles: ["direction"], icone: "shield" }),
   E({
     id: "admin.faq",
@@ -520,15 +635,13 @@ export const ECRANS: readonly Ecran[] = [
   }),
 
   // ── Aide ─────────────────────────────────────────────────────────
-  E({ id: "aide.guide", section: "aide", libelle: "Guide d'utilisation", href: "/guide", roles: TOUS_LES_ROLES, icone: "file", mobile: "plus" }),
-  E({ id: "aide.faq", section: "aide", libelle: "Questions fréquentes", href: "/faq", roles: TOUS_LES_ROLES, icone: "lifebuoy" }),
+  E({ id: "aide.guide", section: "aide", libelle: "Guide d'utilisation", href: "/aide/guide", roles: TOUS_LES_ROLES, icone: "file", mobile: "plus" }),
+  E({ id: "aide.faq", section: "aide", libelle: "Questions fréquentes", href: "/aide/faq", roles: TOUS_LES_ROLES, icone: "lifebuoy" }),
   E({ id: "aide.compte", section: "aide", libelle: "Mon compte", href: "/account", roles: TOUS_LES_ROLES, icone: "user", mobile: "plus" }),
 ];
 
 /** Anciennes pages conservées jusqu'au lot 5, gardées par l'écran qui les remplace. */
-export const PAGES_ALIAS: Readonly<Record<string, string>> = {
-  "/my-fines": "moi.amendes",
-};
+export const PAGES_ALIAS: Readonly<Record<string, string>> = {};
 
 const PAR_ID = new Map(ECRANS.map((e) => [e.id, e]));
 
@@ -555,16 +668,19 @@ export type MotifRefus = "role" | "module";
 
 export type DecisionAcces =
   | { ok: true }
-  | { ok: false; motif: "role"; rolesAutorises: readonly UserRole[]; redirection?: string }
+  | { ok: false; motif: "role"; rolesAutorises: readonly UserRole[]; redirection?: string; conducteur?: boolean }
   | { ok: false; motif: "module"; modules: readonly CleModule[] };
 
 /**
  * Décision pure : rôle d'abord, puis modules. Partagée par la garde de
  * page, la garde d'API et le menu.
  */
-export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): DecisionAcces {
+export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): DecisionAcces {
   if (!e.roles.includes(role)) {
     return { ok: false, motif: "role", rolesAutorises: e.roles, redirection: e.alternative?.[role] };
+  }
+  if (e.conducteur && !conduit) {
+    return { ok: false, motif: "role", rolesAutorises: e.roles, redirection: e.alternative?.[role], conducteur: true };
   }
   const manquants = (e.modules ?? []).filter((m) => !modulesActifs.has(m));
   if (manquants.length > 0) return { ok: false, motif: "module", modules: manquants };
@@ -574,12 +690,85 @@ export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
   return { ok: true };
 }
 
-/** Entrée de menu visible pour ce rôle et ces modules. */
-export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>): boolean {
+/** Onglet visible (barre de section ou sous-onglets), sans tenir compte du parent. */
+function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
   if (e.menu === "cache") return false;
   if (!(e.rolesMenu ?? e.roles).includes(role)) return false;
+  return deciderAcces(e, role, modulesActifs, conduit).ok;
+}
+
+/** Le parent de cet écran est visible : l'écran n'est qu'un sous-onglet. */
+function estSousOngletVisible(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
+  if (!e.parent) return false;
+  const p = PAR_ID.get(e.parent);
+  return Boolean(p && estOuvrableEnOnglet(p, role, modulesActifs, conduit));
+}
+
+/** Entrée de menu visible pour ce rôle et ces modules. */
+export function estVisibleAuMenu(e: Ecran, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): boolean {
+  if (e.menu === "onglet") return false;
   if (e.saufModule && modulesActifs.has(e.saufModule)) return false;
-  return deciderAcces(e, role, modulesActifs).ok;
+  if (estSousOngletVisible(e, role, modulesActifs, conduit)) return false;
+  return estOuvrableEnOnglet(e, role, modulesActifs, conduit);
+}
+
+/** Préfixe d'URL de chaque section (les onglets hors préfixe, comme /account, n'y figurent pas). */
+export const PREFIXE_SECTION: Record<SectionId, string> = {
+  dashboard: "/dashboard",
+  moi: "/moi",
+  exploitation: "/exploitation",
+  flotte: "/flotte",
+  carburant: "/carburant",
+  equipe: "/equipe",
+  communication: "/communication",
+  admin: "/admin",
+  aide: "/aide",
+};
+
+export interface OngletEcran {
+  id: string;
+  href: string;
+  libelle: string;
+  /** Chemins qui allument aussi l'onglet (sous-onglets, fiches). */
+  prefixes: string[];
+}
+
+const chemin = (href: string) => href.split("?")[0]!;
+const dansSection = (e: Ecran) => {
+  const p = PREFIXE_SECTION[e.section];
+  const h = chemin(e.href);
+  return h === p || h.startsWith(`${p}/`);
+};
+
+function versOnglet(e: Ecran): OngletEcran {
+  const enfants = ECRANS.filter((x) => x.parent === e.id).map((x) => chemin(x.href));
+  return { id: e.id, href: e.href, libelle: e.libelleOnglet ?? e.libelle, prefixes: [...enfants, ...(e.aussiActif ?? []).map((a) => a.replace(/\/$/, ""))] };
+}
+
+/** Barre d'onglets d'une section, filtrée par rôle et modules. */
+export function ongletsSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): OngletEcran[] {
+  const vus = new Set<string>();
+  return ECRANS.filter(
+    (e) => e.section === section && dansSection(e) && estOuvrableEnOnglet(e, role, modulesActifs, conduit) && !estSousOngletVisible(e, role, modulesActifs, conduit),
+  )
+    .filter((e) => (vus.has(chemin(e.href)) ? false : (vus.add(chemin(e.href)), true)))
+    .map(versOnglet);
+}
+
+/** Sous-onglets d'un écran parent (le parent en premier), filtrés par rôle et modules. */
+export function sousOnglets(parentId: string, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): OngletEcran[] {
+  const p = ecran(parentId);
+  if (!estOuvrableEnOnglet(p, role, modulesActifs, conduit)) return [];
+  const enfants = ECRANS.filter((e) => e.parent === parentId && estOuvrableEnOnglet(e, role, modulesActifs, conduit));
+  return [{ id: p.id, href: p.href, libelle: p.libelleSousOnglet ?? p.libelle, prefixes: [] }, ...enfants.map((e) => ({ ...versOnglet(e), libelle: e.libelleSousOnglet ?? e.libelle }))];
+}
+
+/** Premier onglet ouvrable d'une section (lien de section, URL nue /flotte…). */
+export function premierOngletSection(section: SectionId, role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): string | null {
+  const o = ongletsSection(section, role, modulesActifs, conduit)[0];
+  if (o) return o.href;
+  const ouvrable = ECRANS.find((e) => e.section === section && dansSection(e) && !chemin(e.href).includes("[") && deciderAcces(e, role, modulesActifs, conduit).ok);
+  return ouvrable?.href ?? null;
 }
 
 export interface SectionMenu {
@@ -593,10 +782,10 @@ export interface SectionMenu {
  * Une même URL n'apparaît qu'une fois (première section gagnante), pour
  * qu'aucun rôle n'ait deux entrées vers la même page.
  */
-export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>): SectionMenu[] {
+export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
   const vus = new Set<string>();
   return SECTIONS.map((s) => {
-    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs)).filter((e) => {
+    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
       if (vus.has(e.href)) return false;
       vus.add(e.href);
       return true;
@@ -605,8 +794,8 @@ export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>): Se
   }).filter((s) => s.ecrans.length > 0);
 }
 
-export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>): Ecran[] {
-  return menuPour(role, modulesActifs).flatMap((s) => s.ecrans);
+export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): Ecran[] {
+  return menuPour(role, modulesActifs, conduit).flatMap((s) => s.ecrans);
 }
 
 /** Entrée active : la plus longue URL qui correspond, sinon un préfixe `aussiActif`. */
@@ -618,14 +807,20 @@ export function entreeActive(ecrans: readonly Ecran[], pathname: string): Ecran 
   };
   const directes = ecrans.filter((e) => correspond(e.href)).sort((a, b) => chemin(b.href).length - chemin(a.href).length);
   if (directes[0]) return directes[0];
-  return ecrans.find((e) => e.aussiActif?.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`))));
+  const parPrefixe = ecrans.find((e) => e.aussiActif?.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`))));
+  if (parPrefixe) return parPrefixe;
+  // Onglet sans entrée de menu (Suivi en direct, Approvisionnements…) :
+  // première entrée de la même section.
+  return ecrans.find((e) => {
+    const p = PREFIXE_SECTION[e.section];
+    return p !== "/dashboard" && (pathname === p || pathname.startsWith(`${p}/`));
+  });
 }
 
 export function libelleRoles(roles: readonly UserRole[]): string {
   const L: Record<UserRole, string> = {
     direction: "Direction",
     manager: "Manager",
-    manager_chauffeur: "Manager-chauffeur",
     chauffeur: "Chauffeur",
     comptable: "Comptable",
   };
@@ -636,7 +831,7 @@ export function libelleRoles(roles: readonly UserRole[]): string {
 export function titreReserve(roles: readonly UserRole[]): string {
   const set = new Set(roles);
   if (set.size === 1 && set.has("direction")) return "Réservé à la direction";
-  if (set.size === 3 && ENCADREMENT.every((r) => set.has(r))) return "Réservé à l'encadrement";
+  if (set.size === ENCADREMENT.length && ENCADREMENT.every((r) => set.has(r))) return "Réservé à l'encadrement";
   if (set.size === 2 && set.has("direction") && set.has("comptable")) return "Réservé à la direction et à la comptabilité";
   return `Réservé à : ${libelleRoles(roles)}`;
 }

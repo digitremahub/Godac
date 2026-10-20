@@ -158,7 +158,7 @@ export function NotificationBell() {
               })}
             </ul>
           )}
-          <a href="/alerts" className="border-t border-navy/[0.08] px-4 py-3 text-center text-sm font-semibold text-teal-ink hover:bg-navy/[0.03]">
+          <a href="/communication/alertes" className="border-t border-navy/[0.08] px-4 py-3 text-center text-sm font-semibold text-teal-ink hover:bg-navy/[0.03]">
             Voir toutes les alertes
           </a>
         </div>

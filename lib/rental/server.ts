@@ -7,7 +7,7 @@ import { renderProviderRequestEmail } from "@/lib/rental/email";
 import { generateProviderToken, hashProviderToken, SIGNED_LINK_SECONDS, tokenExpiry } from "@/lib/rental/token";
 import { nextStatusAfterManager, type RentalRequestStatus } from "@/lib/rental/workflow";
 
-export const MANAGER_ROLES = ["manager", "manager_chauffeur", "direction"] as const;
+export const MANAGER_ROLES = ["manager", "direction"] as const;
 
 export function appBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");

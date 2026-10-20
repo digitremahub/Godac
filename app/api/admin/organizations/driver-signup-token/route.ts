@@ -1,15 +1,15 @@
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { regenererJetonInscription } from "@/lib/organization/lien-inscription";
 
 /**
  * Rotates the org's self-signup link (app/join/[token]) — the only
  * real mitigation if it's shared somewhere it shouldn't be, since
  * anyone holding the old link can no longer create pending accounts
- * with it once this runs. RLS ("org: direction can update their own
- * org") already restricts this to direction, so the regular
- * session-scoped client is enough — no admin client needed.
+ * with it once this runs. Audit M18 : le jeton vit dans
+ * organization_signup_tokens, sans policy d'écriture : écrit ici avec le
+ * client service, après le contrôle « direction » ci-dessous.
  */
 export async function POST() {
   const g = await garderApi({ roles: "tous" });
@@ -19,10 +19,10 @@ export async function POST() {
     return NextResponse.json({ error: "Seule la direction peut régénérer ce lien." }, { status: 403 });
   }
 
-  const supabase = await createServerSupabaseClient();
-  const token = randomUUID();
-  const { error } = await supabase.from("organizations").update({ driver_signup_token: token }).eq("id", appUser.organization_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({ token });
+  try {
+    const token = await regenererJetonInscription(createAdminSupabaseClient(), appUser.organization_id);
+    return NextResponse.json({ token });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
 }

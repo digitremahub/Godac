@@ -47,7 +47,7 @@ const FIELD_GUIDES: Record<"vehicles" | "drivers", FieldGuide> = {
       { name: "email", desc: "adresse email — obligatoire, n'invente jamais une adresse, ignore la ligne si absente" },
       {
         name: "role",
-        desc: "un de: chauffeur, manager, manager_chauffeur, comptable, direction — \"chauffeur\" par défaut si rien d'autre n'est indiqué",
+        desc: "un de: chauffeur, manager, comptable, direction — \"chauffeur\" par défaut si rien d'autre n'est indiqué",
       },
       { name: "phone", desc: "numéro de téléphone, si indiqué (optionnel)" },
       { name: "service", desc: "service/dépôt/agence, si indiqué (optionnel)" },

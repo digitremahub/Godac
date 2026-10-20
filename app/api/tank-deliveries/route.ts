@@ -15,7 +15,7 @@ const bodySchema = z.object({
 
 /**
  * Records a fuel delivery into a tank ("approvisionnement") — the
- * Phase 2 feature the /tanks page used to only disclaim. RLS
+ * Phase 2 feature the /carburant/cuves page used to only disclaim. RLS
  * ("tank_deliveries: manager-like write scoped to service") is the
  * real gate; this route just gives a clearer error. Le stock, le PMP de
  * la cuve (moyenne pondérée stock + livraison) et l'alerte de
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour enregistrer un approvisionnement" }, { status: 403 });
   }
 

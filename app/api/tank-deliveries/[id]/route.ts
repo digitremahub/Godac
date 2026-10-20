@@ -16,7 +16,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour annuler un approvisionnement" }, { status: 403 });
   }
   const supabase = await createServerSupabaseClient();

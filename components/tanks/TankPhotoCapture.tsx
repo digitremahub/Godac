@@ -9,7 +9,7 @@ import { IconCamera } from "@/components/layout/icons";
  * Lets any driver document a tank's totalizer with a photo, no OCR
  * involved — unlike a fuel ticket, nobody tries to auto-extract this,
  * it just needs a manager-like/direction user to read and confirm the
- * value later from the table on /tanks (see app/api/tank-photos/route.ts).
+ * value later from the table on /carburant/cuves (see app/api/tank-photos/route.ts).
  */
 export function TankPhotoCapture({ tankId }: { tankId: string }) {
   const router = useRouter();

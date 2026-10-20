@@ -885,7 +885,7 @@ export function TourRoutesBoard({
                 className="input !w-auto !py-1.5"
                 value={jour}
                 onChange={(e) => {
-                  if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) router.push(`/tours/routes${e.target.value === today ? "" : `?jour=${e.target.value}`}`);
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) router.push(`/exploitation/tournees${e.target.value === today ? "" : `?jour=${e.target.value}`}`);
                 }}
                 aria-label="Jour affiché pour les renforts"
               />

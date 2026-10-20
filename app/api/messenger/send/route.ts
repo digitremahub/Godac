@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Messenger had no notification at all until now — a recipient only
-  // found out about a message by opening /messenger on their own.
+  // found out about a message by opening /communication/messenger on their own.
   // related_id is the sender's id, not the message's, so the "Voir →"
   // link (and the push tap target) opens straight into that thread
   // (see lib/alerts/resolve-url.ts's new_message override) rather than

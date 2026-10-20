@@ -46,12 +46,12 @@ export function TourHeroCard({
       </div>
 
       <div className="relative flex flex-col gap-3">
-        <Link href={openTour ? "/tours/end" : "/tours/start"} className="btn-primary w-full !py-3.5 text-base">
+        <Link href={openTour ? "/moi/tournee/retour" : "/moi/tournee/depart"} className="btn-primary w-full !py-3.5 text-base">
           {openTour ? "Terminer ma tournée" : "Démarrer une tournée"}
           <IconArrowRight className="h-5 w-5" />
         </Link>
         {showPlanningLink && (
-          <Link href="/planning/mine" className="text-center text-sm font-medium text-white/75 hover:text-white">
+          <Link href="/moi/planning" className="text-center text-sm font-medium text-white/75 hover:text-white">
             Voir mon planning
           </Link>
         )}

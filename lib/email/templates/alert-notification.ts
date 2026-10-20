@@ -44,7 +44,7 @@ export function renderAlertEmail({
             ${label} · ${type}
           </p>
           <p style="font-size: 16px; line-height: 1.5;">${message}</p>
-          <a href="${appUrl}${linkPath ?? "/alerts"}" style="display: inline-block; margin-top: 16px; background: #1BE4C1; color: #0A0F1E; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-weight: 700;">
+          <a href="${appUrl}${linkPath ?? "/communication/alertes"}" style="display: inline-block; margin-top: 16px; background: #1BE4C1; color: #0A0F1E; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-weight: 700;">
             Voir dans GODAC
           </a>
         </div>

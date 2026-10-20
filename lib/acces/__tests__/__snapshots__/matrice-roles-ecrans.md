@@ -1,56 +1,60 @@
-| Section | Écran | URL | chauffeur | manager | manager_chauffeur | comptable | direction | Modules |
-|---|---|---|---|---|---|---|---|---|
-| Tableau de bord | Tableau de bord | `/dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Tableau de bord | Reporting BI | `/reporting` | — | — | — | — | ✅ | bi_reporting |
-| Mon espace | Démarrer une tournée | `/tours/start` | ✅ | — | ✅ | — | — | planning |
-| Mon espace | Terminer une tournée | `/tours/end` | ✅ | — | ✅ | — | — | planning |
-| Mon espace | J'entre pour un collègue | `/tours/help` | ✅ | ✅ | ✅ | — | 🔒 | planning |
-| Mon espace | Mon planning | `/planning/mine` | ✅ | — | ✅ | — | — | planning |
-| Mon espace | Mon véhicule | `/my-vehicle` | ✅ | — | ✅ | — | — | — |
-| Mon espace | Signaler un problème | `/maintenance` | ✅ | — | — | — | — | maintenance_requests |
-| Mon espace | Mes amendes | `/mes-amendes` | ✅ | — | ✅ | — | — | fines |
-| Mon espace | Mes fiches de paie | `/payslips` | ✅ | ✅ | ✅ | ✅ | 🔒 | payslips |
-| Mon espace | Mon pointage | `/time-clock` | ✅ | 🔒 | 🔒 | ✅ | 🔒 | time_clock |
-| Mon espace | Mes congés | `/leaves` | ✅ | 🔒 | 🔒 | ✅ | 🔒 | leave_management |
-| Exploitation | Planning | `/planning` | ↪ /planning/mine | ✅ | ✅ | — | ✅ | planning |
-| Exploitation | Tournées & villages | `/tours/routes` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
-| Exploitation | Tournées colis | `/colis` | ✅ | ✅ | ✅ | — | ✅ | route_optimizer |
-| Exploitation | Suivi en direct | `/suivi` | — | 🔒 | 🔒 | — | 🔒 | route_optimizer |
-| Exploitation | Historique des tournées | `/tours/history` | ✅ | ✅ | ✅ | ✅ | ✅ | planning |
-| Exploitation | Rapports de tournée | `/reports` | ↪ /tours/history | ✅ | ✅ | ✅ | ✅ | planning |
-| Exploitation | Contestations clients | `/contestations` | ✅ | ✅ | ✅ | — | ✅ | customer_disputes |
-| Flotte | Véhicules | `/vehicles` | ↪ /my-vehicle | ✅ | ✅ | ✅ | ✅ | fleet |
-| Flotte | Fiche véhicule | `/vehicles/[id]` | ↪ /my-vehicle | 🔒 | 🔒 | 🔒 | 🔒 | fleet |
-| Flotte | Nouveau véhicule | `/vehicles/new` | — | 🔒 | 🔒 | — | 🔒 | fleet |
-| Flotte | Actions rapides véhicule (QR) | `/v/[id]` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | — |
-| Flotte | Demandes d'entretien | `/maintenance` | 🔒 | ✅ | ✅ | — | ✅ | maintenance_requests |
-| Flotte | Demandes aux loueurs | `/loueurs/demandes` | — | ✅ | ✅ | — | ✅ | rental_providers |
-| Flotte | Loueurs & prestataires | `/loueurs` | — | ✅ | ✅ | — | ✅ | rental_providers |
-| Flotte | Amendes | `/fines` | ↪ /mes-amendes | ✅ | ✅ | ✅ | ✅ | fines |
-| Flotte | Badges QR | `/qr-codes` | — | ✅ | ✅ | — | ✅ | — |
-| Carburant | Pleins | `/fuel` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Carburant | Revue OCR | `/ocr-review` | — | ✅ | ✅ | — | ✅ | ocr |
-| Carburant | Cuves & approvisionnements | `/tanks` | — | ✅ | ✅ | ✅ | ✅ | — |
-| Carburant | Export TICPE | `/ticpe` | — | — | — | ✅ | ✅ | ticpe_export |
-| Carburant | Détail export TICPE | `/ticpe/[id]` | — | — | — | 🔒 | 🔒 | ticpe_export |
-| Équipe & RH | Utilisateurs | `/admin/users` | — | ✅ | ✅ | — | ✅ | — |
-| Équipe & RH | Fiche salarié | `/admin/users/[id]` | — | 🔒 | 🔒 | 🔒 | 🔒 | — |
-| Équipe & RH | Chauffeurs à valider | `/driver-signups` | — | ✅ | ✅ | — | ✅ | — |
-| Équipe & RH | Pointage | `/time-clock` | — | ✅ | ✅ | — | ✅ | time_clock |
-| Équipe & RH | Congés & absences | `/leaves` | — | ✅ | ✅ | — | ✅ | leave_management |
-| Équipe & RH | Calendrier des congés | `/leaves/planning` | — | ✅ | ✅ | — | ✅ | leave_management |
-| Équipe & RH | Paie & salaires | `/paie` | — | — | — | ✅ | ✅ | payslips |
-| Équipe & RH | Bulletin d'un salarié | `/paie/[userId]` | — | — | — | 🔒 | 🔒 | payslips |
-| Équipe & RH | Réglages de paie | `/paie/parametres` | — | — | — | — | 🔒 | payslips |
-| Équipe & RH | Salaires | `/payroll` | — | — | — | 🔒 | 🔒 | planning?, time_clock? |
-| Communication | Messenger | `/messenger` | ✅ | ✅ | ✅ | ✅ | ✅ | messenger |
-| Communication | Intranet & convocations | `/intranet` | ✅ | ✅ | ✅ | ✅ | ✅ | intranet |
-| Communication | Alertes | `/alerts` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Communication | Demandes d'assistance | `/support` | — | ✅ | ✅ | — | ✅ | assistant |
-| Administration | Organisation | `/admin/organizations` | — | — | — | — | ✅ | — |
-| Administration | Abonnement & modules | `/admin/billing` | — | — | — | — | ✅ | — |
-| Administration | Journal d'audit | `/admin/journal` | — | — | — | — | ✅ | — |
-| Administration | FAQ plateforme | `/admin/faq` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | — |
-| Aide | Guide d'utilisation | `/guide` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Aide | Questions fréquentes | `/faq` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Aide | Mon compte | `/account` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Section | Écran | URL | chauffeur | manager | comptable | direction | Modules |
+|---|---|---|---|---|---|---|---|
+| Tableau de bord | Tableau de bord | `/dashboard` | ✅ | ✅ | ✅ | ✅ | — |
+| Tableau de bord | Reporting BI | `/dashboard/reporting` | — | — | — | ✅ | bi_reporting |
+| Mon espace | Démarrer une tournée | `/moi/tournee/depart` | ✅ | — | — | — | planning |
+| Mon espace | Terminer une tournée | `/moi/tournee/retour` | 🔒 | — | — | — | planning |
+| Mon espace | J'entre pour un collègue | `/moi/tournee/collegue` | 🔒 | ✅ | — | 🔒 | planning |
+| Mon espace | Mon planning | `/moi/planning` | ✅ | — | — | — | planning |
+| Mon espace | Mon véhicule | `/moi/vehicule` | ✅ | — | — | — | — |
+| Mon espace | Signaler un problème | `/moi/signaler` | ✅ | 🔒 | — | 🔒 | maintenance_requests |
+| Mon espace | Mes amendes | `/moi/amendes` | ✅ | — | — | — | fines |
+| Mon espace | Mes fiches de paie | `/moi/fiches-de-paie` | ✅ | ✅ | ✅ | ↪ /equipe/paie/fiches | payslips |
+| Mon espace | Mon pointage | `/moi/pointage` | ✅ | ✅ | ✅ | ↪ /equipe/pointage | time_clock |
+| Mon espace | Mes congés | `/moi/conges` | ✅ | ✅ | ✅ | ↪ /equipe/conges | leave_management |
+| Exploitation | Planning | `/exploitation/planning` | ↪ /moi/planning | ✅ | — | ✅ | planning |
+| Exploitation | Tournées & villages | `/exploitation/tournees` | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
+| Exploitation | Tournée colis | `/exploitation/colis` | ✅ | ✅ | — | ✅ | route_optimizer |
+| Exploitation | Suivi en direct | `/exploitation/suivi` | — | 🔒 | — | 🔒 | route_optimizer |
+| Exploitation | Historique des tournées | `/exploitation/historique` | ✅ | ✅ | ✅ | ✅ | planning |
+| Exploitation | Rapports de tournée | `/exploitation/historique/rapports` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | planning |
+| Exploitation | Photos de tournée | `/exploitation/historique/photos` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | planning |
+| Exploitation | Tournées colis passées | `/exploitation/historique/colis` | 🔒 | 🔒 | — | 🔒 | route_optimizer |
+| Exploitation | Contestations clients | `/exploitation/contestations` | ✅ | ✅ | — | ✅ | customer_disputes |
+| Flotte | Véhicules | `/flotte/vehicules` | ↪ /moi/vehicule | ✅ | ✅ | ✅ | fleet |
+| Flotte | Fiche véhicule | `/flotte/vehicules/[id]` | ↪ /moi/vehicule | 🔒 | 🔒 | 🔒 | fleet |
+| Flotte | Nouveau véhicule | `/flotte/vehicules/nouveau` | — | 🔒 | — | 🔒 | fleet |
+| Flotte | Actions rapides véhicule (QR) | `/v/[id]` | 🔒 | 🔒 | 🔒 | 🔒 | — |
+| Flotte | Demandes d'entretien | `/flotte/entretien` | ↪ /moi/signaler | ✅ | — | ✅ | maintenance_requests |
+| Flotte | Demandes aux loueurs | `/flotte/loueurs` | — | ✅ | — | ✅ | rental_providers |
+| Flotte | Loueurs & prestataires | `/flotte/loueurs/prestataires` | — | 🔒 | — | 🔒 | rental_providers |
+| Flotte | Amendes | `/flotte/amendes` | ↪ /moi/amendes | ✅ | ✅ | ✅ | fines |
+| Flotte | Badges QR | `/flotte/badges` | — | ✅ | — | ✅ | — |
+| Carburant | Pleins | `/carburant/pleins` | ✅ | ✅ | ✅ | ✅ | — |
+| Carburant | Revue OCR | `/carburant/revue-ocr` | — | ✅ | — | ✅ | ocr |
+| Carburant | Cuves | `/carburant/cuves` | — | ✅ | ✅ | ✅ | — |
+| Carburant | Approvisionnements | `/carburant/approvisionnements` | — | 🔒 | 🔒 | 🔒 | — |
+| Carburant | Export TICPE | `/carburant/ticpe` | — | — | ✅ | ✅ | ticpe_export |
+| Carburant | Détail export TICPE | `/carburant/ticpe/[id]` | — | — | 🔒 | 🔒 | ticpe_export |
+| Équipe & RH | Utilisateurs | `/equipe/utilisateurs` | — | ✅ | — | ✅ | — |
+| Équipe & RH | Fiche salarié | `/equipe/utilisateurs/[id]` | — | 🔒 | 🔒 | 🔒 | — |
+| Équipe & RH | Chauffeurs à valider | `/equipe/inscriptions` | — | ✅ | — | ✅ | — |
+| Équipe & RH | Pointage | `/equipe/pointage` | ↪ /moi/pointage | ✅ | ↪ /moi/pointage | ✅ | time_clock |
+| Équipe & RH | Congés & absences | `/equipe/conges` | ↪ /moi/conges | ✅ | ↪ /moi/conges | ✅ | leave_management |
+| Équipe & RH | Calendrier des congés | `/equipe/conges/calendrier` | — | 🔒 | — | 🔒 | leave_management |
+| Équipe & RH | Paie & salaires | `/equipe/paie` | — | — | ✅ | ✅ | payslips |
+| Équipe & RH | Heures & salaires | `/equipe/paie/heures` | — | — | 🔒 | 🔒 | planning?, time_clock? |
+| Équipe & RH | Fiches de paie | `/equipe/paie/fiches` | — | — | 🔒 | 🔒 | payslips |
+| Équipe & RH | Réglages de paie | `/equipe/paie/reglages` | — | — | — | 🔒 | payslips |
+| Équipe & RH | Bulletin d'un salarié | `/equipe/paie/[userId]` | — | — | 🔒 | 🔒 | payslips |
+| Communication | Messenger | `/communication/messenger` | ✅ | ✅ | ✅ | ✅ | messenger |
+| Communication | Intranet & convocations | `/communication/intranet` | ✅ | ✅ | ✅ | ✅ | intranet |
+| Communication | Alertes | `/communication/alertes` | ✅ | ✅ | ✅ | ✅ | — |
+| Communication | Demandes d'assistance | `/communication/assistance` | — | ✅ | — | ✅ | assistant |
+| Administration | Organisation | `/admin/organisation` | — | — | — | ✅ | — |
+| Administration | Abonnement & modules | `/admin/abonnement` | — | — | — | ✅ | — |
+| Administration | Journal d'audit | `/admin/journal` | — | — | — | ✅ | — |
+| Administration | FAQ plateforme | `/admin/faq` | 🔒 | 🔒 | 🔒 | 🔒 | — |
+| Aide | Guide d'utilisation | `/aide/guide` | ✅ | ✅ | ✅ | ✅ | — |
+| Aide | Questions fréquentes | `/aide/faq` | ✅ | ✅ | ✅ | ✅ | — |
+| Aide | Mon compte | `/account` | ✅ | ✅ | ✅ | ✅ | — |

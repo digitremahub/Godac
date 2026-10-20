@@ -9,7 +9,6 @@ type Status = "suggested" | "published" | "dismissed";
 const ROLES = [
   { key: "chauffeur", label: "Chauffeur" },
   { key: "manager", label: "Manager" },
-  { key: "manager_chauffeur", label: "Manager-chauffeur" },
   { key: "comptable", label: "Comptable" },
   { key: "direction", label: "Direction" },
 ] as const;

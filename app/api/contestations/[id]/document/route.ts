@@ -8,7 +8,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const g = await garderApi({ modules: ["customer_disputes"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
+  if (!hasRole(appUser.role, ["manager", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const { data: c } = await supabase.from("customer_disputes").select("document_path").eq("id", id).maybeSingle();

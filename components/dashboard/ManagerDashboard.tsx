@@ -12,12 +12,12 @@ import type { AppUser } from "@/lib/auth/session";
  * A manager runs one or more services day-to-day: who's on the road
  * right now, what's waiting for a decision (OCR tickets, leave
  * requests, new drivers), and which vehicles are drinking too much
- * fuel. A manager_chauffeur additionally drives their own tours, so
+ * fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
  * they also get the same start/end-tour action a plain chauffeur has.
  */
 export async function ManagerDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
   const supabase = await createServerSupabaseClient();
-  const isManagerChauffeur = appUser.role === "manager_chauffeur";
+  const isManagerChauffeur = appUser.conduit;
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
 
@@ -94,12 +94,12 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     .slice(0, 5);
 
   const tiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Tournées en cours", value: ongoingTours.length, accent: "teal", href: "/tours/history" },
-    { label: "Tickets OCR en attente", value: pendingOcrRes.count ?? 0, accent: "gold", href: "/ocr-review" },
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignups.length, accent: "teal", href: "/driver-signups" },
+    { label: "Tournées en cours", value: ongoingTours.length, accent: "teal", href: "/exploitation/historique" },
+    { label: "Tickets OCR en attente", value: pendingOcrRes.count ?? 0, accent: "gold", href: "/carburant/revue-ocr" },
+    { label: "Nouveaux chauffeurs à valider", value: pendingSignups.length, accent: "teal", href: "/equipe/inscriptions" },
   ];
-  if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/leaves" });
-  if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/maintenance" });
+  if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
+  if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
 
   // Pointage assisté only concerns someone who also drives.
   const autoClockEnabled =

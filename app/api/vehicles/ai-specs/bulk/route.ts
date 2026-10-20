@@ -25,10 +25,10 @@ const RATE_LIMIT_PER_HOUR = 30;
  * exactly like the single-vehicle wizard.
  */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager", "manager_chauffeur"], modules: ["fleet"] });
+  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fleet"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "manager_chauffeur", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé." }, { status: 403 });
   }
 

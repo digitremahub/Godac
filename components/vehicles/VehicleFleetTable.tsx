@@ -81,7 +81,7 @@ export function VehicleFleetTable({ vehicles }: { vehicles: VehicleRow[] }) {
               {filtered.map((v) => (
                 <tr key={v.id} className="border-t border-navy/5">
                   <td className="py-2">
-                    <Link href={`/vehicles/${v.id}`} className="text-teal-ink hover:underline">
+                    <Link href={`/flotte/vehicules/${v.id}`} className="text-teal-ink hover:underline">
                       {v.registration}
                     </Link>
                   </td>

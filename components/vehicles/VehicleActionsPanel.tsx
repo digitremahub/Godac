@@ -11,18 +11,21 @@ export function VehicleActionsPanel({
   vehicleId,
   vehicleType,
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   hasActiveTourHere,
 }: {
   vehicleId: string;
   vehicleType: VehicleType;
   role: UserRole;
+  /** Chauffeur, ou manager qui conduit aussi. */
+  conduit?: boolean;
   enabledModuleKeys: string[];
   hasActiveTourHere: boolean;
 }) {
   const [showWash, setShowWash] = useState(false);
   const enabled = new Set(enabledModuleKeys);
-  const canDriveTours = role === "chauffeur" || role === "manager_chauffeur";
+  const canDriveTours = conduit;
 
   if (showWash) {
     return (
@@ -46,18 +49,18 @@ export function VehicleActionsPanel({
         </Link>
       )}
 
-      <Link href={`/fuel?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
+      <Link href={`/carburant/pleins?new=1&vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
         <IconDroplet className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Plein
       </Link>
 
       {enabled.has("maintenance_requests") && (
-        <Link href={`/maintenance?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
+        <Link href={`/moi/signaler?vehicle=${vehicleId}`} className="btn-secondary min-h-[52px] w-full justify-center text-base">
           <IconWrench className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Signaler un problème
         </Link>
       )}
 
       {canDriveTours && (
-        <Link href={`/tours/help?vehicle=${vehicleId}`} className="btn-ghost min-h-[52px] w-full justify-center text-center text-base">
+        <Link href={`/moi/tournee/collegue?vehicle=${vehicleId}`} className="btn-ghost min-h-[52px] w-full justify-center text-center text-base">
           <IconUsers className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> J&apos;entre le départ / retour / ravitaillement d&apos;un collègue
         </Link>
       )}

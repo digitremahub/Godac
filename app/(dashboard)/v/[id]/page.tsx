@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 /**
  * Driver-facing landing page for the vehicle QR sticker — distinct
- * from the manager-oriented fiche at /vehicles/[id] (edit panel,
+ * from the manager-oriented fiche at /flotte/vehicules/[id] (edit panel,
  * interventions, full history). This is what a chauffeur reaches:
  * a handful of large touch-target actions, no management controls.
  */
@@ -51,6 +51,7 @@ export default async function VehicleQuickActionsPage({ params }: { params: Prom
         vehicleId={vehicle.id}
         vehicleType={vehicle.type}
         role={appUser.role}
+        conduit={appUser.conduit}
         enabledModuleKeys={enabledModuleKeys}
         hasActiveTourHere={hasActiveTourHere}
       />

@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { boutonsBarreMobile } from "@/lib/acces/barre-mobile";
+import { urlDe } from "@/lib/acces/catalogue";
 
 const tout = new Set(["planning", "route_optimizer", "messenger", "maintenance_requests"]);
 
 describe("barre mobile chauffeur (§ 3.3)", () => {
-  it("rôles terrain uniquement", () => {
+  it("personnes qui conduisent uniquement : chauffeur, manager avec « conduit aussi »", () => {
     expect(boutonsBarreMobile("direction", tout, false)).toEqual([]);
     expect(boutonsBarreMobile("comptable", tout, false)).toEqual([]);
-    expect(boutonsBarreMobile("manager_chauffeur", tout, false)).toHaveLength(4);
+    expect(boutonsBarreMobile("manager", tout, false)).toEqual([]);
+    expect(boutonsBarreMobile("manager", tout, false, true)).toHaveLength(4);
   });
 
   it("Tournée / Retour selon la tournée en cours, Plein, Colis, Messages", () => {
-    expect(boutonsBarreMobile("chauffeur", tout, false).map((b) => b.href)).toEqual(["/tours/start", "/fuel?new=1", "/livreur", "/messenger"]);
-    expect(boutonsBarreMobile("chauffeur", tout, true)[0]).toMatchObject({ href: "/tours/end", libelle: "Retour" });
+    expect(boutonsBarreMobile("chauffeur", tout, false).map((b) => b.href)).toEqual([urlDe("moi.tournee_depart"), `${urlDe("carburant.pleins")}?new=1`, "/livreur", urlDe("communication.messenger")]);
+    expect(boutonsBarreMobile("chauffeur", tout, true)[0]).toMatchObject({ href: urlDe("moi.tournee_retour"), libelle: "Retour" });
   });
 
   it("replis : Planning sans Tournée colis, Signaler sans Messenger", () => {

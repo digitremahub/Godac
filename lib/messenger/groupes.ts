@@ -28,7 +28,7 @@ export interface ServiceTeamInfo {
 }
 
 /** Rôles GODAC qui sont responsables d'office dans un groupe (en plus du chef d'équipe). */
-const ROLES_RESPONSABLES: UserRole[] = ["manager", "manager_chauffeur", "direction"];
+const ROLES_RESPONSABLES: UserRole[] = ["manager", "direction"];
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 

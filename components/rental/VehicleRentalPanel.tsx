@@ -150,7 +150,7 @@ export function VehicleRentalPanel({
                 </select>
               </label>
               {providers.length === 0 && (
-                <Link href="/loueurs" className="text-xs text-teal-ink hover:underline">
+                <Link href="/flotte/loueurs/prestataires" className="text-xs text-teal-ink hover:underline">
                   Ajouter un loueur →
                 </Link>
               )}

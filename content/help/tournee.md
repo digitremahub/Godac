@@ -2,7 +2,7 @@
 
 ## Démarrer
 
-1. Ouvre **Démarrer une tournée** dans le menu (ou scanne le badge QR collé sur le tableau de bord du véhicule).
+1. Ouvre **Mon espace › Ma tournée** dans le menu (bouton « Tournée » en bas de l'écran sur téléphone) (ou scanne le badge QR collé sur le tableau de bord du véhicule).
 2. Scanne le véhicule si ce n'est pas déjà fait.
 3. Renseigne le kilométrage de départ — tu peux prendre en photo le compteur, il est lu automatiquement (tu peux corriger le chiffre si besoin).
 4. Indique si le véhicule est en bon état. Si un problème est constaté, décris-le : un signalement est créé automatiquement pour ton responsable.

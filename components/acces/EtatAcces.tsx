@@ -6,11 +6,11 @@ const FORMULES: Record<FormuleMin, string> = { essentiel: "Essentiel", starter: 
 
 /** Lien vers l'onglet Modules de l'administration, ancré sur le module. */
 export function lienActivationModule(cle: string): string {
-  return `/admin/billing?vue=modules#module-${cle}`;
+  return `/admin/abonnement?vue=modules#module-${cle}`;
 }
 
 type Props =
-  | { motif: "role"; ecran?: string; rolesAutorises: readonly UserRole[] }
+  | { motif: "role"; ecran?: string; rolesAutorises: readonly UserRole[]; /** Écran réservé aux personnes qui conduisent. */ conducteur?: boolean }
   | { motif: "module"; ecran?: string; modules: readonly string[]; direction: boolean; formuleMin?: FormuleMin }
   | { motif: "limite"; titre?: string; utilise: number; inclus: number; unite: string; formule?: string; direction: boolean }
   | { motif: "pays"; ecran?: string; texte?: string };
@@ -31,6 +31,15 @@ export function EtatAcces(props: Props) {
 
   switch (props.motif) {
     case "role":
+      if (props.conducteur) {
+        titre = "Réservé aux personnes qui conduisent";
+        texte = (
+          <>
+            {props.ecran ? <>« {props.ecran} » </> : "Cet écran "}est réservé aux chauffeurs et aux managers qui conduisent aussi. La direction peut cocher « Conduit aussi » sur votre fiche.
+          </>
+        );
+        break;
+      }
       titre = titreReserve(props.rolesAutorises);
       texte = (
         <>
@@ -70,7 +79,7 @@ export function EtatAcces(props: Props) {
       );
       if (props.direction) {
         action = (
-          <Link href="/admin/billing" className="btn-primary !py-2 text-sm">
+          <Link href="/admin/abonnement" className="btn-primary !py-2 text-sm">
             Changer de formule
           </Link>
         );

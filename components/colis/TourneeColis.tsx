@@ -1,11 +1,11 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
-import { IconPointRelais, IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
+import { IconPointRelais, IconCamera, IconCheck, IconBuilding, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
@@ -22,6 +22,9 @@ import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from "@/components/colis/Triable";
+import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
+import type { SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
@@ -41,6 +44,8 @@ interface Draft {
   /** Créneau confirmé avant l’ajout du colis. */
   window_start?: string;
   window_end?: string;
+  /** Établissement choisi dans la recherche : nom et coordonnées. */
+  etablissement?: { nom: string; lat: number | null; lng: number | null } | null;
   /** Ne pas mémoriser cette ramasse dans les tournées futures. */
   exceptionnelle?: boolean;
   /** Point relais : nom du relais et nombre de colis à déposer. */
@@ -78,17 +83,41 @@ const AUTO = "__auto__";
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
 /** Suggestions d'adresses et d'entreprises : BAN en France + lieux professionnels OpenStreetMap. */
-function AdresseInput({ value, onChange, autoFocus, france }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; france: boolean }) {
-  const [suggestions, setSuggestions] = useState<{ label: string; detail?: string }[]>([]);
+/**
+ * Champ adresse : adresses postales ET établissements par leur nom
+ * (« Pharmacie du Centre Saint-X », « Carrefour Market Y »). Résultats de
+ * /api/colis/adresses/recherche (annuaire de l'entreprise, OpenStreetMap,
+ * Base Adresse Nationale, Google Places si configuré), biaisés autour du
+ * dépôt. Choisir un établissement remplit l'adresse, le nom et les
+ * coordonnées (`onChoisir`) ; les horaires sont cherchés après l'ajout.
+ */
+function AdresseInput({
+  value,
+  onChange,
+  onChoisir,
+  autoFocus,
+  biais,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onChoisir?: (s: SuggestionAdresse) => void;
+  autoFocus?: boolean;
+  /** Dépôt de la tournée (ou position du chauffeur) pour privilégier les résultats proches. */
+  biais?: { lat: number; lng: number } | null;
+}) {
+  const [suggestions, setSuggestions] = useState<SuggestionAdresse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actif, setActif] = useState(-1);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const request = useRef(0);
+  const listeId = useRef(`adresses-${Math.random().toString(36).slice(2)}`).current;
 
   function change(v: string) {
     onChange(v);
     clearTimeout(timer.current);
     const query = v.trim();
     const id = ++request.current;
+    setActif(-1);
     if (query.length < 3) {
       setSuggestions([]);
       setLoading(false);
@@ -97,44 +126,66 @@ function AdresseInput({ value, onChange, autoFocus, france }: { value: string; o
     timer.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const jobs: Promise<{ label: string; detail?: string }[]>[] = [
-          fetch(`/api/geo/search?q=${encodeURIComponent(query)}&country=${france ? "FR" : "CH"}`)
-            .then(async (res) => res.ok ? (await res.json() as { results?: { label: string; detail?: string }[] }).results ?? [] : [])
-            .catch(() => []),
-        ];
-        if (france) {
-          jobs.push(fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5&autocomplete=1`)
-            .then(async (res) => {
-              const data = await res.json() as { features?: { properties?: { label?: string } }[] };
-              return (data.features ?? []).map((f) => ({ label: f.properties?.label ?? "" })).filter((x) => x.label);
-            }).catch(() => []));
+        const p = new URLSearchParams({ q: query });
+        if (biais) {
+          p.set("lat", String(biais.lat));
+          p.set("lng", String(biais.lng));
         }
-        const results = (await Promise.all(jobs)).flat();
-        if (request.current !== id) return;
-        const seen = new Set<string>();
-        setSuggestions(results.filter((x) => {
-          const key = x.label.toLocaleLowerCase("fr-FR");
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }).slice(0, 7));
+        const res = await fetch(`/api/colis/adresses/recherche?${p.toString()}`);
+        const data = res.ok ? ((await res.json()) as { resultats?: SuggestionAdresse[] }) : { resultats: [] };
+        if (request.current === id) setSuggestions(data.resultats ?? []);
+      } catch {
+        if (request.current === id) setSuggestions([]);
       } finally {
         if (request.current === id) setLoading(false);
       }
-    }, 450);
+    }, 300);
+  }
+
+  function choisir(sug: SuggestionAdresse) {
+    onChange(sug.adresse);
+    onChoisir?.(sug);
+    setSuggestions([]);
+    setActif(-1);
   }
 
   return (
     <div className="relative">
-      <input className="input" value={value} onChange={(e) => change(e.target.value)} placeholder="Entreprise, commerce ou adresse…" autoFocus={autoFocus} aria-label="Entreprise ou adresse de livraison" autoComplete="off" />
+      <input
+        className="input"
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        onKeyDown={(e) => {
+          if (suggestions.length === 0) return;
+          if (e.key === "ArrowDown") (e.preventDefault(), setActif((i) => Math.min(suggestions.length - 1, i + 1)));
+          else if (e.key === "ArrowUp") (e.preventDefault(), setActif((i) => Math.max(0, i - 1)));
+          else if (e.key === "Enter" && actif >= 0) (e.preventDefault(), choisir(suggestions[actif]!));
+          else if (e.key === "Escape") setSuggestions([]);
+        }}
+        placeholder="Nom de l'entreprise, du commerce ou adresse…"
+        autoFocus={autoFocus}
+        aria-label="Entreprise, commerce ou adresse de livraison"
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={suggestions.length > 0}
+        aria-controls={listeId}
+        aria-activedescendant={actif >= 0 ? `${listeId}-${actif}` : undefined}
+      />
       {loading && <p className="absolute right-3 top-3 text-xs text-navy/45">Recherche…</p>}
       {suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-navy/10 bg-surface shadow-pop">
-          {suggestions.map((s) => (
-            <li key={s.label}>
-              <button type="button" className="block w-full px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05]" onClick={() => (onChange(s.label), setSuggestions([]))}>
-                <span className="block font-medium">{s.label}</span>
-                {s.detail && <span className="mt-0.5 block text-xs text-navy/55">{s.detail}</span>}
+        <ul id={listeId} role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-auto rounded-xl border border-navy/10 bg-surface shadow-pop">
+          {suggestions.map((sug, i) => (
+            <li key={`${sug.source}-${sug.nom ?? ""}-${sug.adresse}`} id={`${listeId}-${i}`} role="option" aria-selected={i === actif}>
+              <button type="button" className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05] ${i === actif ? "bg-navy/[0.05]" : ""}`} onClick={() => choisir(sug)}>
+                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${sug.type === "etablissement" ? "bg-teal/15 text-teal-ink" : "bg-navy/[0.06] text-navy/55"}`} aria-hidden="true">
+                  {sug.type === "etablissement" ? <IconBuilding className="h-3.5 w-3.5" /> : <IconMapPin className="h-3.5 w-3.5" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="sr-only">{sug.type === "etablissement" ? "Établissement : " : "Adresse : "}</span>
+                  {sug.nom && <span className="block font-semibold">{sug.nom}</span>}
+                  <span className={`block ${sug.nom ? "text-xs text-navy/65" : "font-medium"}`}>{sug.adresse}</span>
+                  {(sug.detail || sug.source === "annuaire") && <span className="mt-0.5 block text-[11px] text-navy/50">{sug.detail ?? "Déjà livré par votre équipe"}</span>}
+                </span>
               </button>
             </li>
           ))}
@@ -330,6 +381,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           exceptionnelle: d.exceptionnelle === true,
           window_start: d.window_start ?? null,
           window_end: d.window_end ?? null,
+          etablissement: d.etablissement ?? null,
           ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
         }),
       });
@@ -614,6 +666,19 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     }
   }
 
+  /** Glisser-déposer : ordre local tout de suite, puis enregistrement (événement « reordered »). */
+  async function deposer(id: string, cible: CibleDepot) {
+    const changements = reordonner(stops, id, cible);
+    if (changements.length === 0) return;
+    setStops((all) => appliquerChangements(all, changements));
+    try {
+      await api(`/api/colis/arrets/${id}`, { method: "PATCH", body: JSON.stringify({ deposer: cible }) });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
+    await recharger(run?.id);
+  }
+
   async function phase(status: Run["status"]) {
     if (!run) return;
     await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
@@ -699,6 +764,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   const groupes = termeAdresse
     ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
     : groupesComplets;
+  // Recherche d'adresses et d'établissements biaisée autour du dépôt de la tournée.
+  const depot = run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
+  // Glisser-déposer : arrêts à livrer, hors recherche et hors tournée terminée.
+  const triActif = Boolean(run && run.status !== "done" && !termeAdresse && edition === null);
+  const ordreTri = groupes.flatMap((g) => g.arrets).filter((s) => s.status === "pending").map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
   const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
   const cibles = [{ id: AUTO, nom: "Automatique (village / Hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
@@ -1124,7 +1194,25 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               <span><strong>Ramasse exceptionnelle</strong><span className="block text-xs text-navy/65">Ne pas ajouter cette adresse aux ramasses quotidiennes des prochaines tournées.</span></span>
             </label>
           )}
-          <AdresseInput france={pays === "FR"} value={draft.adresse} onChange={(adresse) => setDraft({ ...draft, adresse, window_start: undefined, window_end: undefined })} autoFocus={!lectureEtiquette} />
+          <AdresseInput
+            biais={depot}
+            value={draft.adresse}
+            onChange={(adresse) => setDraft((d) => (d ? { ...d, adresse, etablissement: null, window_start: undefined, window_end: undefined } : d))}
+            onChoisir={(sug) =>
+              setDraft((d) =>
+                d
+                  ? {
+                      ...d,
+                      adresse: sug.adresse,
+                      etablissement: sug.nom ? { nom: sug.nom, lat: sug.lat, lng: sug.lng } : null,
+                      destinataire: d.destinataire.trim() ? d.destinataire : (sug.nom ?? ""),
+                    }
+                  : d,
+              )
+            }
+            autoFocus={!lectureEtiquette}
+          />
+          {draft.etablissement && <p className="-mt-1 text-xs text-teal-ink">Établissement : {draft.etablissement.nom} — ses horaires seront cherchés après l&apos;ajout.</p>}
           {draft.type === "livraison" && (
             <div className="rounded-xl border border-teal/25 bg-teal/5 p-3" aria-live="polite">
               <p className="text-sm font-semibold">Créneau de livraison pour aujourd'hui</p>
@@ -1228,6 +1316,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               <ResumeOptimisationCarte resume={resume} stops={stops} onFermer={() => setResume(null)} />
             </div>
           )}
+          <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
           <ol className="mt-2 divide-y divide-navy/[0.07]">
             {rechercheAdresse && groupes.length === 0 && <li className="px-4 py-6 text-center text-sm text-navy/60">Aucune adresse ne correspond à « {rechercheAdresse} ».</li>}
             {groupes.map((g, k) => (
@@ -1236,10 +1325,11 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                 {multi && g.arrets.length === 0 && <li className="px-4 py-2.5 text-xs text-navy/55 sm:px-5">Liste vide : choisissez-la dans « Ajouter dans » pour y charger des colis.</li>}
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
-                  return (
-                    <li key={s.id} className={`relative py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                  const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
+                    <li key={s.id} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
                       <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
+                        {triActif && <span className="-my-2.5 -ml-2 flex items-center">{poignee ? <BoutonPoignee poignee={poignee} libelle={s.address} /> : <span className="w-8" aria-hidden="true" />}</span>}
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
                             s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-marine text-teal"
@@ -1379,7 +1469,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
                           {edition.type === "point_relais" && <NomRelaisInput value={edition.relais} onChange={(relais) => setEdition({ ...edition, relais })} />}
-                          <AdresseInput france={pays === "FR"} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
+                          <AdresseInput biais={depot} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
                           <input
                             className="input"
                             value={edition.destinataire}
@@ -1430,10 +1520,13 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                       )}
                     </li>
                   );
+                  return triActif && s.status === "pending" ? <ArretTriable key={s.id} id={s.id} rendu={rendu} /> : rendu(null, null);
                 })}
+                {triActif && multi && <ZoneFinListe listId={g.liste?.id ?? null} className="h-2" />}
               </Fragment>
             ))}
           </ol>
+          </ZoneTri>
         </Card>
       )}
 

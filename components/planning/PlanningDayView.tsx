@@ -64,7 +64,7 @@ export function PlanningDayView({
   function navTo(nextDay: string) {
     const qs = new URLSearchParams({ view: "day", day: nextDay });
     if (selectedService) qs.set("service", selectedService);
-    router.push(`/planning?${qs.toString()}`);
+    router.push(`/exploitation/planning?${qs.toString()}`);
   }
 
   function startEdit(entry: PlanningEntry) {
@@ -214,7 +214,7 @@ export function PlanningDayView({
           })}
         </div>
       )}
-      <Link href={`/planning?view=week${selectedService ? `&service=${selectedService}` : ""}`} className="text-sm text-teal-ink hover:underline">
+      <Link href={`/exploitation/planning?view=week${selectedService ? `&service=${selectedService}` : ""}`} className="text-sm text-teal-ink hover:underline">
         Passer en vue semaine pour glisser-déposer une affectation →
       </Link>
     </div>

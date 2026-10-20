@@ -7,9 +7,11 @@ import { MobileActionBar } from "@/components/layout/MobileActionBar";
 import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
 import type { UserRole } from "@/lib/types/domain";
 import { OfflineSyncStatus } from "@/components/offline/OfflineSyncStatus";
+import { BandeauMenuReorganise } from "@/components/layout/BandeauMenuReorganise";
 
 export function DashboardShell({
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   organizationName,
   logoUrl,
@@ -25,6 +27,8 @@ export function DashboardShell({
   children,
 }: {
   role: UserRole;
+  /** Chauffeur, ou manager qui conduit aussi (users.can_drive). */
+  conduit?: boolean;
   enabledModuleKeys: string[];
   organizationName?: string;
   logoUrl?: string | null;
@@ -53,7 +57,7 @@ export function DashboardShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
 
-  const showActionBar = role === "chauffeur" || role === "manager_chauffeur";
+  const showActionBar = conduit;
 
   return (
     <div className="flex min-h-screen">
@@ -72,6 +76,7 @@ export function DashboardShell({
       )}
       <Sidebar
         role={role}
+        conduit={conduit}
         enabledModuleKeys={enabledModuleKeys}
         organizationName={organizationName}
         logoUrl={logoUrl}
@@ -92,10 +97,10 @@ export function DashboardShell({
         )}
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
         <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
-          <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{children}</div>
+          <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus /><BandeauMenuReorganise userId={currentUserId} />{children}</div>
         </main>
       </div>
-      {showActionBar && <MobileActionBar role={role} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}
+      {showActionBar && <MobileActionBar role={role} conduit={conduit} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}
       <FloatingChatWidget
         assistantAvailable={assistantAvailable}
         messengerAvailable={messengerAvailable}

@@ -17,7 +17,7 @@ describe("lireFiltres", () => {
   it("aller-retour URL", () => {
     const f = lireFiltres({ du: "2026-10-01", chauffeur: B, page: "2" }, "2026-10-13");
     const q = versParams(f, "2026-10-13", { tournee: A });
-    expect(q.get("onglet")).toBe("historique");
+    expect(q.get("onglet")).toBeNull();
     expect(q.has("au")).toBe(false);
     expect(lireFiltres(Object.fromEntries(q), "2026-10-13")).toEqual(f);
     expect(q.get("tournee")).toBe(A);

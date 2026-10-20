@@ -40,7 +40,7 @@ export function DriverCreatedRuns({
                 {driverNames[run.driver_id] || "Chauffeur"} · {run.run_date.split("-").reverse().join("/")} · {STATUS_LABEL[run.status] || run.status}
               </p>
             </div>
-            <Link className="btn-secondary !px-3 !py-1.5 text-sm" href={`/colis?onglet=historique&tournee=${encodeURIComponent(run.id)}`}>
+            <Link className="btn-secondary !px-3 !py-1.5 text-sm" href={`/exploitation/historique/colis?tournee=${encodeURIComponent(run.id)}`}>
               Ouvrir la fiche
             </Link>
           </li>

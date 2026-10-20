@@ -10,7 +10,7 @@ const routes = [
 
 describe("accès à « Tournées & villages »", () => {
   it("carte et modification réservées aux chefs d'équipe et à la direction", () => {
-    for (const r of ["manager", "manager_chauffeur", "direction"] as const) {
+    for (const r of ["manager", "direction"] as const) {
       expect(peutGererTournees(r)).toBe(true);
       expect(peutVoirCarteTournees(r)).toBe(true);
     }

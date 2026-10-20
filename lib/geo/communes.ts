@@ -1,7 +1,7 @@
 /**
  * Localisation d'une commune française par son nom — API officielle
  * geo.api.gouv.fr (gratuite, sans clé). Sert à placer les villages des
- * tournées sur la carte (/tours/routes). Le choix entre homonymes
+ * tournées sur la carte (/exploitation/tournees). Le choix entre homonymes
  * (« Saint-Martin »…) est une fonction pure, testée à part.
  */
 import { haversineKm, normalizeVillageName, type LngLat } from "@/lib/tours/carte-villages";

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { journaliser } from "@/lib/audit/journal";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
+import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
 const CONFIRMATION_PHRASE = "REINITIALISER LES ACCES";
 
@@ -52,12 +53,12 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminSupabaseClient();
-  // Chauffeurs et chefs d'équipe chauffeurs (manager_chauffeur).
+  // Chauffeurs et managers qui conduisent aussi (users.can_drive).
   const { data: drivers, error: lookupError } = await admin
     .from("users")
     .select("id, full_name, auth_method")
     .eq("organization_id", appUser.organization_id)
-    .in("role", ["chauffeur", "manager_chauffeur"]);
+    .or(FILTRE_CONDUCTEURS);
 
   if (lookupError) {
     return NextResponse.json({ error: "Impossible de récupérer les chauffeurs de l'organisation." }, { status: 500 });

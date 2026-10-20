@@ -26,7 +26,7 @@ export function LigneCliquable({ href, selection, children }: { href: string; se
 
 /**
  * Filtres de l'historique des tournées colis, reflétés dans l'URL
- * (?onglet=historique&du=&au=&service=&chauffeur=&camion=) : un lien
+ * (/exploitation/historique/colis?du=&au=&service=&chauffeur=&camion=) : un lien
  * copié rouvre exactement la même vue.
  */
 export function HistoriqueFiltres({
@@ -47,13 +47,12 @@ export function HistoriqueFiltres({
 
   function changer(cle: string, valeur: string) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("onglet", "historique");
     if (valeur) params.set(cle, valeur);
     else params.delete(cle);
     // Nouveau filtre : première page, détail refermé.
     params.delete("page");
     params.delete("tournee");
-    router.push(`/colis?${params.toString()}`);
+    router.push(`/exploitation/historique/colis?${params.toString()}`);
   }
 
   const select = (cle: string, libelle: string, tous: string, options: Option[]) => (
@@ -111,7 +110,7 @@ export function HistoriqueFiltres({
       {chauffeurs && select("chauffeur", "Filtrer par chauffeur", "Tous les chauffeurs", chauffeurs)}
       {select("camion", "Filtrer par camion", "Tous les camions", camions)}
       {filtre && (
-        <button type="button" className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/colis?onglet=historique")}>
+        <button type="button" className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/exploitation/historique/colis")}>
           Réinitialiser
         </button>
       )}

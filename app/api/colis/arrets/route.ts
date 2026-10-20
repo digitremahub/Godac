@@ -33,6 +33,15 @@ const bodySchema = z.object({
   /** Créneau suggéré/confirmé avant l’ajout de l’adresse. */
   window_start: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   window_end: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  /**
+   * Établissement choisi dans la recherche (annuaire, OpenStreetMap,
+   * Google) : son nom devient business_name et ses coordonnées évitent un
+   * géocodage approximatif de l'adresse.
+   */
+  etablissement: z
+    .object({ nom: z.string().trim().min(1).max(200), lat: z.number().min(-90).max(90).nullable(), lng: z.number().min(-180).max(180).nullable() })
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -132,6 +141,8 @@ export async function POST(req: Request) {
   }
 
   if (geo === undefined) geo = await geocodeAddressDetail(parsed.data.adresse, pays);
+  const etablissement = parsed.data.etablissement ?? null;
+  const pointChoisi = etablissement && etablissement.lat !== null && etablissement.lng !== null ? { lat: etablissement.lat, lng: etablissement.lng } : null;
   // Adresse pro (forme juridique, mot-clé métier) : nom retenu sur l'arrêt ;
   // les horaires sont cherchés ensuite, sans bloquer l'ajout
   // (/api/colis/horaires/recherche, appelé par l'écran).
@@ -158,13 +169,14 @@ export async function POST(req: Request) {
       ...(poids ? { weight_kg: poids } : {}),
       window_start: parsed.data.window_start ?? null,
       window_end: parsed.data.window_end ?? null,
-      lat: geo?.lat ?? null,
-      lng: geo?.lng ?? null,
+      lat: pointChoisi?.lat ?? geo?.lat ?? null,
+      lng: pointChoisi?.lng ?? geo?.lng ?? null,
     })
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (pro?.pro && pro.nom) await supabase.from("delivery_stops").update({ business_name: pro.nom.slice(0, 200) }).eq("id", data.id).then(() => undefined, () => undefined);
+  const nomPro = etablissement?.nom ?? (pro?.pro ? pro.nom : null);
+  if (nomPro) await supabase.from("delivery_stops").update({ business_name: nomPro.slice(0, 200) }).eq("id", data.id).then(() => undefined, () => undefined);
   // Nouvel arrêt avant le départ : l'ordre est à recalculer (fait au lancement).
   if (run.status === "loading" && run.optimized_at) await supabase.from("delivery_runs").update({ optimized_at: null }).eq("id", run.id);
 
@@ -173,9 +185,9 @@ export async function POST(req: Request) {
   // afin qu’elles soient communes à tous les chauffeurs qui desservent ce village.
   return NextResponse.json({
     stop: data,
-    geocoded: Boolean(geo),
+    geocoded: Boolean(pointChoisi ?? geo),
     village,
-    professionnel: pro?.pro ? pro.nom : null,
+    professionnel: nomPro,
     ...(kind === "point_relais" ? { horaires } : {}),
   });
 }

@@ -65,6 +65,7 @@ export const ICONES: Record<IconeId, (props: { className?: string }) => React.Re
  */
 export function Sidebar({
   role,
+  conduit = role === "chauffeur",
   enabledModuleKeys,
   organizationName,
   logoUrl,
@@ -73,6 +74,8 @@ export function Sidebar({
   onNavigate,
 }: {
   role: UserRole;
+  /** Chauffeur, ou manager qui conduit aussi : entrées « Mon espace » de conduite. */
+  conduit?: boolean;
   enabledModuleKeys: string[];
   organizationName?: string;
   logoUrl?: string | null;
@@ -87,7 +90,7 @@ export function Sidebar({
   // active indicator) — the sidebar is navy, so text stays white.
   const accent = accentColor || "#1BE4C1";
 
-  const sections = menuPour(role, new Set(enabledModuleKeys));
+  const sections = menuPour(role, new Set(enabledModuleKeys), conduit);
   const active = entreeActive(
     sections.flatMap((s) => s.ecrans),
     pathname,
@@ -143,7 +146,7 @@ export function Sidebar({
                 <span style={estActif ? { color: accent } : undefined} className={`shrink-0 transition-colors ${estActif ? "" : "text-white/55 group-hover:text-white/80"}`}>
                   <Icon className="h-[18px] w-[18px]" />
                 </span>
-                <span className="truncate">{item.libelle}</span>
+                <span className="truncate">{item.libelleOnglet ?? item.libelle}</span>
               </Link>
             );
           })}

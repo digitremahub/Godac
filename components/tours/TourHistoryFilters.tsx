@@ -10,7 +10,7 @@ interface Option {
   full_name?: string;
 }
 
-/** Date range + (direction only) service + driver filters for /tours/history. */
+/** Date range + (direction only) service + driver filters for /exploitation/historique. */
 export function TourHistoryFilters({
   from,
   to,
@@ -35,7 +35,7 @@ export function TourHistoryFilters({
     for (const [key, value] of Array.from(qs.entries())) {
       if (!value) qs.delete(key);
     }
-    router.push(`/tours/history?${qs.toString()}`);
+    router.push(`/exploitation/historique?${qs.toString()}`);
   }
 
   return (

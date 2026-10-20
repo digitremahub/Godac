@@ -41,7 +41,7 @@ export async function GET() {
     severity: a.severity,
     message: a.message,
     createdAt: a.created_at,
-    href: resolveAlertUrl(a.related_table, a.type, a.related_id, { recipientUserId: a.recipient_user_id, role: appUser.role }) ?? "/alerts",
+    href: resolveAlertUrl(a.related_table, a.type, a.related_id, { recipientUserId: a.recipient_user_id, role: appUser.role }) ?? "/communication/alertes",
     read: readSet.has(a.id),
   }));
   return NextResponse.json({ items, unread: items.filter((i) => !i.read).length });
