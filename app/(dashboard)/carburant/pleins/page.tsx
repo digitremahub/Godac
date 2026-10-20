@@ -10,9 +10,12 @@ import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
+import { ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
 
 const PAGE_SIZE = 50;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * "Carburant" (historique) et "Nouveau ravitaillement" (l'assistant de
@@ -27,7 +30,7 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export default async function FuelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string; plein?: string }>;
 }) {
   const params = await searchParams;
   const g = await garderPage("carburant.pleins");
@@ -98,13 +101,16 @@ export default async function FuelPage({
   let query = supabase
     .from("fuel_entries")
     .select(
-      "id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
+      "id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, totalizer_gap, totalizer_before, totalizer_after, pmp_at_entry, ocr_raw, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
       { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
     .order("id", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
+  // Lien d'une alerte d'écart (?plein=) : ce plein seul, fiche ouverte.
+  const pleinCible = params.plein && UUID_RE.test(params.plein) ? params.plein : null;
+  if (pleinCible) query = query.eq("id", pleinCible);
   if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
   if (params.driver) query = query.eq("driver_id", params.driver);
   if (params.status) query = query.eq("status", params.status);
@@ -116,6 +122,18 @@ export default async function FuelPage({
     supabase.from("vehicles").select("id, registration").order("registration"),
     canSeeOtherDrivers ? supabase.from("users").select("id, full_name").eq("active", true).order("full_name") : Promise.resolve({ data: null }),
   ]);
+
+  // Écarts de chaque plein et statut de leur traitement (journal
+  // fuel_gap_reviews ; tolère la migration pas encore appliquée).
+  const suivi = await chargerSuiviEcarts(supabase, (entries ?? []).map((e) => e.id));
+  const lignes = (entries ?? []).map(({ ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry, ...e }) => ({
+    ...e,
+    statut_ecart: statutEcart(
+      ecartsDuPlein({ ...e, ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry }, suivi.alertes.get(e.id) ?? []).length,
+      suivi.traitements.get(e.id) ?? [],
+    ),
+  }));
+  const aTraiter = lignes.filter((l) => l.statut_ecart === "ouvert" || l.statut_ecart === "reponse_recue").length;
 
   return (
     <div>
@@ -139,7 +157,21 @@ export default async function FuelPage({
 
       {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
 
-      <FuelHistoryTable entries={(entries ?? []) as any} />
+      {pleinCible && (
+        <Card className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span>Plein ouvert depuis une alerte d&apos;écart.</span>
+          <Link href="/carburant/pleins" className="text-teal-ink underline">
+            Voir tout l&apos;historique
+          </Link>
+        </Card>
+      )}
+      {!pleinCible && canCreate && aTraiter > 0 && (
+        <p className="mb-3 text-sm text-orange-ink">
+          {aTraiter} écart{aTraiter > 1 ? "s" : ""} à traiter sur cette page — ouvrez « Détails » pour justifier / classer ou demander une explication.
+        </p>
+      )}
+
+      <FuelHistoryTable entries={lignes as any} initialOpenId={pleinCible ?? undefined} />
 
       <FuelHistoryPager params={params} page={page} total={count ?? 0} />
     </div>

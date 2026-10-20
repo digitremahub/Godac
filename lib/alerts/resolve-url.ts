@@ -49,6 +49,9 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   rental_contract: (id) => (id ? { id: "flotte.vehicule_fiche", params: { id }, suite: "#location" } : { id: "flotte.vehicules" }),
   // Bulletins en attente de validation : Paie du mois (direction).
   payslip_validation: () => ({ id: "equipe.paie" }),
+  // Écart carburant (explication demandée au chauffeur, ou sa réponse) :
+  // le plein ouvert dans l'historique, fiche dépliée.
+  fuel_gap_explanation: (id) => ({ id: "carburant.pleins", suite: id ? `?plein=${encodeURIComponent(id)}` : "" }),
 };
 
 /** Destinataire de l'alerte, quand le lien dépend de qui la lit. */
