@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { deciderAcces, ecran } from "@/lib/acces/catalogue";
+import { deciderAcces, ecran, horsOffreGoNavigation } from "@/lib/acces/catalogue";
+import { ACCUEIL_GO_NAVIGATION } from "@/lib/go-navigation/offre";
 import { modulesActifs, utilisateurCourant } from "@/lib/acces/modules-requete";
 import { EtatAcces } from "@/components/acces/EtatAcces";
 
@@ -26,6 +27,8 @@ export async function garderPage(id: string): Promise<ResultatGarde> {
   const appUser = await utilisateurCourant();
   if (!appUser) redirect("/onboarding");
   const modules = await modulesActifs(appUser.organization_id);
+  // Compte d'essai GO Navigation : seuls les écrans de l'offre s'ouvrent.
+  if (horsOffreGoNavigation(e.id, modules)) redirect(ACCUEIL_GO_NAVIGATION);
   const decision = deciderAcces(e, appUser.role, modules, appUser.conduit);
   if (!decision.ok) {
     if (decision.motif === "role") {

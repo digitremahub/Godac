@@ -5,6 +5,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { StaffSupportRequestsList } from "@/components/godac-staff/StaffSupportRequestsList";
+import { essaiTermine, estOffreGoNavigation } from "@/lib/go-navigation/offre";
 
 /**
  * GODAC's own cross-tenant backoffice (Module 9): every client
@@ -26,11 +27,11 @@ export default async function GodacStaffPage() {
   }
 
   const supabase = createAdminSupabaseClient();
+  const colonnesOrg = "id, name, plan, subscription_status, created_at, vehicles(count), users(count)";
+  const lireOrganisations = (colonnes: string) => supabase.from("organizations").select(colonnes).order("created_at", { ascending: false });
   const [{ data: organizations }, { data: ocrRows }, { data: supportRequests }, { data: demandesDemo }] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select("id, name, plan, subscription_status, created_at, vehicles(count), users(count)")
-      .order("created_at", { ascending: false }),
+    // Colonne offre absente (migration 20261023000003 non appliquée) : liste sans badge GO Navigation.
+    lireOrganisations(`${colonnesOrg}, offre, trial_ends_at`).then((r) => (r.error?.code === "42703" ? lireOrganisations(colonnesOrg) : r)),
     supabase.from("organization_modules").select("organization_id, enabled").eq("module_key", "ocr"),
     supabase
       .from("support_requests")
@@ -52,6 +53,11 @@ export default async function GodacStaffPage() {
         title="GODAC — Backoffice opérateur"
         description={`Connecté en tant que ${email}. Vue cross-tenant, hors RLS — usage interne uniquement.`}
       />
+      <p className="mb-4 text-sm">
+        <Link href="/godac-staff/go-navigation" className="font-semibold text-teal-ink hover:underline">
+          Invitations GO Navigation →
+        </Link>
+      </p>
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-navy/60">
@@ -69,7 +75,14 @@ export default async function GodacStaffPage() {
           <tbody>
             {(organizations ?? []).map((org: any) => (
               <tr key={org.id} className="border-t border-navy/5">
-                <td className="py-2">{org.name}</td>
+                <td className="py-2">
+                  {org.name}
+                  {estOffreGoNavigation(org) && (
+                    <span className={`ml-2 ${essaiTermine(org) ? "badge-gold" : "badge-teal"}`}>
+                      GO Navigation – {essaiTermine(org) ? "essai terminé" : "essai"}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 capitalize">{org.plan}</td>
                 <td className="py-2">
                   <span className={org.subscription_status === "active" ? "badge-teal" : "badge-gold"}>

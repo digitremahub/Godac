@@ -2,6 +2,8 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { consommer } from "@/lib/usage/consommer";
 import { cleAdresse, horairesDesAdresses, listesDeTournee, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { sequenceParListes } from "@/lib/colis/listes";
 import { fenetresArret, heureDepart, instantParis, lireHeure, type Fenetres } from "@/lib/colis/horaires";
@@ -47,6 +49,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
+  // Quota « route_optimization » : prix 0 € et volume large pour les
+  // formules classiques ; plafond strict pour l'essai GO Navigation.
+  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "route_optimization");
+  if (!quota.ok) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
 
   const [{ data: stops }, listes] = await Promise.all([
     supabase.from("delivery_stops").select("id, list_id, lat, lng, status, position, address, window_start, window_end").eq("run_id", run.id).order("position"),

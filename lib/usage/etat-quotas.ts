@@ -23,6 +23,7 @@ export const LIBELLES_JAUGE: Record<UsageFeature, string> = {
   vehicle_ai_specs: "Fiches véhicule complétées par IA",
   import_ai: "Imports assistés par IA",
   assistant: "Questions à l'assistant",
+  route_optimization: "Optimisations de tournée",
 };
 
 const formuleDe = cache(async (organizationId: string) => {
@@ -45,11 +46,14 @@ export async function etatQuotas(organizationId: string, fonctions: readonly Usa
     const maintenant = new Date();
     const mois = bornesMoisParis(maintenant);
     const jour = debutJourParis(maintenant);
-    const [{ data: quotas }, ...totaux] = await Promise.all([
+    const [{ data: quotas }, propres, ...totaux] = await Promise.all([
       admin.from("usage_quotas").select("feature, included_per_month").eq("plan_id", formule).in("feature", [...fonctions]),
+      // Plafonds propres à l'organisation (essai GO Navigation) ; table absente → ignorés.
+      admin.from("usage_quota_overrides").select("feature, included_per_month").eq("organization_id", organizationId).in("feature", [...fonctions]),
       ...fonctions.map((f) => admin.rpc("usage_feature_totals", { p_org: organizationId, p_feature: f, p_month_start: mois.debut, p_day_start: jour })),
     ]);
     const inclusPar = new Map((quotas ?? []).map((q: { feature: string; included_per_month: number | null }) => [q.feature, q.included_per_month]));
+    for (const q of (propres.error ? [] : (propres.data ?? [])) as { feature: string; included_per_month: number | null }[]) inclusPar.set(q.feature, q.included_per_month);
     return fonctions.map((f, i) => {
       const t = totaux[i]?.data;
       const ligne = (Array.isArray(t) ? t[0] : t) as { month_units?: number } | null;

@@ -6,6 +6,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { AppLivreur } from "@/components/colis/AppLivreur";
 import { paysOrganisation } from "@/lib/pays/serveur";
+import { lireEtatOffre } from "@/lib/go-navigation/etat";
+import { EssaiTermine } from "@/components/go-navigation/EssaiTermine";
 
 export const metadata: Metadata = { title: "GO Navigation — GODAC" };
 
@@ -19,6 +21,7 @@ export default async function NavigationLivreurPage() {
   const appUser = await getCurrentAppUser();
   if (!appUser) redirect("/sign-in");
   const supabase = await createServerSupabaseClient();
+  if ((await lireEtatOffre(supabase, appUser.organization_id)).essaiTermine) return <EssaiTermine />;
   if (!(await isModuleEnabled(supabase, appUser.organization_id, "route_optimizer"))) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-paper p-6 text-center">

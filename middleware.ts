@@ -46,6 +46,10 @@ const PUBLIC_PREFIXES = [
   // lien à jeton (haché en base, 30 jours, une seule demande).
   "/prestataire/",
   "/api/public/prestataire/",
+  // Essai GO Navigation : inscription sur lien d'invitation unique (jeton
+  // haché en base, usage unique, expiration), sans compte au départ.
+  "/go-navigation/",
+  "/api/public/go-navigation/",
 ];
 
 function isPublicPath(pathname: string): boolean {

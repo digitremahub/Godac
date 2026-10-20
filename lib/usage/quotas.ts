@@ -18,6 +18,7 @@ export const USAGE_FEATURES = [
   "vehicle_ai_specs",
   "import_ai",
   "assistant",
+  "route_optimization",
 ] as const;
 export type UsageFeature = (typeof USAGE_FEATURES)[number];
 
@@ -37,6 +38,7 @@ export const LIBELLES_FONCTION: Record<UsageFeature, string> = {
   vehicle_ai_specs: "les fiches véhicule complétées par IA",
   import_ai: "l'import de fichiers assisté par IA",
   assistant: "l'assistant GODAC",
+  route_optimization: "l'optimisation des tournées colis",
 };
 
 /**
@@ -51,6 +53,30 @@ export function resoudreFormule(plan: string | null | undefined): PlanTier {
 /** Plafond journalier de sécurité par défaut : 10× la moyenne journalière incluse, 20 au minimum. */
 export function plafondJournalierParDefaut(inclusParMois: number): number {
   return Math.max(20, Math.ceil((inclusParMois * 10) / 30));
+}
+
+export interface QuotaLigne {
+  included_per_month: number | null;
+  daily_cap: number | null;
+}
+
+/**
+ * Quota effectif d'une fonction : le plafond propre à l'organisation
+ * (`usage_quota_overrides`, ex. essai GO Navigation) l'emporte sur celui de
+ * la formule et interdit tout dépassement facturé ; sinon la formule.
+ */
+export function quotaEffectif(
+  formule: QuotaLigne | null | undefined,
+  propre: QuotaLigne | null | undefined,
+  depassementOrganisation: boolean,
+): { inclusParMois: number; plafondJour: number; depassementAutorise: boolean } {
+  const q = propre ?? formule;
+  const inclusParMois = Number(q?.included_per_month ?? 0);
+  return {
+    inclusParMois,
+    plafondJour: Number(q?.daily_cap ?? plafondJournalierParDefaut(inclusParMois)),
+    depassementAutorise: propre ? false : depassementOrganisation,
+  };
 }
 
 export interface EtatQuota {
@@ -104,11 +130,14 @@ export function formatEuro(montant: number): string {
 export function messageRefus(
   motif: "quota_mensuel" | "plafond_jour",
   fonction: UsageFeature,
-  info: { inclusParMois: number; plafondJour: number; prixUnitaire: number | null },
+  info: { inclusParMois: number; plafondJour: number; prixUnitaire: number | null; plafondPropre?: boolean },
 ): string {
   const libelle = LIBELLES_FONCTION[fonction] ?? fonction;
   if (motif === "plafond_jour") {
     return `Limite de sécurité journalière atteinte pour ${libelle} (${info.plafondJour} par jour). Réessayez demain ou contactez le support GODAC.`;
+  }
+  if (info.plafondPropre) {
+    return `Plafond mensuel atteint pour ${libelle} : ${info.inclusParMois} par mois pendant votre essai. Contactez GODAC pour l'augmenter.`;
   }
   const prix = info.prixUnitaire !== null ? ` (${formatEuro(info.prixUnitaire)} HT l'unité)` : "";
   return `Quota mensuel atteint pour ${libelle} : ${info.inclusParMois} inclus dans votre formule ce mois-ci. La direction peut autoriser le dépassement facturé${prix} dans Abonnement › Consommation.`;

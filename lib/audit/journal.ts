@@ -20,6 +20,7 @@ export const ACTIONS_AUDIT = {
   paie_bulletin_genere: "Bulletin de paie généré (en attente de validation)",
   paie_bulletin_valide: "Bulletin de paie validé par la direction",
   paie_bulletin_refuse: "Bulletin de paie refusé par la direction",
+  inscription_go_navigation: "Compte d'essai GO Navigation créé (invitation)",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

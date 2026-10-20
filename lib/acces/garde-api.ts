@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentAppUser, type AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
+import { lireEtatOffre } from "@/lib/go-navigation/etat";
+import { MESSAGE_ESSAI_TERMINE } from "@/lib/go-navigation/offre";
 import { deciderAcces, ecran as ecranDe, libelleModule, libelleRoles, type CleModule, type Ecran } from "@/lib/acces/catalogue";
 import type { UserRole } from "@/lib/types/domain";
 
@@ -95,6 +97,12 @@ export async function garderApi(opts: OptionsGarde = {}): Promise<ResultatGardeA
   const besoinModules = (regle.modules?.length ?? 0) > 0 || (regle.modulesAuMoinsUn?.length ?? 0) > 0;
   const modules: ReadonlySet<string> = besoinModules ? new Set(await getEnabledModuleKeys(supabase, appUser.organization_id)) : new Set();
   const r = refusPour(regle, appUser.role, modules, appUser.conduit);
-  if (r) return { ok: false, reponse: r };
+  if (r) {
+    // Module refusé parce que l'essai GO Navigation est terminé : message dédié.
+    if (r.status === 403 && (await lireEtatOffre(supabase, appUser.organization_id)).essaiTermine) {
+      return { ok: false, reponse: refus("MODULE_INACTIF", MESSAGE_ESSAI_TERMINE) };
+    }
+    return { ok: false, reponse: r };
+  }
   return { ok: true, appUser, supabase, modules };
 }
