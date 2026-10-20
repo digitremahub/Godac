@@ -9,7 +9,7 @@ import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { BadgeHoraires, type useHoraires } from "@/components/colis/HorairesSheet";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { AdresseInput } from "@/components/colis/AdresseInput";
-import { pastille, marqueurChauffeur, orienterChauffeur } from "@/components/colis/marqueurs";
+import { pastille, marqueurVehicule, etatVehicule } from "@/components/colis/marqueurs";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type Stop } from "@/components/colis/commun";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
 import { formatPoids } from "@/lib/colis/poids";
@@ -22,7 +22,21 @@ import type { CibleDepot } from "@/lib/colis/reordonner";
 import type { SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { COULEURS_CARTE, styliserGodac, type StyleCarte } from "@/lib/colis/style-carte";
-import { RAYON_ARRIVEE_M, arretApresCloture, arretSuivi, distanceM, doitRecalculer, formatDistance, formatDuree, meilleureInsertion, resteSurTrace } from "@/lib/colis/navigation";
+import { ECART_MAX_M, RAYON_ARRIVEE_M, arretApresCloture, arretSuivi, distanceM, doitRecalculer, formatDistance, formatDuree, meilleureInsertion, projeterSurTrace, resteSurTrace } from "@/lib/colis/navigation";
+import {
+  DEPLACEMENT_CAP_M,
+  PITCH_CONDUITE,
+  choisirCap,
+  dureeAnimation,
+  interpoler,
+  lisserCap,
+  lisserZoom,
+  margesConduite,
+  vitesseEstimee,
+  zoomSelonVitesse,
+  type EtatCamera,
+} from "@/lib/colis/conduite";
+import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
 
 /** Fond vectoriel gratuit et sans clé déjà utilisé par l'app (OpenStreetMap via OpenFreeMap), recoloré aux couleurs GODAC. */
 const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.org/styles/liberty";
@@ -30,6 +44,31 @@ const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.or
 const REMONTEE_POSITION_MS = 30_000;
 const ligneGeo = (coordinates: [number, number][]) => ({ type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates } });
 const VIDE = ligneGeo([]);
+const SANS_MARGE = { top: 0, bottom: 0, left: 0, right: 0 };
+/** Guidage vocal activé (mémorisé sur le téléphone). */
+const CLE_VOIX = "godac.go-navigation.voix";
+
+/**
+ * Vue de la carte : « conduite » (3D, orientée dans le sens de la marche,
+ * suit la voiture), « ensemble » (vue de dessus, nord en haut) ou « libre »
+ * (le chauffeur a déplacé la carte : bouton « Recentrer »).
+ */
+type Vue = "conduite" | "ensemble" | "libre";
+
+/** Annonce vocale (voix française du navigateur) ; sans effet si indisponible. */
+function parler(texte: string) {
+  try {
+    const synthese = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!synthese || typeof SpeechSynthesisUtterance === "undefined") return;
+    const u = new SpeechSynthesisUtterance(texte);
+    u.lang = "fr-FR";
+    const voixFr = synthese.getVoices().find((v) => v.lang?.toLowerCase().startsWith("fr"));
+    if (voixFr) u.voice = voixFr;
+    synthese.speak(u);
+  } catch {
+    /* synthèse vocale indisponible */
+  }
+}
 
 type Horaires = ReturnType<typeof useHoraires>;
 type Placement = "meilleur" | "optimiser" | "fin";
@@ -77,7 +116,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const [feuille, setFeuille] = useState<"reduit" | "liste">("reduit");
   const [position, setPosition] = useState<Point | null>(null);
   const [erreurGps, setErreurGps] = useState<string | null>(null);
-  const [suivre, setSuivre] = useState(true);
+  const [vue, setVue] = useState<Vue>("ensemble");
+  const [voix, setVoix] = useState(false);
   const [trajet, setTrajet] = useState<Itineraire | null>(null);
   const [ajout, setAjout] = useState(false);
   const [recherche, setRecherche] = useState("");
@@ -99,9 +139,27 @@ export function GoNavigation(p: GoNavigationProps) {
   const marqueurs = useRef<Marker[]>([]);
   const moi = useRef<Marker | null>(null);
   const [prete, setPrete] = useState(false);
-  const suivreRef = useRef(suivre);
-  suivreRef.current = suivre;
+  const vueRef = useRef(vue);
+  vueRef.current = vue;
   const feuilleRef = useRef<HTMLDivElement>(null);
+  const bandeauRef = useRef<HTMLDivElement>(null);
+  const boussoleRef = useRef<HTMLSpanElement>(null);
+  const trajetRef = useRef<Itineraire | null>(null);
+
+  // Mouvements réduits (réglage du téléphone) : transitions courtes.
+  const reduit = useRef(false);
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+      reduit.current = mq.matches;
+      const maj = () => (reduit.current = mq.matches);
+      mq.addEventListener?.("change", maj);
+      return () => mq.removeEventListener?.("change", maj);
+    } catch {
+      return undefined;
+    }
+  }, []);
+  const duree = (ms: number) => (reduit.current ? Math.min(ms, 150) : ms);
 
   useEffect(() => {
     let annule = false;
@@ -126,6 +184,7 @@ export function GoNavigation(p: GoNavigationProps) {
         zoom: depart ? 14 : 5,
         attributionControl: { compact: true },
         pitchWithRotate: false,
+        maxPitch: 60,
       });
       m.on("load", () => {
         m.addSource("suite", { type: "geojson", data: VIDE });
@@ -135,12 +194,28 @@ export function GoNavigation(p: GoNavigationProps) {
         m.addLayer({ id: "trajet", type: "line", source: "trajet", paint: { "line-color": COULEURS_CARTE.teal, "line-width": 7 }, layout: { "line-cap": "round", "line-join": "round" } });
         setPrete(true);
       });
-      // Le chauffeur déplace la carte : on arrête de le suivre (bouton « Recentrer »).
-      m.on("dragstart", () => setSuivre(false));
+      // Le chauffeur déplace, zoome ou tourne la carte : on arrête de le
+      // suivre (bouton « Recentrer », comme Waze). Les mouvements de la
+      // caméra lancés par le code n'ont pas d'événement d'origine.
+      const quitterSuivi = (e: { originalEvent?: unknown }) => {
+        if (!e.originalEvent || vueRef.current !== "conduite") return;
+        vueRef.current = "libre";
+        setVue("libre");
+      };
+      m.on("dragstart", quitterSuivi);
+      m.on("zoomstart", quitterSuivi);
+      m.on("rotatestart", quitterSuivi);
+      m.on("pitchstart", quitterSuivi);
+      // Boussole : le « N » pointe vers le nord de la carte.
+      m.on("rotate", () => {
+        if (boussoleRef.current) boussoleRef.current.style.transform = `rotate(${-m.getBearing()}deg)`;
+      });
       carte.current = m;
     })();
     return () => {
       annule = true;
+      cancelAnimationFrame(raf.current);
+      raf.current = 0;
       carte.current?.remove();
       carte.current = null;
     };
@@ -160,6 +235,75 @@ export function GoNavigation(p: GoNavigationProps) {
   hauteurRef.current = hauteur;
   const hauteurFeuille = () => Math.min(hauteurRef.current, (typeof window !== "undefined" ? window.innerHeight : 800) * 0.6);
   const marges = () => ({ top: 150, bottom: hauteurFeuille() + 20, left: 40, right: 40 });
+  /** Marges de la vue conduite : voiture dans le bas de la zone visible, au-dessus de la feuille. */
+  const margesC = () => margesConduite(typeof window !== "undefined" ? window.innerHeight : 800, hauteurFeuille(), bandeauRef.current?.getBoundingClientRect().bottom ?? 150);
+
+  // ——— Caméra : la voiture « avance » entre deux points GPS ———
+  const affiche = useRef<EtatCamera | null>(null);
+  const anim = useRef<{ de: EtatCamera; vers: EtatCamera; debut: number; duree: number } | null>(null);
+  const raf = useRef(0);
+  /** Pendant une transition (easeTo), la boucle d'animation ne bouge pas la caméra. */
+  const transitionJusqua = useRef(0);
+  /** Marges de la vue conduite, recalculées à chaque point GPS (pas à chaque image). */
+  const margesCache = useRef<ReturnType<typeof margesConduite> | null>(null);
+
+  function dessiner(e: EtatCamera) {
+    moi.current?.setLngLat([e.lng, e.lat]).setRotation(e.cap);
+    const m = carte.current;
+    if (m && vueRef.current === "conduite" && performance.now() > transitionJusqua.current) {
+      m.jumpTo({ center: [e.lng, e.lat], bearing: e.cap, zoom: e.zoom, pitch: PITCH_CONDUITE, padding: (margesCache.current ??= margesC()) });
+    }
+  }
+  function boucle(t: number) {
+    const a = anim.current;
+    if (!a) {
+      raf.current = 0;
+      return;
+    }
+    const k = a.duree > 0 ? (t - a.debut) / a.duree : 1;
+    const e = interpoler(a.de, a.vers, k);
+    affiche.current = e;
+    dessiner(e);
+    if (k < 1) raf.current = requestAnimationFrame(boucle);
+    else {
+      anim.current = null;
+      raf.current = 0;
+    }
+  }
+
+  /** Vue conduite : 3D, orientée selon le cap, qui suit la voiture. */
+  function passerEnConduite() {
+    const m = carte.current;
+    const e = affiche.current;
+    if (!m || !e) return;
+    clearTimeout(ajustement.current);
+    vueRef.current = "conduite";
+    setVue("conduite");
+    const d = duree(800);
+    transitionJusqua.current = performance.now() + d + 50;
+    m.easeTo({ center: [e.lng, e.lat], bearing: e.cap, zoom: e.zoom, pitch: PITCH_CONDUITE, padding: margesC(), duration: d });
+  }
+
+  /** Vue d'ensemble : vue de dessus, nord en haut, les points donnés visibles. */
+  const ajustement = useRef<ReturnType<typeof setTimeout>>();
+  function vueEnsemble(pts: [number, number][], maxZoom = 16, nouvelleVue: Vue = "ensemble") {
+    const m = carte.current;
+    const maplibregl = lib.current;
+    if (!m || !maplibregl) return;
+    vueRef.current = nouvelleVue;
+    setVue(nouvelleVue);
+    const d = duree(450);
+    // D'abord à plat, nord en haut et sans les marges de la vue conduite, puis cadrage.
+    m.easeTo({ pitch: 0, bearing: 0, padding: SANS_MARGE, duration: d });
+    clearTimeout(ajustement.current);
+    if (!pts.length) return;
+    ajustement.current = setTimeout(() => {
+      if (vueRef.current === "conduite") return;
+      const b = pts.reduce((bb, x) => bb.extend(x), new maplibregl.LngLatBounds(pts[0]!, pts[0]!));
+      m.fitBounds(b, { padding: marges(), maxZoom, duration: d, bearing: 0, pitch: 0, linear: true });
+    }, d + 30);
+  }
+  useEffect(() => () => clearTimeout(ajustement.current), []);
 
   // Arrêts numérotés (et dépôt), mêmes codes couleur que les cartes d'arrêt.
   useEffect(() => {
@@ -193,6 +337,13 @@ export function GoNavigation(p: GoNavigationProps) {
 
   // Position en direct (navigator.geolocation.watchPosition).
   const derniereRemontee = useRef(0);
+  const dernierFix = useRef<(Point & { t: number }) | null>(null);
+  const dernierPoint = useRef<number | null>(null);
+  const capLisse = useRef<number | null>(null);
+  const zoomLisse = useRef<number | null>(null);
+  const capConnu = useRef(false);
+  /** La vue conduite s'active d'elle-même au premier point GPS (sauf choix du chauffeur). */
+  const conduiteAuto = useRef(false);
   const onPosition = p.onPosition;
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -203,15 +354,42 @@ export function GoNavigation(p: GoNavigationProps) {
       (g) => {
         setErreurGps(null);
         const pos = { lat: g.coords.latitude, lng: g.coords.longitude };
+        const t = Date.now();
+        const prec = dernierFix.current;
+        // Cap : GPS en mouvement, sinon entre les deux dernières positions, sinon sens du tracé ; lissé.
+        const vitesse = vitesseEstimee(g.coords.speed, prec, { ...pos, t });
+        const mesure = choisirCap({ capGps: g.coords.heading, vitesse, precedente: prec, actuelle: pos, ligne: trajetRef.current?.ligne ?? null });
+        if (!prec || distanceM(prec, pos) >= DEPLACEMENT_CAP_M) dernierFix.current = { ...pos, t };
+        if (mesure !== null) {
+          capLisse.current = lisserCap(capLisse.current, mesure, 0.5);
+          capConnu.current = true;
+        }
+        zoomLisse.current = lisserZoom(zoomLisse.current, zoomSelonVitesse(vitesse));
+        const vers: EtatCamera = { lng: pos.lng, lat: pos.lat, cap: capLisse.current ?? 0, zoom: zoomLisse.current };
+        const intervalle = dernierPoint.current === null ? null : t - dernierPoint.current;
+        dernierPoint.current = t;
         setPosition(pos);
         const m = carte.current;
         const maplibregl = lib.current;
         if (m && maplibregl) {
-          if (!moi.current) moi.current = new maplibregl.Marker({ element: marqueurChauffeur() }).setLngLat([pos.lng, pos.lat]).addTo(m);
-          else moi.current.setLngLat([pos.lng, pos.lat]);
-          // Cap affiché seulement en mouvement (il est faux à l'arrêt).
-          orienterChauffeur(moi.current.getElement(), g.coords.heading !== null && (g.coords.speed ?? 0) > 1.5 ? g.coords.heading : null);
-          if (suivreRef.current) m.easeTo({ center: [pos.lng, pos.lat], zoom: Math.max(m.getZoom(), 15.5), padding: marges(), duration: 900 });
+          if (!moi.current) {
+            moi.current = new maplibregl.Marker({ element: marqueurVehicule(), rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([pos.lng, pos.lat]).addTo(m);
+          }
+          etatVehicule(moi.current.getElement(), capConnu.current);
+          margesCache.current = margesC();
+          // Animation linéaire de la position affichée vers le nouveau point, sur la durée de l'intervalle GPS.
+          const de = affiche.current;
+          if (!de) {
+            affiche.current = vers;
+            dessiner(vers);
+          } else {
+            anim.current = { de: { ...de }, vers, debut: performance.now(), duree: dureeAnimation(intervalle, reduit.current) };
+            if (!raf.current) raf.current = requestAnimationFrame(boucle);
+          }
+          if (!conduiteAuto.current) {
+            conduiteAuto.current = true;
+            if (vueRef.current === "ensemble") passerEnConduite();
+          }
         }
         const maintenant = Date.now();
         if (maintenant - derniereRemontee.current > REMONTEE_POSITION_MS) {
@@ -271,18 +449,19 @@ export function GoNavigation(p: GoNavigationProps) {
     if (recalcul) void tracer(cible.id, position);
   }, [prete, cible, position, trajet, tracer]);
 
-  // Arrêt suivi qui change (clôture, carte glissée) : on le montre avec le chauffeur.
+  trajetRef.current = trajet;
+
+  // Arrêt suivi qui change (clôture, carte glissée) : on le montre avec le chauffeur (hors vue conduite).
   const derniereCible = useRef<string | null>(null);
   useEffect(() => {
     if (!prete || !cible || cible.id === derniereCible.current) return;
     derniereCible.current = cible.id;
     const m = carte.current;
     const maplibregl = lib.current;
-    if (!m || !maplibregl || cible.lat === null || cible.lng === null || suivreRef.current) return;
+    if (!m || !maplibregl || cible.lat === null || cible.lng === null || vueRef.current === "conduite") return;
     const pts: [number, number][] = [[Number(cible.lng), Number(cible.lat)]];
     if (position) pts.push([position.lng, position.lat]);
-    const b = pts.reduce((bb, x) => bb.extend(x), new maplibregl.LngLatBounds(pts[0]!, pts[0]!));
-    m.fitBounds(b, { padding: marges(), maxZoom: 16, duration: 600 });
+    vueEnsemble(pts, 16, vueRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prete, cible?.id]);
 
@@ -308,21 +487,35 @@ export function GoNavigation(p: GoNavigationProps) {
   }, [prete, cleSuite, aPosition, run.id, onItineraire]);
 
   function recentrer() {
-    setSuivre(true);
-    const m = carte.current;
-    if (m && position) m.easeTo({ center: [position.lng, position.lat], zoom: 16, padding: marges(), duration: 600 });
+    conduiteAuto.current = true;
+    passerEnConduite();
   }
   function toutVoir() {
-    setSuivre(false);
-    const m = carte.current;
-    const maplibregl = lib.current;
-    if (!m || !maplibregl) return;
+    conduiteAuto.current = true;
     const pts: [number, number][] = restants.filter((s) => s.lat !== null).map((s) => [Number(s.lng), Number(s.lat)]);
     if (position) pts.push([position.lng, position.lat]);
-    if (!pts.length) return;
-    const b = pts.reduce((bb, x) => bb.extend(x), new maplibregl.LngLatBounds(pts[0]!, pts[0]!));
-    m.fitBounds(b, { padding: marges(), maxZoom: 15, duration: 600 });
+    vueEnsemble(pts, 15);
   }
+  /** Vue d'ensemble du trajet vers l'arrêt suivi (ou de la position et de l'arrêt). */
+  function voirTrajet() {
+    conduiteAuto.current = true;
+    const pts: [number, number][] = trajet && cible && cibleTracee.current === cible.id ? [...trajet.ligne] : [];
+    if (cible && cible.lat !== null && cible.lng !== null) pts.push([Number(cible.lng), Number(cible.lat)]);
+    if (position) pts.push([position.lng, position.lat]);
+    vueEnsemble(pts, 16);
+  }
+
+  // La feuille change de hauteur en vue conduite : la voiture reste au-dessus.
+  useEffect(() => {
+    const m = carte.current;
+    const e = affiche.current;
+    if (!m || !e || vueRef.current !== "conduite") return;
+    const d = duree(300);
+    transitionJusqua.current = performance.now() + d + 30;
+    margesCache.current = margesC();
+    m.easeTo({ center: [e.lng, e.lat], padding: margesCache.current, duration: d });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hauteur]);
 
   // Taille de la carte quand la feuille change de hauteur.
   useEffect(() => {
@@ -337,6 +530,55 @@ export function GoNavigation(p: GoNavigationProps) {
   const dureeAffichee =
     trajet && trajet.dureeMin !== null && trajet.distanceKm > 0 && distanceAffichee !== null ? (trajet.dureeMin * distanceAffichee) / (trajet.distanceKm * 1000) : null;
   const arrive = directM !== null && directM < RAYON_ARRIVEE_M;
+
+  // ——— Indications de direction (manœuvres OSRM) ———
+  const trajetValide = trajet && cible && cibleTracee.current === cible.id ? trajet : null;
+  const placees = useMemo(() => (trajetValide?.manoeuvres?.length && trajetValide.ligne.length > 1 ? placerManoeuvres(trajetValide.ligne, trajetValide.manoeuvres) : []), [trajetValide]);
+  const projection = placees.length && position && trajetValide ? projeterSurTrace(position, trajetValide.ligne) : null;
+  // Hors du tracé (en attendant le recalcul) : pas d'indication trompeuse.
+  const courante = projection && projection.ecartM <= ECART_MAX_M * 1.5 ? manoeuvreCourante(placees, projection.abscisseM) : null;
+  const manoeuvre = courante ? placees[courante.index]! : null;
+  const suivante = courante ? (placees[courante.index + 1] ?? null) : null;
+
+  // ——— Guidage vocal (désactivé par défaut, mémorisé) ———
+  useEffect(() => {
+    try {
+      setVoix(localStorage.getItem(CLE_VOIX) === "1");
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
+  function basculerVoix() {
+    const v = !voix;
+    setVoix(v);
+    try {
+      localStorage.setItem(CLE_VOIX, v ? "1" : "0");
+    } catch {
+      /* stockage indisponible */
+    }
+    if (v) parler("Guidage vocal activé");
+    else {
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {
+        /* rien */
+      }
+    }
+  }
+  const annonces = useRef(new Set<string>());
+  const distanceManoeuvre = courante?.distanceM ?? null;
+  useEffect(() => {
+    if (!voix || !manoeuvre || distanceManoeuvre === null) return;
+    const palier = palierAnnonce(distanceManoeuvre);
+    if (!palier) return;
+    const base = `${manoeuvre.lieu.join(",")}|${manoeuvre.type}|`;
+    if (annonces.current.has(base + palier)) return;
+    // Une seule fois chacune ; un palier proche annoncé couvre les plus lointains (tremblement GPS).
+    const ordre: Palier[] = ["500", "150", "point"];
+    ordre.slice(0, ordre.indexOf(palier) + 1).forEach((x) => annonces.current.add(base + x));
+    if (annonces.current.size > 300) annonces.current.clear();
+    parler(phraseAnnonce(manoeuvre, palier, distanceManoeuvre));
+  }, [voix, manoeuvre, distanceManoeuvre]);
 
   // ——— Feuille : cartes à faire glisser ———
   const defile = useRef<HTMLDivElement>(null);
@@ -419,13 +661,33 @@ export function GoNavigation(p: GoNavigationProps) {
 
       {/* Bandeau de guidage */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-2">
+        <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-2">
           <button type="button" onClick={p.onFermer} className="flex w-12 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la liste des arrêts">
             ‹
           </button>
           <div className="min-w-0 flex-1 rounded-2xl bg-marine px-4 py-2.5 text-white shadow-pop" aria-live="polite">
             {fige ? (
               <p className="py-1 text-sm font-semibold">Tournée clôturée : consultation seulement.</p>
+            ) : cible && manoeuvre && courante && !arrive ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-12 w-12 shrink-0 text-teal" />
+                  <div className="min-w-0">
+                    <p className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistanceManoeuvre(courante.distanceM)}</p>
+                    <p className="line-clamp-2 text-sm font-semibold leading-snug">{texteManoeuvre(manoeuvre)}</p>
+                  </div>
+                </div>
+                {suivante && (
+                  <p className="mt-1.5 flex items-center gap-1.5 border-t border-white/15 pt-1.5 text-xs text-white/75">
+                    <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-4 w-4 shrink-0 text-white/75" />
+                    <span className="truncate">Puis : {texteManoeuvre(suivante)}</span>
+                  </p>
+                )}
+                <p className="mt-1 truncate text-[11px] text-white/70">
+                  {formatDistance(distanceAffichee)}
+                  {dureeAffichee !== null && ` · ${formatDuree(dureeAffichee)}`} · Arrêt {numero(cible)} · {cible.address}
+                </p>
+              </>
             ) : cible ? (
               <>
                 <p className="flex items-baseline gap-2">
@@ -446,8 +708,12 @@ export function GoNavigation(p: GoNavigationProps) {
             </p>
           </div>
         </div>
-        {erreurGps && <p className="pointer-events-auto mx-auto mt-2 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">{erreurGps}</p>}
-        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl justify-end gap-2">
+        {erreurGps ? (
+          <p className="pointer-events-auto mx-auto mt-2 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">{erreurGps}</p>
+        ) : (
+          !position && <p className="mx-auto mt-2 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
+        )}
+        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl flex-wrap justify-end gap-2">
           {!fige && run.status === "in_progress" && (
             <button type="button" onClick={() => setAjout(true)} className="rounded-full bg-teal px-4 py-2.5 text-sm font-bold text-marine shadow-pop">
               + Adresse
@@ -456,13 +722,57 @@ export function GoNavigation(p: GoNavigationProps) {
           <button type="button" onClick={toutVoir} className="rounded-full bg-surface px-3 py-2.5 text-xs font-semibold text-navy shadow-pop">
             Toute la tournée
           </button>
-          {!suivre && (
-            <button type="button" onClick={recentrer} className="rounded-full bg-marine px-3 py-2.5 text-xs font-semibold text-white shadow-pop">
-              ◎ Recentrer
+          {vue === "conduite" ? (
+            <button type="button" onClick={voirTrajet} className="rounded-full bg-surface px-3 py-2.5 text-xs font-semibold text-navy shadow-pop">
+              Vue d&apos;ensemble
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={recentrer}
+              disabled={!position}
+              className="rounded-full bg-marine px-3 py-2.5 text-xs font-semibold text-white shadow-pop disabled:opacity-50"
+              title={position ? undefined : "En attente de la position GPS"}
+            >
+              Conduite
+            </button>
+          )}
+        </div>
+        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={basculerVoix}
+            className={`flex h-11 w-11 items-center justify-center rounded-full shadow-pop ${voix ? "bg-marine text-teal" : "bg-surface text-navy/70"}`}
+            aria-pressed={voix}
+            aria-label={voix ? "Couper le guidage vocal" : "Activer le guidage vocal"}
+          >
+            <IconeHautParleur actif={voix} className="h-5 w-5" />
+          </button>
+          {vue !== "ensemble" && (
+            <button type="button" onClick={voirTrajet} className="flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-pop" aria-label="Nord en haut (vue d'ensemble)">
+              <span ref={boussoleRef} className="flex flex-col items-center leading-none" aria-hidden="true">
+                <svg viewBox="0 0 12 16" className="h-3.5 w-3">
+                  <path d="M6 0 L11 9 H1 Z" fill="#FF6B35" />
+                  <path d="M1 9 H11 L6 16 Z" fill="#0A0F1E" opacity=".35" />
+                </svg>
+                <span className="text-[9px] font-bold text-navy">N</span>
+              </span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Recentrer (le chauffeur a déplacé la carte) */}
+      {vue === "libre" && position && (
+        <button
+          type="button"
+          onClick={recentrer}
+          className="absolute left-3 z-10 flex items-center gap-1.5 rounded-full bg-marine px-4 py-3 text-sm font-bold text-white shadow-pop"
+          style={{ bottom: `${Math.round(Math.min(hauteur, (typeof window !== "undefined" ? window.innerHeight : 800) * 0.6)) + 12}px` }}
+        >
+          <IconNavigation className="h-4 w-4 text-teal" /> Recentrer
+        </button>
+      )}
 
       {/* Feuille de la tournée */}
       <div
@@ -601,6 +911,81 @@ export function GoNavigation(p: GoNavigationProps) {
         />
       )}
     </div>
+  );
+}
+
+const ANGLES: Partial<Record<Pictogramme, number>> = {
+  "tout-droit": 0,
+  droite: 90,
+  gauche: -90,
+  "legere-droite": 45,
+  "legere-gauche": -45,
+  "serree-droite": 135,
+  "serree-gauche": -135,
+};
+
+/** Flèche de la manœuvre (tout droit, gauche, droite, légère, serrée, demi-tour, rond-point avec numéro de sortie, arrivée). */
+function FlecheManoeuvre({ picto, sortie, className }: { picto: Pictogramme; sortie?: number; className?: string }) {
+  let contenu: JSX.Element;
+  if (picto === "demi-tour") {
+    contenu = (
+      <>
+        <path d="M32 44 V22 a8 8 0 0 0 -16 0 V36" />
+        <path d="M10 30 L16 36 L22 30" />
+      </>
+    );
+  } else if (picto === "rond-point") {
+    contenu = (
+      <>
+        <circle cx="24" cy="18" r="10" />
+        <path d="M24 44 V28" />
+        {sortie ? (
+          <text x="24" y="23" textAnchor="middle" fontSize="14" fontWeight="700" fill="currentColor" stroke="none">
+            {sortie}
+          </text>
+        ) : null}
+      </>
+    );
+  } else if (picto === "arrivee") {
+    contenu = (
+      <>
+        <path d="M16 44 V6" />
+        <path d="M16 7 H36 L31 14 L36 21 H16" fill="currentColor" />
+      </>
+    );
+  } else {
+    const a = ((ANGLES[picto] ?? 0) * Math.PI) / 180;
+    const x = 24 + 16 * Math.sin(a);
+    const y = 24 - 16 * Math.cos(a);
+    const pointe = (d: number) => `${(x - 10 * Math.sin(a + d)).toFixed(1)} ${(y + 10 * Math.cos(a + d)).toFixed(1)}`;
+    contenu = (
+      <>
+        <path d={`M24 44 V24 L${x.toFixed(1)} ${y.toFixed(1)}`} />
+        <path d={`M${pointe(0.65)} L${x.toFixed(1)} ${y.toFixed(1)} L${pointe(-0.65)}`} />
+      </>
+    );
+  }
+  return (
+    <svg viewBox="0 0 48 48" className={className} fill="none" stroke="currentColor" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {contenu}
+    </svg>
+  );
+}
+
+/** Haut-parleur (barré quand le guidage vocal est coupé). */
+function IconeHautParleur({ actif, className }: { actif: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 9 H8 L13 5 V19 L8 15 H4 Z" fill="currentColor" />
+      {actif ? (
+        <>
+          <path d="M16.5 8.5 a5 5 0 0 1 0 7" />
+          <path d="M19 6 a8.5 8.5 0 0 1 0 12" />
+        </>
+      ) : (
+        <path d="M16 9 L22 15 M22 9 L16 15" />
+      )}
+    </svg>
   );
 }
 
