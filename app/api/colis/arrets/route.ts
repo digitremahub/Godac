@@ -11,6 +11,7 @@ import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { cleAdresse, horairesDesAdresses, listeDeLaTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 import { listePourAdresse } from "@/lib/colis/villages-serveur";
 import { detecterProfessionnel } from "@/lib/colis/professionnel";
+import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -64,6 +65,9 @@ export async function POST(req: Request) {
   }
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
+  // Tournée clôturée : figée. En cours (in_progress) : le chauffeur peut
+  // ajouter une adresse oubliée depuis GO Navigation.
+  if (run.status === "done") return NextResponse.json({ error: MESSAGE_TOURNEE_CLOTUREE }, { status: 409 });
   let listId = parsed.data.list_id ?? null;
   if (listId && !(await listeDeLaTournee(supabase, run.id, listId))) return NextResponse.json({ error: "Liste introuvable dans cette tournée." }, { status: 400 });
 

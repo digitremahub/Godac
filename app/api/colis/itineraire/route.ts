@@ -8,6 +8,11 @@ import { ligneDroite, troncons, type Itineraire, type Point } from "@/lib/colis/
 const bodySchema = z.object({
   run_id: z.string().uuid(),
   depuis: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).nullable().optional(),
+  /**
+   * GO Navigation : trajet vers ce seul arrêt (depuis la position du
+   * chauffeur, sinon le dépôt) au lieu de toute la suite de la tournée.
+   */
+  cible: z.string().uuid().nullable().optional(),
 });
 
 /** Service d'itinéraires compatible OSRM (serveur de démonstration public par défaut). */
@@ -50,6 +55,15 @@ export async function POST(req: Request) {
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
+  const depot = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
+  if (parsed.data.cible) {
+    const { data: arret } = await supabase.from("delivery_stops").select("lat, lng").eq("run_id", run.id).eq("id", parsed.data.cible).maybeSingle();
+    if (!arret) return NextResponse.json({ error: "Arrêt introuvable dans cette tournée." }, { status: 404 });
+    const depart = parsed.data.depuis ?? depot;
+    if (!depart || arret.lat === null || arret.lng === null) return NextResponse.json({ ligne: [], distanceKm: 0, dureeMin: 0, approx: false } satisfies Itineraire);
+    return NextResponse.json(await troncon([depart, { lat: Number(arret.lat), lng: Number(arret.lng) }]));
+  }
+
   const { data: stops } = await supabase
     .from("delivery_stops")
     .select("lat, lng")
@@ -57,7 +71,6 @@ export async function POST(req: Request) {
     .eq("status", "pending")
     .not("lat", "is", null)
     .order("position");
-  const depot = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
   const points: Point[] = [
     ...(parsed.data.depuis ? [parsed.data.depuis] : depot ? [depot] : []),
     ...(stops ?? []).map((s) => ({ lat: Number(s.lat), lng: Number(s.lng) })),

@@ -5,37 +5,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as CarteMap, Marker } from "maplibre-gl";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import type { Run, Stop } from "@/components/colis/commun";
+import { pastille } from "@/components/colis/marqueurs";
 
 /** Fond de carte vectoriel gratuit (OpenStreetMap via OpenFreeMap), remplaçable par variable d'environnement. */
 const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.org/styles/liberty";
 const TEAL = "#1BE4C1";
 const NAVY = "#0A0F1E";
-
-const GOLD = "#F5C842";
-const RELAIS = "#A78BFA";
-
-/** Pastille numérotée ; une ramasse a une encoche (coin carré) et une bordure dorée, un point relais une bordure violette. */
-function pastille(numero: string, statut: Stop["status"], actif: boolean, ramasse = false, relais = false): HTMLElement {
-  const el = document.createElement("button");
-  el.type = "button";
-  el.textContent = numero;
-  const fond = statut === "delivered" ? "#9AA3B5" : statut === "failed" ? "#F25A22" : actif ? TEAL : NAVY;
-  const texte = statut === "pending" && actif ? NAVY : "#FFFFFF";
-  const taille = actif ? 38 : 28;
-  Object.assign(el.style, {
-    width: `${taille}px`,
-    height: `${taille}px`,
-    borderRadius: ramasse || relais ? "999px 999px 999px 3px" : "999px",
-    background: fond,
-    color: texte,
-    border: ramasse ? `3px solid ${GOLD}` : relais ? `3px solid ${RELAIS}` : "2px solid #FFFFFF",
-    boxShadow: "0 2px 6px rgba(10,15,30,.35)",
-    font: `700 ${actif ? 15 : 12}px system-ui, sans-serif`,
-    cursor: "pointer",
-    zIndex: actif ? "2" : "1",
-  });
-  return el;
-}
 
 /**
  * Carte de la tournée (étape 1 du GPS livraison) : arrêts numérotés dans
