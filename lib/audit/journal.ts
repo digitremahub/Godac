@@ -8,6 +8,8 @@ export const ACTIONS_AUDIT = {
   rapport_correction: "Rapport de tournée corrigé",
   rapport_relecture: "Scans de rapport relus",
   plein_modification: "Plein modifié",
+  ecart_carburant_traite: "Écart carburant justifié / classé",
+  ecart_carburant_explication: "Explication demandée au chauffeur sur un écart carburant",
   livraison_cuve_annulee: "Livraison de cuve annulée",
   role_modifie: "Rôle ou accès modifié",
   pin_reinitialise: "Code PIN réinitialisé",

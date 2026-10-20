@@ -580,7 +580,7 @@ export function AppLivreur({ prenom, pays = "FR" }: { prenom: string | null; pay
                     <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => terminer(arretCarte)}>
                       <IconCheck className="h-4 w-4" /> {libelleFait(arretCarte)}
                     </button>
-                  ) : (
+                  ) : run.status !== "done" && (
                     <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
                       Annuler
                     </button>

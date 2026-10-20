@@ -49,16 +49,16 @@ export async function POST(req: Request) {
       ["loading", "in_progress"].includes(fiche.status)
     ) ?? (fichesDuJour ?? []).find((fiche: any) => fiche.status !== "done");
 
-    // Une fiche clôturée ne doit jamais être recréée ni modifiée par un second clic.
-    if (!ficheExistante && (fichesDuJour ?? []).some((fiche: any) => fiche.status === "done")) {
-      const ficheCloturee = (fichesDuJour ?? []).find((fiche: any) => fiche.status === "done");
-      return NextResponse.json({ run: ficheCloturee, reused: true });
-    }
+    // Fiche du jour déjà clôturée : le chauffeur lance une tournée
+    // supplémentaire (nouvelle fiche, la clôturée reste intacte dans
+    // l'historique). Ses tournées planifiées ont déjà été chargées sur la
+    // première fiche : on ne les recharge pas sur la suivante.
+    const supplementaire = !ficheExistante && (fichesDuJour ?? []).some((fiche: any) => fiche.status === "done");
 
     let run: NonNullable<typeof ficheExistante> | Awaited<ReturnType<typeof creerTournee>> | undefined = ficheExistante;
     if (!run) {
       try {
-        run = await creerTournee(supabase, appUser, parsed.data.name ?? null);
+        run = await creerTournee(supabase, appUser, parsed.data.name ?? (supplementaire ? "Tournée supplémentaire" : null));
       } catch (e) {
         // Double clic : l'index unique « une fiche ouverte par chauffeur et
         // par jour » (migration 20261019000006, audit M3) refuse la seconde ;
@@ -79,7 +79,9 @@ export async function POST(req: Request) {
       }
     }
     runCreee = run;
-    const pays = await codePays(appUser.organization_id);
+    if (supplementaire || (fichesDuJour ?? []).some((fiche: any) => fiche.status === "done" && fiche.id !== run!.id)) {
+      return NextResponse.json({ run, reused: Boolean(ficheExistante) });
+    }
     // Au clic du chauffeur, charger toutes les tournées qui lui sont planifiées
     // pour cette date dans UNE seule fiche Tournée colis.
     const date = run.run_date;

@@ -34,6 +34,8 @@ const PUBLIC_PREFIXES = [
   // and every other auth-only route stay gated as before.
   "/driver-pin",
   "/api/auth/driver-pin",
+  // Connexion Face ID / empreinte : se fait forcément sans session.
+  "/api/auth/passkey/login/",
   "/scan/driver",
   // Self-service driver signup (app/join/[token]) — a chauffeur who
   // has no account yet scans this before ever signing in.
@@ -87,6 +89,11 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (!user && !isPublicPath(pathname)) {
+    // Une API appelée sans session répond 401 en JSON : la redirection vers
+    // /sign-in d'un POST donnait un « 405 » incompréhensible côté écran.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Session expirée : reconnectez-vous." }, { status: 401 });
+    }
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/sign-in";
     signInUrl.searchParams.set("redirect_to", pathname);

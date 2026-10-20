@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { estimerAvancement } from "@/lib/colis/estimation";
-import { arretsRestants, cloturesHorsOrdre, libelleMotif, motifsPour, prochainArret, refusCloture } from "@/lib/colis/cloture";
+import { arretsRestants, cloturesHorsOrdre, libelleMotif, motifsPour, prochainArret, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
 
 const a = (id: string, status: "pending" | "delivered" | "failed" = "pending") => ({ id, status });
 
@@ -59,5 +59,14 @@ describe("motifs d'échec", () => {
     expect(motifsPour(true).map((m) => m.key)).toContain("rien_a_ramasser");
     expect(motifsPour(true).map((m) => m.key)).not.toContain("refuse");
     expect(motifsPour(false).map((m) => m.key)).not.toContain("rien_a_ramasser");
+  });
+});
+
+describe("tournée clôturée", () => {
+  it("fige les arrêts d'une tournée clôturée, quelle que soit la forme de la jointure", () => {
+    expect(tourneeCloturee({ delivery_runs: { status: "done" } })).toBe(true);
+    expect(tourneeCloturee({ delivery_runs: [{ status: "done" }] })).toBe(true);
+    expect(tourneeCloturee({ delivery_runs: { status: "in_progress" } })).toBe(false);
+    expect(tourneeCloturee({ delivery_runs: null })).toBe(false);
   });
 });

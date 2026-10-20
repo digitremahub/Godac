@@ -71,3 +71,14 @@ export function refusCloture(actuel: string, demande: StatutArret): string | nul
   if (actuel !== "pending") return "Arrêt déjà clôturé : annulez d'abord la clôture pour le modifier.";
   return null;
 }
+
+export const MESSAGE_TOURNEE_CLOTUREE = "Tournée clôturée : ses livraisons ne peuvent plus être modifiées ni annulées.";
+
+/**
+ * Arrêt d'une tournée clôturée (jointure delivery_runs(status), objet ou
+ * tableau selon le client Supabase) : figé, rien ne se modifie plus.
+ */
+export function tourneeCloturee(arret: { delivery_runs?: { status?: string | null } | { status?: string | null }[] | null }): boolean {
+  const run = Array.isArray(arret.delivery_runs) ? arret.delivery_runs[0] : arret.delivery_runs;
+  return run?.status === "done";
+}
