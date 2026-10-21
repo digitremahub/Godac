@@ -172,9 +172,30 @@ export interface VariablesMois {
   periodesConges?: PeriodeConges[];
   /** Taux du panier repas ce mois ; null = profil ou entreprise. */
   tauxRepas?: number | null;
+  /** Date de paiement du salaire (AAAA-MM-JJ) ; absente = dernier jour du mois. */
+  datePaiement?: string | null;
+  /** Mode de paiement du salaire ; absent = virement. */
+  modePaiement?: ModePaiement | null;
+  /**
+   * Type de taux du prélèvement à la source ; absent = personnalisé si un
+   * taux est saisi au profil, sinon non personnalisé (grille).
+   */
+  typeTauxPas?: TypeTauxPas | null;
 }
 
-export type Section = "brut" | "sante" | "retraite" | "famille" | "chomage" | "autres" | "csg" | "exonerations" | "net";
+export type ModePaiement = "virement" | "cheque" | "especes";
+
+/**
+ * Taux du prélèvement à la source : « personnalisé » (transmis par la
+ * DGFiP, saisi au profil) ou « non personnalisé » (grille du taux neutre).
+ */
+export type TypeTauxPas = "personnalise" | "non_personnalise";
+
+/**
+ * Rubriques du bulletin clarifié, dans l'ordre d'affichage : Santé, puis
+ * Accidents du travail & maladies professionnelles (`at`), puis Retraite…
+ */
+export type Section = "brut" | "sante" | "at" | "retraite" | "famille" | "chomage" | "autres" | "csg" | "exonerations" | "net";
 
 export interface LigneBulletin {
   section: Section;
@@ -186,6 +207,8 @@ export interface LigneBulletin {
   montantPatronal: number | null;
   /** Ligne de gain (brut, frais) plutôt que de retenue. */
   gain?: boolean;
+  /** Précision affichée sous le libellé (ex. type de taux du PAS). */
+  mention?: string;
 }
 
 export interface Bulletin {
@@ -199,6 +222,8 @@ export interface Bulletin {
   netSocial: number;
   netImposable: number;
   tauxPas: number;
+  /** Type du taux appliqué (absent des bulletins antérieurs). */
+  typeTauxPas?: TypeTauxPas;
   montantPas: number;
   fraisNonSoumis: number;
   /** Net à payer avant acomptes et saisies. */

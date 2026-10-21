@@ -10,6 +10,7 @@ import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { genererBulletinPdf } from "@/lib/paie/pdf";
 import { donneesBulletinPdf } from "@/lib/paie/rendu-bulletin";
 import { variablesSchema } from "@/lib/paie/schemas";
+import { paiementDuBulletin } from "@/lib/paie/paiement";
 import { fusionnerRetenues } from "@/lib/paie/acomptes";
 import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
 
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
 
   const [{ data: employe }, { data: organisation }, { data: dossier }] = await Promise.all([
     supabase.from("users").select("id, full_name, role_title, address").eq("id", userId).eq("organization_id", appUser.organization_id).maybeSingle(),
-    supabase.from("organizations").select("name, siret, legal_address, ape_code, convention_collective, urssaf_number").eq("id", appUser.organization_id).single(),
+    supabase.from("organizations").select("name, siret, legal_address, ape_code, convention_collective, urssaf_number, logo_url, accent_color").eq("id", appUser.organization_id).single(),
     supabase.from("employee_files").select("matricule, social_security_number, hire_date, contract_type").eq("user_id", userId).maybeSingle(),
   ]);
   if (!employe) return NextResponse.json({ error: "Salarié introuvable." }, { status: 404 });
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
     ...parsed.data.variables,
     retenues: fusionnerRetenues(parsed.data.variables.retenues, ctx.acomptes.retenues),
     cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees,
+    // Date et mode de paiement toujours enregistrés (défaut : fin de mois, virement).
+    ...paiementDuBulletin(mois, parsed.data.variables),
   };
   const bulletin = calculerBulletin({ legal: ctx.legal, entreprise: ctx.entreprise, salarie: ctx.salarie, variables });
 

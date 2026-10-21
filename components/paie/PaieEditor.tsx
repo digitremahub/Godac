@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
-import { calculerBulletin, HEURES_EQUIVALENCE, LIBELLE_RETENUE } from "@/lib/paie/calcul";
+import { calculerBulletin, HEURES_EQUIVALENCE, LIBELLE_RETENUE, LIBELLE_TYPE_TAUX_PAS } from "@/lib/paie/calcul";
+import { MODES_PAIEMENT, paiementDuBulletin } from "@/lib/paie/paiement";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import type { ParametresEntreprise, ParametresLegaux, PeriodeConges, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
+import type { ModePaiement, ParametresEntreprise, ParametresLegaux, PeriodeConges, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, TypeTauxPas, VariablesMois } from "@/lib/paie/types";
 import { joursOuvrables } from "@/lib/paie/conges";
 
 const eur = (n: number | null) => (n === null ? "" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -17,6 +18,7 @@ const REGIMES: { key: RegimeTransport; label: string }[] = [
 const SECTIONS: Record<Section, string> = {
   brut: "Rémunération",
   sante: "Santé",
+  at: "Accidents du travail & maladies professionnelles",
   retraite: "Retraite",
   famille: "Famille",
   chomage: "Assurance chômage",
@@ -109,6 +111,10 @@ export function PaieEditor({
   const [hs50, setHs50] = useState<Num>(prefill.heuresSup50 ?? "");
   const [periodes, setPeriodes] = useState<PeriodeConges[]>(prefill.periodesConges ?? []);
   const [tauxRepasMois, setTauxRepasMois] = useState<Num>(prefill.tauxRepas ?? "");
+  const paiementInitial = paiementDuBulletin(mois, prefill);
+  const [datePaiement, setDatePaiement] = useState(paiementInitial.datePaiement);
+  const [modePaiement, setModePaiement] = useState<ModePaiement>(paiementInitial.modePaiement);
+  const [typeTauxPas, setTypeTauxPas] = useState<TypeTauxPas | "">(prefill.typeTauxPas ?? "");
 
   const [busy, setBusy] = useState<"profil" | "bulletin" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -139,6 +145,9 @@ export function PaieEditor({
     retenues: retenues.filter((r) => r.montant > 0),
     personnesACharge: n(personnesACharge),
     cumulHeuresSupExonereesAnnee: prefill.cumulHeuresSupExonereesAnnee,
+    datePaiement: datePaiement || null,
+    modePaiement,
+    typeTauxPas: typeTauxPas || null,
   };
   const bulletin = useMemo(
     () => (salarie.tauxHoraire > 0 ? calculerBulletin({ legal, entreprise, salarie, variables }) : null),
@@ -304,6 +313,34 @@ export function PaieEditor({
           <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setPeriodes([...periodes, { du: "", au: "", jours: 0 }])}>
             + Période de congés
           </button>
+          <p className="label !mb-0">Paiement et impôt</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="label">Date de paiement</span>
+              <input className="input" type="date" value={datePaiement} onChange={(e) => setDatePaiement(e.target.value)} />
+              <span className="mt-1 block text-xs text-navy/55">Vide = dernier jour du mois</span>
+            </label>
+            <label className="block">
+              <span className="label">Mode de paiement</span>
+              <select className="input" value={modePaiement} onChange={(e) => setModePaiement(e.target.value as ModePaiement)}>
+                {(Object.keys(MODES_PAIEMENT) as ModePaiement[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MODES_PAIEMENT[m]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="col-span-2 block">
+              <span className="label">Taux du prélèvement à la source</span>
+              <select className="input" value={typeTauxPas} onChange={(e) => setTypeTauxPas(e.target.value as TypeTauxPas | "")}>
+                <option value="">Automatique ({tauxPas === "" ? "non personnalisé : aucun taux au profil" : "personnalisé : taux du profil"})</option>
+                <option value="personnalise" disabled={tauxPas === ""}>
+                  {LIBELLE_TYPE_TAUX_PAS.personnalise} (taux du profil)
+                </option>
+                <option value="non_personnalise">{LIBELLE_TYPE_TAUX_PAS.non_personnalise} (grille du taux neutre)</option>
+              </select>
+            </label>
+          </div>
           <p className="label !mb-0">Frais de déplacement</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label={`Paniers repas (${eur(tauxRepasMois === "" ? (tauxRepasProfil === "" ? entreprise.frais.repas : tauxRepasProfil) : tauxRepasMois)} €)`} value={repas} onChange={setRepas} step="1" hint="Nombre de jours" />
@@ -455,7 +492,10 @@ export function PaieEditor({
                       .filter((l) => l.section === sec)
                       .map((l, i) => (
                         <tr key={i}>
-                          <td>{l.libelle}</td>
+                          <td>
+                            {l.libelle}
+                            {l.mention && <span className="ml-1 text-xs text-navy/55">· {l.mention}</span>}
+                          </td>
                           <td className="text-right tabular-nums text-navy/70">{l.base !== null ? eur(l.base) : ""}</td>
                           <td className="text-right tabular-nums text-navy/70">{l.tauxSalarial !== null ? eur(l.tauxSalarial) : ""}</td>
                           <td className={`text-right tabular-nums ${l.gain ? "font-semibold" : ""}`}>{eur(l.montantSalarial)}</td>
@@ -477,7 +517,7 @@ export function PaieEditor({
                 ["Assiette CSG/CRDS", bulletin.assietteCsg ?? 0],
                 ["Réintégration fiscale santé", bulletin.reintegrationSante ?? 0],
                 ["Net imposable", bulletin.netImposable],
-                [`Prélèvement à la source (${eur(bulletin.tauxPas)} %)`, bulletin.montantPas],
+                [`Impôt sur le revenu prélevé à la source (${bulletin.typeTauxPas ? `${LIBELLE_TYPE_TAUX_PAS[bulletin.typeTauxPas].toLowerCase()}, ` : ""}${eur(bulletin.tauxPas)} %)`, bulletin.montantPas],
                 ["Frais non soumis", bulletin.fraisNonSoumis],
                 ["Heures sup. exonérées d'impôt", bulletin.heuresSupExonerees],
               ].map(([l, v]) => (
