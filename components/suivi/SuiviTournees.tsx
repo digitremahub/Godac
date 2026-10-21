@@ -267,8 +267,8 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
         </div>
       </div>
       <p className="text-xs text-navy/50">
-        Position partagée par le chauffeur uniquement pendant sa tournée colis en cours (il peut la masquer pendant une pause) ; seule la
-        dernière position est conservée, effacée à la clôture de la tournée.
+        Position partagée par le chauffeur uniquement pendant sa tournée colis en cours (il peut la masquer pendant une pause) ; la
+        dernière position est effacée à la clôture de la tournée, le trajet emprunté est gardé 1 an dans l&apos;historique des tournées.
       </p>
     </div>
   );

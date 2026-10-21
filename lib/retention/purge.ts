@@ -11,6 +11,8 @@ export const RETENTION_DAYS = {
   assistantConversations: 90,
   /** Tournées colis : adresses, initiales des destinataires et photos de livraison, gardées pour les contestations. */
   parcelRuns: 365,
+  /** Tracé GPS réel des tournées colis (fil d'Ariane, analyse des trajets) : 1 an, recommandation CNIL. */
+  parcelTrack: 365,
   /** Au-delà : nom complet réduit aux initiales, téléphone et consignes effacés. */
   parcelRecipients: 30,
   /** Journal d'audit des actions sensibles. */
@@ -79,6 +81,10 @@ export async function purgeExpiredData() {
   const chemins = (photos ?? []).map((p) => p.proof_photo_path as string);
   for (let i = 0; i < chemins.length; i += 100) await admin.storage.from("delivery-proofs").remove(chemins.slice(i, i + 100));
   results.deliveryPhotos = chemins.length;
+
+  // Tracé GPS des tournées : points de plus d'un an (les tournées supprimées emportent les leurs en cascade).
+  const trace = await admin.from("delivery_run_track_points").delete({ count: "exact" }).lt("recorded_at", daysAgo(RETENTION_DAYS.parcelTrack));
+  results.parcelTrack = trace.error ? trace.error.message : (trace.count ?? 0);
 
   const runs = await admin
     .from("delivery_runs")

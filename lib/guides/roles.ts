@@ -41,7 +41,7 @@ const DEMARRER_CHAUFFEUR: SectionGuide = {
     {
       titre: "Autoriser la localisation et les notifications",
       texte:
-        "Acceptez la localisation quand GODAC la demande : elle sert au moment du pointage et, pendant une tournée colis, à montrer votre dernière position à l'exploitation (vous pouvez la masquer pendant une pause, elle est effacée en fin de tournée). Les notifications vous préviennent d'un changement de planning, d'un message ou d'une alerte.",
+        "Acceptez la localisation quand GODAC la demande : elle sert au moment du pointage et, pendant une tournée colis, à montrer votre dernière position à l'exploitation et à enregistrer le trajet emprunté pour l'historique (indication « Trajet enregistré », conservé 1 an). Vous pouvez la masquer pendant une pause (rien n'est alors enregistré) ; la dernière position est effacée en fin de tournée. Les notifications vous préviennent d'un changement de planning, d'un message ou d'une alerte.",
     },
   ],
 };
