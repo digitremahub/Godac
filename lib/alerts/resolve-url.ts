@@ -56,6 +56,10 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   // Écart carburant (explication demandée au chauffeur, ou sa réponse) :
   // le plein ouvert dans l'historique, fiche dépliée.
   fuel_gap_explanation: (id) => ({ id: "carburant.pleins", suite: id ? `?plein=${encodeURIComponent(id)}` : "" }),
+  // Amende (contestation ou explication du chauffeur) : la fiche, côté encadrement.
+  fine_notification: (id) => ({ id: "flotte.amendes", suite: id ? `?amende=${encodeURIComponent(id)}` : "" }),
+  // Contestation client : la fiche (le chauffeur attributaire ouvre la même page, limitée aux siennes).
+  customer_dispute: (id) => ({ id: "exploitation.contestations", suite: id ? `?fiche=${encodeURIComponent(id)}` : "" }),
 };
 
 /** Destinataire de l'alerte, quand le lien dépend de qui la lit. */
@@ -77,8 +81,10 @@ function urlPour(cible: Cible, role?: string | null): string {
 }
 
 export function resolveAlertUrl(relatedTable: string | null, type?: string | null, relatedId?: string | null, contexte?: ContexteDestinataire): string | null {
-  // Amende attribuée à un chauffeur (alerte personnelle) : ses amendes.
-  if ((type === "fine_notification" || (relatedTable === "fines" && !type)) && contexte?.recipientUserId) return urlDe("moi.amendes");
+  // Amende attribuée à un chauffeur (alerte personnelle) : sa fiche dans ses amendes.
+  if ((type === "fine_notification" || (relatedTable === "fines" && !type)) && contexte?.recipientUserId) {
+    return urlDe("moi.amendes") + (relatedId ? `?amende=${encodeURIComponent(relatedId)}` : "");
+  }
   const parType = type ? CIBLE_PAR_TYPE[type] : undefined;
   if (parType) return urlPour(parType(relatedId ?? null), contexte?.role);
   const id = relatedTable ? ECRAN_PAR_TABLE[relatedTable] : undefined;

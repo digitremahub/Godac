@@ -19,15 +19,20 @@ export const fineSchema = z.object({
   infraction_time: fieldSchema(z.string()), // "HH:MM"
   amount: fieldSchema(z.number().nonnegative()),
   reference: fieldSchema(z.string()),
+  // Champs complémentaires, facultatifs (anciennes réponses sans eux acceptées).
+  location: fieldSchema(z.string()).optional().default(null),
+  reduced_amount: fieldSchema(z.number().nonnegative()).optional().default(null),
+  payment_deadline: fieldSchema(z.string()).optional().default(null), // "YYYY-MM-DD"
 });
 
 export type FineFields = z.infer<typeof fineSchema>;
 
 export type FineOcrResult = { ok: true; fields: FineFields } | { ok: false; reason: string };
 
-const SYSTEM_PROMPT = `Tu lis une photo d'un avis de contravention (amende routière). Extrais uniquement les informations explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Champs : plaque d'immatriculation du véhicule verbalisé, date de l'infraction (format YYYY-MM-DD), heure de l'infraction (format HH:MM), montant de l'amende en euros (nombre), numéro de référence/dossier de l'avis.`;
+const SYSTEM_PROMPT = `Tu lis une photo d'un avis de contravention (amende routière). Extrais uniquement les informations explicitement lisibles sur la photo — ne devine jamais une valeur absente ou floue, renvoie null dans ce cas. Champs : plaque d'immatriculation du véhicule verbalisé, date de l'infraction (format YYYY-MM-DD), heure de l'infraction (format HH:MM), montant de l'amende en euros (nombre), numéro de l'avis (référence / dossier), lieu de l'infraction (adresse ou commune), montant minoré en euros s'il est indiqué (nombre), date limite de paiement du montant forfaitaire (format YYYY-MM-DD).`;
 
 const imageMediaTypeFromFilename = (filename: string): string => {
+  if (filename.endsWith(".pdf")) return "application/pdf";
   if (filename.endsWith(".png")) return "image/png";
   if (filename.endsWith(".webp")) return "image/webp";
   return "image/jpeg";
@@ -47,8 +52,11 @@ export async function extractFineFromImage(imageBytes: Buffer, filename: string)
       infraction_time: { anyOf: [{ type: "string" }, { type: "null" }] },
       amount: { anyOf: [{ type: "number" }, { type: "null" }] },
       reference: { anyOf: [{ type: "string" }, { type: "null" }] },
+      location: { anyOf: [{ type: "string" }, { type: "null" }] },
+      reduced_amount: { anyOf: [{ type: "number" }, { type: "null" }] },
+      payment_deadline: { anyOf: [{ type: "string" }, { type: "null" }] },
     },
-    required: ["registration", "infraction_date", "infraction_time", "amount", "reference"],
+    required: ["registration", "infraction_date", "infraction_time", "amount", "reference", "location", "reduced_amount", "payment_deadline"],
   };
 
   let response: Response;
@@ -68,10 +76,9 @@ export async function extractFineFromImage(imageBytes: Buffer, filename: string)
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: imageMediaTypeFromFilename(filename), data: imageBytes.toString("base64") },
-              },
+              imageMediaTypeFromFilename(filename) === "application/pdf"
+                ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: imageBytes.toString("base64") } }
+                : { type: "image", source: { type: "base64", media_type: imageMediaTypeFromFilename(filename), data: imageBytes.toString("base64") } },
               { type: "text", text: "Extrais les champs de cet avis de contravention via l'outil fourni." },
             ],
           },

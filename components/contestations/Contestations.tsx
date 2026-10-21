@@ -1,17 +1,31 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { IconCamera, IconFileText } from "@/components/layout/icons";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { resumeCodeQr } from "@/lib/colis/livraison";
+import { BadgeConfiance, Commentaires, type CommentaireVue } from "@/components/rattachement/Commentaires";
+import type { PreuveLivraison } from "@/lib/rattachement/contestation";
+import { dateParis, heureParis } from "@/lib/rattachement/format";
+
+export interface CandidatArret {
+  stopId: string;
+  driverId: string;
+  driverName: string;
+  runId: string;
+  confiance: string;
+  raison: string;
+  parcelCode: string | null;
+  address: string;
+  doneAt: string | null;
+}
 
 export interface Contestation {
   id: string;
   status: "to_validate" | "assigned" | "answered" | "resolved" | "rejected";
-  has_document: boolean;
   /** Livraison retrouvée dans une tournée colis (lieu de dépôt, photo). */
   preuve: { stopId: string; photo: boolean; lieu: string | null; relais?: string | null; code?: string | null; livreLe: string | null } | null;
   client_name: string | null;
@@ -30,6 +44,16 @@ export interface Contestation {
   responded_at: string | null;
   resolution_note: string | null;
   created_at: string;
+  /** Nombre de documents de la réclamation (photos, captures, PDF). */
+  documents: number;
+  recipient: string | null;
+  delivery_stop_id: string | null;
+  confiance: string | null;
+  raison: string | null;
+  candidats: CandidatArret[];
+  /** Preuves détaillées (photos, lieu, code, GPS, historique), calculées au rapprochement. */
+  preuveDetaillee: PreuveLivraison | null;
+  commentaires: CommentaireVue[];
 }
 
 /** Lien vers la photo prise par le chauffeur à la livraison, avec le lieu de dépôt. */
@@ -70,12 +94,73 @@ function PreuveLivraison({ c }: { c: Contestation }) {
   ) : null;
 }
 
+/** Liens vers les documents de la réclamation. */
+function Documents({ c }: { c: Contestation }) {
+  if (c.documents === 0) return <span className="self-center text-xs text-orange-ink">Réclamation non jointe</span>;
+  return (
+    <>
+      {Array.from({ length: c.documents }, (_, i) => (
+        <a key={i} href={`/api/contestations/${c.id}/document?i=${i}`} target="_blank" rel="noreferrer" className="btn-ghost !py-2 text-sm">
+          <IconFileText className="h-4 w-4" /> Réclamation{c.documents > 1 ? ` ${i + 1}` : ""}
+        </a>
+      ))}
+    </>
+  );
+}
+
+/** Preuves de livraison détaillées : photos, lieu, code, clôture, position GPS, historique de l'arrêt. */
+function PreuveDetaillee({ p }: { p: PreuveLivraison }) {
+  return (
+    <div className={`flex flex-col gap-2 rounded-xl border p-3 text-sm ${p.complete ? "border-teal/40 bg-teal/[0.06]" : "border-orange/30 bg-orange/[0.05]"}`}>
+      <p className={`font-semibold ${p.complete ? "text-teal-ink" : "text-orange-ink"}`}>{p.verdict}</p>
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+        <div className="flex gap-2"><dt className="text-navy/55">Clôture</dt><dd>{p.clotureA ? `${dateParis(p.clotureA)} à ${heureParis(p.clotureA)}` : "—"}</dd></div>
+        <div className="flex gap-2"><dt className="text-navy/55">Lieu de dépôt</dt><dd>{p.lieu ?? "—"}{p.relais ? ` · ${p.relais}` : ""}</dd></div>
+        {p.code && <div className="flex gap-2 sm:col-span-2"><dt className="text-navy/55">Code scanné</dt><dd className="font-mono" title={p.code}>{resumeCodeQr(p.code, 40)}</dd></div>}
+        {p.gps && (
+          <div className="flex gap-2 sm:col-span-2">
+            <dt className="text-navy/55">Position GPS</dt>
+            <dd>
+              <a className="text-teal-ink underline" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${p.gps.lat}&mlon=${p.gps.lng}#map=18/${p.gps.lat}/${p.gps.lng}`}>
+                à {heureParis(p.gps.at)}
+              </a>
+              {p.gps.distanceM !== null ? ` · ${p.gps.distanceM} m de l'adresse` : ""}
+            </dd>
+          </div>
+        )}
+      </dl>
+      {p.photos > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: p.photos }, (_, i) => (
+            <a key={i} href={`/api/colis/arrets/${p.stopId}/livraison?index=${i}`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs text-teal-ink">
+              📷 Photo de preuve {p.photos > 1 ? i + 1 : ""}
+            </a>
+          ))}
+        </div>
+      )}
+      {p.historique.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-xs text-navy/60">Historique de l&apos;arrêt ({p.historique.length})</summary>
+          <ul className="mt-1 text-xs text-navy/70">
+            {p.historique.map((e, i) => (
+              <li key={i}>
+                {dateParis(e.at)} {heureParis(e.at)} — {e.libelle}
+                {e.details ? ` : ${e.details}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 const STATUT: Record<Contestation["status"], { label: string; cls: string }> = {
   to_validate: { label: "À valider", cls: "bg-gold/25 text-navy" },
-  assigned: { label: "Chauffeur notifié", cls: "bg-orange/15 text-orange-ink" },
+  assigned: { label: "Responsable notifié", cls: "bg-orange/15 text-orange-ink" },
   answered: { label: "Réponse reçue", cls: "bg-teal/15 text-teal-ink" },
   resolved: { label: "Réglée", cls: "bg-navy/[0.06] text-navy/70" },
-  rejected: { label: "Sans suite", cls: "bg-navy/[0.06] text-navy/70" },
+  rejected: { label: "Contestée / sans suite", cls: "bg-navy/[0.06] text-navy/70" },
 };
 
 const CHAMPS: { key: keyof Contestation; label: string; type?: string }[] = [
@@ -85,6 +170,7 @@ const CHAMPS: { key: keyof Contestation; label: string; type?: string }[] = [
   { key: "delivery_date", label: "Date de livraison", type: "date" },
   { key: "tour_number", label: "N° de tournée" },
   { key: "claimed_amount", label: "Montant réclamé (€)", type: "number" },
+  { key: "recipient", label: "Destinataire" },
   { key: "delivery_address", label: "Adresse de livraison" },
 ];
 
@@ -107,6 +193,7 @@ function Details({ c }: { c: Contestation }) {
         ["Livraison", c.delivery_date ? dateFr(c.delivery_date) : null],
         ["Tournée", c.tour_number],
         ["Montant réclamé", c.claimed_amount !== null ? `${c.claimed_amount.toLocaleString("fr-FR")} €` : null],
+        ["Destinataire", c.recipient],
         ["Adresse", c.delivery_address],
       ]
         .filter(([, v]) => v)
@@ -120,11 +207,12 @@ function Details({ c }: { c: Contestation }) {
   );
 }
 
-function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id: string; name: string }[] }) {
+function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chauffeurs: { id: string; name: string }[]; moi: string; focus: boolean }) {
   const router = useRouter();
   const [f, setF] = useState(() => Object.fromEntries(CHAMPS.map(({ key }) => [key, c[key] === null ? "" : String(c[key])])) as Record<string, string>);
   const [reason, setReason] = useState(c.reason ?? "");
   const [driver, setDriver] = useState(c.driver_id ?? c.suggested_driver_id ?? "");
+  const [stop, setStop] = useState<string | null>(c.delivery_stop_id);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,7 +237,8 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
 
   const s = STATUT[c.status];
   return (
-    <Card className="flex flex-col gap-3">
+    <div id={`contestation-${c.id}`}>
+    <Card className={`flex flex-col gap-3 ${focus ? "ring-2 ring-teal" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-display text-lg font-bold">{c.client_name ?? "Client non renseigné"}</p>
@@ -185,14 +274,45 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
                 ))}
               </select>
             </label>
-            <p className="mt-1.5 text-xs text-navy/60">
-              {c.suggestion_reason ? `Suggestion : ${c.suggestion_reason}.` : "Aucune suggestion : complétez n° de colis, date ou tournée puis « Rechercher »."}
-            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <BadgeConfiance confiance={c.confiance} />
+              <span className="text-xs text-navy/60">
+                {c.suggestion_reason ? `Suggestion : ${c.suggestion_reason}.` : c.raison ?? "Aucune suggestion : complétez n° de colis, adresse, date ou tournée puis relancez la recherche."}
+              </span>
+            </div>
+            {c.candidats.length > 1 && (
+              <fieldset className="mt-2 flex flex-col gap-1 text-xs">
+                <legend className="mb-1 text-navy/60">Livraisons possibles :</legend>
+                {c.candidats.map((k) => (
+                  <label key={k.stopId} className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name={`arret-${c.id}`}
+                      checked={stop === k.stopId}
+                      onChange={() => {
+                        setStop(k.stopId);
+                        setDriver(k.driverId);
+                      }}
+                    />
+                    <span>
+                      {k.driverName} — {k.confiance} : {k.raison}
+                      {k.doneAt ? ` (livré le ${dateParis(k.doneAt)} à ${heureParis(k.doneAt)})` : ""} · {k.address}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
           </div>
+          {c.preuveDetaillee ? <PreuveDetaillee p={c.preuveDetaillee} /> : null}
           {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-primary" disabled={busy || !driver} onClick={() => run({ action: "valider", driver_id: driver, champs: champs() })}>
-              Valider et notifier le chauffeur
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={busy || !driver}
+              onClick={() => run({ action: "valider", driver_id: driver, stop_id: c.candidats.find((k) => k.stopId === stop)?.driverId === driver ? stop : null, champs: champs() })}
+            >
+              Valider le responsable et notifier
             </button>
             <button
               type="button"
@@ -203,14 +323,10 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
                 await run({ action: "resuggerer" });
               }}
             >
-              Enregistrer et rechercher le chauffeur
+              Enregistrer et relancer la recherche
             </button>
-            {c.has_document && (
-              <a href={`/api/contestations/${c.id}/document`} target="_blank" rel="noreferrer" className="btn-ghost">
-                <IconFileText className="h-4 w-4" /> Document
-              </a>
-            )}
-            <PreuveLivraison c={c} />
+            <Documents c={c} />
+            {!c.preuveDetaillee && <PreuveLivraison c={c} />}
           </div>
         </>
       ) : (
@@ -218,8 +334,9 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
           <Details c={c} />
           {c.reason && <p className="rounded-lg bg-navy/[0.04] px-3 py-2 text-sm">{c.reason}</p>}
           <p className="text-sm">
-            Chauffeur : <strong>{c.driver_name ?? "—"}</strong>
+            Responsable : <strong>{c.driver_name ?? "—"}</strong>
           </p>
+          {c.preuveDetaillee && <PreuveDetaillee p={c.preuveDetaillee} />}
           {c.driver_response && (
             <div className="rounded-xl border border-teal/30 bg-teal/[0.06] p-3 text-sm">
               <p className="text-xs font-semibold text-teal-ink">Réponse du chauffeur · {dateFr(c.responded_at)}</p>
@@ -238,22 +355,35 @@ function CarteEncadrement({ c, chauffeurs }: { c: Contestation; chauffeurs: { id
                 <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy} onClick={() => run({ action: "cloturer", statut: "rejected", note: note.trim() || null })}>
                   Classer sans suite
                 </button>
-                {c.has_document && (
-                  <a href={`/api/contestations/${c.id}/document`} target="_blank" rel="noreferrer" className="btn-ghost !py-2 text-sm">
-                    <IconFileText className="h-4 w-4" /> Document
-                  </a>
-                )}
-                <PreuveLivraison c={c} />
+                <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy} onClick={() => run({ action: "cloturer", statut: "rejected", note: note.trim() || "Contestée : preuve de livraison opposée au client" })}>
+                  Contester (preuve)
+                </button>
+                <Documents c={c} />
+                {!c.preuveDetaillee && <PreuveLivraison c={c} />}
               </div>
             </div>
+          )}
+          {(c.status === "resolved" || c.status === "rejected") && (
+            <div className="flex flex-wrap gap-2">
+              <Documents c={c} />
+            </div>
+          )}
+          {c.driver_id && (
+            <details open={focus && c.commentaires.length > 0} className="rounded-xl border border-navy/10 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Échanges avec le chauffeur ({c.commentaires.length})</summary>
+              <div className="mt-2">
+                <Commentaires api={`/api/contestations/${c.id}`} routePiece="document" commentaires={c.commentaires} moi={moi} placeholder="Message au chauffeur…" ouvert={c.status === "assigned" || c.status === "answered"} />
+              </div>
+            </details>
           )}
         </>
       )}
     </Card>
+    </div>
   );
 }
 
-function CarteChauffeur({ c }: { c: Contestation }) {
+function CarteChauffeur({ c, moi, focus }: { c: Contestation; moi: string; focus: boolean }) {
   const router = useRouter();
   const [reponse, setReponse] = useState(c.driver_response ?? "");
   const [busy, setBusy] = useState(false);
@@ -261,13 +391,19 @@ function CarteChauffeur({ c }: { c: Contestation }) {
   const s = STATUT[c.status];
   const ouverte = c.status === "assigned" || c.status === "answered";
   return (
-    <Card className="flex flex-col gap-3">
+    <div id={`contestation-${c.id}`}>
+    <Card className={`flex flex-col gap-3 ${focus ? "ring-2 ring-teal" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="font-display text-lg font-bold">{c.client_name ?? "Contestation client"}</p>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${s.cls}`}>{c.status === "assigned" ? "À régler" : s.label}</span>
       </div>
       <Details c={c} />
       {c.reason && <p className="rounded-lg bg-orange/[0.07] px-3 py-2 text-sm">{c.reason}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Documents c={c} />
+        {!c.preuveDetaillee && <PreuveLivraison c={c} />}
+      </div>
+      {c.preuveDetaillee && <PreuveDetaillee p={c.preuveDetaillee} />}
       {c.resolution_note && <p className="text-sm text-navy/70">Clôture : {c.resolution_note}</p>}
       {ouverte && (
         <>
@@ -302,7 +438,14 @@ function CarteChauffeur({ c }: { c: Contestation }) {
           </button>
         </>
       )}
+      {(ouverte || c.commentaires.length > 0) && (
+        <div className="border-t border-navy/10 pt-3">
+          <p className="mb-2 text-sm font-semibold">Photos et compléments</p>
+          <Commentaires api={`/api/contestations/${c.id}`} routePiece="document" commentaires={c.commentaires} moi={moi} placeholder="Un complément, une photo du lieu de dépôt…" libelleEnvoi="Envoyer à mon responsable" ouvert={ouverte} />
+        </div>
+      )}
     </Card>
+    </div>
   );
 }
 
@@ -312,25 +455,29 @@ function NouvelleContestation({ organizationId, lectureAuto }: { organizationId:
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function creer(file: File | null) {
+  /** La réclamation est obligatoire : un ou plusieurs fichiers (photo, capture du mail / du ticket, courrier, PDF). */
+  async function creer(files: File[]) {
+    if (files.length === 0) return;
     setBusy(true);
     setMessage(null);
     try {
-      let document_path: string | null = null;
-      if (file) {
+      const document_paths: string[] = [];
+      for (const file of files.slice(0, 6)) {
         const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-        document_path = `${organizationId}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await createBrowserSupabaseClient().storage.from("dispute-docs").upload(document_path, file, { contentType: file.type });
+        const path = `${organizationId}/${crypto.randomUUID()}.${ext}`;
+        const { error } = await createBrowserSupabaseClient().storage.from("dispute-docs").upload(path, file, { contentType: file.type });
         if (error) throw new Error(`Envoi du document impossible : ${error.message}`);
+        document_paths.push(path);
       }
-      const res = await fetch("/api/contestations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document_path }) });
+      const res = await fetch("/api/contestations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document_paths }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Création impossible");
+      const suggestion = json.suggestion ? `Responsable suggéré (${json.confiance}) : ${json.suggestion.driverName}.` : "Aucun chauffeur trouvé automatiquement : complétez puis relancez la recherche.";
       setMessage({
         ok: json.lecture !== "echec",
         text:
           json.lecture === "ok"
-            ? `Document lu. ${json.suggestion ? `Chauffeur suggéré : ${json.suggestion.driverName}.` : "Aucun chauffeur trouvé automatiquement."} Vérifiez puis validez.`
+            ? `Réclamation lue. ${suggestion} Vérifiez puis validez.`
             : json.lecture === "echec"
               ? json.lectureErreur
                 ? `${json.lectureErreur} Complétez les champs à la main.`
@@ -351,16 +498,13 @@ function NouvelleContestation({ organizationId, lectureAuto }: { organizationId:
       <h2 className="text-lg">Nouvelle contestation</h2>
       <p className="text-sm text-navy/65">
         {lectureAuto
-          ? "Photographiez ou importez la réclamation (photo, capture, PDF) : GODAC la lit, propose le chauffeur concerné, et vous validez avant toute notification."
-          : "La lecture automatique est désactivée pour votre entreprise : le document est joint et vous complétez les champs."}
+          ? "Joignez la réclamation (photo, capture du mail ou du ticket transporteur, courrier, PDF — plusieurs fichiers possibles) : GODAC la lit, retrouve la livraison et propose le chauffeur concerné ; vous validez avant toute notification."
+          : "Joignez la réclamation (photo, capture, courrier, PDF — plusieurs fichiers possibles) : la lecture automatique est désactivée, vous complétez les champs."}
       </p>
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && creer(e.target.files[0])} />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => creer(Array.from(e.target.files ?? []))} />
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}>
-          <IconCamera className="h-4 w-4" /> {busy ? "Lecture…" : "Photo ou document"}
-        </button>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => creer(null)}>
-          Saisie manuelle
+          <IconCamera className="h-4 w-4" /> {busy ? "Lecture…" : "Photo(s) ou document(s) de la réclamation"}
         </button>
       </div>
       {message && <p role="status" className={`text-sm ${message.ok ? "text-teal-ink" : "text-orange-ink"}`}>{message.text}</p>}
@@ -369,8 +513,8 @@ function NouvelleContestation({ organizationId, lectureAuto }: { organizationId:
 }
 
 const ONGLETS = [
-  { key: "a_valider", label: "À valider", statuts: ["to_validate"] },
-  { key: "en_cours", label: "En cours", statuts: ["assigned", "answered"] },
+  { key: "a_valider", label: "À traiter", statuts: ["to_validate"] },
+  { key: "en_cours", label: "Responsable désigné", statuts: ["assigned", "answered"] },
   { key: "closes", label: "Clôturées", statuts: ["resolved", "rejected"] },
 ] as const;
 
@@ -380,14 +524,22 @@ export function Contestations({
   chauffeurs,
   organizationId,
   lectureAuto,
+  moi = "",
+  focusId = null,
 }: {
   contestations: Contestation[];
   encadrement: boolean;
   chauffeurs: { id: string; name: string }[];
   organizationId: string;
   lectureAuto: boolean;
+  moi?: string;
+  focusId?: string | null;
 }) {
-  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["key"]>(encadrement ? "a_valider" : "en_cours");
+  const ongletFocus = focusId ? ONGLETS.find((o) => (o.statuts as readonly string[]).includes(contestations.find((c) => c.id === focusId)?.status ?? ""))?.key : undefined;
+  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["key"]>(ongletFocus ?? (encadrement ? "a_valider" : "en_cours"));
+  useEffect(() => {
+    if (focusId) document.getElementById(`contestation-${focusId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId]);
 
   if (!encadrement) {
     const ouvertes = contestations.filter((c) => c.status === "assigned" || c.status === "answered");
@@ -396,11 +548,11 @@ export function Contestations({
       <div className="flex flex-col gap-4">
         {ouvertes.length === 0 && <p className="text-sm text-navy/60">Aucune contestation en cours. 👍</p>}
         {ouvertes.map((c) => (
-          <CarteChauffeur key={c.id} c={c} />
+          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} />
         ))}
         {closes.length > 0 && <h2 className="mt-2 text-lg">Clôturées</h2>}
         {closes.map((c) => (
-          <CarteChauffeur key={c.id} c={c} />
+          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} />
         ))}
       </div>
     );
@@ -433,7 +585,7 @@ export function Contestations({
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {visibles.map((c) => (
-            <CarteEncadrement key={`${c.id}-${c.status}-${c.suggested_driver_id}`} c={c} chauffeurs={chauffeurs} />
+            <CarteEncadrement key={`${c.id}-${c.status}-${c.suggested_driver_id}-${c.delivery_stop_id}`} c={c} chauffeurs={chauffeurs} moi={moi} focus={c.id === focusId} />
           ))}
         </div>
       )}
