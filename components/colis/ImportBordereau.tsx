@@ -3,6 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import { IconCamera, IconFileText, IconImage, IconX } from "@/components/layout/icons";
 import { imageEnBase64 } from "@/components/colis/commun";
+import { EtapeCreneau } from "@/components/colis/EtapeCreneau";
+import { choixDepuisCreneau, colonnesCreneau, libelleChoix, validerChoix, type ChoixCreneau } from "@/lib/colis/creneau";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import {
   LIBELLE_DOUTE,
@@ -64,6 +66,10 @@ export function ImportBordereau({
   const [lecturesIa, setLecturesIa] = useState(0);
   const [decoches, setDecoches] = useState<Set<string>>(new Set());
   const [modifs, setModifs] = useState<Record<string, Partial<Pick<ArretBordereau, Champ>>>>({});
+  /** Créneau modifié dans l'aperçu, par arrêt ; absent : celui lu sur le bordereau. */
+  const [creneaux, setCreneaux] = useState<Record<string, ChoixCreneau>>({});
+  /** Arrêt dont le choix du créneau est déplié. */
+  const [creneauOuvert, setCreneauOuvert] = useState<string | null>(null);
   const [busy, setBusy] = useState<"lecture" | "import" | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -80,6 +86,8 @@ export function ImportBordereau({
     setLectures([]);
     setDecoches(new Set());
     setModifs({});
+    setCreneaux({});
+    setCreneauOuvert(null);
     setErreur(null);
   }
 
@@ -129,15 +137,36 @@ export function ImportBordereau({
     return m ? { ...a, ...m } : a;
   }
 
+  /** Créneau lu sur le bordereau (fenêtre ou plage unique), pré-sélectionné. */
+  function creneauLu(a: ArretBordereau): ChoixCreneau {
+    const p = pointDepuisArret(a);
+    return choixDepuisCreneau(p.window_start, p.window_end);
+  }
+
+  function creneauDe(a: ArretBordereau): ChoixCreneau {
+    return creneaux[a.cle] ?? creneauLu(a);
+  }
+
   function modifier(cle: string, champ: Champ, valeur: string) {
     setModifs((m) => ({ ...m, [cle]: { ...m[cle], [champ]: valeur.trim() ? valeur : null } }));
   }
 
   async function importer() {
     if (!retenus.length) return;
+    // Créneau incohérent dans l'aperçu : on le signale avant tout envoi.
+    const incoherent = retenus.find((a) => !validerChoix(creneauDe(a)).ok);
+    if (incoherent) {
+      setCreneauOuvert(incoherent.cle);
+      return setErreur(`Position ${incoherent.position ?? "?"} : créneau à corriger.`);
+    }
     setBusy("import");
     setErreur(null);
-    const points = retenus.map((a) => pointDepuisArret(arretModifie(a))).filter((p) => p.adresse.length >= 5);
+    const points = retenus
+      .map((a) => {
+        const choix = validerChoix(creneauDe(a));
+        return { ...pointDepuisArret(arretModifie(a)), ...colonnesCreneau(choix.ok ? choix.creneau : null) };
+      })
+      .filter((p) => p.adresse.length >= 5);
     const total = { ajoutes: 0, regroupes: 0, ignores: retenus.length - points.length, doublons: 0, sansGps: 0, horairesPro: 0 };
     try {
       for (let i = 0; i < points.length; i += LOT) {
@@ -319,7 +348,6 @@ export function ImportBordereau({
                       {[
                         a.contact && `Contact : ${a.contact}`,
                         a.plages && `Horaires : ${a.plages.map((p) => `${p.debut}–${p.fin}`).join(" / ")}`,
-                        !a.plages && a.fenetre && `Créneau : ${a.fenetre.debut}–${a.fenetre.fin}`,
                         a.nature,
                         a.expediteur && `Exp. : ${a.expediteur}`,
                         a.mentions,
@@ -327,6 +355,41 @@ export function ImportBordereau({
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {(() => {
+                      const choix = creneauDe(a);
+                      const lu = creneauLu(a);
+                      const ouvert = creneauOuvert === a.cle;
+                      const invalide = !validerChoix(choix).ok;
+                      const estLu = lu.cle !== "aucun" && choix.cle === lu.cle && choix.debut === lu.debut && choix.fin === lu.fin;
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className={invalide ? "font-semibold text-orange-ink" : choix.cle === "aucun" ? "text-navy/60" : "font-semibold text-teal-ink"}>
+                              Créneau : {invalide ? "à corriger" : (libelleChoix(choix) ?? "aucun")}
+                              {estLu ? " (lu sur le bordereau)" : ""}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-ghost !min-h-[44px] !px-3 !py-1 text-xs"
+                              aria-expanded={ouvert}
+                              onClick={() => setCreneauOuvert(ouvert ? null : a.cle)}
+                            >
+                              {ouvert ? "Fermer" : "Modifier"}
+                            </button>
+                          </div>
+                          {ouvert && (
+                            <EtapeCreneau
+                              idBase={`bordereau-creneau-${a.cle.replace(/[^\w-]/g, "_")}`}
+                              titre={null}
+                              value={choix}
+                              onChange={(c) => setCreneaux((m) => ({ ...m, [a.cle]: c }))}
+                              ymd={runDate}
+                              indication={estLu ? "Lu sur le bordereau" : null}
+                            />
+                          )}
+                        </div>
+                      );
+                    })()}
                     {brut.doutes.length > 0 && <p className="text-xs text-orange-ink">À vérifier : {brut.doutes.map((d) => LIBELLE_DOUTE[d]).join(", ")}.</p>}
                   </div>
                 </li>

@@ -9,6 +9,9 @@ import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { BadgeHoraires, type useHoraires } from "@/components/colis/HorairesSheet";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { AdresseInput } from "@/components/colis/AdresseInput";
+import { EtapeCreneau, useHorairesOuverture } from "@/components/colis/EtapeCreneau";
+import { CRENEAU_AUCUN, validerChoix, type ChoixCreneau } from "@/lib/colis/creneau";
+import { dateParis } from "@/lib/colis/heure-paris";
 import { pastille, marqueurVehicule, etatVehicule } from "@/components/colis/marqueurs";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type Stop } from "@/components/colis/commun";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
@@ -1310,12 +1313,17 @@ function AjoutAdresse({
   const [relais, setRelais] = useState("");
   const [colis, setColis] = useState("1");
   const [placement, setPlacement] = useState<Placement>("meilleur");
+  /** Créneau du jour choisi avant l'ajout ; « Aucun » par défaut. */
+  const [creneau, setCreneau] = useState<ChoixCreneau>(CRENEAU_AUCUN);
+  const ouverture = useHorairesOuverture(adresse, true);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const biais = position ?? (run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null);
 
   async function ajouter() {
     if (adresse.trim().length < 5) return setErreur("Saisissez une adresse (5 caractères au moins).");
+    const choix = validerChoix(creneau);
+    if (!choix.ok) return setErreur(choix.erreur);
     setEnvoi(true);
     setErreur(null);
     try {
@@ -1327,6 +1335,7 @@ function AjoutAdresse({
           type,
           destinataire: destinataire.trim() || etablissement?.nom || null,
           telephone: telephone.trim() || null,
+          creneau: choix.creneau,
           ...(type === "point_relais" ? { relais: relais.trim() || etablissement?.nom || null, colis: Math.max(0, Math.min(500, Number(colis) || 0)) } : {}),
           etablissement: etablissement && etablissement.adresse === adresse ? { nom: etablissement.nom ?? etablissement.adresse, lat: etablissement.lat, lng: etablissement.lng } : null,
         }),
@@ -1410,8 +1419,22 @@ function AjoutAdresse({
             </label>
           ))}
         </fieldset>
+        <EtapeCreneau
+          idBase="go-creneau"
+          value={creneau}
+          onChange={(c) => {
+            setCreneau(c);
+            setErreur(null);
+            // « Au meilleur endroit » ne regarde que le détour : avec un créneau,
+            // on propose de recalculer l'ordre (l'optimisation respecte le créneau).
+            if (c.cle !== "aucun" && c.cle !== "ouverture" && (creneau.cle === "aucun" || creneau.cle === "ouverture") && placement === "meilleur") setPlacement("optimiser");
+          }}
+          fiche={ouverture.fiche}
+          chargement={ouverture.chargement}
+          ymd={run.run_date ?? dateParis(new Date())}
+        />
         {erreur && <p className="rounded-lg bg-orange/10 px-3 py-2 text-sm font-semibold text-orange-ink">{erreur}</p>}
-        <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={envoi || adresse.trim().length < 5} onClick={ajouter}>
+        <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={envoi || adresse.trim().length < 5 || !validerChoix(creneau).ok} onClick={ajouter}>
           {envoi ? "Ajout…" : "Ajouter à la tournée"}
         </button>
       </section>

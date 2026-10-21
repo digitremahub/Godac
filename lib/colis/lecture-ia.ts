@@ -1,6 +1,7 @@
 import "server-only";
 import { extraireTelephone, normaliserTelephone } from "@/lib/colis/telephone";
 import { lirePoids } from "@/lib/colis/poids";
+import { colonnesCreneau, erreurCreneau, type CreneauSaisi } from "@/lib/colis/creneau";
 
 /**
  * Lit l'adresse du destinataire sur la photo d'une étiquette de colis
@@ -15,11 +16,13 @@ export interface EtiquetteLue {
   telephone: string | null;
   /** Poids du colis en kg (les grammes sont convertis). */
   poids: number | null;
+  /** Créneau imprimé sur l'étiquette (Predict DPD « 10:00-13:00 », « avant 10:00 »), absent sinon. */
+  creneau?: CreneauSaisi;
 }
 
 export type LectureResult = { ok: true; etiquette: EtiquetteLue } | { ok: false; reason: string };
 
-const PROMPT = `Lis cette étiquette de colis. Priorité absolue : adresse de LIVRAISON du destinataire (numéro, rue, complément utile, code postal, ville), jamais l’expéditeur ni le dépôt. Extrais aussi le nom du destinataire, son téléphone, le poids en kg (convertis les grammes) et le numéro de suivi s’ils sont lisibles. Ne devine rien : renvoie null si illisible. Réponse très concise.`;
+const PROMPT = `Lis cette étiquette de colis. Priorité absolue : adresse de LIVRAISON du destinataire (numéro, rue, complément utile, code postal, ville), jamais l’expéditeur ni le dépôt. Extrais aussi le nom du destinataire, son téléphone, le poids en kg (convertis les grammes), le numéro de suivi et le créneau de livraison imprimé (ex. Predict 10:00-13:00, « avant 10:00 ») s’ils sont lisibles. Ne devine rien : renvoie null si illisible. Réponse très concise.`;
 
 /**
  * Champs bruts renvoyés par l'IA → étiquette nettoyée : téléphone normalisé
@@ -29,7 +32,17 @@ const PROMPT = `Lis cette étiquette de colis. Priorité absolue : adresse de LI
 export function nettoyerEtiquette(input: Record<string, unknown>, pays = "FR"): EtiquetteLue {
   const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 300) : null);
   const telephone = normaliserTelephone(clean(input.telephone), pays) ?? extraireTelephone(clean(input.telephone), pays);
-  return { adresse: clean(input.adresse), destinataire: clean(input.destinataire), code: clean(input.code), telephone, poids: lirePoids(input.poids) };
+  // Créneau : gardé seulement s'il est lisible et cohérent (fin après début).
+  const creneau = { debut: clean(input.creneau_debut), fin: clean(input.creneau_fin) };
+  const creneauLu = (creneau.debut || creneau.fin) && !erreurCreneau(creneau) ? colonnesCreneau(creneau) : null;
+  return {
+    adresse: clean(input.adresse),
+    destinataire: clean(input.destinataire),
+    code: clean(input.code),
+    telephone,
+    poids: lirePoids(input.poids),
+    ...(creneauLu ? { creneau: { debut: creneauLu.window_start, fin: creneauLu.window_end } } : {}),
+  };
 }
 
 export async function lireEtiquette(imageBase64: string, mediaType: string, pays = "FR"): Promise<LectureResult> {
@@ -43,6 +56,8 @@ export async function lireEtiquette(imageBase64: string, mediaType: string, pays
       code: { anyOf: [{ type: "string" }, { type: "null" }] },
       telephone: { anyOf: [{ type: "string" }, { type: "null" }] },
       poids: { anyOf: [{ type: "number" }, { type: "null" }], description: "Poids du colis en kg (850 g → 0.85)" },
+      creneau_debut: { anyOf: [{ type: "string" }, { type: "null" }], description: "Début du créneau de livraison imprimé, HH:MM (null si « avant … » ou absent)" },
+      creneau_fin: { anyOf: [{ type: "string" }, { type: "null" }], description: "Fin du créneau de livraison imprimé, HH:MM (null si absent)" },
     },
     required: ["adresse", "destinataire", "code", "telephone", "poids"],
   };

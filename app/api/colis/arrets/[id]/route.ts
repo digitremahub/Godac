@@ -6,7 +6,7 @@ import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { normaliserTelephone } from "@/lib/colis/telephone";
 import { listeDeLaTournee, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
-import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
+import { colonnesCreneau, schemaCreneau } from "@/lib/colis/creneau";
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { MESSAGE_TOURNEE_CLOTUREE, MOTIFS_ECHEC, libelleMotif, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
 import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
@@ -48,13 +48,7 @@ const patchSchema = z.object({
    * Créneau ponctuel pour aujourd'hui (« avant 10 h » : fin seule) ;
    * prioritaire sur les horaires de l'annuaire. null : retirer le créneau.
    */
-  creneau: z
-    .object({ debut: z.string().nullable(), fin: z.string().nullable() })
-    .refine((c) => (c.debut === null || lireHeure(c.debut) !== null) && (c.fin === null || lireHeure(c.fin) !== null), "Heure invalide")
-    .refine((c) => c.debut !== null || c.fin !== null, "Créneau vide")
-    .refine((c) => c.debut === null || c.fin === null || lireHeure(c.debut)! < lireHeure(c.fin)!, "Créneau incohérent")
-    .nullable()
-    .optional(),
+  creneau: schemaCreneau.nullable().optional(),
 });
 
 /** Livré / échec / type (livraison, ramasse ou point relais) / nom du relais / adresse corrigée (re-géocodée). RLS : le chauffeur de la tournée ou l'encadrement. */
@@ -66,7 +60,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const { id } = await params;
   const parsed = patchSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  if (!parsed.success) {
+    // Créneau refusé : message clair (fin avant début, heure illisible…).
+    const creneauRefuse = parsed.error.issues.find((i) => i.path[0] === "creneau");
+    return NextResponse.json({ error: creneauRefuse?.message ?? "Requête invalide." }, { status: 400 });
+  }
   const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, deposer, list_id, creneau } = parsed.data;
 
   // Tournée clôturée : plus aucune modification de ses arrêts (ni annulation
@@ -183,10 +181,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (relais !== undefined) update.relay_name = normaliserNomRelais(relais);
   if (poids !== undefined) update.weight_kg = poids === null ? null : lirePoids(poids);
   if (notes !== undefined) update.notes = notes;
-  if (creneau !== undefined) {
-    const heure = (v: string | null | undefined) => (v ? ecrireHeure(lireHeure(v)!) : null);
-    Object.assign(update, { window_start: heure(creneau?.debut), window_end: heure(creneau?.fin) });
-  }
+  if (creneau !== undefined) Object.assign(update, colonnesCreneau(creneau));
   if (adresse) {
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });

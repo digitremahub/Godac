@@ -12,6 +12,7 @@ import { typeApresRegroupement } from "@/lib/colis/relais";
 import { POIDS_MAX_KG, lirePoids } from "@/lib/colis/poids";
 import { jourIso } from "@/lib/colis/heure-paris";
 import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
+import { erreurCreneau } from "@/lib/colis/creneau";
 
 const HEURE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
@@ -39,6 +40,11 @@ const pointSchema = z.object({
   /** Commune et code postal connus (bordereau) : rangement par village sans attendre le géocodage. */
   commune: z.string().trim().max(120).nullable().optional(),
   code_postal: z.string().trim().max(10).nullable().optional(),
+}).superRefine((p, ctx) => {
+  // Créneau du jour (modifiable dans l'aperçu du bordereau) : mêmes règles que l'ajout unitaire.
+  if (!p.window_start && !p.window_end) return;
+  const erreur = erreurCreneau({ debut: p.window_start ?? null, fin: p.window_end ?? null });
+  if (erreur) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["window_end"], message: erreur });
 });
 // Géocodage d'une longue liste hors de France (une adresse par seconde).
 export const maxDuration = 300;
@@ -93,7 +99,11 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Liste invalide (200 adresses au plus)." }, { status: 400 });
+  if (!parsed.success) {
+    const creneauRefuse = parsed.error.issues.find((i) => i.code === "custom" && i.path.includes("window_end"));
+    if (creneauRefuse) return NextResponse.json({ error: `Arrêt n° ${Number(creneauRefuse.path[1]) + 1} : ${creneauRefuse.message}` }, { status: 400 });
+    return NextResponse.json({ error: "Liste invalide (200 adresses au plus)." }, { status: 400 });
+  }
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
   if (run.status === "done") return NextResponse.json({ error: MESSAGE_TOURNEE_CLOTUREE }, { status: 409 });

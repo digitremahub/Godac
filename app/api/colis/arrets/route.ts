@@ -12,6 +12,7 @@ import { cleAdresse, horairesDesAdresses, listeDeLaTournee, moduleActif, tournee
 import { listePourAdresse } from "@/lib/colis/villages-serveur";
 import { detecterProfessionnel } from "@/lib/colis/professionnel";
 import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
+import { colonnesCreneau, schemaCreneau } from "@/lib/colis/creneau";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -31,9 +32,12 @@ const bodySchema = z.object({
   poids: z.number().positive().max(POIDS_MAX_KG).nullable().optional(),
   /** Une ramasse exceptionnelle ne devient pas une habitude quotidienne. */
   exceptionnelle: z.boolean().optional(),
-  /** Créneau suggéré/confirmé avant l’ajout de l’adresse. */
-  window_start: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
-  window_end: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  /**
+   * Créneau ponctuel du jour choisi avant l'ajout (« avant 10 h » : fin
+   * seule) ; mêmes format et règles que le PATCH (lib/colis/creneau.ts).
+   * Absent ou null : pas de créneau (l'annuaire des horaires s'applique).
+   */
+  creneau: schemaCreneau.nullable().optional(),
   /**
    * Établissement choisi dans la recherche (annuaire, OpenStreetMap,
    * Google) : son nom devient business_name et ses coordonnées évitent un
@@ -60,6 +64,8 @@ export async function POST(req: Request) {
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
+    const creneauRefuse = parsed.error.issues.find((issue) => issue.path[0] === "creneau");
+    if (creneauRefuse) return NextResponse.json({ error: creneauRefuse.message }, { status: 400 });
     const champs = parsed.error.issues.map((issue) => `${issue.path.join(".") || "requête"} : ${issue.message}`).join(" · ");
     return NextResponse.json({ error: `Impossible d’ajouter cet arrêt. Vérifiez les champs requis. ${champs}` }, { status: 400 });
   }
@@ -101,6 +107,8 @@ export async function POST(req: Request) {
   const village = rangement?.nom ? { nom: rangement.nom, horsTournee: rangement.raison === "hors_tournee" } : null;
 
   const telephone = normaliserTelephone(parsed.data.telephone, pays);
+  // window_start / window_end posés dès la création : l'optimisation les respecte.
+  const creneau = parsed.data.creneau ? colonnesCreneau(parsed.data.creneau) : null;
   const poids = lirePoids(parsed.data.poids ?? null);
 
   const kind: TypeArret = parsed.data.type ?? "livraison";
@@ -135,8 +143,8 @@ export async function POST(req: Request) {
         ...(telephone && !memeAdresse.phone ? { phone: telephone } : {}),
         // Poids de l'arrêt = somme des colis dont le poids est connu.
         ...(poids ? { weight_kg: lirePoids(Number(memeAdresse.weight_kg ?? 0) + poids) } : {}),
-        ...(parsed.data.window_start ? { window_start: parsed.data.window_start } : {}),
-        ...(parsed.data.window_end ? { window_end: parsed.data.window_end } : {}),
+        // Créneau choisi à l'ajout : il remplace celui de l'arrêt existant.
+        ...(creneau ? creneau : {}),
       })
       .eq("id", memeAdresse.id)
       .select(STOP_FIELDS)
@@ -171,8 +179,7 @@ export async function POST(req: Request) {
       recipient: parsed.data.destinataire || null,
       phone: telephone,
       ...(poids ? { weight_kg: poids } : {}),
-      window_start: parsed.data.window_start ?? null,
-      window_end: parsed.data.window_end ?? null,
+      ...(creneau ?? {}),
       lat: pointChoisi?.lat ?? geo?.lat ?? null,
       lng: pointChoisi?.lng ?? geo?.lng ?? null,
     })
