@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (appUser.role !== "manager" && appUser.role !== "direction") {
+  if (appUser.role !== "manager" && appUser.role !== "exploitation" && appUser.role !== "direction") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 

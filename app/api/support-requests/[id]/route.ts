@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) {
     return NextResponse.json({ error: "Seuls les gestionnaires peuvent traiter une demande d'assistance." }, { status: 403 });
   }
 

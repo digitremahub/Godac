@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: c } = await supabase.from("customer_disputes").select("id, driver_id, status, client_name, parcel_code").eq("id", id).maybeSingle();
   if (!c) return NextResponse.json({ error: "Contestation introuvable." }, { status: 404 });
   const estChauffeur = c.driver_id === appUser.id;
-  if (!estChauffeur && !hasRole(appUser.role, ["manager", "direction"])) return NextResponse.json({ error: "Contestation introuvable." }, { status: 404 });
+  if (!estChauffeur && !hasRole(appUser.role, ["manager", "exploitation", "direction"])) return NextResponse.json({ error: "Contestation introuvable." }, { status: 404 });
 
   const admin = createAdminSupabaseClient();
   const r = await enregistrerCommentaire(admin, { type: "dispute", ficheId: id, organizationId: appUser.organization_id, auteurId: appUser.id, texte: form.texte, fichiers: form.fichiers });
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: messageExplicationChauffeur(appUser.full_name, "contestation", form.fichiers.length, form.texte),
       relatedTable: "customer_disputes",
       relatedId: id,
-      recipientRoles: ["manager", "direction"],
+      recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: await serviceDuChauffeur(admin, appUser.id),
     });
   } else if (c.driver_id) {

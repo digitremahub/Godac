@@ -4,7 +4,7 @@ import type { AppUser } from "@/lib/auth/session";
 
 /**
  * Who may approve/reject a given pending self-signup: direction can
- * act on anyone in their org; a chef de service/responsable
+ * act on anyone in their org, exploitation too (whole organisation); a chef de service/responsable
  * exploitation (manager) can act on a driver who
  * picked one of their own services, or picked none at all (so nobody
  * self-registering without a service ends up stuck unapprovable).
@@ -20,6 +20,12 @@ export async function canManagePendingDriver(
   targetUserId: string,
 ): Promise<boolean> {
   if (appUser.role === "direction") return true;
+  // Exploitation : toute l'organisation (la RLS « users: read within org »
+  // ne renvoie la cible que si elle est de la même organisation).
+  if (appUser.role === "exploitation") {
+    const { data: cible } = await supabase.from("users").select("id").eq("id", targetUserId).eq("organization_id", appUser.organization_id).maybeSingle();
+    return Boolean(cible);
+  }
   if (appUser.role !== "manager") return false;
 
   const [{ data: targetServices }, { data: myServices }] = await Promise.all([

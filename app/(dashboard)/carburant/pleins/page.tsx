@@ -38,8 +38,8 @@ export default async function FuelPage({
   const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
-  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "direction", "comptable"]);
-  const canCreate = hasRole(appUser.role, ["manager", "direction"]);
+  const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "exploitation", "direction", "comptable"]);
+  const canCreate = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   // Un manager qui conduit est lui-même chauffeur — "soi-même" reste un
   // choix valide par défaut. Un manager/la direction ne le sont jamais :
   // les laisser sur ce défaut soumettrait le plein au nom de leur

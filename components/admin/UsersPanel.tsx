@@ -9,6 +9,7 @@ import { ROLE_LABELS } from "@/lib/roles/labels";
 import type { UserRole } from "@/lib/types/domain";
 import { grouperParPole } from "@/lib/organization/poles";
 import { PoleBadge } from "@/components/shared/PoleBadge";
+import { peutGererCompte, rolesAttribuables } from "@/lib/roles/perimetre";
 
 interface UserRow {
   id: string;
@@ -48,7 +49,6 @@ function ServiceOptions({ services }: { services: ServiceOption[] }) {
   );
 }
 
-const ROLES: UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
 
 /** API routes return either a plain string (thrown Error) or a zod .flatten() object — never {message}. */
 function apiErrorMessage(error: unknown): string {
@@ -61,7 +61,13 @@ function apiErrorMessage(error: unknown): string {
   return "Erreur";
 }
 
-export function UsersPanel({ users, services }: { users: UserRow[]; services: ServiceOption[] }) {
+/**
+ * `acteur` : rôle de la personne connectée. La direction attribue tous les
+ * rôles ; l'exploitation crée et gère seulement les chauffeurs et les
+ * managers (lib/roles/perimetre.ts) — les autres comptes restent en lecture.
+ */
+export function UsersPanel({ users, services, acteur = "direction" }: { users: UserRow[]; services: ServiceOption[]; acteur?: UserRole }) {
+  const ROLES = rolesAttribuables(acteur);
   const router = useRouter();
   const [mode, setMode] = useState<"email" | "pin">("email");
   const [fullName, setFullName] = useState("");
@@ -249,7 +255,7 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
     }
   }
 
-  const roleOptions = mode === "pin" ? PIN_DRIVER_ROLES : ROLES;
+  const roleOptions = mode === "pin" ? PIN_DRIVER_ROLES.filter((r) => ROLES.includes(r)) : ROLES;
 
   return (
     <div className="flex flex-col gap-6">
@@ -381,6 +387,8 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
           <tbody>
             {users.map((u) => {
               const isEditing = editingId === u.id;
+              // Compte hors de portée (exploitation face à direction, comptable, exploitation) : lecture seule.
+              const gerable = peutGererCompte(acteur, u.role);
               return (
                 <tr key={u.id} className="border-t border-navy/5">
                   <td className="py-2">
@@ -446,18 +454,22 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                     )}
                   </td>
                   <td className="py-2">
-                    <select aria-label="Rôle"
-                      className="input !w-auto !py-1"
-                      value={u.role}
-                      disabled={busy}
-                      onChange={(e) => changeRole(u.id, e.target.value as UserRole)}
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
+                    {gerable ? (
+                      <select aria-label="Rôle"
+                        className="input !w-auto !py-1"
+                        value={u.role}
+                        disabled={busy}
+                        onChange={(e) => changeRole(u.id, e.target.value as UserRole)}
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      ROLE_LABELS[u.role] ?? u.role
+                    )}
                   </td>
                   <td className="py-2">
                     <span className={u.active ? "badge-teal" : "badge-neutral"}>{u.active ? "Actif" : "Inactif"}</span>
@@ -472,6 +484,8 @@ export function UsersPanel({ users, services }: { users: UserRow[]; services: Se
                           Annuler
                         </button>
                       </div>
+                    ) : !gerable ? (
+                      <span className="text-xs text-navy/55">Géré par la direction</span>
                     ) : (
                       <div className="flex gap-2">
                         <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => startEdit(u)}>

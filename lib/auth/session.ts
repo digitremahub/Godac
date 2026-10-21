@@ -13,16 +13,16 @@ export interface AppUser {
   phone: string | null;
   active: boolean;
   pending_approval: boolean;
-  /** users.can_drive : manager qui conduit aussi (sans effet pour les autres rôles). */
+  /** users.can_drive : manager ou exploitation qui conduit aussi (sans effet pour les autres rôles). */
   can_drive: boolean;
-  /** Conduit : chauffeur, ou manager avec can_drive (lib/roles/conducteurs.ts). */
+  /** Conduit : chauffeur, ou manager / exploitation avec can_drive (lib/roles/conducteurs.ts). */
   conduit: boolean;
 }
 
 const COLONNES = "id, organization_id, role, role_title, full_name, email, phone, active, pending_approval";
 
 /**
- * The 5 GODAC roles are domain-specific and live in our own `users`
+ * The GODAC roles (chauffeur, manager, exploitation, comptable, direction) are domain-specific and live in our own `users`
  * table, keyed by the Supabase Auth user id (see
  * supabase/migrations/20260101000002_core_tables.sql).
  */

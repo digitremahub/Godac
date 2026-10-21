@@ -12,7 +12,7 @@ import { estSchemaManquant } from "@/lib/rattachement/tolerance";
  * lecture directe du bucket est réservée à l'encadrement.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const g = await garderApi({ roles: ["direction", "manager", "comptable", "chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation", "comptable", "chauffeur"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { supabase } = g;
   const { id } = await params;

@@ -12,6 +12,7 @@ import {
   peutCreerGroupe,
   peutEcrireGroupe,
   peutLireGroupe,
+  estResponsableGroupe,
   peutReagir,
   peutSupprimerMessage,
   pieceJointeAcceptee,
@@ -95,6 +96,15 @@ describe("permissions", () => {
     expect(peutLireGroupe(direction)).toBe(true);
     expect(peutLireGroupe(exclu)).toBe(false);
     expect(peutLireGroupe(desactive)).toBe(false);
+  });
+  it("exploitation : lit et modère tous les groupes, comme la direction ; un manager non membre, non", () => {
+    const exploitation = { userRole: "exploitation" as const, memberRole: null, active: true };
+    const manager = { userRole: "manager" as const, memberRole: null, active: true };
+    expect(peutLireGroupe(exploitation)).toBe(true);
+    expect(estResponsableGroupe(exploitation)).toBe(true);
+    expect(peutLireGroupe(manager)).toBe(false);
+    expect(membresAutorisesGroupe(["x", "y"], new Set(["x"]), "exploitation", new Set(["x", "y"]))).toEqual(["x", "y"]);
+    expect(membresAutorisesGroupe(["x", "y"], new Set(["x"]), "manager", new Set(["x", "y"]))).toEqual(["x"]);
   });
   it("mode annonces : seuls les responsables écrivent, tout membre réagit", () => {
     expect(peutEcrireGroupe(membre, false)).toBe(true);

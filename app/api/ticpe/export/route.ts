@@ -29,10 +29,10 @@ const PAGE = 1000;
  * check the role up front so the error is immediate and clear.
  */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  const g = await garderApi({ roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!["comptable", "direction"].includes(appUser.role)) {
+  if (!["comptable", "direction", "exploitation"].includes(appUser.role)) {
     return NextResponse.json({ error: "Rôle non autorisé pour l'export TICPE" }, { status: 403 });
   }
 

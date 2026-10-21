@@ -120,7 +120,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     message: `${provider?.name ?? "Le prestataire"} ${PROVIDER_ACTION_LABELS[d.action]}${slotText} — ${vehicle?.registration ?? "véhicule"}${invoicePath ? " (facture jointe)" : ""}.`,
     related_table: "rental_maintenance_requests",
     related_id: request.id,
-    recipient_roles: ["manager", "direction"],
+    recipient_roles: ["manager", "exploitation", "direction"],
     service_id: vehicle?.service_id ?? null,
   });
 

@@ -16,14 +16,19 @@
 import { ECRANS_GO_NAVIGATION } from "@/lib/go-navigation/offre";
 import type { UserRole } from "@/lib/types/domain";
 
-export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
-export const ENCADREMENT: readonly UserRole[] = ["manager", "direction"];
+export const TOUS_LES_ROLES: readonly UserRole[] = ["chauffeur", "manager", "exploitation", "comptable", "direction"];
 /**
- * Rôles « terrain » : chauffeur, et manager qui conduit aussi
- * (users.can_drive). Les écrans marqués `conducteur` exigent en plus que la
- * personne conduise : un manager sans can_drive en est exclu.
+ * Encadrement : manager (ses services), exploitation (toute l'organisation,
+ * sans paie, facturation, réglages ni audit), direction (tout).
+ * Voir lib/roles/perimetre.ts.
  */
-export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager"];
+export const ENCADREMENT: readonly UserRole[] = ["manager", "exploitation", "direction"];
+/**
+ * Rôles « terrain » : chauffeur, et manager ou exploitation qui conduit
+ * aussi (users.can_drive). Les écrans marqués `conducteur` exigent en plus
+ * que la personne conduise : un manager sans can_drive en est exclu.
+ */
+export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager", "exploitation"];
 
 /** Clés réelles de la table `modules` qui correspondent à du code. */
 export const MODULES_AVEC_CODE = [
@@ -215,7 +220,7 @@ const E = (e: Ecran) => e;
 export const ECRANS: readonly Ecran[] = [
   // ── Tableau de bord ──────────────────────────────────────────────
   E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", libelleOnglet: "Aujourd'hui", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
-  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction"], modules: ["bi_reporting"], icone: "chart" }),
+  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation"], modules: ["bi_reporting"], icone: "chart", note: "exploitation : carburant et tournées, sans paie" }),
 
   // ── Mon espace ───────────────────────────────────────────────────
   E({
@@ -250,8 +255,8 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "J'entre pour un collègue",
     libelleSousOnglet: "Pour un collègue",
     href: "/moi/tournee/collegue",
-    roles: ["chauffeur", "manager", "direction"],
-    rolesMenu: ["chauffeur", "manager"],
+    roles: ["chauffeur", "manager", "exploitation", "direction"],
+    rolesMenu: ["chauffeur", "manager", "exploitation"],
     modules: ["planning"],
     icone: "users",
     mobile: "plus",
@@ -265,7 +270,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Signaler un problème",
     href: "/moi/signaler",
     // Tout rôle qui conduit ou reçoit un véhicule peut signaler (QR véhicule).
-    roles: ["chauffeur", "manager", "direction"],
+    roles: ["chauffeur", "manager", "exploitation", "direction"],
     rolesMenu: ["chauffeur"],
     modules: ["maintenance_requests"],
     icone: "wrench",
@@ -277,7 +282,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Mes fiches de paie",
     href: "/moi/fiches-de-paie",
-    roles: ["chauffeur", "manager", "comptable"],
+    roles: ["chauffeur", "manager", "exploitation", "comptable"],
     modules: ["payslips"],
     icone: "coins",
     mobile: "plus",
@@ -289,7 +294,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Demander un acompte",
     href: "/moi/acomptes",
-    roles: ["chauffeur", "manager", "comptable"],
+    roles: ["chauffeur", "manager", "exploitation", "comptable"],
     modules: ["payslips"],
     icone: "coins",
     mobile: "plus",
@@ -301,7 +306,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Mon pointage",
     href: "/moi/pointage",
-    roles: ["chauffeur", "manager", "comptable"],
+    roles: ["chauffeur", "manager", "exploitation", "comptable"],
     modules: ["time_clock"],
     icone: "clock",
     mobile: "plus",
@@ -312,7 +317,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "moi",
     libelle: "Mes congés",
     href: "/moi/conges",
-    roles: ["chauffeur", "manager", "comptable"],
+    roles: ["chauffeur", "manager", "exploitation", "comptable"],
     modules: ["leave_management"],
     icone: "calendar",
     mobile: "plus",
@@ -335,7 +340,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "exploitation",
     libelle: "Tournées & villages",
     href: "/exploitation/tournees",
-    roles: ["direction", "manager", "chauffeur"],
+    roles: ["direction", "manager", "exploitation", "chauffeur"],
     modulesAuMoinsUn: ["planning", "route_optimizer"],
     icone: "map",
     note: "chauffeur : lecture",
@@ -345,7 +350,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "exploitation",
     libelle: "Tournée colis",
     href: "/exploitation/colis",
-    roles: ["direction", "manager", "chauffeur"],
+    roles: ["direction", "manager", "exploitation", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
     aussiActif: ["/exploitation/suivi"],
@@ -370,7 +375,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Rapports de tournée",
     libelleSousOnglet: "Rapports",
     href: "/exploitation/historique/rapports",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     modules: ["planning"],
     icone: "file",
     parent: "exploitation.historique",
@@ -383,7 +388,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Photos de tournée",
     libelleSousOnglet: "Photos",
     href: "/exploitation/historique/photos",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     modules: ["planning"],
     icone: "camera",
     parent: "exploitation.historique",
@@ -395,7 +400,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Tournées colis passées",
     libelleSousOnglet: "Tournées colis",
     href: "/exploitation/historique/colis",
-    roles: ["direction", "manager", "chauffeur"],
+    roles: ["direction", "manager", "exploitation", "chauffeur"],
     modules: ["route_optimizer"],
     icone: "qr",
     parent: "exploitation.historique",
@@ -407,7 +412,7 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "Contestations clients",
     libelleOnglet: "Contestations",
     href: "/exploitation/contestations",
-    roles: ["direction", "manager", "chauffeur"],
+    roles: ["direction", "manager", "exploitation", "chauffeur"],
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
@@ -419,7 +424,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Véhicules",
     href: "/flotte/vehicules",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     modules: ["fleet"],
     icone: "truck",
     alternative: { chauffeur: "/moi/vehicule" },
@@ -430,7 +435,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Fiche véhicule",
     href: "/flotte/vehicules/[id]",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     modules: ["fleet"],
     icone: "truck",
     menu: "cache",
@@ -486,11 +491,11 @@ export const ECRANS: readonly Ecran[] = [
     section: "flotte",
     libelle: "Amendes",
     href: "/flotte/amendes",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     modules: ["fines"],
     icone: "file",
     alternative: { chauffeur: "/moi/amendes" },
-    note: "manager : son service ; comptable : lecture",
+    note: "manager : son service ; exploitation : toute l'organisation ; comptable : lecture",
   }),
   E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr" }),
 
@@ -502,7 +507,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "carburant",
     libelle: "Cuves",
     href: "/carburant/cuves",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     icone: "cylinder",
     aussiActif: ["/carburant/approvisionnements"],
   }),
@@ -511,7 +516,7 @@ export const ECRANS: readonly Ecran[] = [
     section: "carburant",
     libelle: "Approvisionnements",
     href: "/carburant/approvisionnements",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     menu: "onglet",
     icone: "cylinder",
   }),
@@ -520,11 +525,12 @@ export const ECRANS: readonly Ecran[] = [
     section: "carburant",
     libelle: "Export TICPE",
     href: "/carburant/ticpe",
-    roles: ["direction", "comptable"],
+    roles: ["direction", "exploitation", "comptable"],
     modules: ["ticpe_export"],
     icone: "file",
+    note: "exploitation : lecture et export",
   }),
-  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
+  E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
 
   // ── Équipe & RH ──────────────────────────────────────────────────
   E({
@@ -534,14 +540,14 @@ export const ECRANS: readonly Ecran[] = [
     href: "/equipe/utilisateurs",
     roles: ENCADREMENT,
     icone: "users",
-    note: "manager : lecture de son service",
+    note: "manager : lecture de son service ; exploitation : comptes chauffeur et manager",
   }),
   E({
     id: "equipe.utilisateur_fiche",
     section: "equipe",
     libelle: "Fiche salarié",
     href: "/equipe/utilisateurs/[id]",
-    roles: ["direction", "manager", "comptable"],
+    roles: ["direction", "manager", "exploitation", "comptable"],
     icone: "users",
     menu: "cache",
   }),
@@ -555,7 +561,7 @@ export const ECRANS: readonly Ecran[] = [
     modules: ["time_clock"],
     icone: "clock",
     alternative: { chauffeur: "/moi/pointage", comptable: "/moi/pointage" },
-    note: "manager : son service",
+    note: "manager : son service ; exploitation : toute l'organisation",
   }),
   E({
     id: "equipe.conges",
@@ -579,7 +585,7 @@ export const ECRANS: readonly Ecran[] = [
     modules: ["leave_management"],
     icone: "calendar",
     parent: "equipe.conges",
-    note: "manager : son service",
+    note: "manager : son service ; exploitation : toute l'organisation",
   }),
   E({
     id: "equipe.paie",
@@ -625,7 +631,7 @@ export const ECRANS: readonly Ecran[] = [
     icone: "coins",
     parent: "equipe.paie",
     // Alerte « décision » reçue par le salarié : ses demandes.
-    alternative: { chauffeur: "/moi/acomptes", manager: "/moi/acomptes" },
+    alternative: { chauffeur: "/moi/acomptes", manager: "/moi/acomptes", exploitation: "/moi/acomptes" },
     note: "comptable : prépare, la direction accepte ou refuse",
   }),
   E({
@@ -896,6 +902,7 @@ export function entreeActive(ecrans: readonly Ecran[], pathname: string): Ecran 
 export function libelleRoles(roles: readonly UserRole[]): string {
   const L: Record<UserRole, string> = {
     direction: "Direction",
+    exploitation: "Exploitation",
     manager: "Manager",
     chauffeur: "Chauffeur",
     comptable: "Comptable",

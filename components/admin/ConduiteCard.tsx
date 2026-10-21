@@ -7,7 +7,8 @@ import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
 
 /**
- * Fiche utilisateur (direction) : un chauffeur peut être passé manager en
+ * Fiche utilisateur (direction, ou exploitation pour un chauffeur ou un
+ * manager) : un chauffeur peut être passé manager en
  * gardant la conduite ; un manager peut « conduire aussi » (planning,
  * tournées, pleins, app Livreur, Tournée colis, badge + PIN, palier App
  * Livreur). Remplace l'ancien rôle manager_chauffeur.
@@ -48,7 +49,8 @@ export function ConduiteCard({ userId, role, canDrive, nom }: { userId: string; 
     );
   }
 
-  if (role !== "manager") return null;
+  // Manager ou exploitation qui conduit aussi (users.can_drive).
+  if (role !== "manager" && role !== "exploitation") return null;
   return (
     <Card className="flex flex-col gap-2">
       <label className="flex min-h-[44px] cursor-pointer items-start gap-3 text-sm">

@@ -5,6 +5,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { journaliser } from "@/lib/audit/journal";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { peutGererCompte } from "@/lib/roles/perimetre";
 
 const CONFIRMATION_PHRASE = "REINITIALISER LES ACCES";
 
@@ -45,8 +46,9 @@ export async function POST(request: NextRequest) {
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Seule la direction peut réinitialiser les accès chauffeurs." }, { status: 403 });
+  // Direction, ou exploitation (comptes chauffeur et manager seulement).
+  if (appUser.role !== "direction" && appUser.role !== "exploitation") {
+    return NextResponse.json({ error: "Seules la direction et l'exploitation peuvent réinitialiser les accès chauffeurs." }, { status: 403 });
   }
   if (!appUser.organization_id) {
     return NextResponse.json({ error: "Organisation introuvable pour ce compte." }, { status: 400 });
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
   // Chauffeurs et managers qui conduisent aussi (users.can_drive).
   const { data: drivers, error: lookupError } = await admin
     .from("users")
-    .select("id, full_name, auth_method")
+    .select("id, full_name, auth_method, role")
     .eq("organization_id", appUser.organization_id)
     .or(FILTRE_CONDUCTEURS);
 
@@ -64,7 +66,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Impossible de récupérer les chauffeurs de l'organisation." }, { status: 500 });
   }
 
-  const comptes = drivers ?? [];
+  // L'exploitation ne touche jamais un compte exploitation (le sien compris).
+  const comptes = (drivers ?? []).filter((d) => peutGererCompte(appUser.role, d.role));
   if (comptes.length === 0) return NextResponse.json({ ok: true, resetCount: 0, failedCount: 0, failures: [], activationCodes: [] });
 
   const succeeded: string[] = [];

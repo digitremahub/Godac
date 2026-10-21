@@ -99,7 +99,7 @@ export async function draftFaqEntries(input: {
             existing_id: { anyOf: [{ type: "string" }, { type: "null" }] },
             question: { type: "string" },
             answer: { type: "string" },
-            roles: { type: "array", items: { type: "string", enum: ["chauffeur", "manager", "comptable", "direction"] } },
+            roles: { type: "array", items: { type: "string", enum: ["chauffeur", "manager", "exploitation", "comptable", "direction"] } },
             count: { type: "integer" },
           },
           required: ["existing_id", "question", "answer", "roles", "count"],

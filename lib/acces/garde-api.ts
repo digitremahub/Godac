@@ -6,7 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { lireEtatOffre } from "@/lib/go-navigation/etat";
 import { MESSAGE_ESSAI_TERMINE } from "@/lib/go-navigation/offre";
-import { deciderAcces, ecran as ecranDe, libelleModule, libelleRoles, type CleModule, type Ecran } from "@/lib/acces/catalogue";
+import { TOUS_LES_ROLES, deciderAcces, ecran as ecranDe, libelleModule, libelleRoles, type CleModule, type Ecran } from "@/lib/acces/catalogue";
 import type { UserRole } from "@/lib/types/domain";
 
 export type CodeRefus = "NON_CONNECTE" | "ROLE_REFUSE" | "MODULE_INACTIF" | "LIMITE_FORMULE" | "QUOTA_ATTEINT";
@@ -50,7 +50,7 @@ export type ResultatGardeApi =
 /** Règle effective (fusion écran + options), pure. */
 export function regleEffective(opts: OptionsGarde): Ecran {
   const base = opts.ecran ? ecranDe(opts.ecran) : undefined;
-  const roles = opts.roles === "tous" || (!opts.roles && !base) ? (["chauffeur", "manager", "comptable", "direction"] as const) : (opts.roles ?? base!.roles);
+  const roles = opts.roles === "tous" || (!opts.roles && !base) ? TOUS_LES_ROLES : (opts.roles ?? base!.roles);
   return {
     id: base?.id ?? "api",
     section: base?.section ?? "dashboard",

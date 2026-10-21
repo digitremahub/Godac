@@ -53,7 +53,7 @@ export function DriverContactForm({
       <div>
         <h2 className="font-semibold">Coordonnées du chauffeur</h2>
         <p className="mt-1 text-sm text-navy/60">
-          {canEditAll ? "La Direction peut mettre à jour les coordonnées de cette fiche." : "Exploitation : modification limitée aux coordonnées des chauffeurs de vos services."}
+          {canEditAll ? "La direction (ou l'exploitation pour un chauffeur ou un manager) peut mettre à jour les coordonnées de cette fiche." : "Exploitation : modification limitée aux coordonnées des chauffeurs de vos services."}
         </p>
       </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}

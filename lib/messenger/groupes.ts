@@ -28,7 +28,7 @@ export interface ServiceTeamInfo {
 }
 
 /** Rôles GODAC qui sont responsables d'office dans un groupe (en plus du chef d'équipe). */
-const ROLES_RESPONSABLES: UserRole[] = ["manager", "direction"];
+const ROLES_RESPONSABLES: UserRole[] = ["manager", "exploitation", "direction"];
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
@@ -112,15 +112,20 @@ export interface GroupAccess {
   active: boolean;
 }
 
-/** Responsable du groupe : admin du groupe, ou direction (qui peut tout lire et rejoindre). */
+/** Direction ou exploitation : lit, rejoint et modère tous les groupes de l'organisation. */
+function encadrementOrg(role: UserRole): boolean {
+  return role === "direction" || role === "exploitation";
+}
+
+/** Responsable du groupe : admin du groupe, ou direction / exploitation (qui peuvent tout lire et rejoindre). */
 export function estResponsableGroupe(a: GroupAccess): boolean {
   if (!a.active) return false;
-  return a.memberRole === "admin" || a.userRole === "direction";
+  return a.memberRole === "admin" || encadrementOrg(a.userRole);
 }
 
 export function peutLireGroupe(a: GroupAccess): boolean {
   if (!a.active) return false;
-  return a.memberRole !== null || a.userRole === "direction";
+  return a.memberRole !== null || encadrementOrg(a.userRole);
 }
 
 /**
@@ -164,7 +169,7 @@ export function peutCreerGroupe(userRole: UserRole, estChefDUnService: boolean):
  * ajouter n'importe quel collègue actif — groupe transversal).
  */
 export function membresAutorisesGroupe(selection: string[], equipe: Set<string>, creatorRole: UserRole, actifsOrg: Set<string>): string[] {
-  const allowed = creatorRole === "direction" ? actifsOrg : equipe;
+  const allowed = encadrementOrg(creatorRole) ? actifsOrg : equipe;
   return Array.from(new Set(selection)).filter((id) => allowed.has(id) && actifsOrg.has(id));
 }
 

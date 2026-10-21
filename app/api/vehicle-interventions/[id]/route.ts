@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const g = await garderApi({ modules: ["maintenance_requests"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour modifier une demande d'entretien" }, { status: 403 });
   }
 

@@ -3,7 +3,16 @@ import { GUIDES, guideDe, guideFiltre } from "@/lib/guides/roles";
 
 describe("guides par rôle", () => {
   it("un guide pour chacun des 5 rôles", () => {
-    expect(GUIDES.map((g) => g.role).sort()).toEqual(["chauffeur", "comptable", "direction", "manager"]);
+    expect(GUIDES.map((g) => g.role).sort()).toEqual(["chauffeur", "comptable", "direction", "exploitation", "manager"]);
+  });
+  it("exploitation : guide dédié, avec les écrans du chauffeur quand elle conduit", () => {
+    expect(guideDe("exploitation").titre).toBe("Guide de l'exploitation");
+    const conduit = guideDe("exploitation", true);
+    expect(conduit.role).toBe("exploitation");
+    expect(conduit.sections[0]!.titre).toBe("Bien démarrer");
+    // Jamais la paie dans le guide de l'exploitation.
+    const liens = guideDe("exploitation").sections.flatMap((s) => s.etapes.map((e) => e.lien?.href ?? ""));
+    expect(liens.some((h) => h.startsWith("/equipe/paie") || h.startsWith("/admin/"))).toBe(false);
   });
   it("masque les étapes des modules non souscrits", () => {
     const sans = guideFiltre(guideDe("chauffeur"), []);

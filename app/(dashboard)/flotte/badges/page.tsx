@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 /**
  * Bulk view of vehicle/driver QR badges for printing or reference —
@@ -28,7 +29,7 @@ export default async function QrCodesPage() {
   const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const isDirection = appUser.role === "direction";
+  const isDirection = voitToutLOrganisation(appUser.role);
 
   let serviceIds: string[] | null = null;
   if (!isDirection) {

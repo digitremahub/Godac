@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { group, access, admin } = ctx;
 
   if (input.join) {
-    if (appUser.role !== "direction") return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
+    if (appUser.role !== "direction" && appUser.role !== "exploitation") return NextResponse.json({ error: "Réservé à la direction et à l'exploitation." }, { status: 403 });
     if (!access.memberRole) {
       const { error } = await admin.from("message_group_members").insert({
         group_id: group.id,

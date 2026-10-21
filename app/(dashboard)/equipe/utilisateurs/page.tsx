@@ -20,8 +20,9 @@ export default async function AdminUsersPage() {
   ]);
 
   // Décision client Q6 : les managers voient, en lecture, les membres de
-  // leur(s) service(s), avec leurs coordonnées. Gestion réservée à la direction.
-  if (appUser.role !== "direction") {
+  // leur(s) service(s), avec leurs coordonnées. Gestion réservée à la
+  // direction et, pour les comptes chauffeur et manager, à l'exploitation.
+  if (appUser.role !== "direction" && appUser.role !== "exploitation") {
     const mesServices = new Set((userServices ?? []).filter((r) => r.user_id === appUser.id).map((r) => r.service_id));
     const servicesDe = new Map<string, string[]>();
     for (const r of userServices ?? []) servicesDe.set(r.user_id, [...(servicesDe.get(r.user_id) ?? []), r.service_id]);
@@ -74,11 +75,20 @@ export default async function AdminUsersPage() {
 
   return (
     <div>
-      <PageHeader title="Utilisateurs" description="Invitations et gestion des rôles GODAC." />
-      <div className="mb-4">
-        <UserImportPanel />
-      </div>
-      <UsersPanel users={usersWithService} services={services ?? []} />
+      <PageHeader
+        title="Utilisateurs"
+        description={
+          appUser.role === "exploitation"
+            ? "Comptes chauffeur et manager : création, services, conduite, désactivation. Les autres comptes sont gérés par la direction."
+            : "Invitations et gestion des rôles GODAC."
+        }
+      />
+      {appUser.role === "direction" && (
+        <div className="mb-4">
+          <UserImportPanel />
+        </div>
+      )}
+      <UsersPanel users={usersWithService} services={services ?? []} acteur={appUser.role} />
     </div>
   );
 }

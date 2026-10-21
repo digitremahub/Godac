@@ -8,9 +8,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { creerCodeActivation, revoquerSessions } from "@/lib/auth/code-activation-serveur";
+import { verifierModificationParExploitation } from "@/lib/roles/perimetre";
 
 const bodySchema = z.object({
-  role: z.enum(["chauffeur", "manager", "comptable", "direction"]).optional(),
+  role: z.enum(["chauffeur", "manager", "exploitation", "comptable", "direction"]).optional(),
   role_title: z.string().nullable().optional(),
   // Manager qui conduit aussi (planning, tournées, pleins, app Livreur,
   // badge + PIN) — migration 20261021000002.
@@ -77,12 +78,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const contactOnly = ["phone", "address", "contact_email"].some((key) => Object.prototype.hasOwnProperty.call(parsed.data, key))
     && Object.keys(parsed.data).every((key) => ["phone", "address", "contact_email"].includes(key));
-  if (appUser.role !== "direction" && !contactOnly) {
+  const estDirection = appUser.role === "direction";
+  // Exploitation : gère les comptes chauffeur et manager (rôle chauffeur ↔
+  // manager, activation, services, conduite, PIN, contact), jamais ceux de
+  // la direction, du comptable ou de l'exploitation, ni salaire / contrat /
+  // dossier RH (lib/roles/perimetre.ts).
+  const estExploitation = appUser.role === "exploitation";
+  if (!estDirection && !estExploitation && !contactOnly) {
     return NextResponse.json({ error: "Seule la direction peut modifier les rôles et les données administratives." }, { status: 403 });
   }
 
   const supabase = await createServerSupabaseClient();
-  if (appUser.role !== "direction") {
+  if (estExploitation) {
+    const { data: target, error: targetError } = await supabase
+      .from("users").select("id, organization_id, role").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (targetError || !target) return NextResponse.json({ error: "Utilisateur introuvable dans votre organisation." }, { status: 404 });
+    const verdict = verifierModificationParExploitation(target.role, Object.keys(parsed.data), parsed.data.role);
+    if (!verdict.ok) return NextResponse.json({ error: verdict.error }, { status: verdict.status });
+    // Services choisis : uniquement ceux de l'organisation (l'écriture se
+    // fait ensuite par le client admin).
+    const demandes = [...new Set([...(parsed.data.services ?? []).map((x) => x.service_id), ...(parsed.data.service_id ? [parsed.data.service_id] : [])])];
+    if (demandes.length > 0) {
+      const { data: connus } = await supabase.from("services").select("id").eq("organization_id", appUser.organization_id).in("id", demandes);
+      if ((connus ?? []).length !== demandes.length) return NextResponse.json({ error: "Service inconnu dans votre organisation." }, { status: 400 });
+    }
+  } else if (!estDirection) {
     const { data: target, error: targetError } = await supabase
       .from("users").select("id, organization_id, role").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (targetError || !target) return NextResponse.json({ error: "Utilisateur introuvable dans votre organisation." }, { status: 404 });
@@ -145,7 +165,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // « Passer manager » un chauffeur : il garde la conduite (planning,
   // tournées, badge + PIN) sauf si la direction décoche explicitement.
-  if (parsed.data.role === "manager" && parsed.data.can_drive === undefined) {
+  if ((parsed.data.role === "manager" || parsed.data.role === "exploitation") && parsed.data.can_drive === undefined) {
     const { data: avant } = await supabase.from("users").select("role").eq("id", id).maybeSingle();
     if (avant?.role === "chauffeur") updateFields.can_drive = true;
   }
@@ -211,7 +231,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // organisation, chauffeur de ses services, seuls téléphone/adresse/
     // e-mail de contact) est contrôlé plus haut : écriture par le client
     // admin, limitée à l'organisation.
-    const ecrivain = appUser.role === "direction" ? supabase : createAdminSupabaseClient();
+    // Exploitation : même schéma (la RLS de `users` et la garde
+    // users_guard_self_update réservent ces écritures à la direction) ; le
+    // périmètre a été contrôlé plus haut (verifierModificationParExploitation).
+    const ecrivain = estDirection ? supabase : createAdminSupabaseClient();
     const { data, error } = await ecrivain
       .from("users")
       .update(updateFields)
@@ -230,14 +253,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     targetUser = data;
   }
 
+  // « user_services: direction manages » : l'exploitation écrit les
+  // rattachements par le client admin, après le contrôle ci-dessus.
+  const ecrivainServices = estDirection ? supabase : createAdminSupabaseClient();
   if (services !== undefined) {
     // Full replace: a driver qualified on several services, each with
     // its own status (titulaire/formation/remplacement) — see
     // DriverServicesPanel.
-    const { error: clearError } = await supabase.from("user_services").delete().eq("user_id", id);
+    const { error: clearError } = await ecrivainServices.from("user_services").delete().eq("user_id", id);
     if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
     if (services.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await ecrivainServices
         .from("user_services")
         .insert(services.map((s) => ({ user_id: id, service_id: s.service_id, status: s.status })));
       if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
@@ -246,10 +272,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // A user has at most one service through the admin table's quick
     // edit — replace rather than accumulate rows in the underlying
     // many-to-many table.
-    const { error: clearError } = await supabase.from("user_services").delete().eq("user_id", id);
+    const { error: clearError } = await ecrivainServices.from("user_services").delete().eq("user_id", id);
     if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
     if (service_id) {
-      const { error: linkError } = await supabase.from("user_services").insert({ user_id: id, service_id });
+      const { error: linkError } = await ecrivainServices.from("user_services").insert({ user_id: id, service_id });
       if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
     }
   }

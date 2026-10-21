@@ -43,7 +43,7 @@ type Amende = {
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "manager", "chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation", "chauffeur"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
   const parsed = bodySchema.safeParse(await req.json());
@@ -56,7 +56,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Contestation par le chauffeur de sa propre amende (un manager qui
   // conduit peut aussi contester la sienne) ; sinon, gestion par l'encadrement.
   let contestationPersonnelle = appUser.role === "chauffeur";
-  if (appUser.role === "manager" && appUser.conduit && body.status === "contested" && !decision) {
+  if ((appUser.role === "manager" || appUser.role === "exploitation") && appUser.conduit && body.status === "contested" && !decision) {
     const { data: sienne } = await createAdminSupabaseClient()
       .from("fines")
       .select("id")
@@ -86,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       message: `${appUser.full_name} signale une contestation pour une amende${ownFine.reference ? ` (réf. ${ownFine.reference})` : ""}${vehicule ? ` — véhicule ${vehicule.registration}` : ""}.`,
       relatedTable: "fines",
       relatedId: id,
-      recipientRoles: ["manager", "direction"],
+      recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: vehicule?.service_id ?? null,
     });
     if (alertError) return NextResponse.json({ error: alertError }, { status: 500 });

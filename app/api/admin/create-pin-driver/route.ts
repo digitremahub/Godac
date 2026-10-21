@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createPinDriver } from "@/lib/auth/driver-pin";
 import { creerCodeActivation } from "@/lib/auth/code-activation-serveur";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { peutAttribuerRole } from "@/lib/roles/perimetre";
 
 const bodySchema = z.object({
   full_name: z.string().min(1),
@@ -30,13 +31,21 @@ export async function POST(req: Request) {
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Seule la direction peut créer un chauffeur sans email" }, { status: 403 });
+  // Direction ou exploitation (comptes chauffeur et manager).
+  if (appUser.role !== "direction" && appUser.role !== "exploitation") {
+    return NextResponse.json({ error: "Seules la direction et l'exploitation peuvent créer un chauffeur sans email" }, { status: 403 });
   }
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  if (!peutAttribuerRole(appUser.role, parsed.data.role)) {
+    return NextResponse.json({ error: "Rôle non autorisé." }, { status: 403 });
+  }
+  if (parsed.data.service_id) {
+    const { data: service } = await g.supabase.from("services").select("id").eq("id", parsed.data.service_id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (!service) return NextResponse.json({ error: "Service inconnu dans votre organisation." }, { status: 400 });
   }
 
   try {

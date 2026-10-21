@@ -22,6 +22,7 @@ import {
   type GroupAccess,
   type GroupMemberRole,
 } from "@/lib/messenger/groupes";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 interface GroupListRow {
   id: string;
@@ -72,7 +73,7 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
   const groups = (groupRows ?? []) as unknown as GroupListRow[];
   const myMembership = (g: GroupListRow) => g.message_group_members.find((m) => m.user_id === appUser.id) ?? null;
   const myGroups = groups.filter((g) => myMembership(g));
-  const otherGroups = appUser.role === "direction" ? groups.filter((g) => !myMembership(g)) : [];
+  const otherGroups = voitToutLOrganisation(appUser.role) ? groups.filter((g) => !myMembership(g)) : [];
 
   const unreadCounts = new Map<string, number>(
     await Promise.all(
@@ -93,13 +94,13 @@ export default async function MessengerPage({ searchParams }: { searchParams: Pr
   const nameById = new Map((colleagues ?? []).map((c) => [c.id as string, c.full_name as string]));
   nameById.set(appUser.id, appUser.full_name);
   const teamOptions: TeamOption[] = groups
-    .filter((g) => g.kind === "team" && (appUser.role === "direction" || myMembership(g)?.role === "admin"))
+    .filter((g) => g.kind === "team" && (voitToutLOrganisation(appUser.role) || myMembership(g)?.role === "admin"))
     .map((g) => ({
       service_id: g.service_id,
       label: g.services?.name ?? g.name,
       members: g.message_group_members.filter((m) => nameById.has(m.user_id)).map((m) => ({ id: m.user_id, full_name: nameById.get(m.user_id)! })),
     }));
-  if (appUser.role === "direction") {
+  if (voitToutLOrganisation(appUser.role)) {
     teamOptions.push({
       service_id: null,
       label: "Transversal (toute l'entreprise)",
@@ -300,7 +301,7 @@ async function GroupPane({
   // Collègues ajoutables à un groupe ponctuel : l'équipe du service (direction : tous).
   let addable: { id: string; full_name: string }[] = [];
   if (canAdmin && group.kind === "custom") {
-    if (group.service_id && appUser.role !== "direction") {
+    if (group.service_id && !voitToutLOrganisation(appUser.role)) {
       const { data: team } = await supabase
         .from("message_groups")
         .select("message_group_members(user_id, users(full_name))")
@@ -344,7 +345,7 @@ async function GroupPane({
           joinedManually={me?.source === "manual"}
           muted={me?.muted ?? false}
           canAdmin={canAdmin}
-          canJoin={appUser.role === "direction"}
+          canJoin={voitToutLOrganisation(appUser.role)}
           addableMembers={addable}
           currentUserId={appUser.id}
         />

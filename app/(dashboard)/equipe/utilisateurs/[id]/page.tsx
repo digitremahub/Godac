@@ -18,6 +18,7 @@ import { RegistreSalarieForm, type ValeursRegistre } from "@/components/registre
 import { EmployeeDocumentsPanel, type EmployeeDocument } from "@/components/admin/EmployeeDocumentsPanel";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { computeHourlyRates } from "@/lib/business/payroll";
+import { peutGererCompte } from "@/lib/roles/perimetre";
 
 const LEAVE_STATUS_LABELS: Record<string, string> = { pending: "En attente", approved: "Approuvé", rejected: "Refusé" };
 const STATUS_LABELS: Record<string, string> = { titulaire: "Titulaire", formation: "Formation", remplacement: "Remplacement" };
@@ -55,7 +56,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const g = await garderPage("equipe.utilisateur_fiche");
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
-  const canViewOthers = hasRole(appUser.role, ["manager", "direction", "comptable"]);
+  const canViewOthers = hasRole(appUser.role, ["manager", "exploitation", "direction", "comptable"]);
   if (!canViewOthers && id !== appUser.id) {
     redirect("/dashboard");
   }
@@ -64,7 +65,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const isSelf = id === appUser.id;
   const isDirection = appUser.role === "direction";
   const isComptable = appUser.role === "comptable";
-  const isManagerLike = hasRole(appUser.role, ["manager"]) && !isSelf;
+  // Manager ou exploitation (vue opérationnelle d'un autre salarié).
+  const isManagerLike = hasRole(appUser.role, ["manager", "exploitation"]) && !isSelf;
+  // Exploitation : gère les comptes chauffeur et manager (rôle, conduite,
+  // services, coordonnées) — jamais la paie ni le dossier RH.
+  const estExploitation = appUser.role === "exploitation";
   const canSeeOperational = isDirection || isManagerLike || isSelf;
   const canSeePayrollAndHr = isDirection || isComptable;
   // Rémunération/dossier RH stay direction+comptable only — but a
@@ -121,7 +126,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             .order("occurred_at", { ascending: false })
             .limit(15)
         : Promise.resolve({ data: null }),
-      isDirection ? supabase.from("services").select("id, name, pole").order("name") : Promise.resolve({ data: null }),
+      isDirection || estExploitation ? supabase.from("services").select("id, name, pole").order("name") : Promise.resolve({ data: null }),
       canSeePayrollAndHr
         ? supabase.from("user_contracts").select("monthly_gross_salary, monthly_net_salary, contractual_monthly_hours").eq("user_id", id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -233,7 +238,9 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const { data: conduite } = await supabase.from("users").select("can_drive").eq("id", id).maybeSingle();
   const canDrive = Boolean((conduite as { can_drive?: boolean } | null)?.can_drive);
   const isFieldRole = estConducteur(u.role, canDrive);
-  const canConvene = hasRole(appUser.role, ["manager", "direction"]) && !isSelf;
+  const canConvene = hasRole(appUser.role, ["manager", "exploitation", "direction"]) && !isSelf;
+  /** Gestion du compte (conduite, services, coordonnées complètes) : direction, ou exploitation sur un chauffeur / manager. */
+  const gereLeCompte = !isSelf && (isDirection || (estExploitation && peutGererCompte(appUser.role, u.role)));
 
   return (
     <div>
@@ -243,7 +250,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         actions={canConvene ? <ConvocationButton employeeId={u.id} /> : undefined}
       />
 
-      {isDirection && !isSelf && (u.role === "chauffeur" || u.role === "manager") && (
+      {gereLeCompte && (u.role === "chauffeur" || u.role === "manager" || u.role === "exploitation") && (
         <div className="mb-4">
           <ConduiteCard userId={u.id} role={u.role} canDrive={canDrive} nom={u.full_name} />
         </div>
@@ -291,7 +298,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           currentPhone={u.phone ?? null}
           currentAddress={u.address ?? null}
           currentContactEmail={u.contact_email ?? null}
-          canEditAll={isDirection}
+          canEditAll={gereLeCompte}
         />
       )}
 
@@ -428,7 +435,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </Card>
       )}
 
-      {isDirection && <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />}
+      {gereLeCompte && <DriverServicesPanel userId={u.id} services={orgServices ?? []} initialAssignments={serviceAssignments} />}
 
       {showLeaves && (
         <Card className="mb-6 flex flex-col gap-2">

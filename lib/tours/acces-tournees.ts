@@ -10,7 +10,7 @@ import type { UserRole } from "@/lib/types/domain";
  *   services »), plus celles sur lesquelles ils sont planifiés. Ni carte,
  *   ni modification, ni tournées d'autres services.
  */
-export const GESTION_TOURNEES: UserRole[] = ["manager", "direction"];
+export const GESTION_TOURNEES: UserRole[] = ["manager", "exploitation", "direction"];
 
 export function peutGererTournees(role: UserRole): boolean {
   return GESTION_TOURNEES.includes(role);

@@ -188,7 +188,8 @@ export function droitsEcart(params: {
 }): DroitsEcart {
   const { role, userId, driverId, statut } = params;
   const sonPlein = Boolean(driverId) && driverId === userId;
-  const encadrement = role === "direction" || (role === "manager" && !sonPlein);
+  // Exploitation : comme un manager (jamais son propre plein), sur toute l'organisation.
+  const encadrement = role === "direction" || ((role === "manager" || role === "exploitation") && !sonPlein);
   return {
     traiter: encadrement && statut !== "aucun" && statut !== "traite",
     repondre: sonPlein && statut === "explication_demandee",

@@ -55,7 +55,7 @@ export async function synchroniserGroupesEquipe(admin: SupabaseClient, organizat
   }
   const users = (usersRes.data ?? []) as CandidateUser[];
   const actifs = new Set(users.filter(estCompteActif).map((u) => u.id));
-  const directionActive = new Set(users.filter((u) => estCompteActif(u) && u.role === "direction").map((u) => u.id));
+  const directionActive = new Set(users.filter((u) => estCompteActif(u) && (u.role === "direction" || u.role === "exploitation")).map((u) => u.id));
   const parService = new Map<string, string[]>();
   for (const l of (liensRes.data ?? []) as { user_id: string; service_id: string }[]) {
     parService.set(l.service_id, [...(parService.get(l.service_id) ?? []), l.user_id]);

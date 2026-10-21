@@ -15,7 +15,7 @@ export default async function IntranetPage() {
   const supabase = await createServerSupabaseClient();
 
 
-  const isManagerLike = hasRole(appUser.role, ["manager", "direction"]);
+  const isManagerLike = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const canRequestMeeting = appUser.role !== "direction";
 
   const [{ data: announcements }, { data: myReads }, { data: services }, { data: meetingRequests }, { data: convocations }] =

@@ -47,7 +47,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Demande de congé introuvable" }, { status: 404 });
   }
 
-  const isDecisionMaker = hasRole(appUser.role, ["manager", "direction"]);
+  const isDecisionMaker = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const isOwner = current.driver_id === appUser.id;
 
   const update: Record<string, unknown> = {};

@@ -76,13 +76,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       message: `${appUser.full_name} a répondu à la contestation${c.client_name ? ` de ${c.client_name}` : ""}.`,
       relatedTable: "customer_disputes",
       relatedId: id,
-      recipientRoles: ["manager", "direction"],
+      recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: await serviceDuChauffeur(admin, appUser.id),
     });
     return NextResponse.json({ ok: true });
   }
 
-  if (!hasRole(appUser.role, ["manager", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const { data: c } = await supabase.from("customer_disputes").select("*").eq("id", id).maybeSingle();
   if (!c) return NextResponse.json({ error: "Contestation introuvable." }, { status: 404 });
 

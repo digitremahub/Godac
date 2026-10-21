@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { SupportRequestsList } from "@/components/assistant/SupportRequestsList";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 /**
  * Manager-like inbox for the assistant's human relay. Same
@@ -24,7 +25,7 @@ export default async function SupportPage() {
     .select("id, question, conversation_summary, recipient, status, response, service_id, created_at, users!support_requests_requested_by_fkey(full_name)")
     .order("created_at", { ascending: false });
 
-  if (appUser.role !== "direction") {
+  if (!voitToutLOrganisation(appUser.role)) {
     const { data: myServices } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
     const serviceIds = (myServices ?? []).map((s) => s.service_id);
     query = query.in("service_id", serviceIds.length > 0 ? serviceIds : ["00000000-0000-0000-0000-000000000000"]);

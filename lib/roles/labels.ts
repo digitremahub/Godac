@@ -8,6 +8,7 @@ import type { UserRole } from "@/lib/types/domain";
 export const ROLE_LABELS: Record<UserRole, string> = {
   chauffeur: "Chauffeur",
   manager: "Manager",
+  exploitation: "Exploitation",
   comptable: "Comptable",
   direction: "Direction",
 };

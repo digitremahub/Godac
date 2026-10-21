@@ -7,7 +7,7 @@ import { cleAdresse, horairesDesAdresses, moduleActif, HOURS_FIELDS } from "@/li
 import { normaliserSemaine } from "@/lib/colis/horaires";
 
 /** Saisie des horaires : chauffeurs et encadrement (pas la comptabilité). RLS identique. */
-const PEUVENT_ECRIRE = ["chauffeur", "manager", "direction"] as const;
+const PEUVENT_ECRIRE = ["chauffeur", "manager", "exploitation", "direction"] as const;
 
 async function contexte(ecriture: boolean) {
   const g = await garderApi({ modules: ["route_optimizer"] });

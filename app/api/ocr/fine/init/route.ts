@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 
 /** Chemin de dépôt de l'avis (photo ou PDF) — voir app/api/ocr/fine/process. */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   const corps = (await req.json().catch(() => ({}))) as { ext?: string };

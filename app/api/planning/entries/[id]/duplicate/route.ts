@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const g = await garderApi({ modules: ["planning"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!["direction", "manager"].includes(appUser.role)) {
+  if (!["direction", "manager", "exploitation"].includes(appUser.role)) {
     return NextResponse.json({ error: "Seule la Direction, le responsable exploitation ou le chef d’équipe peut dupliquer une tournée." }, { status: 403 });
   }
   const { id } = await params;

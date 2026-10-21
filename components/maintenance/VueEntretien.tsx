@@ -28,7 +28,7 @@ export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demand
   ]);
 
   // Module « Véhicules loués » : rappel des demandes à valider avant transmission au loueur.
-  const canManage = hasRole(appUser.role, ["manager", "direction"]);
+  const canManage = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const rentalToValidate =
     canManage && (await isModuleEnabled(supabase, appUser.organization_id, "rental_providers"))
       ? ((await supabase.from("rental_maintenance_requests").select("id", { count: "exact", head: true }).eq("status", "a_valider")).count ?? 0)
@@ -82,7 +82,7 @@ export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demand
           requesterName: r.users?.full_name ?? "—",
           createdAt: r.created_at,
         }))}
-        canManage={hasRole(appUser.role, ["manager", "direction"])}
+        canManage={hasRole(appUser.role, ["manager", "exploitation", "direction"])}
       />
     </div>
   );

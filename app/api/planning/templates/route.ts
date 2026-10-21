@@ -2,8 +2,9 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
-const writeRoles = ["direction", "manager"] as const;
+const writeRoles = ["direction", "manager", "exploitation"] as const;
 
 const createSchema = z.object({
   service_id: z.string().uuid(),
@@ -38,11 +39,11 @@ export async function GET(req: Request) {
     .order("name");
 
   if (requestedService) {
-    if (appUser.role !== "direction" && !serviceIds.includes(requestedService)) {
+    if (!voitToutLOrganisation(appUser.role) && !serviceIds.includes(requestedService)) {
       return NextResponse.json({ error: "Ce service ne fait pas partie de vos services autorisés." }, { status: 403 });
     }
     query = query.eq("service_id", requestedService);
-  } else if (appUser.role !== "direction") {
+  } else if (!voitToutLOrganisation(appUser.role)) {
     if (!serviceIds.length) return NextResponse.json({ templates: [] });
     query = query.in("service_id", serviceIds);
   }
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
   if (input.default_vehicle_id && (!vehicle || (vehicle.service_id && vehicle.service_id !== input.service_id))) {
     return NextResponse.json({ error: "Le véhicule sélectionné n'est pas compatible avec ce service." }, { status: 400 });
   }
-  if (appUser.role !== "direction") {
+  if (!voitToutLOrganisation(appUser.role)) {
     const { data: lien } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id).eq("service_id", input.service_id).maybeSingle();
     if (!lien) return NextResponse.json({ error: "Ce service ne fait pas partie de vos services autorisés." }, { status: 403 });
   }

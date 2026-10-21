@@ -77,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ? "Seul le chauffeur du plein répond à une demande d'explication en cours."
         : plein.driver_id === appUser.id && appUser.role !== "direction"
           ? "Vous ne pouvez pas traiter l'écart de votre propre plein : la direction ou un autre manager s'en charge."
-          : "Action réservée à l'encadrement (manager, direction).";
+          : "Action réservée à l'encadrement (manager, exploitation, direction).";
     return NextResponse.json({ error: message, code: "ROLE_REFUSE" }, { status: 403 });
   }
 
@@ -144,7 +144,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: `${appUser.full_name} a répondu sur l'écart de son plein du ${quand}${vehicule?.registration ? ` (${vehicule.registration})` : ""} : ${extrait}`,
       related_table: "fuel_entries",
       related_id: id,
-      recipient_roles: ["manager", "direction"],
+      recipient_roles: ["manager", "exploitation", "direction"],
       service_id: vehicule?.service_id ?? null,
     });
     if (alertError) console.error("alerte réponse écart carburant", alertError.message);

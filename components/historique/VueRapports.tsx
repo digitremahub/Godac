@@ -8,6 +8,7 @@ import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable"
 import { addDays, todayISO } from "@/lib/planning/dates";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 interface PhotoRow {
   id: string;
@@ -63,7 +64,8 @@ export interface ReportsSearchParams {
 export async function VueRapports({ params, vue, appUser, supabase }: { params: ReportsSearchParams; vue: "table" | "photos"; appUser: AppUser; supabase: SupabaseClient }) {
   const view = vue;
 
-  const isDirection = appUser.role === "direction";
+  // Direction ou exploitation : tous les services ; correction : direction.
+  const isDirection = voitToutLOrganisation(appUser.role);
   const from = params.from && !Number.isNaN(Date.parse(params.from)) ? params.from : addDays(todayISO(), -30);
   const to = params.to && !Number.isNaN(Date.parse(params.to)) ? params.to : todayISO();
   const toExclusive = addDays(to, 1);
@@ -103,7 +105,7 @@ export async function VueRapports({ params, vue, appUser, supabase }: { params: 
           toExclusive={toExclusive}
           service={filters.service}
           driver={filters.driver}
-          canEdit={isDirection}
+          canEdit={appUser.role === "direction"}
         />
       )}
     </div>
