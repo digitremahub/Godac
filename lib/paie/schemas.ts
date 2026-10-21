@@ -22,6 +22,60 @@ export const parametresEntrepriseSchema = z.object({
   health_pmss_patronal_rate: taux.nullable().optional(),
   dfs_enabled: z.boolean().optional(),
   dfs_rate: taux.nullable().optional(),
+  // Maintien de salaire et subrogation (migration 20261026000002) : facultatifs.
+  sick_pay_min_seniority_months: z.coerce.number().int().min(0).max(120).nullable().optional(),
+  sick_pay_waiting_days: z.coerce.number().int().min(0).max(30).nullable().optional(),
+  sick_pay_waiting_days_at: z.coerce.number().int().min(0).max(30).nullable().optional(),
+  sick_pay_rate_1: taux.nullable().optional(),
+  sick_pay_rate_2: taux.nullable().optional(),
+  sick_pay_base_days: z.coerce.number().int().min(0).max(365).nullable().optional(),
+  sick_pay_step_days: z.coerce.number().int().min(0).max(365).nullable().optional(),
+  sick_pay_step_years: z.coerce.number().int().min(1).max(50).nullable().optional(),
+  sick_pay_max_days: z.coerce.number().int().min(0).max(365).nullable().optional(),
+  subrogation_enabled: z.boolean().optional(),
+});
+
+/** Colonnes ajoutées par 20261026000002 (maintien de salaire, subrogation). */
+export const COLONNES_ARRETS_SORTIES = {
+  reglages: [
+    "sick_pay_min_seniority_months",
+    "sick_pay_waiting_days",
+    "sick_pay_waiting_days_at",
+    "sick_pay_rate_1",
+    "sick_pay_rate_2",
+    "sick_pay_base_days",
+    "sick_pay_step_days",
+    "sick_pay_step_years",
+    "sick_pay_max_days",
+    "subrogation_enabled",
+  ],
+} as const;
+
+const dateIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const arretSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    type: z.enum(["maladie", "at_mp", "trajet", "maternite", "paternite", "sans_solde"]),
+    du: dateIso,
+    au: dateIso,
+    prolongationDu: dateIso.nullable().optional(),
+    ijssBrutesJour: z.coerce.number().min(0).max(1000).nullable().optional(),
+    ijssNettesJour: z.coerce.number().min(0).max(1000).nullable().optional(),
+    joursIjss: z.coerce.number().min(0).max(31).nullable().optional(),
+    maintienManuel: z.coerce.number().min(0).max(100000).nullable().optional(),
+  })
+  .refine((a) => a.au >= a.du, { message: "Fin avant le début." });
+
+export const sortieSchema = z.object({
+  exit_date: dateIso,
+  reason: z.enum(["licenciement", "licenciement_faute_grave", "rupture_conventionnelle", "demission", "fin_cdd", "retraite", "autre"]),
+  notice_type: z.enum(["effectue", "paye", "non_paye", "sans"]),
+  notice_days: z.coerce.number().min(0).max(365).nullable(),
+  notice_amount: montant.nullable(),
+  severance_amount: z.coerce.number().min(0).max(10000000).nullable(),
+  jobs_held: z.string().trim().max(1000).nullable(),
+  notes: z.string().trim().max(1000).nullable(),
 });
 
 /** Colonnes ajoutées par 20261024000003 : retirées si la migration n'est pas encore passée. */
@@ -79,4 +133,7 @@ export const variablesSchema = z.object({
   datePaiement: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   modePaiement: z.enum(["virement", "cheque", "especes"]).nullable().optional(),
   typeTauxPas: z.enum(["personnalise", "non_personnalise"]).nullable().optional(),
+  // Arrêts de travail (cumuls de référence CP et sortie : relus côté serveur).
+  arrets: z.array(arretSchema).max(10).optional(),
+  subrogation: z.boolean().nullable().optional(),
 });
