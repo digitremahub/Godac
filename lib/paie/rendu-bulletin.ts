@@ -2,12 +2,13 @@ import "server-only";
 import type { ContextePaie } from "@/lib/paie/donnees";
 import type { BulletinPdfData } from "@/lib/paie/pdf";
 import type { Bulletin, VariablesMois } from "@/lib/paie/types";
+import { libellePaiement, paiementDuBulletin } from "@/lib/paie/paiement";
 
 const CONTRATS: Record<string, string> = { cdi: "CDI", cdd: "CDD", interim: "Intérim", apprentissage: "Apprentissage" };
 const jour = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" });
 
 export interface IdentitesBulletin {
-  organisation: { name?: string | null; siret?: string | null; legal_address?: string | null; ape_code?: string | null; convention_collective?: string | null; urssaf_number?: string | null } | null;
+  organisation: { name?: string | null; siret?: string | null; legal_address?: string | null; ape_code?: string | null; convention_collective?: string | null; urssaf_number?: string | null; logo_url?: string | null; accent_color?: string | null } | null;
   employe: { full_name: string; role_title?: string | null; address?: string | null };
   dossier: { matricule?: string | null; social_security_number?: string | null; hire_date?: string | null; contract_type?: string | null } | null;
 }
@@ -18,12 +19,16 @@ export interface IdentitesBulletin {
  * la génération des bulletins (app/api/paie/bulletins) et la démo
  * (lib/demo/seed.ts), pour un rendu identique.
  */
-export function donneesBulletinPdf(params: { ctx: ContextePaie; bulletin: Bulletin; variables: Pick<VariablesMois, "joursCongesPris"> } & IdentitesBulletin): BulletinPdfData {
+export function donneesBulletinPdf(params: { ctx: ContextePaie; bulletin: Bulletin; variables: Pick<VariablesMois, "joursCongesPris" | "datePaiement" | "modePaiement"> } & IdentitesBulletin): BulletinPdfData {
   const { ctx, bulletin, variables, organisation, employe, dossier } = params;
+  const paiement = paiementDuBulletin(ctx.mois, variables);
   return {
     bulletin,
     periode: new Date(`${ctx.debut}T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }),
+    periodeDu: jour(ctx.debut),
+    periodeAu: jour(ctx.fin),
     dateEdition: new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }),
+    paiement: libellePaiement(paiement.datePaiement, paiement.modePaiement),
     employeur: {
       nom: organisation?.name ?? "Entreprise",
       adresse: organisation?.legal_address ?? null,
@@ -31,6 +36,8 @@ export function donneesBulletinPdf(params: { ctx: ContextePaie; bulletin: Bullet
       ape: organisation?.ape_code ?? null,
       urssaf: organisation?.urssaf_number ?? null,
       convention: organisation?.convention_collective ?? null,
+      logoUrl: organisation?.logo_url ?? null,
+      accent: organisation?.accent_color ?? null,
     },
     salarie: {
       nom: employe.full_name,

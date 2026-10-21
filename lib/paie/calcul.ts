@@ -1,4 +1,4 @@
-import type { Bulletin, LigneBulletin, ParametresEntreprise, ParametresLegaux, ProfilSalarie, Retenue, Section, TypeRetenue, VariablesMois } from "@/lib/paie/types";
+import type { Bulletin, LigneBulletin, ParametresEntreprise, ParametresLegaux, ProfilSalarie, Retenue, Section, TypeRetenue, TypeTauxPas, VariablesMois } from "@/lib/paie/types";
 import { partSaisissableMensuelle } from "@/lib/paie/parametres";
 
 /** Libellé sur le bulletin de chaque type de retenue après le net. */
@@ -36,6 +36,22 @@ export const HEURES_EQUIVALENCE: Record<ProfilSalarie["regime"], number> = {
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const pct = (base: number, taux: number) => r2((base * taux) / 100);
+
+/** Libellé du type de taux du PAS, tel qu'il figure sur le bulletin. */
+export const LIBELLE_TYPE_TAUX_PAS: Record<TypeTauxPas, string> = {
+  personnalise: "Taux personnalisé",
+  non_personnalise: "Taux non personnalisé",
+};
+
+/**
+ * Type de taux appliqué : le choix du mois s'il est possible, sinon
+ * personnalisé dès qu'un taux est saisi au profil. Sans taux saisi, seul
+ * le taux non personnalisé (grille du taux neutre) s'applique.
+ */
+export function typeTauxPasEffectif(tauxProfil: number | null, choix?: TypeTauxPas | null): TypeTauxPas {
+  if (tauxProfil === null) return "non_personnalise";
+  return choix ?? "personnalise";
+}
 
 export function tauxNeutre(grille: ParametresLegaux["tauxNeutrePas"], netImposable: number): number {
   for (const tranche of grille) {
@@ -157,7 +173,6 @@ export function calculerBulletin({
   // ── Santé ──
   const maladieTaux = brut <= legal.maladie.seuilReduitSmic * smicMensuel ? legal.maladie.reduit : legal.maladie.normal;
   const maladie = cot("sante", "Sécurité sociale — maladie, maternité, invalidité, décès", baseCot, null, maladieTaux);
-  const at = cot("sante", "Accidents du travail — maladies professionnelles", baseCot, null, entreprise.tauxAccidentTravail);
   const prevoyanceTaux = salarie.cadre ? { salarial: entreprise.prevoyance.salarial, patronal: Math.max(entreprise.prevoyance.patronal, legal.prevoyanceCadreMinT1) } : entreprise.prevoyance;
   let prevoyancePatronale = 0;
   if (prevoyanceTaux.salarial || prevoyanceTaux.patronal) {
@@ -178,6 +193,10 @@ export function calculerBulletin({
       montantPatronal: sante.patronal,
     });
   }
+
+  // ── Accidents du travail & maladies professionnelles ──
+  // Rubrique à part entière du bulletin clarifié, entre Santé et Retraite.
+  const at = cot("at", "Accidents du travail & maladies professionnelles", baseCot, null, entreprise.tauxAccidentTravail);
 
   // ── Retraite ──
   const vp = cot("retraite", "Sécurité sociale plafonnée", t1, legal.vieillessePlafonnee.salarial, legal.vieillessePlafonnee.patronal);
@@ -281,7 +300,8 @@ export function calculerBulletin({
   // Montant net social : brut moins l'ensemble des cotisations et
   // contributions sociales salariales, réduction HS comprise.
   const netSocial = netAvantImpot;
-  const tauxPas = salarie.tauxPas ?? tauxNeutre(legal.tauxNeutrePas, netImposable);
+  const typeTauxPas = typeTauxPasEffectif(salarie.tauxPas, variables.typeTauxPas);
+  const tauxPas = typeTauxPas === "personnalise" ? (salarie.tauxPas ?? 0) : tauxNeutre(legal.tauxNeutrePas, netImposable);
   const montantPas = pct(Math.max(netImposable, 0), tauxPas);
 
   const f = entreprise.frais;
@@ -301,7 +321,7 @@ export function calculerBulletin({
   }
   fraisNonSoumis = r2(fraisNonSoumis);
 
-  add("net", "Impôt sur le revenu prélevé à la source", { base: netImposable, tauxSalarial: tauxPas, montantSalarial: montantPas });
+  add("net", "Impôt sur le revenu prélevé à la source", { base: netImposable, tauxSalarial: tauxPas, montantSalarial: montantPas, mention: LIBELLE_TYPE_TAUX_PAS[typeTauxPas] });
 
   const netAvantRetenues = r2(netAvantImpot - montantPas + fraisNonSoumis);
   const coutEmployeur = r2(brut + totalPat + fraisNonSoumis);
@@ -352,6 +372,7 @@ export function calculerBulletin({
     netSocial,
     netImposable,
     tauxPas,
+    typeTauxPas,
     montantPas,
     fraisNonSoumis,
     netAvantRetenues,

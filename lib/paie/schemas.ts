@@ -75,4 +75,8 @@ export const variablesSchema = z.object({
     .max(10)
     .optional(),
   tauxRepas: z.coerce.number().min(0).max(100).nullable().optional(),
+  // Date et mode de paiement (défaut : dernier jour du mois, virement).
+  datePaiement: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  modePaiement: z.enum(["virement", "cheque", "especes"]).nullable().optional(),
+  typeTauxPas: z.enum(["personnalise", "non_personnalise"]).nullable().optional(),
 });
