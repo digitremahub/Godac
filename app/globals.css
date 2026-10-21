@@ -11,6 +11,21 @@
   --c-orange-ink: 194 65 12;
   --c-gold-ink: 146 102 10;
   --c-relais-ink: 109 40 217;
+  /* Fills of the brand accents (bg-teal, bg-orange). They never flip
+     between light and dark, but the Orange GODAC theme swaps them. */
+  --c-teal: 27 228 193;
+  --c-teal-hover: 58 234 203;
+  --c-orange: 255 107 53;
+  --c-orange-hover: 242 90 34;
+  /* « OK » status pills (badge-teal): teal by default, kept green in the
+     Orange GODAC theme so success never reads as the accent. */
+  --c-success: 27 228 193;
+  --c-success-ink: var(--c-teal-ink);
+  /* Selection, focus halo and the page's soft background tints. */
+  --c-halo: 15 118 110;
+  --c-tint-1: 15 118 110;
+  --c-tint-2: 146 102 10;
+  --c-tint-3: 194 65 12;
   --color-paper: rgb(var(--c-paper));
   color-scheme: light;
 }
@@ -18,7 +33,7 @@
 /* Dark theme: explicit choice (Mon compte → Affichage), or the
    system setting when the user left it on « Système ». */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     --c-ink: 230 235 245;
     --c-paper: 7 11 20;
     --c-surface: 16 23 38;
@@ -37,6 +52,52 @@
   --c-orange-ink: 255 140 96;
   --c-gold-ink: 245 200 66;
   --c-relais-ink: 196 181 253;
+  color-scheme: dark;
+}
+
+/* Orange GODAC (Mon compte → Affichage) : thème clair à dominante
+   orange. L'accent (teal partout ailleurs) devient l'orange GODAC, le
+   fond un papier légèrement chaud, le texte reste marine. Les erreurs et
+   alertes « orange » passent en rouge framboise pour ne pas se confondre
+   avec l'accent ; les pastilles « OK » restent vertes. Ratios de
+   contraste vérifiés dans lib/display/__tests__/theme-orange.test.ts. */
+:root[data-theme="orange"] {
+  --c-ink: 10 15 30;
+  --c-paper: 251 246 241;
+  --c-surface: 255 255 255;
+  --c-teal: 255 107 53;
+  --c-teal-hover: 255 133 89;
+  --c-teal-ink: 194 65 12;
+  --c-orange: 225 29 72;
+  --c-orange-hover: 190 18 60;
+  --c-orange-ink: 190 18 60;
+  --c-success: 22 163 74;
+  --c-success-ink: 22 101 52;
+  --c-halo: 194 65 12;
+  --c-tint-1: 255 107 53;
+  --c-tint-2: 245 200 66;
+  --c-tint-3: 194 65 12;
+  color-scheme: light;
+}
+/* Orange sombre : même logique sur le fond sombre, papier un peu chaud. */
+:root[data-theme="orange-dark"] {
+  --c-ink: 236 232 228;
+  --c-paper: 16 11 9;
+  --c-surface: 30 22 18;
+  --c-teal: 255 107 53;
+  --c-teal-hover: 255 133 89;
+  --c-teal-ink: 255 140 96;
+  --c-orange: 225 29 72;
+  --c-orange-hover: 190 18 60;
+  --c-orange-ink: 251 113 133;
+  --c-gold-ink: 245 200 66;
+  --c-relais-ink: 196 181 253;
+  --c-success: 22 163 74;
+  --c-success-ink: 74 222 128;
+  --c-halo: 255 107 53;
+  --c-tint-1: 255 107 53;
+  --c-tint-2: 245 200 66;
+  --c-tint-3: 194 65 12;
   color-scheme: dark;
 }
 
@@ -146,9 +207,9 @@
     @apply text-navy font-body antialiased;
     background-color: var(--color-paper);
     background-image:
-      radial-gradient(ellipse 80% 50% at 15% -10%, rgba(15, 118, 110, 0.07), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(146, 102, 10, 0.06), transparent),
-      radial-gradient(ellipse 70% 60% at 50% 110%, rgba(194, 65, 12, 0.05), transparent);
+      radial-gradient(ellipse 80% 50% at 15% -10%, rgb(var(--c-tint-1) / 0.07), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(var(--c-tint-2) / 0.06), transparent),
+      radial-gradient(ellipse 70% 60% at 50% 110%, rgb(var(--c-tint-3) / 0.05), transparent);
     background-attachment: fixed;
   }
   h1,
@@ -169,7 +230,7 @@
     @apply text-base font-bold leading-snug sm:text-[17px];
   }
   ::selection {
-    background-color: rgba(15, 118, 110, 0.18);
+    background-color: rgb(var(--c-halo) / 0.18);
   }
   ::-webkit-scrollbar {
     width: 10px;
@@ -205,7 +266,7 @@
     @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold leading-5 transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 sm:py-2.5;
   }
   .btn-primary {
-    @apply btn bg-teal text-marine shadow-[inset_0_-1px_0_rgba(10,15,30,0.12),0_1px_2px_rgba(10,15,30,0.08)] hover:bg-[#3AEACB];
+    @apply btn bg-teal text-marine shadow-[inset_0_-1px_0_rgba(10,15,30,0.12),0_1px_2px_rgba(10,15,30,0.08)] hover:bg-[rgb(var(--c-teal-hover))];
   }
   .btn-secondary {
     @apply btn border border-navy/[0.12] bg-surface text-navy shadow-[0_1px_2px_rgba(10,15,30,0.05)] hover:border-navy/20 hover:bg-paper;
@@ -217,12 +278,12 @@
     @apply btn text-navy/70 hover:bg-navy/[0.05] hover:text-navy;
   }
   .btn-danger {
-    @apply btn bg-orange text-white shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[#F25A22];
+    @apply btn bg-orange text-white shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[rgb(var(--c-orange-hover))];
   }
 
   /* Form fields — white, 44px tall, teal focus halo. */
   .input {
-    @apply w-full rounded-xl border border-navy/[0.14] bg-surface px-3.5 py-2.5 text-[15px] leading-6 text-navy shadow-[0_1px_2px_rgba(10,15,30,0.04)] placeholder-navy/50 outline-none transition-[border-color,box-shadow] duration-150 hover:border-navy/25 focus:border-teal-ink/60 focus:shadow-[0_0_0_4px_rgba(15,118,110,0.12)] disabled:cursor-not-allowed disabled:bg-paper disabled:text-navy/60 sm:py-2 sm:text-sm;
+    @apply w-full rounded-xl border border-navy/[0.14] bg-surface px-3.5 py-2.5 text-[15px] leading-6 text-navy shadow-[0_1px_2px_rgba(10,15,30,0.04)] placeholder-navy/50 outline-none transition-[border-color,box-shadow] duration-150 hover:border-navy/25 focus:border-teal-ink/60 focus:shadow-[0_0_0_4px_rgb(var(--c-halo)/0.12)] disabled:cursor-not-allowed disabled:bg-paper disabled:text-navy/60 sm:py-2 sm:text-sm;
   }
   .label {
     @apply mb-1.5 block text-[13px] font-semibold text-navy/80;
@@ -233,7 +294,7 @@
     @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold before:h-1.5 before:w-1.5 before:shrink-0 before:rounded-full before:bg-current before:opacity-80 before:content-[''];
   }
   .badge-teal {
-    @apply badge bg-teal/[0.12] text-teal-ink;
+    @apply badge bg-[rgb(var(--c-success)/0.12)] text-[rgb(var(--c-success-ink))];
   }
   .badge-orange {
     @apply badge bg-orange/[0.12] text-orange-ink;
@@ -280,21 +341,23 @@
   }
 }
 
-/* Logo wordmark: ink letters on light theme, white letters on dark theme. */
+/* Logo wordmark: ink letters on light themes, white letters on dark ones. */
 .brand-white {
   display: none;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .brand-ink {
+  :root:not([data-theme]) .brand-ink {
     display: none;
   }
-  :root:not([data-theme="light"]) .brand-white {
+  :root:not([data-theme]) .brand-white {
     display: inline;
   }
 }
-:root[data-theme="dark"] .brand-ink {
+:root[data-theme="dark"] .brand-ink,
+:root[data-theme="orange-dark"] .brand-ink {
   display: none;
 }
-:root[data-theme="dark"] .brand-white {
+:root[data-theme="dark"] .brand-white,
+:root[data-theme="orange-dark"] .brand-white {
   display: inline;
 }
