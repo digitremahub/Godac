@@ -65,6 +65,99 @@ export interface ParametresLegaux {
   };
   /** Grille du taux neutre du prélèvement à la source (métropole), mensuelle. */
   tauxNeutrePas: { jusqua: number | null; taux: number }[];
+  /** Nom court de la version, affiché dans les réglages (ex. « SMIC du 1er juin 2026 »). */
+  libelle?: string;
+  /**
+   * CSG / CRDS sur les indemnités journalières de Sécurité sociale
+   * (revenus de remplacement), reprises sur le bulletin en subrogation.
+   */
+  ijss?: { csgDeductible: number; csgNonDeductible: number; crds: number };
+  /**
+   * Sortie du salarié : plafond annuel de la Sécurité sociale (PASS) et
+   * contribution patronale spécifique sur la part exonérée de
+   * l'indemnité de rupture conventionnelle.
+   */
+  rupture?: { pass: number; contributionPatronale: number };
+}
+
+/**
+ * Maintien de salaire en cas d'arrêt (art. L1226-1 et D1226-1 s. du code
+ * du travail) : valeurs légales par défaut, remplaçables dans les
+ * réglages par les valeurs de la convention collective ou d'un accord.
+ */
+export interface ParametresMaintien {
+  /** Ancienneté minimale (mois) à la date de l'arrêt. */
+  ancienneteMinMois: number;
+  /** Délai de carence employeur (jours calendaires) — maladie, accident de trajet. */
+  carenceMaladie: number;
+  /** Délai de carence employeur pour un AT / maladie professionnelle. */
+  carenceAt: number;
+  /** Taux de la 1re période et de la 2e période (en % de la rémunération). */
+  taux1: number;
+  taux2: number;
+  /** Durée de chaque période (jours) pour l'ancienneté minimale. */
+  dureeBase: number;
+  /** Jours ajoutés à chaque période par tranche d'ancienneté… */
+  dureeIncrement: number;
+  /** …de tant d'années au-delà de la première. */
+  trancheAnnees: number;
+  /** Durée maximale de chaque période (jours). */
+  dureeMax: number;
+}
+
+/** Nature d'un arrêt ou d'une absence saisie sur le bulletin. */
+export type TypeArret = "maladie" | "at_mp" | "trajet" | "maternite" | "paternite" | "sans_solde";
+
+/** Arrêt de travail (ou congé sans solde) — dates incluses. */
+export interface ArretTravail {
+  /** Ligne de work_stoppages (absent tant qu'il n'est pas enregistré). */
+  id?: string;
+  type: TypeArret;
+  du: string;
+  au: string;
+  /**
+   * Prolongation : date de début de l'arrêt initial. Les délais de
+   * carence ne sont pas réappliqués et les durées de maintien courent
+   * depuis cette date.
+   */
+  prolongationDu?: string | null;
+  /** IJSS brutes journalières (relevé CPAM), si connues. */
+  ijssBrutesJour?: number | null;
+  /** IJSS nettes journalières, si connues (sinon brutes − CSG/CRDS). */
+  ijssNettesJour?: number | null;
+  /** Nombre de jours d'IJSS dans le mois, si connu (sinon calculé). */
+  joursIjss?: number | null;
+  /** Maintien saisi à la main (remplace le calcul). */
+  maintienManuel?: number | null;
+}
+
+export type MotifSortie = "licenciement" | "licenciement_faute_grave" | "rupture_conventionnelle" | "demission" | "fin_cdd" | "retraite" | "autre";
+
+/**
+ * Éléments du bulletin de sortie, calculés côté serveur
+ * (lib/paie/sortie.ts) à partir de employee_exits : jamais repris du
+ * navigateur.
+ */
+export interface ElementsSortie {
+  date: string;
+  motif: MotifSortie;
+  /** Indemnité compensatrice de congés payés (jours acquis non pris). */
+  iccp: { jours: number; montant: number; methode: "maintien" | "dixieme" } | null;
+  /** Indemnité compensatrice de préavis (préavis non effectué, payé). */
+  preavis: { jours: number | null; montant: number } | null;
+  /** Indemnité de licenciement ou de rupture conventionnelle. */
+  rupture: {
+    libelle: string;
+    montant: number;
+    /** Part exonérée de cotisations sociales. */
+    exonereeSocial: number;
+    /** Part exonérée d'impôt sur le revenu. */
+    exonereeFiscal: number;
+    /** Base de la CSG / CRDS (part au-delà de l'indemnité légale). */
+    baseCsg: number;
+    /** Contribution patronale spécifique (rupture conventionnelle), en %. */
+    contributionPatronale: number;
+  } | null;
 }
 
 /** Paramètres propres à l'entreprise (saisis une fois). */
@@ -91,6 +184,14 @@ export interface ParametresEntreprise {
    * seulement si `active`.
    */
   dfs?: { taux: number; active: boolean } | null;
+  /**
+   * Maintien de salaire conventionnel ou d'entreprise (réglages). Absent
+   * = maintien légal seul ; renseigné, le plus favorable des deux
+   * s'applique jour par jour.
+   */
+  maintien?: ParametresMaintien | null;
+  /** Subrogation : l'employeur perçoit les IJSS et les reverse sur le bulletin. */
+  subrogation?: boolean;
 }
 
 export interface ProfilSalarie {
@@ -106,6 +207,8 @@ export interface ProfilSalarie {
   groupe?: string | null;
   /** Taux du panier repas propre au salarié ; null = réglage de l'entreprise. */
   tauxRepas?: number | null;
+  /** Date d'entrée (employee_files.hire_date), pour l'ancienneté du maintien de salaire. */
+  dateEntree?: string | null;
 }
 
 /** Une période de congés payés pris dans le mois (dates incluses). */
@@ -181,6 +284,18 @@ export interface VariablesMois {
    * taux est saisi au profil, sinon non personnalisé (grille).
    */
   typeTauxPas?: TypeTauxPas | null;
+  /** Arrêts de travail et congés sans solde du mois (work_stoppages). */
+  arrets?: ArretTravail[];
+  /** Subrogation ce mois ; absent = réglage de l'entreprise. */
+  subrogation?: boolean | null;
+  /**
+   * Cumul brut des bulletins validés de la période de référence des
+   * congés (1er juin – 31 mai précédents), pour la règle du dixième.
+   * Relu côté serveur ; absent = maintien de salaire seul.
+   */
+  cpReference?: { brut: number; joursAcquis: number; du: string; au: string } | null;
+  /** Bulletin de sortie (calculé côté serveur). */
+  sortie?: ElementsSortie | null;
 }
 
 export type ModePaiement = "virement" | "cheque" | "especes";
@@ -245,5 +360,11 @@ export interface Bulletin {
   dfs?: { taux: number; montant: number; appliquee: boolean } | null;
   /** Total des cotisations patronales avant réduction générale et déduction HS. */
   totalPatronalHorsReduction?: number;
+  /** IJSS brutes réintégrées (subrogation), comprises dans le brut mais pas dans l'assiette. */
+  ijssBrutes?: number;
+  /** IJSS nettes reversées au salarié (subrogation). */
+  ijssNettes?: number;
+  /** Indemnité de congés payés retenue ce mois (maintien ou dixième). */
+  indemniteCp?: { jours: number; maintien: number; dixieme: number | null; retenue: "maintien" | "dixieme" } | null;
   avertissements: string[];
 }

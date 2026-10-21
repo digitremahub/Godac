@@ -13,8 +13,36 @@ import { variablesSchema } from "@/lib/paie/schemas";
 import { paiementDuBulletin } from "@/lib/paie/paiement";
 import { fusionnerRetenues } from "@/lib/paie/acomptes";
 import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ArretTravail } from "@/lib/paie/types";
 
 export const maxDuration = 60;
+
+async function synchroniserArrets(supabase: SupabaseClient, organizationId: string, auteur: string, userId: string, debut: string, fin: string, arrets: ArretTravail[]) {
+  const { data: existants, error } = await supabase.from("work_stoppages").select("id").eq("user_id", userId).lte("start_date", fin).gte("end_date", debut);
+  if (error) return;
+  const garder = new Set(arrets.map((a) => a.id).filter(Boolean));
+  const retires = (existants ?? []).map((e) => String(e.id)).filter((id) => !garder.has(id));
+  if (retires.length) await supabase.from("work_stoppages").delete().eq("user_id", userId).in("id", retires);
+  if (!arrets.length) return;
+  const lignes = arrets.map((a) => ({
+    id: a.id ?? randomUUID(),
+    organization_id: organizationId,
+    user_id: userId,
+    stoppage_type: a.type,
+    start_date: a.du,
+    end_date: a.au,
+    extension_of: a.prolongationDu ?? null,
+    daily_ijss_gross: a.ijssBrutesJour ?? null,
+    daily_ijss_net: a.ijssNettesJour ?? null,
+    ijss_days: a.joursIjss ?? null,
+    manual_maintenance: a.maintienManuel ?? null,
+    created_by: auteur,
+    updated_at: new Date().toISOString(),
+  }));
+  const { error: e } = await supabase.from("work_stoppages").upsert(lignes);
+  if (e) console.error("paie: enregistrement des arrêts impossible", e.message);
+}
 
 const bodySchema = z.object({ user_id: z.string().uuid(), mois: z.string(), variables: variablesSchema });
 
@@ -52,10 +80,13 @@ export async function POST(req: Request) {
     ...parsed.data.variables,
     retenues: fusionnerRetenues(parsed.data.variables.retenues, ctx.acomptes.retenues),
     cumulHeuresSupExonereesAnnee: ctx.cumuls.heuresSupExonerees,
+    // Cumuls de référence des congés et éléments de sortie : relus en base.
+    cpReference: ctx.prefill.cpReference ?? null,
+    sortie: ctx.prefill.sortie ?? null,
     // Date et mode de paiement toujours enregistrés (défaut : fin de mois, virement).
     ...paiementDuBulletin(mois, parsed.data.variables),
   };
-  const bulletin = calculerBulletin({ legal: ctx.legal, entreprise: ctx.entreprise, salarie: ctx.salarie, variables });
+  const bulletin = calculerBulletin({ legal: ctx.legal, entreprise: ctx.entreprise, salarie: ctx.salarie, variables, periode: { debut: ctx.debut, fin: ctx.fin } });
 
   let pdf: Buffer;
   try {
@@ -102,6 +133,11 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     payslipId = data.id;
   }
+
+  // Arrêts du mois enregistrés dans work_stoppages (compteurs de congés,
+  // mois suivants) ; ceux retirés du bulletin sont supprimés. Table
+  // absente (migration 20261026000002) : ignoré.
+  await synchroniserArrets(supabase, appUser.organization_id, appUser.id, userId, ctx.debut, ctx.fin, variables.arrets ?? []);
 
   // Le bulletin référence les demandes d'acompte qu'il déduit.
   await rattacherAcomptes(supabase, payslipId, ctx.acomptes.ids);
