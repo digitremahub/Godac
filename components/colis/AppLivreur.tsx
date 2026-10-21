@@ -22,6 +22,7 @@ import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
+import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 
@@ -85,6 +86,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
   // Pendant la tournée en cours : dernière position envoyée à l'exploitation
   // (au plus une fois par minute, écran ouvert), jamais en dehors.
   const runEnCours = run?.status === "in_progress" ? run.id : null;
+  // Trajet réellement emprunté (historique), même règle : tournée en cours, partage non mis en pause.
+  const traceActive = useTraceGps(runEnCours, partage);
   useEffect(() => {
     if (!runEnCours || !partage || !navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
@@ -472,7 +475,9 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
             )}
             {run.status === "in_progress" && (
               <button type="button" onClick={basculerPartage} className="mt-1 text-left text-[11px] text-white/60 underline-offset-2 hover:underline">
-                {partage ? "📍 Position partagée avec l'exploitation pendant la tournée — masquer (pause)" : "📍 Position masquée — la partager à nouveau"}
+                {partage
+                  ? `📍 Position partagée avec l'exploitation pendant la tournée${traceActive ? " · trajet enregistré (historique, 1 an)" : ""} — masquer (pause)`
+                  : "📍 Position masquée, trajet non enregistré — la partager à nouveau"}
               </button>
             )}
             {run.status !== "loading" && stops.length > 0 && (
@@ -517,6 +522,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
           onReoptimiser={reoptimiser}
           onItineraire={setItineraire}
           onPosition={setMaPosition}
+          traceActive={traceActive}
         />
       )}
 

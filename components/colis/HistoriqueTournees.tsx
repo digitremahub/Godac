@@ -155,7 +155,7 @@ function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awai
           {direction && <SupprimerTourneeDirection runId={run.id} nom={run.name ?? "Tournée"} cloturee={run.status === "done"} retour={fermer} />}
         </div>
       </div>
-      {arrets.length > 0 && <HistoriqueCarte stops={arrets.map((s) => ({ id: s.id, address: s.address, status: s.status, lat: s.lat, lng: s.lng, done_at: s.done_at }))} depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null} />}
+      {arrets.length > 0 && <HistoriqueCarte runId={run.id} stops={arrets.map((s) => ({ id: s.id, address: s.address, status: s.status, lat: s.lat, lng: s.lng, done_at: s.done_at }))} depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null} />}
       {arrets.length === 0 ? (
         <p className="text-sm text-navy/60">Aucun arrêt dans cette tournée.</p>
       ) : (
