@@ -174,15 +174,15 @@ function styles(t: Theme) {
 
     // Synthèse et net payé.
     synthese: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
-    recap: { width: "60%", borderWidth: 0.75, borderColor: TRAIT, borderRadius: 2, paddingVertical: 4, paddingHorizontal: 8 },
+    recap: { width: "68%", borderWidth: 0.75, borderColor: TRAIT, borderRadius: 2, paddingVertical: 4, paddingHorizontal: 8 },
     recapLigne: { flexDirection: "row", justifyContent: "space-between", marginBottom: 0.5 },
     recapSep: { borderTopWidth: 0.5, borderTopColor: TRAIT, marginVertical: 1.8 },
     recapTexte: { fontSize: 7.2, lineHeight: 1.2 },
     recapDoux: { color: TEXTE_DOUX, fontSize: 6.5, lineHeight: 1.2 },
-    netCadre: { width: "38.5%", backgroundColor: t.voile, borderWidth: 1.5, borderColor: t.encre, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 10, alignItems: "center", justifyContent: "center" },
-    netEtiquette: { fontSize: 8, color: t.encre, letterSpacing: 1.6 },
-    netValeur: { fontSize: 20, color: MARINE, marginTop: 2, marginBottom: 1 },
-    netPaiement: { fontSize: 7.2, color: MARINE, marginTop: 3, textAlign: "center" },
+    netCadre: { width: "30%", alignSelf: "flex-start", backgroundColor: t.voile, borderWidth: 1, borderColor: t.encre, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 6, alignItems: "center" },
+    netEtiquette: { fontSize: 7, color: t.encre, letterSpacing: 1.2 },
+    netValeur: { fontSize: 15, color: MARINE, marginTop: 1 },
+    netPaiement: { fontSize: 6.6, color: MARINE, marginTop: 2, textAlign: "center" },
     netDoux: { fontSize: 6.3, color: TEXTE_DOUX, textAlign: "center" },
 
     // Pied : cumuls, congés, mentions.
