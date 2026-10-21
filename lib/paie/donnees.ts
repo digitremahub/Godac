@@ -247,6 +247,11 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       // et taux du panier. Les heures sup. et les congés sont propres au mois.
       primes: ((precedent?.variables as VariablesMois | null)?.primes ?? []).filter((p) => p.montant),
       tauxRepas: (precedent?.variables as VariablesMois | null)?.tauxRepas ?? null,
+      // Paiement : dernier jour du mois, par virement ; mode et type de
+      // taux PAS repris du dernier bulletin validé.
+      datePaiement: fin,
+      modePaiement: (precedent?.variables as VariablesMois | null)?.modePaiement ?? "virement",
+      typeTauxPas: (precedent?.variables as VariablesMois | null)?.typeTauxPas ?? null,
       heuresSup25: null,
       heuresSup50: null,
       // Congés validés du mois, avec leurs dates, en jours ouvrables.

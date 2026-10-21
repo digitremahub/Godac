@@ -67,6 +67,11 @@ describe("bulletin de référence — septembre (4 jours de CP, saisie)", () => 
     expect(Math.abs(b.reductionGenerale - 699.4)).toBeLessThan(1);
     expect(Math.abs(b.totalPatronal - 265.55)).toBeLessThan(1);
   });
+  it("AT/MP : rubrique à part entière (5,40 % du brut)", () => {
+    const at = b.lignes.filter((l) => l.section === "at");
+    expect(at).toHaveLength(1);
+    proche(at[0]?.montantPatronal ?? 0, 100.82);
+  });
   it("DFS affichée pour mémoire, non appliquée", () => {
     expect(b.dfs).toMatchObject({ taux: 17, appliquee: false });
     proche(b.dfs?.montant ?? 0, 317.4);
