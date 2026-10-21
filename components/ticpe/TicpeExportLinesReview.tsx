@@ -27,7 +27,8 @@ const STATUS_LABEL: Record<TicpeExportLine["status"], string> = {
   corrected: "Corrigé",
 };
 
-export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) {
+/** `lectureSeule` : exploitation (TICPE en lecture et export, sans correction). */
+export function TicpeExportLinesReview({ lines, lectureSeule = false }: { lines: TicpeExportLine[]; lectureSeule?: boolean }) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [litersValue, setLitersValue] = useState("");
@@ -133,7 +134,7 @@ export function TicpeExportLinesReview({ lines }: { lines: TicpeExportLine[] }) 
                         Annuler
                       </button>
                     </div>
-                  ) : (
+                  ) : lectureSeule ? null : (
                     <div className="flex gap-2">
                       <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => confirm(l.id)}>
                         <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Correct

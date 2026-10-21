@@ -8,7 +8,7 @@ import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 
-const roles = ["direction", "manager"];
+const roles = ["direction", "manager", "exploitation"];
 const schema = z.object({
   service_id: z.string().uuid(),
   driver_id: z.string().uuid(),

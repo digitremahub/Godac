@@ -7,6 +7,7 @@ import { classifyLocation, LOCATION_LABEL_DISPLAY } from "@/lib/time-clock/class
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import type { Coordinates } from "@/lib/business/fuel-profitability";
 import { IconMapPin } from "@/components/layout/icons";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 function formatDuration(startIso: string, endIso: string | null) {
   const start = new Date(startIso).getTime();
@@ -54,7 +55,7 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
   // Décision client Q3 : vue d'équipe (Équipe › Pointage) pour la direction
   // (tous) et les managers (membres de leur service, filtrés par la RLS
   // « time_clock: manager reads service »). Mon espace › Mon pointage : soi.
-  const isDirection = appUser.role === "direction";
+  const isDirection = voitToutLOrganisation(appUser.role);
   const vueEquipe = equipe;
 
   const [{ data: openEntry }, { depotsFor }] = await Promise.all([

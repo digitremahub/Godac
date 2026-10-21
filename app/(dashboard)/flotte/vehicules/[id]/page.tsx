@@ -150,7 +150,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   ];
 
   // Module « Véhicules loués » : contrat, forfait km au prorata, demandes au loueur.
-  const canManageRental = rentalEnabled && hasRole(appUser.role, ["manager", "direction"]);
+  const canManageRental = rentalEnabled && hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const today = parisCalendarDate(new Date().toISOString());
   const [rentalProviders, rentalRequests, linkedRequests] = canManageRental
     ? await Promise.all([
@@ -179,7 +179,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     .filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !requestedInterventionIds.has(i.id))
     .map((i) => ({ id: i.id as string, type: i.type as string, created_at: i.created_at as string }));
 
-  const canManageDocuments = hasRole(appUser.role, ["manager", "direction"]);
+  const canManageDocuments = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const vehicleDocuments = canManageDocuments ? await listVehicleDocuments(supabase, id) : [];
 
   return (
@@ -188,7 +188,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         title={v.registration}
         description={`${v.type} · ${v.services?.name ?? "Sans service"}`}
         actions={
-          ["manager", "direction"].includes(appUser.role) ? (
+          ["manager", "exploitation", "direction"].includes(appUser.role) ? (
             <VehicleEditPanel
               vehicleId={v.id}
               registration={v.registration}
@@ -230,7 +230,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <InterventionsPanel
             vehicleId={id}
             interventions={interventionsWithPhotos}
-            canManage={hasRole(appUser.role, ["manager", "direction"])}
+            canManage={hasRole(appUser.role, ["manager", "exploitation", "direction"])}
           />
 
           <div>

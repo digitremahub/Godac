@@ -218,6 +218,37 @@ export const GUIDES: GuideRole[] = [
     sections: [...ENCADREMENT, AIDE],
   },
   {
+    role: "exploitation",
+    titre: "Guide de l'exploitation",
+    intro:
+      "Vous faites le lien entre la direction et les managers : vous voyez tout ce que voit un manager, sur toute l'entreprise et pas seulement un service, et vous gérez les comptes des chauffeurs et des managers. La paie, l'abonnement, les réglages de l'entreprise et le journal d'audit restent à la direction.",
+    sections: [
+      {
+        titre: "Toute l'entreprise",
+        etapes: [
+          { titre: "Planning et tournées de tous les services", texte: "Affectez, suivez en direct et consultez l'historique et les tracés GPS des tournées de tous les services, villages et Tournée colis compris.", lien: { href: "/exploitation/planning", label: "Planning" }, module: "planning" },
+          { titre: "Carburant, cuves et écarts", texte: "Traitez les écarts de carburant et suivez les cuves de toute l'entreprise. L'export TICPE est consultable et téléchargeable.", lien: { href: "/carburant/pleins", label: "Carburant" } },
+          { titre: "Flotte, entretien, loueurs et amendes", texte: "Tous les véhicules, les demandes d'entretien, les loueurs, les amendes et les contestations ; vous validez comme responsable, comme un manager ou la direction.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
+          { titre: "Congés", texte: "Vous validez les congés de toute l'entreprise.", lien: { href: "/equipe/conges", label: "Congés" }, module: "leave_management" },
+          { titre: "Reporting", texte: "Indicateurs d'exploitation consolidés : carburant, consommation, activité (sans la paie).", lien: { href: "/dashboard/reporting", label: "Reporting BI" }, module: "bi_reporting" },
+        ],
+      },
+      {
+        titre: "Comptes chauffeur et manager",
+        etapes: [
+          {
+            titre: "Créer, désactiver, rattacher",
+            texte:
+              "Utilisateurs : créez des chauffeurs (e-mail ou badge) et des managers, désactivez un compte, choisissez ses services, cochez « Conduit aussi » et réinitialisez un code PIN. Les comptes direction, comptable et exploitation ne se gèrent que par la direction.",
+            lien: { href: "/equipe/utilisateurs", label: "Utilisateurs" },
+          },
+        ],
+      },
+      ...ENCADREMENT,
+      AIDE,
+    ],
+  },
+  {
     role: "comptable",
     titre: "Guide du comptable",
     intro: "Vous retrouvez dans GODAC les données utiles à la comptabilité : carburant, cuves, flotte, fiches de paie et export TICPE.",
@@ -253,7 +284,7 @@ export const GUIDES: GuideRole[] = [
           {
             titre: "Inviter les utilisateurs et choisir leur rôle",
             texte:
-              "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, comptable, direction) ; cochez « Conduit aussi » pour un manager qui roule, ou passez un chauffeur manager depuis sa fiche. Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
+              "Utilisateurs : invitez par e-mail ou créez des chauffeurs à badge, attribuez le rôle (chauffeur, manager, exploitation, comptable, direction) ; cochez « Conduit aussi » pour un manager ou une personne de l'exploitation qui roule, ou passez un chauffeur manager depuis sa fiche. Au départ d'un salarié, désactivez son compte : l'accès est coupé immédiatement.",
             lien: { href: "/equipe/utilisateurs", label: "Utilisateurs" },
           },
           { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/abonnement", label: "Abonnement" } },
@@ -279,7 +310,7 @@ export const GUIDES: GuideRole[] = [
   },
 ];
 
-/** Manager qui conduit aussi (users.can_drive) : écrans du chauffeur et du manager. */
+/** Manager (ou exploitation) qui conduit aussi (users.can_drive) : écrans du chauffeur et de l'encadrement. */
 export const GUIDE_MANAGER_CONDUCTEUR: GuideRole = {
   role: "manager",
   titre: "Guide du manager qui conduit",
@@ -287,8 +318,15 @@ export const GUIDE_MANAGER_CONDUCTEUR: GuideRole = {
   sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...ENCADREMENT, AIDE],
 };
 
+/** Exploitation qui conduit aussi : son guide, précédé des écrans du chauffeur. */
+function guideExploitationConducteur(): GuideRole {
+  const base = GUIDES.find((g) => g.role === "exploitation")!;
+  return { ...base, titre: "Guide de l'exploitation qui conduit", sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...base.sections] };
+}
+
 export function guideDe(role: string | null | undefined, conduit = false): GuideRole {
   if (role === "manager" && conduit) return GUIDE_MANAGER_CONDUCTEUR;
+  if (role === "exploitation" && conduit) return guideExploitationConducteur();
   return GUIDES.find((g) => g.role === role) ?? GUIDES[0]!;
 }
 

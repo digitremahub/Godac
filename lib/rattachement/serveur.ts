@@ -315,7 +315,7 @@ export async function notifier(
     message: a.message,
     related_table: a.relatedTable,
     related_id: a.relatedId,
-    ...(a.recipientUserId ? { recipient_user_id: a.recipientUserId } : { recipient_roles: a.recipientRoles ?? ["manager", "direction"] }),
+    ...(a.recipientUserId ? { recipient_user_id: a.recipientUserId } : { recipient_roles: a.recipientRoles ?? ["manager", "exploitation", "direction"] }),
     ...(a.serviceId ? { service_id: a.serviceId } : {}),
   });
   return error?.message ?? null;

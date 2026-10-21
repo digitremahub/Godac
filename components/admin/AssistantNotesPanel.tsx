@@ -13,7 +13,7 @@ interface Note {
   roles: UserRole[];
 }
 
-const ROLES: UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
+const ROLES: UserRole[] = ["chauffeur", "manager", "exploitation", "comptable", "direction"];
 
 /**
  * Lot B: consignes propres à l'entreprise (que faire en cas

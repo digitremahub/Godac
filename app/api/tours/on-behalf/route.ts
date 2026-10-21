@@ -11,7 +11,7 @@ const bodySchema = z.object({
   pin: z.string().min(4).max(12),
 });
 
-const HELPER_ROLES = new Set(["chauffeur", "manager", "direction"]);
+const HELPER_ROLES = new Set(["chauffeur", "manager", "exploitation", "direction"]);
 
 /**
  * « J'entre pour un collègue », step 1: the colleague's badge was scanned

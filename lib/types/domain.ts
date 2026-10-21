@@ -9,10 +9,16 @@
  * Rôles attribuables. L'ancien rôle manager_chauffeur est retiré (décision
  * client du 20/10/2026, contrainte users_role_sans_manager_chauffeur) :
  * un manager qui conduit a users.can_drive = true (lib/roles/conducteurs.ts).
+ *
+ * « exploitation » (migration 20261027000001) : lien entre la direction et
+ * les managers. Tout ce que voit un manager, sur toute l'organisation, plus
+ * la gestion des comptes chauffeur et manager ; ni paie, ni facturation, ni
+ * réglages, ni audit (lib/roles/perimetre.ts).
  */
 export type UserRole =
   | "chauffeur"
   | "manager"
+  | "exploitation"
   | "comptable"
   | "direction";
 

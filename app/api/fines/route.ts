@@ -30,7 +30,7 @@ const bodySchema = z.object({
  * suggestion jusqu'à la validation du responsable (PATCH …/[id]).
  */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
 

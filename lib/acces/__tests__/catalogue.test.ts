@@ -214,7 +214,7 @@ describe("manager qui conduit (décision client du 20/10/2026)", () => {
   const tout = new Set<string>(MODULES_AVEC_CODE);
 
   it("plus aucun rôle manager_chauffeur dans le catalogue", () => {
-    expect(TOUS_LES_ROLES).toEqual(["chauffeur", "manager", "comptable", "direction"]);
+    expect(TOUS_LES_ROLES).toEqual(["chauffeur", "manager", "exploitation", "comptable", "direction"]);
     for (const e of ECRANS) expect(e.roles as readonly string[], e.id).not.toContain("manager_chauffeur");
   });
 

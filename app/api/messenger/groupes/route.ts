@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { membresAutorisesGroupe, peutCreerGroupe } from "@/lib/messenger/groupes";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Nom ou membres invalides." }, { status: 400 });
   const { name, service_id, member_ids } = parsed.data;
-  const isDirection = appUser.role === "direction";
+  const isDirection = voitToutLOrganisation(appUser.role);
   if (!service_id && !isDirection) {
     return NextResponse.json({ error: "Choisissez l'équipe (service) du groupe." }, { status: 400 });
   }

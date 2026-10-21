@@ -2,6 +2,7 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { DriverSignupsList } from "@/components/admin/DriverSignupsList";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 /**
  * Self-signups (app/join/[token]) waiting on a chef de service/
@@ -17,7 +18,7 @@ export default async function DriverSignupsPage() {
   const appUser = g.appUser;
 
   const supabase = await createServerSupabaseClient();
-  const isDirection = appUser.role === "direction";
+  const isDirection = voitToutLOrganisation(appUser.role);
 
   const [{ data: pending }, { data: myServiceRows }] = await Promise.all([
     supabase

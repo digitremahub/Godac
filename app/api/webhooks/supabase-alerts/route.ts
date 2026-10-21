@@ -5,6 +5,7 @@ import { renderAlertEmail } from "@/lib/email/templates/alert-notification";
 import { sendPushToSubscriptions } from "@/lib/push/send";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 import type { UserRole } from "@/lib/types/domain";
+import { rolesDestinatairesEffectifs } from "@/lib/roles/perimetre";
 
 /**
  * Receiver for a Supabase Database Webhook configured on
@@ -59,7 +60,8 @@ export async function POST(req: Request) {
           .select("id, role, email, contact_email, auth_method")
           .eq("organization_id", alert.organization_id)
           .eq("active", true)
-          .in("role", alert.recipient_roles.length > 0 ? alert.recipient_roles : ["direction"]),
+          // L'exploitation reçoit tout ce qui est destiné aux managers (lib/roles/perimetre.ts).
+          .in("role", alert.recipient_roles.length > 0 ? rolesDestinatairesEffectifs(alert.recipient_roles) : ["direction", "exploitation"]),
   ]);
 
   // Lien calculé PAR RÔLE destinataire (lib/alerts/resolve-url.ts) : une

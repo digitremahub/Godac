@@ -4,7 +4,7 @@ import { z } from "zod";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
-const ROLES = ["chauffeur", "manager", "comptable", "direction"] as const;
+const ROLES = ["chauffeur", "manager", "exploitation", "comptable", "direction"] as const;
 
 const patchSchema = z.object({
   question: z.string().trim().min(3).max(300).optional(),

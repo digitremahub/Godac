@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui";
 import { LeavePlanningCalendar } from "@/components/leaves/LeavePlanningCalendar";
 import { firstOfMonth, addMonths, addDays, currentMonth } from "@/lib/planning/dates";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 /**
  * Direction's own "qui couvre qui" view — separate from the work
@@ -42,7 +43,7 @@ export default async function LeavePlanningPage({
   // (la RLS de leave_requests filtre déjà les absences).
   const mesServices = new Set((rattachements ?? []).filter((r) => r.user_id === appUser.id).map((r) => r.service_id));
   const duService = new Set((rattachements ?? []).filter((r) => mesServices.has(r.service_id)).map((r) => r.user_id));
-  const drivers = appUser.role === "direction" ? tousChauffeurs : (tousChauffeurs ?? []).filter((d) => duService.has(d.id));
+  const drivers = voitToutLOrganisation(appUser.role) ? tousChauffeurs : (tousChauffeurs ?? []).filter((d) => duService.has(d.id));
 
   return (
     <div>

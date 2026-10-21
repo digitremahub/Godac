@@ -12,7 +12,7 @@ import { notifier } from "@/lib/rattachement/serveur";
  * Formulaire multipart : `texte`, `photos` (3 au plus).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const g = await garderApi({ roles: ["direction", "manager", "chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation", "chauffeur"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
   const { id } = await params;
@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       message: messageExplicationChauffeur(appUser.full_name, "amende", form.fichiers.length, form.texte),
       relatedTable: "fines",
       relatedId: id,
-      recipientRoles: ["manager", "direction"],
+      recipientRoles: ["manager", "exploitation", "direction"],
       serviceId,
     });
   } else if (fine.driver_id) {

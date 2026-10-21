@@ -2,20 +2,21 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createRecoveryCode, hashRecoveryCode } from "@/lib/auth/driver-recovery";
+import { peutGererCompte } from "@/lib/roles/perimetre";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Seule la direction peut générer un code de secours." }, { status: 403 });
+  if (appUser.role !== "direction" && appUser.role !== "exploitation") {
+    return NextResponse.json({ error: "Seules la direction et l'exploitation peuvent générer un code de secours." }, { status: 403 });
   }
 
   const { id } = await params;
   const admin = createAdminSupabaseClient();
   const { data: driver, error: lookupError } = await admin
     .from("users")
-    .select("id, organization_id, auth_method, active, pending_approval")
+    .select("id, organization_id, auth_method, active, pending_approval, role")
     .eq("id", id)
     .maybeSingle();
 
@@ -24,6 +25,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
   if (driver.organization_id !== appUser.organization_id) {
     return NextResponse.json({ error: "Ce chauffeur n'appartient pas à votre organisation." }, { status: 403 });
+  }
+  if (!peutGererCompte(appUser.role, driver.role)) {
+    return NextResponse.json({ error: "L'exploitation ne gère que les comptes chauffeur et manager." }, { status: 403 });
   }
   if (driver.auth_method !== "pin") {
     return NextResponse.json({ error: "Ce compte n'utilise pas l'authentification par badge/PIN." }, { status: 400 });

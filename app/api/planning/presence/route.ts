@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour planifier." }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json());

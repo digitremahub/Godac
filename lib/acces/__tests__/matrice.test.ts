@@ -21,3 +21,40 @@ describe("matrice rôles × écrans", () => {
     await expect(matrice()).toMatchFileSnapshot("./__snapshots__/matrice-roles-ecrans.md");
   });
 });
+
+describe("rôle exploitation : entre le manager et la direction", () => {
+  const tout = new Set<string>(MODULES_AVEC_CODE);
+  const ouverts = (role: Parameters<typeof deciderAcces>[1], conduit = false) => new Set(ECRANS.filter((e) => deciderAcces(e, role, tout, conduit).ok).map((e) => e.id));
+
+  it("ouvre tout ce qu'ouvre un manager (qui conduit ou non)", () => {
+    for (const conduit of [false, true]) {
+      const exploitation = ouverts("exploitation", conduit);
+      for (const id of ouverts("manager", conduit)) expect(exploitation.has(id), id).toBe(true);
+    }
+  });
+
+  it("ajoute le reporting et la TICPE (lecture et export)", () => {
+    const manager = ouverts("manager");
+    const exploitation = ouverts("exploitation");
+    const enPlus = [...exploitation].filter((id) => !manager.has(id)).sort();
+    expect(enPlus).toEqual(["carburant.ticpe", "carburant.ticpe_detail", "dashboard.reporting"]);
+  });
+
+  it("n'ouvre ni paie, ni facturation, ni réglages, ni audit, ni registre", () => {
+    const exploitation = ouverts("exploitation");
+    const reserves = ECRANS.filter((e) => e.id.startsWith("equipe.paie") || e.id.startsWith("admin.") || ["equipe.heures", "equipe.registre"].includes(e.id));
+    for (const e of reserves) {
+      if (e.id === "admin.faq") continue; // contrôle réel : administrateur plateforme GODAC
+      expect(exploitation.has(e.id), e.id).toBe(false);
+    }
+    // Ses propres bulletins et acomptes restent accessibles, comme pour un manager.
+    expect(exploitation.has("moi.fiches_paie")).toBe(true);
+    expect(exploitation.has("moi.acomptes")).toBe(true);
+  });
+
+  it("tout ce qu'ouvre l'exploitation, la direction l'ouvre aussi (hors écrans de conduite et « Mon espace » salarié)", () => {
+    const direction = ouverts("direction");
+    const horsDirection = [...ouverts("exploitation", true)].filter((id) => !direction.has(id) && !id.startsWith("moi."));
+    expect(horsDirection).toEqual([]);
+  });
+});

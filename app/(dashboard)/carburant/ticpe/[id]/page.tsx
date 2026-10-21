@@ -55,7 +55,7 @@ export default async function TicpeExportDetailPage({ params }: { params: Promis
         <EmptyState title="Aucune ligne" description="Aucun véhicule éligible sur cette période." />
       ) : (
         <Card className="overflow-x-auto">
-          <TicpeExportLinesReview lines={lines as any} />
+          <TicpeExportLinesReview lines={lines as any} lectureSeule={appUser.role === "exploitation"} />
         </Card>
       )}
     </div>

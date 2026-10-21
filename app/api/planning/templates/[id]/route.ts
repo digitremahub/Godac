@@ -2,8 +2,9 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
-const writeRoles = ["direction", "manager"] as const;
+const writeRoles = ["direction", "manager", "exploitation"] as const;
 
 const patchSchema = z.object({ active: z.boolean() });
 
@@ -33,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!modele) return NextResponse.json({ error: "Modèle introuvable." }, { status: 404 });
 
-  if (appUser.role !== "direction") {
+  if (!voitToutLOrganisation(appUser.role)) {
     const { data: lien } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id).eq("service_id", modele.service_id).maybeSingle();
     if (!lien) return NextResponse.json({ error: "Ce service ne fait pas partie de vos services autorisés." }, { status: 403 });
   }

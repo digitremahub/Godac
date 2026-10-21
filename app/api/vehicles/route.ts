@@ -24,7 +24,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager"], modules: ["fleet"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["fleet"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   const parsed = bodySchema.safeParse(await req.json());

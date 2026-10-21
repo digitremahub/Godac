@@ -48,7 +48,7 @@ const bodySchema = z.union([
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "manager"], modules: ["planning"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["planning"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   if (appUser.role !== "direction") {

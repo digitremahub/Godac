@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 /** Same as .../download, but for the PDF file (regenerated whenever a line is reviewed — see app/api/ticpe/export-lines/[id]/route.ts). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  const g = await garderApi({ roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"] });
   if (!g.ok) return g.reponse;
   const supabase = await createServerSupabaseClient();
 

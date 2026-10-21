@@ -12,7 +12,7 @@ const schema = z.object({
   template_ids: z.array(z.string().uuid()).optional(),
 });
 
-const allowedRoles = ["direction", "manager"];
+const allowedRoles = ["direction", "manager", "exploitation"];
 
 /**
  * Génère les affectations planifiées depuis les modèles actifs.

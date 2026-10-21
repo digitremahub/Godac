@@ -15,7 +15,7 @@ const patchSchema = z.object({
 async function guard() {
   const g = await garderApi({ modulesAuMoinsUn: ["planning", "route_optimizer"] });
   if (!g.ok) return null;
-  return hasRole(g.appUser.role, ["manager", "direction"]) ? g.appUser : null;
+  return hasRole(g.appUser.role, ["manager", "exploitation", "direction"]) ? g.appUser : null;
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

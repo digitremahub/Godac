@@ -34,7 +34,7 @@ describe("garderApi", () => {
     if (!r.ok) {
       const json = await r.reponse.json();
       expect(r.reponse.status).toBe(403);
-      expect(json).toMatchObject({ code: "ROLE_REFUSE", rolesAutorises: ["direction", "comptable"] });
+      expect(json).toMatchObject({ code: "ROLE_REFUSE", rolesAutorises: ["direction", "exploitation", "comptable"] });
       expect(typeof json.error).toBe("string");
     }
     expect(modules).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe("règle effective", () => {
     expect(refusPour(r, "direction", new Set(["fines", "ocr"]))).toBeNull();
   });
   it("sans écran ni rôles : tout membre", () => {
-    expect(regleEffective({}).roles).toHaveLength(4);
+    expect(regleEffective({}).roles).toHaveLength(5);
   });
 });
 

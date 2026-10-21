@@ -30,10 +30,10 @@ export interface TourneeSuivie {
  * facultatif par service (?service=). RLS : encadrement de l'entreprise.
  */
 export async function GET(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager"], modules: ["route_optimizer"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["route_optimizer"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) return NextResponse.json({ error: "Réservé à l'encadrement." }, { status: 403 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const service = new URL(req.url).searchParams.get("service");

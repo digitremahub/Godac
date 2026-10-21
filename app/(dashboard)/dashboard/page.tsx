@@ -25,6 +25,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     case "chauffeur":
       return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} presenceMonth={searchParams.presence} />;
     case "manager":
+    case "exploitation":
+      // Exploitation : le tableau de bord du manager, sur toute l'organisation.
       return <ManagerDashboard appUser={appUser} enabledModules={enabledModules} />;
     case "comptable":
       return <ComptableDashboard appUser={appUser} enabledModules={enabledModules} />;

@@ -6,12 +6,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 const bodySchema = z.object({
   title: z.string().min(1),
   content: z.string().min(1),
-  roles: z.array(z.enum(["chauffeur", "manager", "comptable", "direction"])).default([]),
+  roles: z.array(z.enum(["chauffeur", "manager", "exploitation", "comptable", "direction"])).default([]),
 });
 
 /** Direction-only consignes d'entreprise feeding the assistant (Admin > Organisation) — RLS backs the role check. */
 export async function POST(req: Request) {
-  const g = await garderApi({ roles: ["direction", "manager"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   if (appUser.role !== "direction") {

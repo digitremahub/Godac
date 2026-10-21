@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 /** Re-signs a download URL for a previously generated TICPE export (the original link expires after 5 minutes). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "comptable"], modules: ["ticpe_export"] });
+  const g = await garderApi({ roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"] });
   if (!g.ok) return g.reponse;
   const supabase = await createServerSupabaseClient();
 

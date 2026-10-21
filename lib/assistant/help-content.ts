@@ -18,37 +18,37 @@ interface HelpGuide {
   file: string;
 }
 
-const ALL_ROLES: UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
+const ALL_ROLES: UserRole[] = ["chauffeur", "manager", "exploitation", "comptable", "direction"];
 
 const GUIDES: HelpGuide[] = [
-  { slug: "tournee", title: "Démarrer et terminer une tournée", roles: ["chauffeur", "manager"], file: "tournee.md" },
+  { slug: "tournee", title: "Démarrer et terminer une tournée", roles: ["chauffeur", "manager", "exploitation"], file: "tournee.md" },
   {
     slug: "carburant",
     title: "Saisir un ravitaillement et scanner un QR",
-    roles: ["chauffeur", "manager", "direction"],
+    roles: ["chauffeur", "manager", "exploitation", "direction"],
     file: "carburant.md",
   },
   {
     slug: "signalement",
     title: "Signaler un problème sur un véhicule",
-    roles: ["chauffeur", "manager", "direction"],
+    roles: ["chauffeur", "manager", "exploitation", "direction"],
     file: "signalement.md",
   },
   { slug: "conges", title: "Poser un congé", roles: ALL_ROLES, file: "conges.md" },
   {
     slug: "historique",
     title: "Voir mes tournées passées et les rapports",
-    roles: ["chauffeur", "manager", "direction"],
+    roles: ["chauffeur", "manager", "exploitation", "direction"],
     file: "historique.md",
   },
   {
     slug: "alertes",
     title: "Lire et traiter une alerte",
-    roles: ["manager", "direction", "comptable"],
+    roles: ["manager", "exploitation", "direction", "comptable"],
     file: "alertes.md",
   },
-  { slug: "ticpe", title: "Exporter la TICPE", roles: ["comptable", "direction"], file: "ticpe.md" },
-  { slug: "utilisateurs", title: "Inviter un utilisateur", roles: ["direction"], file: "utilisateurs.md" },
+  { slug: "ticpe", title: "Exporter la TICPE", roles: ["comptable", "exploitation", "direction"], file: "ticpe.md" },
+  { slug: "utilisateurs", title: "Inviter un utilisateur", roles: ["exploitation", "direction"], file: "utilisateurs.md" },
 ];
 
 export interface HelpSource {

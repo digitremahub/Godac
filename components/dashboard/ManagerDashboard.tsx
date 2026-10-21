@@ -7,6 +7,7 @@ import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import { AssistedClock } from "@/components/time-clock/AssistedClock";
 import { getVehicleConsumption } from "@/lib/vehicles/consumption";
 import type { AppUser } from "@/lib/auth/session";
+import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 
 /**
  * A manager runs one or more services day-to-day: who's on the road
@@ -14,6 +15,9 @@ import type { AppUser } from "@/lib/auth/session";
  * requests, new drivers), and which vehicles are drinking too much
  * fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
  * they also get the same start/end-tour action a plain chauffeur has.
+ *
+ * Also the dashboard of the « exploitation » role: same tiles, over the
+ * whole organisation instead of the manager's services.
  */
 export async function ManagerDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
   const supabase = await createServerSupabaseClient();
@@ -24,6 +28,8 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
   const { data: myServices } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
   const myServiceIds = (myServices ?? []).map((s) => s.service_id);
   const serviceFilter = myServiceIds.length > 0 ? myServiceIds : ["00000000-0000-0000-0000-000000000000"];
+  // Exploitation : toute l'organisation, aucun filtre par service.
+  const toutLOrganisation = voitToutLOrganisation(appUser.role);
 
   const [
     openTourRes,
@@ -43,16 +49,23 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
           .eq("status", "in_progress")
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    supabase
-      .from("planning_entries")
-      .select("id, tour_number, start_at, vehicles(registration), users!planning_entries_driver_id_fkey(full_name)")
-      .eq("status", "in_progress")
-      .in("service_id", serviceFilter)
-      .order("start_at", { ascending: true }),
-    supabase.from("vehicles").select("id, registration").eq("status", "active").in("service_id", serviceFilter),
+    (() => {
+      const q = supabase
+        .from("planning_entries")
+        .select("id, tour_number, start_at, vehicles(registration), users!planning_entries_driver_id_fkey(full_name)")
+        .eq("status", "in_progress");
+      return (toutLOrganisation ? q : q.in("service_id", serviceFilter)).order("start_at", { ascending: true });
+    })(),
+    (() => {
+      const q = supabase.from("vehicles").select("id, registration").eq("status", "active");
+      return toutLOrganisation ? q : q.in("service_id", serviceFilter);
+    })(),
     supabase.from("fuel_entries").select("id", { count: "exact", head: true }).in("status", ["pending_ocr", "awaiting_validation"]),
     leaveEnabled
-      ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending").in("service_id", serviceFilter)
+      ? (() => {
+          const q = supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending");
+          return toutLOrganisation ? q : q.in("service_id", serviceFilter);
+        })()
       : Promise.resolve({ count: null }),
     supabase.from("users").select("id, user_services(service_id)").eq("organization_id", appUser.organization_id).eq("pending_approval", true),
     maintenanceEnabled
@@ -78,7 +91,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
 
   const pendingSignups = ((pendingSignupsRes.data ?? []) as any[]).filter((u) => {
     const services = (u.user_services ?? []).map((s: any) => s.service_id);
-    return services.length === 0 || services.some((id: string) => myServiceIds.includes(id));
+    return toutLOrganisation || services.length === 0 || services.some((id: string) => myServiceIds.includes(id));
   });
 
   const consumptionRanking = (
@@ -112,7 +125,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
 
   return (
     <div>
-      <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Vue d'ensemble de votre équipe." />
+      <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description={toutLOrganisation ? "Vue d'ensemble de toute l'entreprise." : "Vue d'ensemble de votre équipe."} />
       {autoClockEnabled && <AssistedClock hasOpenTour={Boolean(openTour)} />}
 
       {isManagerChauffeur && (

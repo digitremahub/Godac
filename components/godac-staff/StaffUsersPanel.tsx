@@ -14,7 +14,7 @@ interface StaffUserRow {
   active: boolean;
 }
 
-const ROLES: UserRole[] = ["chauffeur", "manager", "comptable", "direction"];
+const ROLES: UserRole[] = ["chauffeur", "manager", "exploitation", "comptable", "direction"];
 
 /**
  * Same role-select + active-toggle shape as components/admin/UsersPanel,

@@ -94,6 +94,11 @@ describe("statutEcart", () => {
 describe("droitsEcart", () => {
   const base = { userId: "moi", driverId: "chauffeur-1", statut: "ouvert" as const };
 
+  it("exploitation : traite comme un manager, jamais son propre plein", () => {
+    expect(droitsEcart({ ...base, role: "exploitation" }).traiter).toBe(true);
+    expect(droitsEcart({ ...base, role: "exploitation", driverId: "moi" }).traiter).toBe(false);
+  });
+
   it("direction et manager traitent, pas le chauffeur ni le comptable", () => {
     expect(droitsEcart({ ...base, role: "direction" }).traiter).toBe(true);
     expect(droitsEcart({ ...base, role: "manager" }).traiter).toBe(true);

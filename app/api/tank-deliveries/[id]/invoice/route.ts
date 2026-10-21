@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const g = await garderApi({ roles: "tous" });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (!hasRole(appUser.role, ["manager", "direction"])) {
+  if (!hasRole(appUser.role, ["manager", "exploitation", "direction"])) {
     return NextResponse.json({ error: "Rôle non autorisé pour joindre une facture" }, { status: 403 });
   }
 

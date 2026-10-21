@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
 
 /**
- * Direction-only removal of a duplicated planned entry. The duplicate
+ * Direction (or exploitation, whole organisation) removal of a duplicated planned entry. The duplicate
  * is re-checked here against the driver's entries around that day —
  * the button alone is never trusted, and a tour that ran is never
  * deletable (plannedDuplicates only flags `planned` rows).
@@ -13,8 +13,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const g = await garderApi({ modules: ["planning"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  if (appUser.role !== "direction") {
-    return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
+  if (appUser.role !== "direction" && appUser.role !== "exploitation") {
+    return NextResponse.json({ error: "Réservé à la direction et à l'exploitation." }, { status: 403 });
   }
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
