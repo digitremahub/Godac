@@ -9,7 +9,25 @@ import { libellePalier } from "@/lib/organization/paliers";
 
 export const metadata = {
   title: "Modules & tarifs — GODAC",
+  description:
+    "Tarifs GODAC : contrôle du carburant inclus dans tous les plans, puis Tournée colis avec GO Navigation, planning duplicable, paie transport et autres modules à la carte.",
 };
+
+/** Nouveautés mises en avant (texte seul : les prix restent ceux du catalogue ci-dessous). */
+const NOUVEAUTES = [
+  {
+    titre: "Tournée colis + GO Navigation",
+    texte: "Scan et lecture d'étiquette, optimisation sur les km routiers avec les horaires des pros, navigation intégrée en vue conduite, ramasses, points relais et preuves de livraison.",
+  },
+  {
+    titre: "Planning duplicable",
+    texte: "Grille chauffeurs × jours, glisser-déposer, duplication d'une journée ou de la semaine jusqu'à 8 semaines, copier-coller et modèles de tournées.",
+  },
+  {
+    titre: "Paie transport",
+    texte: "Modèle IDCC 16 (paniers, primes, heures sup., prélèvement à la source, net social), validation par la direction, acomptes déduits automatiquement.",
+  },
+];
 
 /**
  * Public presentation page (no auth required): the public plans and
@@ -48,8 +66,8 @@ export default async function ModulesPage() {
           <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Contrôlez le carburant, ajoutez le reste quand vous voulez</h1>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg font-light text-white/75">
             Chaque plan est dimensionné pour votre nombre de véhicules et inclut le contrôle du carburant (pleins, tickets lus
-            automatiquement, cuves, anomalies). Flotte, planning, tournées, paie&nbsp;: les autres modules s&apos;activent à la carte,
-            dans le même outil.
+            automatiquement, cuves, écarts traités). Tournée colis avec GO Navigation, planning, flotte, paie transport&nbsp;: les
+            autres modules s&apos;activent à la carte, dans le même outil.
           </p>
         </div>
       </div>
@@ -60,6 +78,26 @@ export default async function ModulesPage() {
         <div className="mb-16">
           <PricingSimulator plans={plans} modules={modules} prices={prices} />
         </div>
+
+        <section className="mb-16" aria-labelledby="nouveautes">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <h2 id="nouveautes" className="text-2xl sm:text-3xl">Nouveautés</h2>
+            <Link href="/contact?essai=go-navigation" className="btn-secondary w-fit">
+              Demander un essai GO Navigation
+            </Link>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {NOUVEAUTES.map((n) => (
+              <li key={n.titre} className="card flex flex-col gap-2 border-teal/30">
+                <h3 className="text-lg">{n.titre}</h3>
+                <p className="text-sm text-navy/70">{n.texte}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-navy/60">
+            GO Navigation fait partie du module Tournée colis. L&apos;essai de 30 jours se fait sur invitation, après un premier échange.
+          </p>
+        </section>
 
         <h2 className="mb-6 text-2xl sm:text-3xl">Catalogue complet</h2>
         <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
