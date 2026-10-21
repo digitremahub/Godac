@@ -27,6 +27,7 @@ import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/r
 import { AdresseInput } from "@/components/colis/AdresseInput";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import { ImportTournee } from "@/components/colis/ImportTournee";
+import { ImportBordereau } from "@/components/colis/ImportBordereau";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
 import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
@@ -1039,6 +1040,17 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
               void chercherHoraires();
             }}
           />
+          {run.status === "loading" && (
+            <ImportBordereau
+              runId={run.id}
+              runDate={run.run_date}
+              onImporte={async (texte, ok) => {
+                setToast({ ok, text: texte });
+                await recharger(run.id);
+                void chercherHoraires();
+              }}
+            />
+          )}
         </Card>
       )}
 
