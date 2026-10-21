@@ -1,5 +1,7 @@
 import type { Bulletin, LigneBulletin, ParametresEntreprise, ParametresLegaux, ProfilSalarie, Retenue, Section, TypeRetenue, TypeTauxPas, VariablesMois } from "@/lib/paie/types";
 import { partSaisissableMensuelle } from "@/lib/paie/parametres";
+import { calculerArret, joursCalendaires, type CalculArret } from "@/lib/paie/arrets";
+import { LIBELLE_MOTIF } from "@/lib/paie/sortie";
 
 /** Libellé sur le bulletin de chaque type de retenue après le net. */
 export const LIBELLE_RETENUE: Record<TypeRetenue, string> = {
@@ -17,10 +19,11 @@ export const LIBELLE_RETENUE: Record<TypeRetenue, string> = {
  * préparation et la tester ligne à ligne (lib/paie/__tests__).
  *
  * Périmètre volontairement explicite (voir aussi `avertissements`) :
- * mois complet (pas de proratisation d'entrée/sortie), décompte mensuel
- * des heures (pas de décompte trimestriel conventionnel), maintien de
- * salaire pendant les congés payés, pas d'indemnités journalières. Ce
- * qui sort de ce périmètre se saisit en prime/retenue manuelle.
+ * mois complet à l'entrée (pas de proratisation d'embauche), décompte
+ * mensuel des heures (pas de décompte trimestriel conventionnel). Arrêts
+ * de travail (lib/paie/arrets.ts), indemnité de congés payés (maintien ou
+ * dixième) et éléments de sortie (lib/paie/sortie.ts) : voir ces modules.
+ * Ce qui sort de ce périmètre se saisit en prime/retenue manuelle.
  */
 
 /** Durée légale mensualisée : 35 h × 52 / 12. */
@@ -60,16 +63,36 @@ export function tauxNeutre(grille: ParametresLegaux["tauxNeutrePas"], netImposab
   return grille[grille.length - 1]?.taux ?? 0;
 }
 
+/**
+ * Salaire mensuel du contrat (base 35 h + heures d'équivalence majorées),
+ * hors heures supplémentaires : référence des absences, du maintien de
+ * salaire et des indemnités de sortie.
+ */
+export function salaireMensuelContrat(salarie: Pick<ProfilSalarie, "tauxHoraire" | "heuresContractuelles" | "regime">): number {
+  const h = salarie.heuresContractuelles;
+  const equivalence = Math.max(0, Math.min(h, HEURES_EQUIVALENCE[salarie.regime]) - HEURES_LEGALES);
+  return r2(r2(Math.min(h, HEURES_LEGALES) * salarie.tauxHoraire) + r2(r2(equivalence) * salarie.tauxHoraire * 1.25));
+}
+
+/** Bornes d'un mois "AAAA-MM" (fin incluse). */
+function bornes(mois: string): { debut: string; fin: string } {
+  const [y, m] = mois.split("-").map(Number) as [number, number];
+  return { debut: `${mois}-01`, fin: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10) };
+}
+
 export function calculerBulletin({
   legal,
   entreprise,
   salarie,
   variables,
+  periode: periodeDonnee,
 }: {
   legal: ParametresLegaux;
   entreprise: ParametresEntreprise;
   salarie: ProfilSalarie;
   variables: VariablesMois;
+  /** Bornes du mois du bulletin ; nécessaires aux arrêts et à la sortie (sinon déduites des dates saisies). */
+  periode?: { debut: string; fin: string };
 }): Bulletin {
   const lignes: LigneBulletin[] = [];
   const avertissements: string[] = [];
@@ -114,6 +137,8 @@ export function calculerBulletin({
   // au 1/26 du salaire de base, compensée par l'indemnité de congés payés.
   const periodes = (variables.periodesConges ?? []).filter((p) => p.jours > 0);
   const joursCp = periodes.length ? r2(periodes.reduce((t, p) => t + p.jours, 0)) : variables.joursCongesPris;
+  let complementCp = 0;
+  let indemniteCp: Bulletin["indemniteCp"] = null;
   if (joursCp > 0) {
     const parJour = r2(montantBase / 26);
     const fmt = (d: string) => `${d.slice(8, 10)}${d.slice(5, 7)}${d.slice(2, 4)}`;
@@ -121,7 +146,103 @@ export function calculerBulletin({
       ? periodes.map((p) => ({ jours: p.jours, texte: `Congés payés pris ${fmt(p.du)}-${fmt(p.au)} (${p.jours} jour${p.jours > 1 ? "s" : ""})` }))
       : [{ jours: joursCp, texte: `Congés payés pris (${joursCp} jour${joursCp > 1 ? "s" : ""})` }];
     for (const l of libelles) add("brut", l.texte, { base: l.jours, tauxSalarial: parJour, montantSalarial: -r2(l.jours * parJour), gain: true });
-    add("brut", "Indemnité congés payés", { base: joursCp, tauxSalarial: parJour, montantSalarial: r2(joursCp * parJour), gain: true });
+    // Indemnité : la plus favorable entre le maintien de salaire et le
+    // dixième de la rémunération brute de la période de référence, au
+    // prorata des jours pris (art. L3141-24).
+    const maintienCp = r2(joursCp * parJour);
+    const ref = variables.cpReference;
+    const dixieme = ref && ref.brut > 0 && ref.joursAcquis > 0 ? r2((ref.brut * 0.1 * joursCp) / ref.joursAcquis) : null;
+    if (dixieme !== null && dixieme > maintienCp) {
+      complementCp = r2(dixieme - maintienCp);
+      indemniteCp = { jours: joursCp, maintien: maintienCp, dixieme, retenue: "dixieme" };
+      add("brut", "Indemnité congés payés (règle du dixième)", {
+        base: joursCp,
+        tauxSalarial: r2(dixieme / joursCp),
+        montantSalarial: dixieme,
+        gain: true,
+        mention: `plus favorable que le maintien (${maintienCp.toFixed(2).replace(".", ",")} €)`,
+      });
+    } else {
+      indemniteCp = { jours: joursCp, maintien: maintienCp, dixieme, retenue: "maintien" };
+      add("brut", "Indemnité congés payés", {
+        base: joursCp,
+        tauxSalarial: parJour,
+        montantSalarial: maintienCp,
+        gain: true,
+        mention: dixieme !== null ? `maintien, plus favorable que le dixième (${dixieme.toFixed(2).replace(".", ",")} €)` : "maintien de salaire (pas de cumuls validés sur la période de référence)",
+      });
+    }
+  }
+
+  // ── Arrêts de travail, congés sans solde, sortie en cours de mois ──
+  // Méthode des jours calendaires réels sur le salaire du contrat (base +
+  // heures d'équivalence), voir lib/paie/arrets.ts.
+  const premiereDate = variables.sortie?.date ?? (variables.arrets ?? [])[0]?.du ?? variables.datePaiement ?? null;
+  const periode = periodeDonnee ?? (premiereDate ? bornes(premiereDate.slice(0, 7)) : null);
+  const salaireReference = r2(montantBase + r2(Math.max(0, Math.min(heuresPayees, equivalence) - HEURES_LEGALES) * t * 1.25));
+  const subrogation = variables.subrogation ?? entreprise.subrogation ?? false;
+  const calculsArrets: CalculArret[] = [];
+  let absenceArrets = 0;
+  let maintienArrets = 0;
+  let ijssBrutes = 0;
+  let ijssMoitie = 0;
+  if (periode) {
+    for (const a of (variables.arrets ?? []).filter((x) => x.du && x.au && x.au >= x.du && x.du <= periode.fin && x.au >= periode.debut)) {
+      const c = calculerArret({ arret: a, debutMois: periode.debut, finMois: periode.fin, salaireMensuel: salaireReference, dateEntree: salarie.dateEntree, maintienConventionnel: entreprise.maintien, legal });
+      if (c.jours <= 0) continue;
+      calculsArrets.push(c);
+      avertissements.push(...c.avertissements);
+    }
+  }
+  for (const c of calculsArrets) {
+    // Pas plus que le salaire de référence du mois, même avec des arrêts qui se chevauchent.
+    const deduction = r2(Math.min(c.deduction, salaireReference - absenceArrets));
+    absenceArrets = r2(absenceArrets + deduction);
+    add("brut", c.libelle, { base: c.jours, tauxSalarial: c.salaireJour, montantSalarial: -deduction, gain: true, mention: "jours calendaires" });
+    if (subrogation && c.ijssBrutes > 0) {
+      ijssBrutes = r2(ijssBrutes + c.ijssBrutes);
+      if (c.ijssMoitieImposable) ijssMoitie = r2(ijssMoitie + c.ijssBrutes);
+      add("brut", "IJSS brutes", { base: c.joursIjss, tauxSalarial: r2(c.ijssBrutes / Math.max(c.joursIjss, 1)), montantSalarial: c.ijssBrutes, gain: true, mention: "subrogation, non soumises à cotisations" });
+    }
+    if (c.maintien > 0 || c.mention) {
+      maintienArrets = r2(maintienArrets + c.maintien);
+      add("brut", "Maintien de salaire", { base: null, tauxSalarial: null, montantSalarial: c.maintien, gain: true, mention: `${c.mention}${subrogation || !c.ijssBrutes ? "" : " — IJSS versées directement par la CPAM"}` });
+    }
+  }
+  if (calculsArrets.some((c) => c.maintien > 0 && !c.mention.startsWith("maintien saisi"))) {
+    avertissements.push("Maintien de salaire : durées appréciées arrêt par arrêt ; vérifiez le cumul des arrêts des 12 derniers mois (art. D1226-4).");
+  }
+
+  // Sortie en cours de mois : jours après la date de sortie retirés, puis
+  // indemnités de fin de contrat.
+  const sortie = variables.sortie ?? null;
+  let absenceSortie = 0;
+  let indemnitesSortieSoumises = 0;
+  let ruptureExoneree = 0;
+  if (sortie && periode && sortie.date >= periode.debut && sortie.date < periode.fin) {
+    const lendemain = new Date(Date.parse(`${sortie.date}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    const jours = joursCalendaires(lendemain, periode.fin);
+    absenceSortie = r2(Math.min(Math.max(0, salaireReference - absenceArrets), (salaireReference * jours) / joursCalendaires(periode.debut, periode.fin)));
+    if (absenceSortie > 0) add("brut", `Sortie le ${sortie.date.slice(8, 10)}/${sortie.date.slice(5, 7)} : jours non travaillés`, { base: jours, tauxSalarial: r2(salaireReference / joursCalendaires(periode.debut, periode.fin)), montantSalarial: -absenceSortie, gain: true, mention: "jours calendaires" });
+  }
+  if (sortie) {
+    if (sortie.iccp && sortie.iccp.montant > 0) {
+      indemnitesSortieSoumises += sortie.iccp.montant;
+      add("brut", `Indemnité compensatrice de congés payés (${sortie.iccp.jours} j)`, { base: sortie.iccp.jours, montantSalarial: r2(sortie.iccp.montant), gain: true, mention: sortie.iccp.methode === "dixieme" ? "règle du dixième" : "maintien de salaire" });
+    }
+    if (sortie.preavis && sortie.preavis.montant > 0) {
+      indemnitesSortieSoumises += sortie.preavis.montant;
+      add("brut", "Indemnité compensatrice de préavis", { base: sortie.preavis.jours, montantSalarial: r2(sortie.preavis.montant), gain: true });
+    }
+    if (sortie.rupture && sortie.rupture.montant > 0) {
+      const soumise = r2(sortie.rupture.montant - sortie.rupture.exonereeSocial);
+      ruptureExoneree = sortie.rupture.exonereeSocial;
+      if (soumise > 0) {
+        indemnitesSortieSoumises += soumise;
+        add("brut", `${sortie.rupture.libelle} (part soumise)`, { montantSalarial: soumise, gain: true, mention: LIBELLE_MOTIF[sortie.motif] });
+      }
+    }
+    indemnitesSortieSoumises = r2(indemnitesSortieSoumises);
   }
 
   let primesSoumises = 0;
@@ -134,7 +255,9 @@ export function calculerBulletin({
   }
 
   const montantHs = r2(montantEquiv + montantSup25 + montantSup50);
-  const brut = r2(montantBase + montantHs - absence + primesSoumises);
+  // Brut soumis à cotisations ; les IJSS reprises en subrogation s'y
+  // ajoutent pour le brut affiché, hors assiette des cotisations.
+  const brut = r2(montantBase + montantHs - absence + primesSoumises + complementCp - absenceArrets + maintienArrets - absenceSortie + indemnitesSortieSoumises);
 
   // ── DFS « Abattement 17 % » ──────────────────────────────────────
   // Affichée pour mémoire ; appliquée aux bases de cotisations (hors
@@ -156,7 +279,11 @@ export function calculerBulletin({
   // Le SMIC de référence est majoré des heures supplémentaires payées, sans
   // leur majoration (art. D241-7 CSS) ; les heures d'équivalence sont déjà
   // couvertes par le facteur ci-dessus.
-  const smicRef = legal.reductionGenerale.smicHoraireReference * Math.max(HEURES_LEGALES * facteurEquivalence + hSup25 + sup50 - variables.heuresAbsenceNonPayee, 0);
+  // Arrêts et sortie en cours de mois : SMIC de référence réduit dans le
+  // rapport rémunération versée / rémunération sans absence (simplifié).
+  const partNonPayee = salaireReference > 0 ? Math.min(1, Math.max(0, (absenceArrets - maintienArrets + absenceSortie) / salaireReference)) : 0;
+  const smicRef =
+    legal.reductionGenerale.smicHoraireReference * Math.max(HEURES_LEGALES * facteurEquivalence + hSup25 + sup50 - variables.heuresAbsenceNonPayee, 0) * (1 - partNonPayee);
   const eligibleRgdu = brut > 0 && brut < legal.reductionGenerale.plafondSmic * smicRef;
 
   let totalSal = 0;
@@ -230,6 +357,9 @@ export function calculerBulletin({
     cot("autres", "Cotisations conventionnelles (CCN)", baseCot, entreprise.conventionnelles.salarial, entreprise.conventionnelles.patronal);
   }
   if (entreprise.effectif >= 11 && entreprise.tauxVersementMobilite > 0) cot("autres", "Versement mobilité", baseCot, null, entreprise.tauxVersementMobilite);
+  if (sortie?.rupture && sortie.rupture.contributionPatronale > 0 && sortie.rupture.exonereeSocial > 0) {
+    cot("autres", "Contribution patronale sur indemnité de rupture conventionnelle", sortie.rupture.exonereeSocial, null, sortie.rupture.contributionPatronale);
+  }
 
   // ── CSG / CRDS ──
   // Assiette : 98,25 % du brut (dans la limite de 4 PMSS) + part patronale
@@ -243,6 +373,24 @@ export function calculerBulletin({
   const csgNonDed = cot("csg", "CSG/CRDS non déductible de l'impôt sur le revenu", assietteCsg, legal.csgNonDeductible + legal.crds, null);
   let csgHs = { ms: 0, mp: 0 };
   if (assietteCsgHs > 0) csgHs = cot("csg", "CSG non déductible sur heures supplémentaires", assietteCsgHs, legal.csgDeductible, null);
+  // IJSS reprises en subrogation : CSG / CRDS des revenus de remplacement.
+  const tIj = legal.ijss ?? { csgDeductible: 3.8, csgNonDeductible: 2.4, crds: 0.5 };
+  let csgIjDed = { ms: 0, mp: 0 };
+  let csgIjNonDed = { ms: 0, mp: 0 };
+  if (ijssBrutes > 0) {
+    csgIjDed = cot("csg", "CSG déductible sur IJSS", ijssBrutes, tIj.csgDeductible, null);
+    csgIjNonDed = cot("csg", "CSG/CRDS non déductible sur IJSS", ijssBrutes, tIj.csgNonDeductible + tIj.crds, null);
+  }
+  // Indemnité de rupture : CSG / CRDS sur la part au-delà de l'indemnité
+  // légale qui n'est pas déjà dans le brut soumis (simplifié, sans abattement).
+  let csgRuptureNonDed = { ms: 0, mp: 0 };
+  if (sortie?.rupture) {
+    const base = r2(Math.max(0, sortie.rupture.baseCsg - (sortie.rupture.montant - sortie.rupture.exonereeSocial)));
+    if (base > 0) {
+      cot("csg", "CSG déductible sur indemnité de rupture", base, legal.csgDeductible, null);
+      csgRuptureNonDed = cot("csg", "CSG/CRDS non déductible sur indemnité de rupture", base, legal.csgNonDeductible + legal.crds, null);
+    }
+  }
 
   // ── Exonérations ───────────────────────────────────────────────
   // Réduction de cotisations salariales sur heures sup, plafonnée aux
@@ -286,7 +434,8 @@ export function calculerBulletin({
   const totalPatronalHorsReduction = r2(totalPat + reductionGenerale + deductionHs);
 
   // ── Nets ───────────────────────────────────────────────────────
-  const netAvantImpot = r2(brut - totalSal);
+  const brutAffiche = r2(brut + ijssBrutes);
+  const netAvantImpot = r2(brutAffiche - totalSal);
   // Heures sup exonérées d'impôt dans la limite du plafond annuel : la
   // réduction salariale neutralise déjà l'essentiel des cotisations
   // déductibles qui les grèvent, on retire donc leur montant brut.
@@ -296,10 +445,17 @@ export function calculerBulletin({
   // exonérées d'impôt.
   // Réintégration fiscale : part employeur de la complémentaire santé.
   const reintegrationSante = sante.patronal;
-  const netImposable = r2(netAvantImpot + csgNonDed.ms + csgHs.ms + reintegrationSante - heuresSupExonerees);
+  // IJSS (subrogation) : imposables après CSG déductible, à 50 % pour un
+  // AT / maladie professionnelle ou un accident de trajet. Indemnité de
+  // rupture : la part soumise à cotisations mais exonérée d'impôt est retirée.
+  const ijssNonImposables = ijssMoitie > 0 ? r2((ijssMoitie * (1 - tIj.csgDeductible / 100)) / 2) : 0;
+  const ruptureNonImposable = sortie?.rupture ? r2(Math.max(0, sortie.rupture.exonereeFiscal - sortie.rupture.exonereeSocial)) : 0;
+  const netImposable = r2(netAvantImpot + csgNonDed.ms + csgHs.ms + csgIjNonDed.ms + csgRuptureNonDed.ms + reintegrationSante - heuresSupExonerees - ijssNonImposables - ruptureNonImposable);
   // Montant net social : brut moins l'ensemble des cotisations et
-  // contributions sociales salariales, réduction HS comprise.
-  const netSocial = netAvantImpot;
+  // contributions sociales salariales, réduction HS comprise ; hors IJSS
+  // (revenus de remplacement).
+  const ijssReversees = r2(ijssBrutes - csgIjDed.ms - csgIjNonDed.ms);
+  const netSocial = r2(netAvantImpot - ijssReversees);
   const typeTauxPas = typeTauxPasEffectif(salarie.tauxPas, variables.typeTauxPas);
   const tauxPas = typeTauxPas === "personnalise" ? (salarie.tauxPas ?? 0) : tauxNeutre(legal.tauxNeutrePas, netImposable);
   const montantPas = pct(Math.max(netImposable, 0), tauxPas);
@@ -312,6 +468,14 @@ export function calculerBulletin({
     ["Indemnité de grand déplacement", variables.nbGrandDeplacement, f.grandDeplacement],
   ];
   let fraisNonSoumis = primesNonSoumises;
+  if (ruptureExoneree > 0 && sortie?.rupture) {
+    fraisNonSoumis += ruptureExoneree;
+    add("net", `${sortie.rupture.libelle} (part exonérée)`, { montantSalarial: r2(ruptureExoneree), gain: true, mention: "non soumise à cotisations" });
+  }
+  if (ijssBrutes > 0) {
+    // Pour information : les IJSS nettes sont comprises dans le net ci-dessus.
+    add("net", "IJSS nettes", { base: ijssReversees, mention: "reversées par l'employeur (subrogation), comprises dans le net" });
+  }
   for (const [libelle, nb, unitaire] of frais) {
     if (nb > 0 && unitaire > 0) {
       const montant = r2(nb * unitaire);
@@ -324,6 +488,7 @@ export function calculerBulletin({
   add("net", "Impôt sur le revenu prélevé à la source", { base: netImposable, tauxSalarial: tauxPas, montantSalarial: montantPas, mention: LIBELLE_TYPE_TAUX_PAS[typeTauxPas] });
 
   const netAvantRetenues = r2(netAvantImpot - montantPas + fraisNonSoumis);
+  // Coût employeur hors IJSS (remboursées par la CPAM en subrogation).
   const coutEmployeur = r2(brut + totalPat + fraisNonSoumis);
 
   // ── Acomptes, saisies, ATD… (après le net) ──────────────────────
@@ -364,7 +529,7 @@ export function calculerBulletin({
   return {
     lignes,
     heures: { base: heuresBase, sup25: r2(hEquiv + hSup25), sup50, absence: variables.heuresAbsenceNonPayee },
-    brut,
+    brut: brutAffiche,
     totalSalarial: totalSal,
     totalPatronal: totalPat,
     reductionGenerale,
@@ -386,6 +551,9 @@ export function calculerBulletin({
     reintegrationSante,
     dfs,
     totalPatronalHorsReduction,
+    ijssBrutes: ijssBrutes || undefined,
+    ijssNettes: ijssBrutes ? ijssReversees : undefined,
+    indemniteCp,
     avertissements,
   };
 }

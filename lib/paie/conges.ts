@@ -12,12 +12,37 @@
 // - jours ouvrables : lundi → samedi, hors jours fériés ;
 // - pris : congés validés (leave_requests « approved »), imputés d'abord
 //   sur N-1 puis sur N ; en attente : demandes « pending » ;
+// - arrêts (loi du 22/04/2024, art. L3141-5 et L3141-5-1) : un mois
+//   d'arrêt maladie non professionnelle (ou accident de trajet) acquiert
+//   2 jours ouvrables, 24 au plus par période ; un AT / maladie
+//   professionnelle, une maternité ou une paternité acquièrent 2,5 jours
+//   (travail effectif) ; un congé sans solde n'acquiert rien. Un mois
+//   partiellement absent acquiert au prorata des jours calendaires ;
 // - point de départ : le solde de reprise saisi dans le profil de paie
 //   (ex. N-1 : 5, N : 5 au 30/09, d'après le dernier bulletin). Sans
 //   reprise, compteurs à zéro au 1er juin de la période en cours.
 
 export const ACQUIS_PAR_MOIS = 2.5;
 export const PLAFOND_ANNUEL = 30;
+/** Arrêt maladie non professionnelle : 2 jours ouvrables par mois, 24 au plus par période. */
+export const ACQUIS_PAR_MOIS_MALADIE = 2;
+export const PLAFOND_MALADIE = 24;
+
+/** Effet d'une absence sur l'acquisition des congés. */
+export type NatureAbsenceConges = "maladie" | "assimilee" | "sans_solde";
+
+export interface AbsenceConges {
+  du: string;
+  au: string;
+  nature: NatureAbsenceConges;
+}
+
+/** Nature, pour les congés, d'un arrêt de work_stoppages. */
+export function natureAbsenceConges(type: string): NatureAbsenceConges {
+  if (type === "maladie" || type === "trajet") return "maladie";
+  if (type === "sans_solde") return "sans_solde";
+  return "assimilee";
+}
 
 const jour = (d: Date) => d.toISOString().slice(0, 10);
 const date = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`);
@@ -90,6 +115,32 @@ function finDeMois(iso: string): string {
   return jour(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12)));
 }
 
+/**
+ * Jours acquis au titre d'un mois civil (fin = dernier jour du mois),
+ * compte tenu des absences : part travaillée à 2,5 j, part en arrêt
+ * maladie à 2 j (dans la limite de ce qui reste des 24 j de la
+ * période), part en congé sans solde à 0.
+ */
+export function acquisDuMois(finMoisIso: string, absences: AbsenceConges[] = [], maladieDejaAcquise = 0): { jours: number; dontMaladie: number } {
+  if (!absences.length) return { jours: ACQUIS_PAR_MOIS, dontMaladie: 0 };
+  const debut = `${finMoisIso.slice(0, 7)}-01`;
+  const total = Number(finMoisIso.slice(8, 10));
+  const joursDe = (nature: NatureAbsenceConges) => {
+    const vus = new Set<string>();
+    for (const a of absences.filter((x) => x.nature === nature)) {
+      const du = a.du < debut ? debut : a.du;
+      const au = a.au > finMoisIso ? finMoisIso : a.au;
+      for (let d = date(du); jour(d) <= au; d = new Date(d.getTime() + 86_400_000)) vus.add(jour(d));
+    }
+    return vus.size;
+  };
+  const sansSolde = Math.min(total, joursDe("sans_solde"));
+  const maladie = Math.min(total - sansSolde, joursDe("maladie"));
+  const travaille = total - sansSolde - maladie;
+  const dontMaladie = Math.min((ACQUIS_PAR_MOIS_MALADIE * maladie) / total, Math.max(0, PLAFOND_MALADIE - maladieDejaAcquise));
+  return { jours: r2((ACQUIS_PAR_MOIS * travaille) / total + dontMaladie), dontMaladie: r2(dontMaladie) };
+}
+
 export interface Reprise {
   /** Date du solde de reprise (AAAA-MM-JJ), ex. fin du mois du dernier bulletin. */
   au: string;
@@ -127,13 +178,14 @@ export interface CongeDate {
  * + 2,5 j par mois civil terminé depuis, bascule au 1er juin, − congés
  * validés après la reprise. Les congés validés à venir sont déjà déduits.
  */
-export function soldeConges(params: { reprise: Reprise | null; aujourdhui: string; valides: CongeDate[]; enAttente?: CongeDate[] }): SoldeConges {
+export function soldeConges(params: { reprise: Reprise | null; aujourdhui: string; valides: CongeDate[]; enAttente?: CongeDate[]; absences?: AbsenceConges[] }): SoldeConges {
   const { reprise, aujourdhui } = params;
   const origine = reprise ? reprise.au.slice(0, 10) : jour(new Date(date(debutPeriode(aujourdhui)).getTime() - 86_400_000));
   let periode = debutPeriode(jour(new Date(date(origine).getTime() + 86_400_000)));
   const n1: Compteur = { acquis: reprise ? Math.max(0, reprise.n1) : 0, pris: 0, solde: 0 };
   const n: Compteur = { acquis: reprise ? Math.max(0, reprise.n) : 0, pris: 0, solde: 0 };
   let acquisPeriode = 0;
+  let acquisMaladie = 0;
 
   const basculer = (nouvelle: string) => {
     // Reliquat N-1 reporté, N devient N-1.
@@ -142,6 +194,7 @@ export function soldeConges(params: { reprise: Reprise | null; aujourdhui: strin
     n.acquis = 0;
     n.pris = 0;
     acquisPeriode = 0;
+    acquisMaladie = 0;
     periode = nouvelle;
   };
 
@@ -150,7 +203,9 @@ export function soldeConges(params: { reprise: Reprise | null; aujourdhui: strin
     if (fin <= origine) continue;
     const p = debutPeriode(fin);
     if (p > periode) basculer(p);
-    const ajout = Math.min(ACQUIS_PAR_MOIS, Math.max(0, PLAFOND_ANNUEL - acquisPeriode));
+    const mois = acquisDuMois(fin, params.absences, acquisMaladie);
+    acquisMaladie += mois.dontMaladie;
+    const ajout = Math.min(mois.jours, Math.max(0, PLAFOND_ANNUEL - acquisPeriode));
     n.acquis = r2(n.acquis + ajout);
     acquisPeriode += ajout;
   }

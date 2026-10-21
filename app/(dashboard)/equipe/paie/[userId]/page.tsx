@@ -7,6 +7,7 @@ import { Card, PageHeader, EmptyState } from "@/components/ui";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { currentMonth } from "@/lib/planning/dates";
 import { PaieEditor } from "@/components/paie/PaieEditor";
+import { SortieSalarie } from "@/components/paie/SortieSalarie";
 import { fusionnerRetenues } from "@/lib/paie/acomptes";
 
 export default async function PaieSalariePage({ params, searchParams }: { params: Promise<{ userId: string }>; searchParams: Promise<{ mois?: string }> }) {
@@ -28,8 +29,16 @@ export default async function PaieSalariePage({ params, searchParams }: { params
   const { joursTravailles, ...prefill } = ctx.prefill;
   // Un bulletin déjà généré ce mois-ci : on reprend ses variables.
   // Les acomptes acceptés sont toujours relus en base (ajoutés, retirés ou reportés).
+  // Cumuls de référence des congés et éléments de sortie : toujours ceux du jour.
   const variables = ctx.bulletinExistant?.variables
-    ? { ...prefill, ...ctx.bulletinExistant.variables, retenues: fusionnerRetenues(ctx.bulletinExistant.variables.retenues, ctx.acomptes.retenues) }
+    ? {
+        ...prefill,
+        ...ctx.bulletinExistant.variables,
+        retenues: fusionnerRetenues(ctx.bulletinExistant.variables.retenues, ctx.acomptes.retenues),
+        arrets: ctx.bulletinExistant.variables.arrets ?? prefill.arrets,
+        cpReference: prefill.cpReference,
+        sortie: prefill.sortie,
+      }
     : prefill;
 
   return (
@@ -80,6 +89,14 @@ export default async function PaieSalariePage({ params, searchParams }: { params
         dejaGenere={Boolean(ctx.bulletinExistant)}
         avertissementsAcomptes={ctx.acomptes.avertissements}
         repriseConges={ctx.repriseConges}
+      />
+      <SortieSalarie
+        key={`sortie-${userId}-${ctx.sortie?.enregistrement.exit_date ?? ""}`}
+        userId={userId}
+        enregistree={ctx.sortie?.enregistrement ?? null}
+        calcul={ctx.sortie ? { elements: ctx.sortie.elements, indemniteLegale: ctx.sortie.indemniteLegale, avertissements: ctx.sortie.avertissements } : null}
+        emploiParDefaut={salarie.role_title ?? null}
+        dateEntree={ctx.dateEntree}
       />
     </div>
   );

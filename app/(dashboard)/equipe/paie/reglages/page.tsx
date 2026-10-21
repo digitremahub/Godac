@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
-import { FRAIS_CONVENTIONNELS, MODELE_TRANSPORT, parametresLegauxAu } from "@/lib/paie/parametres";
+import { FRAIS_CONVENTIONNELS, MAINTIEN_LEGAL, MODELE_TRANSPORT, parametresLegauxAu, versionParametres } from "@/lib/paie/parametres";
 
 export default async function ReglagesPaiePage() {
   const g = await garderPage("equipe.paie_reglages");
@@ -13,7 +13,10 @@ export default async function ReglagesPaiePage() {
   const pays = await paysOrganisation(supabase, appUser.organization_id);
   if (!pays.paie.moteur) return <EmptyState title={`Paie : ${pays.drapeau} ${pays.nom}`} description={paieIndisponible(pays)} />;
   const { data: r } = await supabase.from("payroll_settings").select("*").eq("organization_id", appUser.organization_id).maybeSingle();
-  const legal = parametresLegauxAu(new Date().toISOString().slice(0, 10));
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const legal = parametresLegauxAu(aujourdhui);
+  const version = versionParametres(aujourdhui);
+  const fr = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" });
 
   // Pas encore de réglages : valeurs du modèle transport (IDCC 16) proposées.
   const m = MODELE_TRANSPORT.entreprise;
@@ -36,6 +39,17 @@ export default async function ReglagesPaiePage() {
     single_meal_allowance: r?.single_meal_allowance ?? null,
     snack_allowance: r?.snack_allowance ?? null,
     overnight_allowance: r?.overnight_allowance ?? null,
+    // Maintien de salaire (migration 20261026000002) : valeurs légales par défaut.
+    sick_pay_min_seniority_months: r && "sick_pay_min_seniority_months" in r ? n(r.sick_pay_min_seniority_months) : MAINTIEN_LEGAL.ancienneteMinMois,
+    sick_pay_waiting_days: r && "sick_pay_waiting_days" in r ? n(r.sick_pay_waiting_days) : MAINTIEN_LEGAL.carenceMaladie,
+    sick_pay_waiting_days_at: r && "sick_pay_waiting_days_at" in r ? n(r.sick_pay_waiting_days_at) : MAINTIEN_LEGAL.carenceAt,
+    sick_pay_rate_1: r && "sick_pay_rate_1" in r ? n(r.sick_pay_rate_1) : MAINTIEN_LEGAL.taux1,
+    sick_pay_rate_2: r && "sick_pay_rate_2" in r ? n(r.sick_pay_rate_2) : MAINTIEN_LEGAL.taux2,
+    sick_pay_base_days: r && "sick_pay_base_days" in r ? n(r.sick_pay_base_days) : MAINTIEN_LEGAL.dureeBase,
+    sick_pay_step_days: r && "sick_pay_step_days" in r ? n(r.sick_pay_step_days) : MAINTIEN_LEGAL.dureeIncrement,
+    sick_pay_step_years: r && "sick_pay_step_years" in r ? n(r.sick_pay_step_years) : MAINTIEN_LEGAL.trancheAnnees,
+    sick_pay_max_days: r && "sick_pay_max_days" in r ? n(r.sick_pay_max_days) : MAINTIEN_LEGAL.dureeMax,
+    subrogation_enabled: Boolean(r?.subrogation_enabled),
   };
 
   return (
@@ -44,6 +58,13 @@ export default async function ReglagesPaiePage() {
         title="Paie & salaires"
         description={`Ce qui est propre à votre entreprise. Les taux légaux (SMIC ${legal.smicHoraire.toFixed(2).replace(".", ",")} €, plafond de la Sécurité sociale ${legal.pmss.toLocaleString("fr-FR")} €, cotisations) sont tenus à jour par GODAC.`}
       />
+      <p role="status" className={`mb-5 max-w-3xl rounded-lg px-3 py-2 text-sm ${version.aJour ? "bg-teal/10 text-teal-ink" : "bg-orange/10 text-orange-ink"}`}>
+        Paramètres légaux appliqués aujourd&apos;hui : <strong>{version.libelle}</strong>, en vigueur depuis le {fr(version.effetAu)} (SMIC horaire{" "}
+        {legal.smicHoraire.toFixed(2).replace(".", ",")} €, PMSS {legal.pmss.toLocaleString("fr-FR")} €).{" "}
+        {version.aJour
+          ? `Vérifiés jusqu'au ${fr(version.aJourJusquau)} ; chaque bulletin prend la version en vigueur au 1er jour de son mois.`
+          : `Attention : paramètres vérifiés jusqu'au ${fr(version.aJourJusquau)} seulement — une mise à jour de GODAC est attendue.`}
+      </p>
       <h2 className="mb-3 text-lg">Réglages de paie</h2>
       <ReglagesPaieForm
         initial={initial}

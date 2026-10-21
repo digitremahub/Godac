@@ -20,6 +20,7 @@ export const ACTIONS_AUDIT = {
   paie_bulletin_genere: "Bulletin de paie généré (en attente de validation)",
   paie_bulletin_valide: "Bulletin de paie validé par la direction",
   paie_bulletin_refuse: "Bulletin de paie refusé par la direction",
+  paie_sortie_enregistree: "Sortie d'un salarié enregistrée (paie)",
   paie_acompte_decision: "Demande d'acompte : décision ou préparation",
   paie_export_comptable: "Export de paie pour le comptable (CSV, journal)",
   paie_bulletins_archive: "Archive ZIP de bulletins de paie téléchargée",
