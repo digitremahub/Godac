@@ -1,143 +1,295 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
+import { BadgeConfiance, Commentaires, type CommentaireVue } from "@/components/rattachement/Commentaires";
+import { libelleSuggestionAmende } from "@/lib/rattachement/amende";
+import { dateParis, heureParis, montantEuros } from "@/lib/rattachement/format";
+import { networkErrorMessage } from "@/lib/utils/network-error";
+
+export interface CandidatVue {
+  driverId: string;
+  driverName: string;
+  planningEntryId: string | null;
+  tourNumber: string | null;
+  debut: string | null;
+  fin: string | null;
+  confiance: string;
+  raison: string;
+  gps: { at: string; lat: number; lng: number } | null;
+}
+
+export type StatutAmende = "pending_identification" | "identified" | "contested" | "paid" | "dismissed";
 
 export interface FineRow {
   id: string;
   infraction_at: string;
   amount: number;
+  reduced_amount: number | null;
+  payment_deadline: string | null;
+  location: string | null;
   reference: string | null;
-  status: "pending_identification" | "identified" | "contested" | "paid";
+  status: StatutAmende;
   notified_at: string | null;
   vehicles: { registration: string } | null;
+  driver_id: string | null;
   driver: { full_name: string } | null;
+  suggested_driver_id: string | null;
   suggested_driver_name: string | null;
   suggested_tour_number: string | null;
+  match_confidence: string | null;
+  raison: string | null;
+  candidats: CandidatVue[];
+  documents: number;
+  validated_at: string | null;
+  validated_by_name: string | null;
+  commentaires: CommentaireVue[];
 }
 
-const STATUS_LABEL: Record<FineRow["status"], string> = {
-  pending_identification: "À identifier",
-  identified: "Chauffeur confirmé",
-  contested: "Contestée",
-  paid: "Payée",
+export const STATUT_AMENDE: Record<StatutAmende, { label: string; cls: string }> = {
+  pending_identification: { label: "À traiter", cls: "badge-gold" },
+  identified: { label: "Responsable désigné", cls: "badge-teal" },
+  contested: { label: "Contestée", cls: "badge-neutral" },
+  paid: { label: "Réglée", cls: "badge-teal" },
+  dismissed: { label: "Classée", cls: "badge-neutral" },
 };
 
-const STATUS_BADGE: Record<FineRow["status"], string> = {
-  pending_identification: "badge-gold",
-  identified: "badge-teal",
-  contested: "badge-neutral",
-  paid: "badge-teal",
-};
+const ONGLETS = [
+  { key: "a_traiter", label: "À traiter", statuts: ["pending_identification"] },
+  { key: "designees", label: "Responsable désigné", statuts: ["identified", "contested"] },
+  { key: "closes", label: "Réglées / classées", statuts: ["paid", "dismissed"] },
+] as const;
 
-/** Actions de l'encadrement (direction ; managers sur les véhicules de leur service, RLS) (confirm/notify/status) — see app/api/fines/[id], which re-checks the role server-side. */
-export function FinesTable({ fines, lectureSeule = false }: { fines: FineRow[]; /** Comptable : consultation sans action. */ lectureSeule?: boolean }) {
+async function patch(id: string, body: Record<string, unknown>) {
+  const res = await fetch(`/api/fines/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Action impossible");
+  return json;
+}
+
+function FicheAmende({ f, chauffeurs, lectureSeule, moi, focus }: { f: FineRow; chauffeurs: { id: string; name: string }[]; lectureSeule: boolean; moi: string; focus: boolean }) {
   const router = useRouter();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [driver, setDriver] = useState(f.driver_id ?? f.suggested_driver_id ?? "");
+  const [corriger, setCorriger] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const immat = f.vehicles?.registration ?? null;
+  const suggestion = f.candidats.find((c) => c.driverId === f.suggested_driver_id) ?? null;
+  const ouverte = f.status === "pending_identification" || f.status === "identified" || f.status === "contested";
 
-  async function patch(id: string, body: Record<string, unknown>) {
-    setBusyId(id);
+  async function run(body: Record<string, unknown>, ok?: (json: Record<string, unknown>) => string | null) {
+    setBusy(true);
     setError(null);
+    setInfo(null);
     try {
-      const res = await fetch(`/api/fines/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur");
+      const json = await patch(f.id, body);
+      setInfo(ok?.(json) ?? null);
+      setCorriger(false);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inattendue");
+      setError(networkErrorMessage(e));
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
-  return (
-    <Card className="overflow-x-auto">
-      {error && <p role="alert" className="mb-2 text-sm text-orange-ink">{error}</p>}
-      <table className="w-full min-w-[980px] text-sm">
-        <thead className="text-left text-navy/60">
-          <tr>
-            <th className="pb-2">Date</th>
-            <th className="pb-2">Véhicule</th>
-            <th className="pb-2">Montant</th>
-            <th className="pb-2">Référence</th>
-            <th className="pb-2">Chauffeur</th>
-            <th className="pb-2">Statut</th>
-            <th className="pb-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {fines.map((f) => (
-            <tr key={f.id} className="border-t border-navy/5">
-              <td className="py-2">{new Date(f.infraction_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" })}</td>
-              <td className="py-2">{f.vehicles?.registration ?? "—"}</td>
-              <td className="py-2">{f.amount.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</td>
-              <td className="py-2">{f.reference ?? "—"}</td>
-              <td className="py-2">
-                {f.driver?.full_name ?? (
-                  f.suggested_driver_name ? (
-                    <span className="text-navy/70">
-                      Suggéré : {f.suggested_driver_name}
-                      {f.suggested_tour_number ? ` (n°${f.suggested_tour_number})` : ""}
-                    </span>
-                  ) : (
-                    "—"
-                  )
-                )}
-              </td>
-              <td className="py-2">
-                <span className={STATUS_BADGE[f.status]}>{STATUS_LABEL[f.status]}</span>
-              </td>
-              <td className="py-2">
-                {!lectureSeule && <div className="flex flex-wrap gap-1.5">
-                  {f.status === "pending_identification" && f.suggested_driver_name && (
-                    <button
-                      className="btn-secondary !px-2 !py-1 text-xs"
-                      disabled={busyId === f.id}
-                      onClick={() => patch(f.id, { confirm: true })}
-                    >
-                      Confirmer
-                    </button>
-                  )}
-                  {f.driver && !f.notified_at && (
-                    <button
-                      className="btn-secondary !px-2 !py-1 text-xs"
-                      disabled={busyId === f.id}
-                      onClick={() => patch(f.id, { notify: true })}
-                    >
-                      Notifier le chauffeur
-                    </button>
-                  )}
-                  {f.notified_at && <span className="text-xs text-navy/60">Notifié</span>}
-                  {f.status === "identified" && (
-                    <button
-                      className="text-xs text-navy/60 hover:text-orange-ink"
-                      disabled={busyId === f.id}
-                      onClick={() => patch(f.id, { status: "contested" })}
-                    >
-                      Contester
-                    </button>
-                  )}
-                  {(f.status === "identified" || f.status === "contested") && (
-                    <button
-                      className="text-xs text-navy/60 hover:text-teal-ink"
-                      disabled={busyId === f.id}
-                      onClick={() => patch(f.id, { status: "paid" })}
-                    >
-                      Marquer payée
-                    </button>
-                  )}
-                </div>}
-              </td>
-            </tr>
+  const candidatChoisi = f.candidats.find((c) => c.driverId === driver);
+  const choix = (
+    <div className="flex flex-col gap-2 rounded-xl bg-navy/[0.04] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <BadgeConfiance confiance={f.match_confidence} />
+        {f.raison && <span className="text-xs text-navy/60">{f.raison}</span>}
+      </div>
+      {suggestion ? (
+        <p className="text-sm font-medium">{libelleSuggestionAmende(suggestion, immat)}</p>
+      ) : f.suggested_driver_name ? (
+        <p className="text-sm font-medium">
+          Suggestion : {f.suggested_driver_name}
+          {f.suggested_tour_number ? `, tournée n°${f.suggested_tour_number}` : ""}
+        </p>
+      ) : (
+        <p className="text-sm text-navy/70">Aucune suggestion automatique : choisissez le chauffeur à la main.</p>
+      )}
+      {f.candidats.length > 1 && (
+        <ul className="text-xs text-navy/70">
+          {f.candidats.map((c) => (
+            <li key={`${c.driverId}-${c.planningEntryId}`}>
+              • {c.driverName} — {c.confiance === "exact" ? "exact" : "probable"} : {c.raison}
+              {c.debut ? ` (${heureParis(c.debut)}–${c.fin ? heureParis(c.fin) : "en cours"})` : ""}
+            </li>
           ))}
-        </tbody>
-      </table>
+        </ul>
+      )}
+      {suggestion?.gps && (
+        <a className="text-xs text-teal-ink underline" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${suggestion.gps.lat}&mlon=${suggestion.gps.lng}#map=17/${suggestion.gps.lat}/${suggestion.gps.lng}`}>
+          Position GPS à {heureParis(suggestion.gps.at)}
+        </a>
+      )}
+      {!lectureSeule && (
+        <>
+          <label className="block">
+            <span className="label">Chauffeur responsable</span>
+            <select className="input" value={driver} onChange={(e) => setDriver(e.target.value)}>
+              <option value="">— Choisir —</option>
+              {chauffeurs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                  {d.id === f.suggested_driver_id ? " (suggéré)" : f.candidats.some((c) => c.driverId === d.id) ? " (candidat)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary !py-2 text-sm"
+              disabled={busy || !driver}
+              onClick={() => run({ action: "valider", driver_id: driver, planning_entry_id: candidatChoisi?.planningEntryId ?? null }, () => "Responsable validé : notification envoyée.")}
+            >
+              Valider le responsable et notifier
+            </button>
+            <button
+              type="button"
+              className="btn-secondary !py-2 text-sm"
+              disabled={busy}
+              onClick={() => run({ action: "resuggerer" }, (j) => (j.suggestion ? `Nouvelle suggestion : ${(j.suggestion as { name: string }).name}.` : `${(j.raison as string) ?? "Aucun chauffeur trouvé."}`))}
+            >
+              Relancer la recherche
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div id={`amende-${f.id}`}>
+    <Card className={`flex flex-col gap-3 ${focus ? "ring-2 ring-teal" : ""}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-display text-lg font-bold">{immat ?? "Véhicule non renseigné"}</p>
+          <p className="text-sm text-navy/65">
+            {dateParis(f.infraction_at)} à {heureParis(f.infraction_at)}
+            {f.location ? ` · ${f.location}` : ""}
+          </p>
+        </div>
+        <span className={STATUT_AMENDE[f.status]?.cls ?? "badge-neutral"}>{STATUT_AMENDE[f.status]?.label ?? f.status}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        <span>
+          <strong>{montantEuros(f.amount)}</strong>
+          {f.reduced_amount !== null ? ` (minoré ${montantEuros(f.reduced_amount)})` : ""}
+        </span>
+        {f.payment_deadline && <span>À régler avant le {dateParis(f.payment_deadline)}</span>}
+        {f.reference && <span>Avis n°{f.reference}</span>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {f.documents === 0 && <span className="text-xs text-orange-ink">Avis non joint</span>}
+        {Array.from({ length: f.documents }, (_, i) => (
+          <a key={i} href={`/api/fines/${f.id}/piece?i=${i}`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !py-1 text-xs text-teal-ink">
+            📄 Avis{f.documents > 1 ? ` ${i + 1}` : ""}
+          </a>
+        ))}
+      </div>
+
+      {f.status === "pending_identification" ? (
+        choix
+      ) : (
+        <>
+          <p className="text-sm">
+            Responsable : <strong>{f.driver?.full_name ?? "—"}</strong>
+            {f.validated_at ? ` · validé le ${dateParis(f.validated_at)}${f.validated_by_name ? ` par ${f.validated_by_name}` : ""}` : ""}
+            {f.notified_at ? " · notifié" : ""}
+          </p>
+          {corriger && choix}
+          {!lectureSeule && ouverte && (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-primary !py-2 text-sm" disabled={busy} onClick={() => run({ status: "paid" })}>
+                Marquer réglée
+              </button>
+              {f.status !== "contested" && (
+                <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy} onClick={() => run({ status: "contested" })}>
+                  Contester
+                </button>
+              )}
+              <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy} onClick={() => run({ status: "dismissed" })}>
+                Classer
+              </button>
+              <button type="button" className="btn-ghost !py-2 text-sm" disabled={busy} onClick={() => setCorriger((v) => !v)}>
+                {corriger ? "Fermer" : "Corriger le responsable"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
+      {info && <p role="status" className="text-sm text-teal-ink">{info}</p>}
+
+      {(f.commentaires.length > 0 || (!lectureSeule && f.driver_id)) && (
+        <details open={f.commentaires.length > 0 && focus} className="rounded-xl border border-navy/10 p-3">
+          <summary className="cursor-pointer text-sm font-semibold">Échanges avec le chauffeur ({f.commentaires.length})</summary>
+          <div className="mt-2">
+            <Commentaires api={`/api/fines/${f.id}`} routePiece="piece" commentaires={f.commentaires} moi={moi} placeholder="Message au chauffeur…" ouvert={!lectureSeule && Boolean(f.driver_id)} />
+          </div>
+        </details>
+      )}
     </Card>
+    </div>
+  );
+}
+
+/** Fiches d'amendes de l'encadrement (direction ; managers sur les véhicules de leur service, RLS). Comptable : lecture seule. */
+export function FinesTable({
+  fines,
+  lectureSeule = false,
+  chauffeurs = [],
+  moi = "",
+  focusId = null,
+}: {
+  fines: FineRow[];
+  lectureSeule?: boolean;
+  chauffeurs?: { id: string; name: string }[];
+  moi?: string;
+  focusId?: string | null;
+}) {
+  const ongletFocus = focusId ? ONGLETS.find((o) => (o.statuts as readonly string[]).includes(fines.find((f) => f.id === focusId)?.status ?? ""))?.key : undefined;
+  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["key"]>(ongletFocus ?? "a_traiter");
+  useEffect(() => {
+    if (focusId) document.getElementById(`amende-${focusId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId]);
+  const tab = ONGLETS.find((o) => o.key === onglet)!;
+  const visibles = fines.filter((f) => (tab.statuts as readonly string[]).includes(f.status));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div role="tablist" className="flex flex-wrap gap-2">
+        {ONGLETS.map((o) => {
+          const n = fines.filter((f) => (o.statuts as readonly string[]).includes(f.status)).length;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="tab"
+              aria-selected={onglet === o.key}
+              className={onglet === o.key ? "btn-primary !px-3 !py-1.5 text-sm" : "btn-secondary !px-3 !py-1.5 text-sm"}
+              onClick={() => setOnglet(o.key)}
+            >
+              {o.label} ({n})
+            </button>
+          );
+        })}
+      </div>
+      {visibles.length === 0 ? (
+        <p className="text-sm text-navy/60">Rien ici.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {visibles.map((f) => (
+            <FicheAmende key={`${f.id}-${f.status}-${f.suggested_driver_id}`} f={f} chauffeurs={chauffeurs} lectureSeule={lectureSeule} moi={moi} focus={f.id === focusId} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

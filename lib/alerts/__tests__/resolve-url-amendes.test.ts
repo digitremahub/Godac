@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 
 describe("lien de l'alerte d'amende (I21)", () => {
-  it("le chauffeur destinataire ouvre ses amendes, pas /flotte/amendes", () => {
-    expect(resolveAlertUrl("fines", "fine_notification", "f1", { recipientUserId: "u1" })).toBe("/moi/amendes");
+  it("le chauffeur destinataire ouvre la fiche dans ses amendes, pas /flotte/amendes", () => {
+    expect(resolveAlertUrl("fines", "fine_notification", "f1", { recipientUserId: "u1" })).toBe("/moi/amendes?amende=f1");
     expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "chauffeur" })).toBe("/moi/amendes");
   });
   it("l'encadrement (contestation adressée à la direction) ouvre la gestion des amendes", () => {
-    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "direction" })).toBe("/flotte/amendes");
-    expect(resolveAlertUrl("fines", "fine_notification", "f1")).toBe("/flotte/amendes");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1", { role: "direction" })).toBe("/flotte/amendes?amende=f1");
+    expect(resolveAlertUrl("fines", "fine_notification", "f1")).toBe("/flotte/amendes?amende=f1");
+  });
+  it("contestation client : la fiche, pour l'encadrement comme pour le chauffeur attributaire", () => {
+    expect(resolveAlertUrl("customer_disputes", "customer_dispute", "c1", { recipientUserId: "u1", role: "chauffeur" })).toBe("/exploitation/contestations?fiche=c1");
+    expect(resolveAlertUrl("customer_disputes", "customer_dispute", "c1", { role: "manager" })).toBe("/exploitation/contestations?fiche=c1");
   });
   it("bulletins en attente de validation → Paie", () => {
     expect(resolveAlertUrl("payslips", "payslip_validation", "p1")).toBe("/equipe/paie");

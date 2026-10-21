@@ -5,7 +5,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { FineFields } from "@/lib/ocr/fine";
 import { IconCamera } from "@/components/layout/icons";
 
-/** Same upload-then-process shape as components/shared/TourReportPhotoCapture, for a fine notice photo. */
+/** Dépôt puis lecture de l'avis de contravention (photo ou PDF), même principe que components/shared/TourReportPhotoCapture. */
 export function FinePhotoCapture({
   onCaptured,
 }: {
@@ -15,13 +15,17 @@ export function FinePhotoCapture({
   const [status, setStatus] = useState<"idle" | "uploading" | "extracting" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [nomPdf, setNomPdf] = useState<string | null>(null);
 
   async function handleFile(file: File) {
-    setPreview(URL.createObjectURL(file));
+    const pdf = file.type === "application/pdf";
+    setPreview(pdf ? null : URL.createObjectURL(file));
+    setNomPdf(pdf ? file.name : null);
     setError(null);
     setStatus("uploading");
     try {
-      const initRes = await fetch("/api/ocr/fine/init", { method: "POST" });
+      const ext = pdf ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+      const initRes = await fetch("/api/ocr/fine/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ext }) });
       const initJson = await initRes.json();
       if (!initRes.ok) throw new Error(typeof initJson.error === "string" ? initJson.error : "Erreur d'initialisation");
       const { storagePath } = initJson as { storagePath: string };
@@ -54,14 +58,14 @@ export function FinePhotoCapture({
         // eslint-disable-next-line @next/next/no-img-element
         <img width={144} height={96} src={preview} alt="Avis de contravention" className="h-24 w-36 rounded-lg border border-navy/10 object-cover" />
       )}
-      <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-1.5 text-xs">
+      {nomPdf && <p className="text-xs text-navy/70">📄 {nomPdf}</p>}
+      <label className="btn-secondary w-full cursor-pointer justify-center text-center !py-2 text-sm">
         {status === "uploading" && "Envoi…"}
         {status === "extracting" && "Lecture…"}
-        {(status === "idle" || status === "error" || status === "done") && <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Photo du PV (lecture automatique)</>}
+        {(status === "idle" || status === "error" || status === "done") && <><IconCamera className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {status === "done" ? "Remplacer l'avis" : "Photo ou PDF de l'avis (obligatoire)"}</>}
         <input
           type="file"
-          accept="image/*"
-          capture="environment"
+          accept="image/*,application/pdf"
           className="sr-only"
           disabled={status === "uploading" || status === "extracting"}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
