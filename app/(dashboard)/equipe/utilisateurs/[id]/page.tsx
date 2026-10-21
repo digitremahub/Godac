@@ -14,6 +14,7 @@ import { ConvocationButton } from "@/components/intranet/ConvocationButton";
 import { DriverServicesPanel } from "@/components/admin/DriverServicesPanel";
 import { DriverContactForm } from "@/components/admin/DriverContactForm";
 import { EmployeeFileForm } from "@/components/admin/EmployeeFileForm";
+import { RegistreSalarieForm, type ValeursRegistre } from "@/components/registre/RegistreSalarieForm";
 import { EmployeeDocumentsPanel, type EmployeeDocument } from "@/components/admin/EmployeeDocumentsPanel";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { computeHourlyRates } from "@/lib/business/payroll";
@@ -158,6 +159,34 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       return { ...p, downloadUrl: signed?.signedUrl ?? null };
     }),
   );
+
+  // Registre du personnel (direction) : colonnes de la migration
+  // 20261026000001 lues via select("*"), table privée lue de façon tolérante.
+  let registre: ValeursRegistre | null = null;
+  if (isDirection) {
+    const [{ data: f }, { data: p }] = await Promise.all([
+      supabase.from("employee_files").select("*").eq("user_id", id).maybeSingle(),
+      supabase.from("employee_register_private").select("*").eq("user_id", id).maybeSingle(),
+    ]);
+    const t = (v: unknown) => (typeof v === "string" ? v : "");
+    registre = {
+      last_name: t(f?.last_name),
+      first_names: t(f?.first_names),
+      sex: f?.sex === "F" || f?.sex === "M" ? f.sex : "",
+      nationality: t(p?.nationality),
+      birth_date: t(f?.birth_date),
+      role_title: t(user?.role_title),
+      classification: t(f?.classification),
+      hire_date: t(f?.hire_date),
+      exit_date: t(f?.exit_date),
+      contract_type: t(f?.contract_type),
+      temp_agency: t(f?.temp_agency),
+      work_permit_type: t(p?.work_permit_type),
+      work_permit_number: t(p?.work_permit_number),
+      work_permit_expiry: t(p?.work_permit_expiry),
+      register_excluded: f?.register_excluded === true,
+    };
+  }
 
   let employeeDocuments: EmployeeDocument[] = [];
   if (isDirection && employeeFilesEnabled && employeeFile?.id) {
@@ -358,6 +387,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
                 </div>
               </Card>
             ))}
+        </div>
+      )}
+
+      {registre && (
+        <div className="mb-6">
+          <RegistreSalarieForm userId={u.id} initial={registre} actif={Boolean(u.active)} nomAffiche={u.full_name} />
         </div>
       )}
 

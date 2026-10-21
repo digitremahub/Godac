@@ -5,6 +5,7 @@ import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
 import { bornesMois, moisValide } from "@/lib/paie/donnees";
 import { addMonths, currentMonth } from "@/lib/planning/dates";
+import { LIBELLE_PAPIER, papierDemande, type PreferenceRemise } from "@/lib/paie/remise-electronique";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
@@ -30,7 +31,7 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
   const mois = moisValide(params.mois) ? params.mois : currentMonth();
   const { debut, fin } = bornesMois(mois);
 
-  const [{ data: salaries }, { data: profils }, { data: bulletins }, { data: reglages }] = await Promise.all([
+  const [{ data: salaries }, { data: profils }, { data: bulletins }, { data: reglages }, { data: preferences }] = await Promise.all([
     supabase.from("users").select("id, full_name, role_title").eq("active", true).order("full_name"),
     supabase.from("payroll_profiles").select("user_id, hourly_rate, regime"),
     supabase
@@ -39,7 +40,10 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
       .eq("period_start", debut)
       .eq("period_end", fin),
     supabase.from("payroll_settings").select("organization_id").maybeSingle(),
+    // Opposition à la remise électronique (migration 20261026000001 ; table absente = aucune).
+    supabase.from("payslip_delivery_preferences").select("user_id, paper_requested, decided_at"),
   ]);
+  const preferenceDe = new Map((preferences ?? []).map((p) => [p.user_id as string, p as PreferenceRemise]));
   const profilDe = new Map((profils ?? []).map((p) => [p.user_id, p]));
   const bulletinDe = new Map((bulletins ?? []).map((b) => [b.user_id, b]));
   const calcules = (bulletins ?? []).filter((b) => b.details);
@@ -108,6 +112,7 @@ export default async function PaiePage({ searchParams }: { searchParams: Promise
                   </span>
                   <span className="flex items-center gap-2 text-sm">
                     {!p?.hourly_rate && <span className="rounded-full bg-gold/25 px-2 py-0.5 text-xs font-semibold">Profil à compléter</span>}
+                    {papierDemande(preferenceDe.get(s.id)) && <span className="badge-gold text-xs">{LIBELLE_PAPIER}</span>}
                     {b ? (
                       <>
                         <span className="text-navy/65">net {eur(Number(b.net_amount ?? 0))}</span>
