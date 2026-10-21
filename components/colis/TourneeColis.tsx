@@ -31,6 +31,9 @@ import { ImportBordereau } from "@/components/colis/ImportBordereau";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
 import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
+import { EtapeCreneau, useHorairesOuverture } from "@/components/colis/EtapeCreneau";
+import { CRENEAU_AUCUN, choixDepuisCreneau, validerChoix, type ChoixCreneau, type CreneauSaisi } from "@/lib/colis/creneau";
+import { dateParis } from "@/lib/colis/heure-paris";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 
 interface Draft {
@@ -42,9 +45,13 @@ interface Draft {
   type: TypeArret;
   /** Poids en kg tel que saisi (« 2,5 ») ; pré-rempli par la lecture de l'étiquette. */
   poids: string;
-  /** Créneau confirmé avant l’ajout du colis. */
-  window_start?: string;
-  window_end?: string;
+  /**
+   * Créneau du jour choisi avant l'ajout (étape « Créneau ») ; absent :
+   * « Aucun ». Pré-sélectionné quand l'étiquette en porte un.
+   */
+  creneau?: ChoixCreneau;
+  /** Le créneau pré-sélectionné vient de la lecture de l'étiquette. */
+  creneauLu?: boolean;
   /** Établissement choisi dans la recherche : nom et coordonnées. */
   etablissement?: { nom: string; lat: number | null; lng: number | null } | null;
   /** Ne pas mémoriser cette ramasse dans les tournées futures. */
@@ -83,6 +90,29 @@ const AUTO = "__auto__";
 
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
 
+/** Réponse de /api/colis/etiquette (lib/colis/lecture-ia.ts). */
+interface EtiquetteLueEcran {
+  adresse: string | null;
+  destinataire: string | null;
+  telephone: string | null;
+  code: string | null;
+  poids?: number | null;
+  creneau?: CreneauSaisi;
+}
+
+/** Créneau lu sur l'étiquette → choix pré-sélectionné du brouillon (« Aucun » sinon). */
+function creneauLu(c: CreneauSaisi | undefined): Pick<Draft, "creneau" | "creneauLu"> {
+  const choix = choixDepuisCreneau(c?.debut, c?.fin);
+  return { creneau: choix, creneauLu: choix.cle !== "aucun" };
+}
+
+/** « 10:00–13:00 », « avant 10:00 », « à partir de 14:00 » (message après l'ajout). */
+function libelleCourt(c: CreneauSaisi): string {
+  if (!c.debut) return `avant ${c.fin}`;
+  if (!c.fin) return `à partir de ${c.debut}`;
+  return `${c.debut}–${c.fin}`;
+}
+
 /**
  * `encadrement` : manager / direction. `conduit` : il fait aussi des
  * tournées (chauffeur, ou manager qui conduit) : « Nouvelle tournée » crée
@@ -115,42 +145,15 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
   const [rechercheAdresse, setRechercheAdresse] = useState("");
-  const [suggestionHoraires, setSuggestionHoraires] = useState<{ adresse: string; label: string | null; weekly_schedule: Record<string, { open: string; close: string }[]> } | null>(null);
-  const [chargementSuggestionHoraires, setChargementSuggestionHoraires] = useState(false);
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // Recherche les horaires habituels connus dès que l’adresse est saisie,
-  // avant que le colis soit ajouté à la tournée.
-  useEffect(() => {
-    const adresse = draft?.adresse.trim() ?? "";
-    if (adresse.length < 5 || draft?.type !== "livraison") {
-      setSuggestionHoraires(null);
-      setChargementSuggestionHoraires(false);
-      return;
-    }
-    let actif = true;
-    const timer = setTimeout(async () => {
-      setChargementSuggestionHoraires(true);
-      try {
-        const response = await fetch(`/api/colis/horaires?adresse=${encodeURIComponent(adresse)}`);
-        const data = await response.json();
-        if (!actif) return;
-        const fiche = data?.fiche;
-        if (fiche?.weekly_schedule && typeof fiche.weekly_schedule === "object") {
-          setSuggestionHoraires({ adresse, label: fiche.label ?? null, weekly_schedule: fiche.weekly_schedule });
-        } else {
-          setSuggestionHoraires(null);
-        }
-      } catch {
-        if (actif) setSuggestionHoraires(null);
-      } finally {
-        if (actif) setChargementSuggestionHoraires(false);
-      }
-    }, 450);
-    return () => { actif = false; clearTimeout(timer); };
-  }, [draft?.adresse, draft?.type]);
+  // Horaires d'ouverture connus de l'adresse saisie, affichés à l'étape « Créneau » avant l'ajout.
+  const ouverture = useHorairesOuverture(draft?.adresse ?? "", draft !== null);
+  const aujourdhui = dateParis(new Date());
+  const jourTournee = run?.run_date ?? aujourdhui;
+  const quandTournee = jourTournee === aujourdhui ? "aujourd'hui" : `le ${jourTournee.split("-").reverse().slice(0, 2).join("/")}`;
 
   const chargerTournee = useCallback(async (id: string) => {
     try {
@@ -258,6 +261,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }, [toast]);
 
   async function ajouter(d: Draft) {
+    const creneau = validerChoix(d.creneau ?? CRENEAU_AUCUN);
+    if (!creneau.ok) return setToast({ ok: false, text: creneau.erreur });
     setBusy("ajout");
     try {
       const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null }>("/api/colis/arrets", {
@@ -272,8 +277,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           type: d.type,
           poids: lirePoids(d.poids),
           exceptionnelle: d.exceptionnelle === true,
-          window_start: d.window_start ?? null,
-          window_end: d.window_end ?? null,
+          creneau: creneau.creneau,
           etablissement: d.etablissement ?? null,
           ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
         }),
@@ -298,6 +302,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
                           ? "Point relais ajouté."
                           : "Colis ajouté.") +
                     (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? " · Rangé dans « Hors tournée »." : ` · Village : ${r.village.nom}.`) : "") +
+                    (creneau.creneau ? ` · Créneau ${libelleCourt(creneau.creneau)}.` : "") +
                     (r.professionnel ? ` · Professionnel détecté : ${r.professionnel} (recherche de ses horaires…).` : "") +
                     sansTel,
                 },
@@ -345,8 +350,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   async function lireImageScannee(image: string, code: string | null, telephone: string | null): Promise<boolean> {
     setBusy("photo");
     try {
-      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
-      const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids) };
+      const lu = await api<EtiquetteLueEcran>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
+      const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids), ...creneauLu(lu.creneau) };
       // Seuls le numéro et l'adresse sont bloquants. Nom, téléphone et poids
       // restent facultatifs : ne pas interrompre le chauffeur pour ces champs.
       const manquants = [
@@ -431,7 +436,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
     setBusy("photo");
     try {
       const image = await imageEnBase64(file);
-      const lu = await api<{ adresse: string | null; destinataire: string | null; telephone: string | null; code: string | null; poids?: number | null }>("/api/colis/etiquette", {
+      const lu = await api<EtiquetteLueEcran>("/api/colis/etiquette", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
       });
@@ -442,6 +447,8 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         code: d?.code ?? lu.code,
         type: d?.type ?? "livraison",
         poids: lu.poids ? champPoids(lu.poids) : (d?.poids ?? ""),
+        // Créneau lu sur l'étiquette pré-sélectionné ; sinon le choix en cours est gardé.
+        ...(lu.creneau ? creneauLu(lu.creneau) : { creneau: d?.creneau, creneauLu: d?.creneauLu }),
       }));
       if (!lu.adresse) setToast({ ok: false, text: "Adresse illisible : saisissez-la." });
     } catch (e) {
@@ -1102,7 +1109,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           <AdresseInput
             biais={depot}
             value={draft.adresse}
-            onChange={(adresse) => setDraft((d) => (d ? { ...d, adresse, etablissement: null, window_start: undefined, window_end: undefined } : d))}
+            onChange={(adresse) => setDraft((d) => (d ? { ...d, adresse, etablissement: null } : d))}
             onChoisir={(sug) =>
               setDraft((d) =>
                 d
@@ -1118,49 +1125,6 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
             autoFocus={!lectureEtiquette}
           />
           {draft.etablissement && <p className="-mt-1 text-xs text-teal-ink">Établissement : {draft.etablissement.nom} — ses horaires seront cherchés après l&apos;ajout.</p>}
-          {draft.type === "livraison" && (
-            <div className="rounded-xl border border-teal/25 bg-teal/5 p-3" aria-live="polite">
-              <p className="text-sm font-semibold">Créneau de livraison pour aujourd'hui</p>
-              <p className="mt-1 text-xs text-navy/65">
-                {chargementSuggestionHoraires
-                  ? "Recherche des horaires habituels connus…"
-                  : suggestionHoraires && suggestionHoraires.adresse.toLocaleLowerCase("fr-FR") === draft.adresse.trim().toLocaleLowerCase("fr-FR")
-                    ? "Horaires habituels" + (suggestionHoraires.label ? " · " + suggestionHoraires.label : "") + " — choisissez un créneau pour cette livraison."
-                    : "Aucun horaire habituel connu : vous pouvez tout de même définir le créneau souhaité pour aujourd'hui."}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[
-                  ["8 h – 11 h", "08:00", "11:00"],
-                  ["10 h – 13 h", "10:00", "13:00"],
-                  ["12 h – 15 h", "12:00", "15:00"],
-                  ["14 h – 17 h", "14:00", "17:00"],
-                ].map(([label, open, close]) => {
-                  const selected = draft.window_start === open && draft.window_end === close;
-                  return (
-                    <button key={label} type="button" className={selected ? "btn-primary !py-1.5 text-sm" : "btn-secondary !py-1.5 text-sm"}
-                      onClick={() => setDraft({ ...draft, window_start: open, window_end: close })}>
-                      {label}{selected ? " ✓" : ""}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <label className="flex items-center gap-1.5">De
-                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_start ?? ""} onChange={(e) => setDraft({ ...draft, window_start: e.target.value || undefined })} aria-label="Début du créneau du jour" />
-                </label>
-                <label className="flex items-center gap-1.5">À
-                  <input type="time" className="input !w-auto !py-1.5" value={draft.window_end ?? ""} onChange={(e) => setDraft({ ...draft, window_end: e.target.value || undefined })} aria-label="Fin du créneau du jour" />
-                </label>
-                {(draft.window_start || draft.window_end) && (
-                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => setDraft({ ...draft, window_start: undefined, window_end: undefined })}>Retirer le créneau</button>
-                )}
-              </div>
-              {draft.window_start && draft.window_end && draft.window_start >= draft.window_end && (
-                <p role="alert" className="mt-1 text-xs font-semibold text-orange-ink">L'heure de fin doit être après l'heure de début.</p>
-              )}
-              <p className="mt-2 text-xs text-navy/55">Ce créneau est enregistré uniquement pour cette livraison. Les horaires habituels restent inchangés.</p>
-            </div>
-          )}
           <input className="input" value={draft.destinataire} onChange={(e) => setDraft({ ...draft, destinataire: e.target.value })} placeholder="Destinataire (facultatif)" aria-label="Destinataire" />
           <input
             className={`input ${normaliserTelephone(draft.telephone, pays) ? "" : "!border-orange ring-2 ring-orange/30"}`}
@@ -1186,8 +1150,20 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
             <span className="text-navy/65">kg</span>
             {draft.poids.trim() && !lirePoids(draft.poids) && <span className="text-xs text-orange-ink">Poids non reconnu</span>}
           </label>
+          <div className="rounded-xl border border-teal/25 bg-teal/5 p-3">
+            <EtapeCreneau
+              idBase="ajout-creneau"
+              value={draft.creneau ?? CRENEAU_AUCUN}
+              onChange={(creneau) => setDraft((d) => (d ? { ...d, creneau, creneauLu: false } : d))}
+              fiche={ouverture.fiche}
+              chargement={ouverture.chargement}
+              ymd={jourTournee}
+              quand={quandTournee}
+              indication={draft.creneauLu ? "Lu sur l'étiquette" : null}
+            />
+          </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5} onClick={() => ajouter(draft)}>
+            <button type="button" className="btn-primary" disabled={busy !== null || draft.adresse.trim().length < 5 || !validerChoix(draft.creneau ?? CRENEAU_AUCUN).ok} onClick={() => ajouter(draft)}>
               {draft.type === "ramasse" ? "Ajouter la ramasse" : draft.type === "point_relais" ? "Ajouter au point relais" : "Ajouter à la tournée"}
             </button>
             {lectureEtiquette && (
