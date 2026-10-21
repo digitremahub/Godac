@@ -31,7 +31,6 @@ create index if not exists delivery_run_bordereaux_org_numero_idx on delivery_ru
 
 alter table delivery_run_bordereaux enable row level security;
 
-drop policy if exists "delivery_run_bordereaux: through own run or manager-like" on delivery_run_bordereaux;
 create policy "delivery_run_bordereaux: through own run or manager-like"
   on delivery_run_bordereaux for all
   using (
