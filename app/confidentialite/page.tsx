@@ -187,6 +187,17 @@ export default function ConfidentialitePage() {
           </li>
           <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
           <li>Journaux de connexion : 1 an maximum.</li>
+          <li>
+            Bulletins de paie : le code du travail impose à l&apos;employeur de les tenir à la disposition du salarié pendant 50 ans, ou
+            jusqu&apos;à ses 75 ans (art. D3243-8). GODAC les conserve tant que l&apos;entreprise utilise GODAC, puis comme les autres données
+            d&apos;activité : il ne garantit donc pas seul cette durée. Chaque salarié peut à tout moment télécharger tous ses bulletins en une
+            archive ZIP (Mon espace › Mes fiches de paie), et la direction l&apos;ensemble des bulletins de l&apos;entreprise, pour les archiver
+            elle-même. Le salarié peut aussi s&apos;opposer à la remise électronique et demander ses bulletins sur papier.
+          </li>
+          <li>
+            Registre unique du personnel (nationalité, titre de travail…) : saisi par la direction, visible d&apos;elle seule et du salarié
+            concerné ; à conserver par l&apos;employeur 5 ans après le départ du salarié, en exportant le registre.
+          </li>
           <li>Factures : 10 ans (obligation comptable).</li>
         </ul>
       </Section>

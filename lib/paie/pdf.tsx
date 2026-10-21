@@ -26,6 +26,8 @@ const SURFACE = "#FFFFFF";
 const TRAIT = "#D9DEE7";
 const ZEBRE = "#F9FAFC";
 const TEXTE_DOUX = "#4A5263";
+/** Palette partagée avec le journal de paie et le registre du personnel (lib/paie/pdf-registres.tsx). */
+export const PALETTE_PDF = { MARINE, TEAL, TEAL_INK, PAPER, SURFACE, TRAIT, ZEBRE, TEXTE_DOUX } as const;
 
 /** Couleurs d'accent du bulletin : teal GODAC, ou la couleur de l'organisation. */
 interface Theme {

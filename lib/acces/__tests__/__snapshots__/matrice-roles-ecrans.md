@@ -47,8 +47,11 @@
 | Équipe & RH | Heures & salaires | `/equipe/paie/heures` | — | — | 🔒 | 🔒 | planning?, time_clock? |
 | Équipe & RH | Fiches de paie | `/equipe/paie/fiches` | — | — | 🔒 | 🔒 | payslips |
 | Équipe & RH | Demandes d'acompte | `/equipe/paie/acomptes` | ↪ /moi/acomptes | ↪ /moi/acomptes | 🔒 | 🔒 | payslips |
+| Équipe & RH | Journal de paie | `/equipe/paie/journal` | — | — | 🔒 | 🔒 | payslips |
+| Équipe & RH | Export pour le comptable | `/equipe/paie/export` | — | — | 🔒 | 🔒 | payslips |
 | Équipe & RH | Réglages de paie | `/equipe/paie/reglages` | — | — | — | 🔒 | payslips |
 | Équipe & RH | Bulletin d'un salarié | `/equipe/paie/[userId]` | — | — | 🔒 | 🔒 | payslips |
+| Équipe & RH | Registre du personnel | `/equipe/registre` | — | — | — | ✅ | — |
 | Communication | Messenger | `/communication/messenger` | ✅ | ✅ | ✅ | ✅ | messenger |
 | Communication | Intranet & convocations | `/communication/intranet` | ✅ | ✅ | ✅ | ✅ | intranet |
 | Communication | Alertes | `/communication/alertes` | ✅ | ✅ | ✅ | ✅ | — |

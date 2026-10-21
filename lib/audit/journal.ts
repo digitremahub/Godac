@@ -21,6 +21,11 @@ export const ACTIONS_AUDIT = {
   paie_bulletin_valide: "Bulletin de paie validé par la direction",
   paie_bulletin_refuse: "Bulletin de paie refusé par la direction",
   paie_acompte_decision: "Demande d'acompte : décision ou préparation",
+  paie_export_comptable: "Export de paie pour le comptable (CSV, journal)",
+  paie_bulletins_archive: "Archive ZIP de bulletins de paie téléchargée",
+  paie_remise_choix: "Remise des bulletins : choix du salarié (électronique / papier)",
+  registre_personnel_modifie: "Registre du personnel : fiche complétée",
+  registre_personnel_export: "Registre du personnel exporté",
   inscription_go_navigation: "Compte d'essai GO Navigation créé (invitation)",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
