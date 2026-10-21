@@ -26,13 +26,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     siteName: "GODAC",
-    title: "GODAC — Logiciel de gestion carburant et flotte pour le transport routier",
+    title: "GODAC — Tournées colis, planning, carburant et paie pour le transport routier",
     description:
-      "Contrôlez et réduisez le carburant de votre entreprise de transport : chaque plein tracé, anomalies détectées, TICPE récupérée. Flotte, planning, tournées et paie dans le même outil.",
+      "Tournée colis avec GO Navigation pour vos chauffeurs, planning duplicable, carburant contrôlé au plein près et paie transport (IDCC 16) : la gestion de votre entreprise de transport dans un seul outil.",
   },
-  title: "GODAC — Logiciel de gestion carburant et flotte pour le transport routier",
+  title: "GODAC — Tournées colis, planning, carburant et paie pour le transport routier",
   description:
-    "Contrôlez et réduisez le carburant de votre entreprise de transport : chaque plein tracé, anomalies détectées, TICPE récupérée. Flotte, planning, tournées et paie dans le même outil.",
+    "Tournée colis avec GO Navigation pour vos chauffeurs, planning duplicable, carburant contrôlé au plein près et paie transport (IDCC 16) : la gestion de votre entreprise de transport dans un seul outil.",
   // iOS only exposes PushManager to a page added to the home screen and
   // reopened from there — this meta (on top of app/manifest.ts) is what
   // makes "Ajouter à l'écran d'accueil" register as a standalone app

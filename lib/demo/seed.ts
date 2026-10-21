@@ -3,6 +3,7 @@ import { createHmac } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
+import { seedModulesRecents, supprimerFichiersDemo } from "@/lib/demo/seed-modules";
 
 /**
  * Mode démo — « Transports Démo », a fictional carrier a prospect can
@@ -13,7 +14,9 @@ import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/p
  *
  * organizations.is_demo switches off outbound effects (alert emails and
  * push, invitations, billing — see lib/demo/guard.ts). Rebuilt nightly
- * by /api/cron/reset-demo.
+ * by /api/cron/reset-demo. Les modules récents (Tournée colis, modèles du
+ * planning, paie transport, écarts carburant) sont construits par
+ * lib/demo/seed-modules.ts, de façon tolérante.
  */
 
 export const DEMO_DOMAIN = "demo.godac.app";
@@ -40,12 +43,16 @@ function rng(seed: number) {
 }
 
 const MODULES = [
-  // Public demo deliberately exposes only a small representative subset.
-  // Detailed operational workflows remain reserved for sales meetings.
+  // La démo publique reste un sous-ensemble représentatif : le socle
+  // carburant/flotte, plus les nouveautés mises en avant sur le site
+  // (Tournée colis + GO Navigation, Planning, Paie transport, Congés).
   "fleet",
   "fuel_tracking",
   "planning",
   "ticpe_export",
+  "route_optimizer",
+  "payslips",
+  "leave_management",
 ];
 
 const PEOPLE = [
@@ -91,7 +98,9 @@ async function deleteDemoAuthUsers(admin: SupabaseClient) {
 export async function teardownDemo(admin: SupabaseClient = createAdminSupabaseClient()) {
   const { data: orgs } = await admin.from("organizations").select("id").eq("is_demo", true);
   for (const org of orgs ?? []) {
-    for (const table of ["fuel_entries", "vehicle_washes", "ticpe_exports"]) {
+    await supprimerFichiersDemo(admin, org.id);
+    // fuel_gap_reviews.created_by est ON DELETE RESTRICT vers users.
+    for (const table of ["fuel_gap_reviews", "fuel_entries", "vehicle_washes", "ticpe_exports"]) {
       await admin.from(table).delete().eq("organization_id", org.id);
     }
     await must(admin.from("organizations").delete().eq("id", org.id), "suppression de l'organisation");
@@ -295,15 +304,21 @@ export async function seedDemo(admin: SupabaseClient = createAdminSupabaseClient
       if (rand() < 0.42 && d > -21) fuel.push({ occurred_at: at(day, endTime), driver: drv.key, liters: Math.round(between(150, 290) * 10) / 10, vehicle_km: startKm + distance });
     });
   }
-  await must(admin.from("planning_entries").insert(tours), "tournées");
+  const affectations = await must(admin.from("planning_entries").insert(tours).select("id, driver_id, start_at, status, tour_number"), "tournées");
 
   fuel.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
   let totalizer = 125000;
-  for (const f of fuel) {
-    if (f.occurred_at < at(addDays(today, -24), "10:00")) continue;
+  // Trois pleins avec un écart de totaliseur (litres sortis de la cuve
+  // sans plein saisi) : un traité, un expliqué par le chauffeur, un à traiter.
+  const retenus = fuel.filter((f) => f.occurred_at >= at(addDays(today, -24), "10:00"));
+  const rangsEcart = new Set([3, Math.floor(retenus.length / 2), retenus.length - 2].filter((r) => r > 0));
+  const pleinsAvecEcart: { id: string; driver: string }[] = [];
+  for (const [rang, f] of retenus.entries()) {
+    const ecart = rangsEcart.has(rang);
+    if (ecart) totalizer = Math.round((totalizer + 12.4 + rang / 10) * 10) / 10;
     const before = totalizer;
     totalizer = Math.round((totalizer + f.liters) * 10) / 10;
-    await must(
+    const plein = await must(
       admin.from("fuel_entries").insert({
         organization_id: orgId,
         vehicle_id: vehicleByDriver[f.driver]!.id,
@@ -317,9 +332,10 @@ export async function seedDemo(admin: SupabaseClient = createAdminSupabaseClient
         unit_price: f.occurred_at < at(addDays(today, -9), "10:15") ? 1.512 : 1.49,
         vehicle_km: f.vehicle_km,
         status: "manual",
-      }),
+      }).select("id").single(),
       "plein",
     );
+    if (ecart) pleinsAvecEcart.push({ id: plein.id as string, driver: f.driver });
   }
 
   const vid = (reg: string) => vehicles.find((v) => v.registration === reg)!.id;
@@ -339,6 +355,8 @@ export async function seedDemo(admin: SupabaseClient = createAdminSupabaseClient
     ]),
     "congés",
   );
+
+  await seedModulesRecents({ admin, orgId, userIds, services, vehicleByDriver, today, at, affectations, pleinsAvecEcart });
 
   return orgId;
 }

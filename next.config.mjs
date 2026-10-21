@@ -57,6 +57,12 @@ const nextConfig = {
     // just makes sure that copy (and the embedded NotoSans font the
     // generators actually ask for) gets traced.
       "/api/payslips/generate": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      // Bulletins de paie (lib/paie/pdf.tsx) : génération, et bulletin
+      // validé de la démo (lib/demo/seed-modules.ts), reconstruit par le
+      // cron nocturne ou au premier « Voir la démo ».
+      "/api/paie/bulletins": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      "/api/cron/reset-demo": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      "/demo": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/api/ticpe/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/api/ticpe/export-lines/[id]": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
     },

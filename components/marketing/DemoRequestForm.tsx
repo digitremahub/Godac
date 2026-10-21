@@ -5,8 +5,8 @@ import { Card } from "@/components/ui";
 
 const ACTIVITES = ["Messagerie / colis", "Lots complets / longue distance", "Régional / distribution", "Frigorifique", "Citerne / vrac", "Déménagement", "Autre"];
 
-/** Formulaire « Demander une démo » (page /contact). */
-export function DemoRequestForm({ plan, modules }: { plan: string | null; modules: string[] }) {
+/** Formulaire « Demander une démo » (page /contact) ; aussi « Demander un essai » GO Navigation (?essai=go-navigation). */
+export function DemoRequestForm({ plan, modules, activite, besoin }: { plan: string | null; modules: string[]; activite?: string; besoin?: string }) {
   const [etat, setEtat] = useState<"saisie" | "envoi" | "envoye">("saisie");
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -77,7 +77,7 @@ export function DemoRequestForm({ plan, modules }: { plan: string | null; module
           </label>
           <label className="block">
             <span className="label">Activité</span>
-            <select name="activity" className="input" defaultValue="">
+            <select name="activity" className="input" defaultValue={activite ?? ""}>
               <option value="">—</option>
               {ACTIVITES.map((a) => (
                 <option key={a}>{a}</option>
@@ -87,7 +87,7 @@ export function DemoRequestForm({ plan, modules }: { plan: string | null; module
         </div>
         <label className="block">
           <span className="label">Votre besoin</span>
-          <textarea name="message" className="input min-h-28" placeholder="Carburant, planning, paie, tournées colis… ce que vous voulez simplifier en premier." />
+          <textarea name="message" className="input min-h-28" defaultValue={besoin} placeholder="Carburant, planning, paie, tournées colis… ce que vous voulez simplifier en premier." />
         </label>
         {/* Champ piège : invisible pour un humain. */}
         <input name="site_web" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" />

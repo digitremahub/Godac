@@ -8,6 +8,7 @@ import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { calculerBulletin } from "@/lib/paie/calcul";
 import { contextePaie, moisValide } from "@/lib/paie/donnees";
 import { genererBulletinPdf } from "@/lib/paie/pdf";
+import { donneesBulletinPdf } from "@/lib/paie/rendu-bulletin";
 import { variablesSchema } from "@/lib/paie/schemas";
 import { fusionnerRetenues } from "@/lib/paie/acomptes";
 import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
@@ -15,9 +16,6 @@ import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
 export const maxDuration = 60;
 
 const bodySchema = z.object({ user_id: z.string().uuid(), mois: z.string(), variables: variablesSchema });
-
-const CONTRATS: Record<string, string> = { cdi: "CDI", cdd: "CDD", interim: "Intérim", apprentissage: "Apprentissage" };
-const jour = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" });
 
 /**
  * Calcule le bulletin du mois avec le moteur (lib/paie/calcul.ts), en
@@ -58,51 +56,7 @@ export async function POST(req: Request) {
 
   let pdf: Buffer;
   try {
-    pdf = await genererBulletinPdf({
-      bulletin,
-      periode: new Date(`${ctx.debut}T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }),
-      dateEdition: new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }),
-      employeur: {
-        nom: organisation?.name ?? "Entreprise",
-        adresse: organisation?.legal_address ?? null,
-        siret: organisation?.siret ?? null,
-        ape: organisation?.ape_code ?? null,
-        urssaf: organisation?.urssaf_number ?? null,
-        convention: organisation?.convention_collective ?? null,
-      },
-      salarie: {
-        nom: employe.full_name,
-        adresse: employe.address ?? null,
-        emploi: employe.role_title ?? null,
-        matricule: dossier?.matricule ?? null,
-        secu: dossier?.social_security_number ?? null,
-        coefficient: ctx.coefficient,
-        groupe: ctx.salarie.groupe ?? null,
-        statut: ctx.salarie.cadre ? "Cadre" : "Non-cadre",
-        entree: dossier?.hire_date ? jour(dossier.hire_date) : null,
-        contrat: dossier?.contract_type ? (CONTRATS[dossier.contract_type] ?? dossier.contract_type) : null,
-      },
-      cumuls: {
-        brut: ctx.cumuls.brut + bulletin.brut,
-        netImposable: ctx.cumuls.netImposable + bulletin.netImposable,
-        heuresSupExonerees: ctx.cumuls.heuresSupExonerees + bulletin.heuresSupExonerees,
-      },
-      conges: { pris: variables.joursCongesPris },
-      pied: {
-        totaux: [
-          { libelle: "Heures", mois: bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heures + bulletin.heures.base + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
-          { libelle: "H. sup.", mois: bulletin.heures.sup25 + bulletin.heures.sup50, annee: ctx.cumulsPied.heuresSup + bulletin.heures.sup25 + bulletin.heures.sup50, heures: true },
-          { libelle: "Brut", mois: bulletin.brut, annee: ctx.cumulsPied.brut + bulletin.brut },
-          { libelle: "Plafond SS", mois: ctx.legal.pmss, annee: ctx.cumulsPied.plafondSs + ctx.legal.pmss },
-          { libelle: "Net imposable", mois: bulletin.netImposable, annee: ctx.cumulsPied.netImposable + bulletin.netImposable },
-          { libelle: "Ch. patronales", mois: bulletin.totalPatronal, annee: ctx.cumulsPied.chargesPatronales + bulletin.totalPatronal },
-          { libelle: "Coût global", mois: bulletin.coutEmployeur, annee: ctx.cumulsPied.coutGlobal + bulletin.coutEmployeur },
-          { libelle: "Total versé", mois: bulletin.netAPayer, annee: ctx.cumulsPied.totalVerse + bulletin.netAPayer },
-          { libelle: "Allègements", mois: bulletin.reductionGenerale, annee: ctx.cumulsPied.allegements + bulletin.reductionGenerale },
-        ],
-        conges: { n1: ctx.conges.n1, n: ctx.conges.n },
-      },
-    });
+    pdf = await genererBulletinPdf(donneesBulletinPdf({ ctx, bulletin, variables, organisation, employe, dossier }));
   } catch (e) {
     console.error("paie: rendu PDF impossible", e);
     return NextResponse.json({ error: "Échec de la génération du PDF." }, { status: 500 });
