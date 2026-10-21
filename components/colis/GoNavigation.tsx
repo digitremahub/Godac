@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as PointerEventReact } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource, Map as CarteMap, Marker, StyleSpecification } from "maplibre-gl";
 import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconPointRelais, IconRamasse, IconX } from "@/components/layout/icons";
@@ -22,7 +22,20 @@ import type { CibleDepot } from "@/lib/colis/reordonner";
 import type { SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { COULEURS_CARTE, styliserGodac, type StyleCarte } from "@/lib/colis/style-carte";
-import { ECART_MAX_M, RAYON_ARRIVEE_M, arretApresCloture, arretSuivi, distanceM, doitRecalculer, formatDistance, formatDuree, meilleureInsertion, projeterSurTrace, resteSurTrace } from "@/lib/colis/navigation";
+import {
+  ECART_MAX_M,
+  RAYON_ARRIVEE_M,
+  arretApresCloture,
+  arretSuivi,
+  distanceM,
+  doitRecalculer,
+  formatDistance,
+  formatDuree,
+  longueursCumulees,
+  meilleureInsertion,
+  projeterSurTrace,
+  resteSurTrace,
+} from "@/lib/colis/navigation";
 import {
   DEPLACEMENT_CAP_M,
   PITCH_CONDUITE,
@@ -36,6 +49,7 @@ import {
   zoomSelonVitesse,
   type EtatCamera,
 } from "@/lib/colis/conduite";
+import { CLE_FEUILLE, FEUILLE_PAR_DEFAUT, adresseCourte, decouperTrace, lirePositionFeuille, positionApresGeste, repeteAdresse, type PositionFeuille } from "@/lib/colis/feuille";
 import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
 
 /** Fond vectoriel gratuit et sans clé déjà utilisé par l'app (OpenStreetMap via OpenFreeMap), recoloré aux couleurs GODAC. */
@@ -97,6 +111,8 @@ export interface GoNavigationProps {
   /** Suite complète de la tournée (heure de fin estimée de l'app chauffeur). */
   onItineraire: (it: Itineraire | null) => void;
   onPosition: (p: Point) => void;
+  /** Trajet en cours d'enregistrement pour l'historique (indicateur discret, RGPD). */
+  traceActive?: boolean;
 }
 
 /**
@@ -113,7 +129,10 @@ export function GoNavigation(p: GoNavigationProps) {
   const { run, stops, lists, horaires, avancement } = p;
   const fige = run.status === "done";
   const [selection, setSelection] = useState<string | null>(null);
-  const [feuille, setFeuille] = useState<"reduit" | "liste">("reduit");
+  const [feuille, setFeuilleBrute] = useState<PositionFeuille>(FEUILLE_PAR_DEFAUT);
+  /** Dernière position réduite / moyenne choisie (la liste pleine n'est qu'un passage). */
+  const feuilleMemo = useRef<PositionFeuille>(FEUILLE_PAR_DEFAUT);
+  const [menuVues, setMenuVues] = useState(false);
   const [position, setPosition] = useState<Point | null>(null);
   const [erreurGps, setErreurGps] = useState<string | null>(null);
   const [vue, setVue] = useState<Vue>("ensemble");
@@ -189,9 +208,15 @@ export function GoNavigation(p: GoNavigationProps) {
       m.on("load", () => {
         m.addSource("suite", { type: "geojson", data: VIDE });
         m.addSource("trajet", { type: "geojson", data: VIDE });
-        m.addLayer({ id: "suite", type: "line", source: "suite", paint: { "line-color": COULEURS_CARTE.marine, "line-width": 3, "line-opacity": 0.35, "line-dasharray": [1.5, 1.5] }, layout: { "line-cap": "round", "line-join": "round" } });
-        m.addLayer({ id: "trajet-bord", type: "line", source: "trajet", paint: { "line-color": COULEURS_CARTE.marine, "line-width": 12, "line-opacity": 0.85 }, layout: { "line-cap": "round", "line-join": "round" } });
-        m.addLayer({ id: "trajet", type: "line", source: "trajet", paint: { "line-color": COULEURS_CARTE.teal, "line-width": 7 }, layout: { "line-cap": "round", "line-join": "round" } });
+        m.addSource("parcouru", { type: "geojson", data: VIDE });
+        const rond = { "line-cap": "round", "line-join": "round" } as const;
+        // Suite de la tournée : pointillés gris-orange clair, discrets.
+        m.addLayer({ id: "suite", type: "line", source: "suite", paint: { "line-color": COULEURS_CARTE.suiteTournee, "line-width": 3, "line-opacity": 0.7, "line-dasharray": [1.5, 1.5] }, layout: rond });
+        // Déjà parcouru (du début du tracé jusqu'au véhicule) : orange clair, semi-transparent.
+        m.addLayer({ id: "parcouru", type: "line", source: "parcouru", paint: { "line-color": COULEURS_CARTE.orangeParcouru, "line-width": 7, "line-opacity": 0.55 }, layout: rond });
+        // Reste à parcourir : orange foncé GODAC sur un liseré marine (contraste sur le papier et les routes blanches).
+        m.addLayer({ id: "trajet-bord", type: "line", source: "trajet", paint: { "line-color": COULEURS_CARTE.marine, "line-width": 11, "line-opacity": 0.85 }, layout: rond });
+        m.addLayer({ id: "trajet", type: "line", source: "trajet", paint: { "line-color": COULEURS_CARTE.orangeEncre, "line-width": 7 }, layout: rond });
         setPrete(true);
       });
       // Le chauffeur déplace, zoome ou tourne la carte : on arrête de le
@@ -328,7 +353,7 @@ export function GoNavigation(p: GoNavigationProps) {
         e.stopPropagation();
         if (s.status === "pending") {
           setSelection(s.id);
-          setFeuille("reduit");
+          setFeuilleBrute((f) => (f === "pleine" ? feuilleMemo.current : f));
         }
       });
       marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([Number(s.lng), Number(s.lat)]).addTo(m));
@@ -437,6 +462,7 @@ export function GoNavigation(p: GoNavigationProps) {
       cibleTracee.current = null;
       setTrajet(null);
       (carte.current?.getSource("trajet") as GeoJSONSource | undefined)?.setData(VIDE);
+      (carte.current?.getSource("parcouru") as GeoJSONSource | undefined)?.setData(VIDE);
       return;
     }
     const maintenant = Date.now();
@@ -540,6 +566,21 @@ export function GoNavigation(p: GoNavigationProps) {
   const manoeuvre = courante ? placees[courante.index]! : null;
   const suivante = courante ? (placees[courante.index + 1] ?? null) : null;
 
+  // Itinéraire découpé à la position du véhicule : parcouru en orange clair, reste en orange foncé.
+  const cumulTrajet = useMemo(() => (trajetValide && trajetValide.ligne.length > 1 ? longueursCumulees(trajetValide.ligne) : null), [trajetValide]);
+  useEffect(() => {
+    const m = carte.current;
+    if (!m || !prete) return;
+    const source = (id: string) => m.getSource(id) as GeoJSONSource | undefined;
+    if (!trajetValide || !cumulTrajet) {
+      source("parcouru")?.setData(VIDE);
+      return;
+    }
+    const { parcouru, restant } = decouperTrace(trajetValide.ligne, position, cumulTrajet);
+    source("trajet")?.setData(ligneGeo(restant));
+    source("parcouru")?.setData(ligneGeo(parcouru));
+  }, [prete, trajetValide, cumulTrajet, position]);
+
   // ——— Guidage vocal (désactivé par défaut, mémorisé) ———
   useEffect(() => {
     try {
@@ -586,7 +627,7 @@ export function GoNavigation(p: GoNavigationProps) {
   const indexCible = cible ? restants.indexOf(cible) : -1;
   useEffect(() => {
     const el = defile.current;
-    if (!el || indexCible < 0 || feuille !== "reduit") return;
+    if (!el || indexCible < 0 || feuille !== "moyenne") return;
     const carteEl = el.children[indexCible] as HTMLElement | undefined;
     if (!carteEl) return;
     const gauche = carteEl.offsetLeft - (el.clientWidth - carteEl.offsetWidth) / 2;
@@ -616,18 +657,64 @@ export function GoNavigation(p: GoNavigationProps) {
     }, 140);
   }
 
-  // Tirer la feuille vers le haut (liste complète) ou vers le bas (cartes).
+  // ——— Feuille : trois positions (réduite, moyenne, pleine), mémorisée ———
+  useEffect(() => {
+    try {
+      const v = lirePositionFeuille(localStorage.getItem(CLE_FEUILLE));
+      feuilleMemo.current = v;
+      setFeuilleBrute(v);
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
+  function setFeuille(v: PositionFeuille) {
+    setFeuilleBrute(v);
+    if (v === "pleine") return;
+    feuilleMemo.current = v;
+    try {
+      localStorage.setItem(CLE_FEUILLE, v);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+  // Poignée : tirer vers le haut ou le bas (geste), appui ou clavier pour alterner.
   const glisse = useRef<{ y: number } | null>(null);
-  function poigneeBas(e: PointerEventReact) {
-    glisse.current = { y: e.clientY };
-  }
-  function poigneeHaut(e: PointerEventReact) {
-    const dy = glisse.current ? e.clientY - glisse.current.y : 0;
-    glisse.current = null;
-    if (dy < -30) setFeuille("liste");
-    else if (dy > 30) setFeuille("reduit");
-    else setFeuille((f) => (f === "liste" ? "reduit" : "liste"));
-  }
+  /** Heure du dernier geste traité : le clic qui le suit est ignoré (sinon, double changement). */
+  const gesteA = useRef(0);
+  const poignee = {
+    onPointerDown(e: PointerEventReact<HTMLElement>) {
+      glisse.current = { y: e.clientY };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture indisponible */
+      }
+    },
+    onPointerUp(e: PointerEventReact<HTMLElement>) {
+      if (!glisse.current) return;
+      const dy = e.clientY - glisse.current.y;
+      glisse.current = null;
+      gesteA.current = Date.now();
+      setFeuille(positionApresGeste(feuille, dy, typeof window !== "undefined" ? window.innerHeight : 800));
+    },
+    onPointerCancel() {
+      glisse.current = null;
+    },
+    onClick() {
+      // Clic clavier (Entrée, Espace) : pas de pointeur, on alterne.
+      if (Date.now() - gesteA.current < 500) return;
+      setFeuille(positionApresGeste(feuille, 0));
+    },
+    onKeyDown(e: KeyboardEventReact<HTMLElement>) {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFeuille(positionApresGeste(feuille, e.key === "ArrowUp" ? -60 : 60));
+      }
+    },
+    "aria-expanded": feuille !== "reduite",
+    "aria-controls": "go-feuille-contenu",
+  };
+  const libellePoignee = feuille === "reduite" ? "Agrandir la feuille de la tournée" : feuille === "moyenne" ? "Feuille de la tournée : tirer vers le haut pour tous les arrêts, vers le bas pour réduire" : "Réduire la liste des arrêts";
 
   // ——— Liste complète (recherche, glisser-déposer) ———
   const terme = recherche.trim().toLocaleLowerCase("fr-FR");
@@ -647,7 +734,7 @@ export function GoNavigation(p: GoNavigationProps) {
 
   function choisirDansListe(s: Stop) {
     setSelection(s.id);
-    setFeuille("reduit");
+    setFeuille("moyenne");
   }
 
   const faits = stops.length - restants.length;
@@ -659,39 +746,35 @@ export function GoNavigation(p: GoNavigationProps) {
         <div ref={conteneur} className="h-full w-full" role="region" aria-label="Carte de navigation" />
       </div>
 
-      {/* Bandeau de guidage */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-2">
-          <button type="button" onClick={p.onFermer} className="flex w-12 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la liste des arrêts">
+      {/* Bandeau de guidage (compact : la carte garde la place) */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-1.5">
+          <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la liste des arrêts">
             ‹
           </button>
-          <div className="min-w-0 flex-1 rounded-2xl bg-marine px-4 py-2.5 text-white shadow-pop" aria-live="polite">
+          <div className="min-w-0 flex-1 rounded-2xl bg-marine px-3 py-2 text-white shadow-pop" aria-live="polite">
             {fige ? (
               <p className="py-1 text-sm font-semibold">Tournée clôturée : consultation seulement.</p>
             ) : cible && manoeuvre && courante && !arrive ? (
               <>
-                <div className="flex items-center gap-3">
-                  <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-12 w-12 shrink-0 text-teal" />
+                <div className="flex items-center gap-2.5">
+                  <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-10 w-10 shrink-0 text-teal" />
                   <div className="min-w-0">
-                    <p className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistanceManoeuvre(courante.distanceM)}</p>
-                    <p className="line-clamp-2 text-sm font-semibold leading-snug">{texteManoeuvre(manoeuvre)}</p>
+                    <p className="font-display text-2xl font-bold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</p>
+                    <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug">{texteManoeuvre(manoeuvre)}</p>
                   </div>
                 </div>
                 {suivante && (
-                  <p className="mt-1.5 flex items-center gap-1.5 border-t border-white/15 pt-1.5 text-xs text-white/75">
-                    <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-4 w-4 shrink-0 text-white/75" />
+                  <p className="mt-1 flex items-center gap-1 border-t border-white/15 pt-1 text-[11px] leading-tight text-white/75">
+                    <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-3.5 w-3.5 shrink-0 text-white/75" />
                     <span className="truncate">Puis : {texteManoeuvre(suivante)}</span>
                   </p>
                 )}
-                <p className="mt-1 truncate text-[11px] text-white/70">
-                  {formatDistance(distanceAffichee)}
-                  {dureeAffichee !== null && ` · ${formatDuree(dureeAffichee)}`} · Arrêt {numero(cible)} · {cible.address}
-                </p>
               </>
             ) : cible ? (
               <>
                 <p className="flex items-baseline gap-2">
-                  <span className="font-display text-2xl font-bold tabular-nums text-teal">{arrive ? "Arrivé" : formatDistance(distanceAffichee)}</span>
+                  <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{arrive ? "Arrivé" : formatDistance(distanceAffichee)}</span>
                   {!arrive && dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
                   {trajet?.approx && !arrive && <span className="text-[11px] text-white/60">(estimation)</span>}
                 </p>
@@ -702,43 +785,100 @@ export function GoNavigation(p: GoNavigationProps) {
             ) : (
               <p className="py-1 text-sm font-semibold">Tous les arrêts sont faits 🎉</p>
             )}
-            <p className="mt-1 text-[11px] text-white/60">
+            <p className="mt-0.5 truncate text-[11px] leading-tight text-white/65">
+              {cible && manoeuvre && courante && !arrive && (
+                <>
+                  {formatDistance(distanceAffichee)}
+                  {dureeAffichee !== null && ` · ${formatDuree(dureeAffichee)}`} ·{" "}
+                </>
+              )}
               {faits}/{stops.length} faits
               {avancement.finEstimee && ` · fin ≈ ${heureFin(avancement.finEstimee)}`}
             </p>
           </div>
         </div>
         {erreurGps ? (
-          <p className="pointer-events-auto mx-auto mt-2 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">{erreurGps}</p>
+          <p className="pointer-events-auto mx-auto mt-1.5 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">{erreurGps}</p>
         ) : (
-          !position && <p className="mx-auto mt-2 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
+          !position && <p className="mx-auto mt-1.5 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
         )}
-        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl flex-wrap justify-end gap-2">
+        <div className="pointer-events-auto relative mx-auto mt-1.5 flex max-w-xl items-center justify-end gap-1.5">
+          {p.traceActive && (
+            <span className="mr-auto flex items-center gap-1 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-navy/65 shadow-card" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
+              <span className="h-1.5 w-1.5 rounded-full bg-orange-ink" aria-hidden="true" /> Trajet enregistré
+            </span>
+          )}
           {!fige && run.status === "in_progress" && (
-            <button type="button" onClick={() => setAjout(true)} className="rounded-full bg-teal px-4 py-2.5 text-sm font-bold text-marine shadow-pop">
+            <button type="button" onClick={() => setAjout(true)} className="min-h-[44px] rounded-full bg-teal px-3.5 text-xs font-bold text-marine shadow-pop">
               + Adresse
             </button>
           )}
-          <button type="button" onClick={toutVoir} className="rounded-full bg-surface px-3 py-2.5 text-xs font-semibold text-navy shadow-pop">
-            Toute la tournée
-          </button>
-          {vue === "conduite" ? (
-            <button type="button" onClick={voirTrajet} className="rounded-full bg-surface px-3 py-2.5 text-xs font-semibold text-navy shadow-pop">
-              Vue d&apos;ensemble
-            </button>
-          ) : (
+          {vue === "ensemble" && (
             <button
               type="button"
               onClick={recentrer}
               disabled={!position}
-              className="rounded-full bg-marine px-3 py-2.5 text-xs font-semibold text-white shadow-pop disabled:opacity-50"
+              className="min-h-[44px] rounded-full bg-marine px-3.5 text-xs font-semibold text-white shadow-pop disabled:opacity-50"
               title={position ? undefined : "En attente de la position GPS"}
             >
               Conduite
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setMenuVues((v) => !v)}
+            className="min-h-[44px] rounded-full bg-surface px-3.5 text-xs font-semibold text-navy shadow-pop"
+            aria-haspopup="menu"
+            aria-expanded={menuVues}
+            aria-controls="go-menu-vues"
+          >
+            Vues ▾
+          </button>
+          {menuVues && (
+            <>
+              <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuVues(false)} />
+              <div id="go-menu-vues" role="menu" aria-label="Vues de la carte" className="absolute right-0 top-full z-10 mt-1.5 flex w-56 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
+                  onClick={() => {
+                    setMenuVues(false);
+                    voirTrajet();
+                  }}
+                >
+                  Vue d&apos;ensemble du trajet
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
+                  onClick={() => {
+                    setMenuVues(false);
+                    toutVoir();
+                  }}
+                >
+                  Toute la tournée
+                </button>
+                {vue !== "conduite" && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!position}
+                    className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5 disabled:opacity-50"
+                    onClick={() => {
+                      setMenuVues(false);
+                      recentrer();
+                    }}
+                  >
+                    Conduite (suivre ma position)
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
-        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl flex-col items-end gap-2">
+        <div className="pointer-events-auto mx-auto mt-1.5 flex max-w-xl flex-col items-end gap-1.5">
           <button
             type="button"
             onClick={basculerVoix}
@@ -767,132 +907,170 @@ export function GoNavigation(p: GoNavigationProps) {
         <button
           type="button"
           onClick={recentrer}
-          className="absolute left-3 z-10 flex items-center gap-1.5 rounded-full bg-marine px-4 py-3 text-sm font-bold text-white shadow-pop"
+          className="absolute left-3 z-10 flex min-h-[44px] items-center gap-1.5 rounded-full bg-marine px-4 text-sm font-bold text-white shadow-pop"
           style={{ bottom: `${Math.round(Math.min(hauteur, (typeof window !== "undefined" ? window.innerHeight : 800) * 0.6)) + 12}px` }}
         >
           <IconNavigation className="h-4 w-4 text-teal" /> Recentrer
         </button>
       )}
 
-      {/* Feuille de la tournée */}
+      {/* Feuille de la tournée : réduite (une ligne), moyenne (carte de l'arrêt), pleine (liste) */}
       <div
         ref={feuilleRef}
-        className={`absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-3xl bg-paper shadow-pop transition-[max-height] duration-300 ${feuille === "liste" ? "max-h-[85dvh]" : "max-h-[60dvh]"}`}
+        className={`absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-3xl bg-paper shadow-pop transition-[max-height] duration-300 motion-reduce:transition-none ${
+          feuille === "pleine" ? "max-h-[85dvh]" : feuille === "moyenne" ? "max-h-[40dvh] min-h-[220px]" : ""
+        }`}
       >
-        <button
-          type="button"
-          className="flex w-full touch-none flex-col items-center gap-1 pb-1 pt-2"
-          onPointerDown={poigneeBas}
-          onPointerUp={poigneeHaut}
-          aria-expanded={feuille === "liste"}
-          aria-label={feuille === "liste" ? "Réduire la liste des arrêts" : "Voir tous les arrêts"}
-        >
-          <span className="h-1.5 w-10 rounded-full bg-navy/20" aria-hidden="true" />
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-navy/55">
-            {restants.length} restant{restants.length > 1 ? "s" : ""}
-            {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis`} · {feuille === "liste" ? "réduire ▾" : "tous les arrêts ▴"}
-          </span>
-        </button>
-
-        {feuille === "reduit" ? (
-          restants.length ? (
-            <div
-              ref={defile}
-              onScroll={auDefilement}
-              className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-[6%] pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 [scrollbar-width:none]"
-              aria-label="Arrêts à faire (glisser pour passer d'un arrêt à l'autre)"
-            >
-              {restants.map((s) => (
-                <CarteArret
-                  key={s.id}
-                  stop={s}
-                  numero={numero(s)}
-                  total={stops.length}
-                  suivi={s.id === cible?.id}
-                  prochain={s.id === restants[0]?.id}
-                  nomListe={multi ? nomListe(s) : null}
-                  horaires={horaires}
-                  fige={fige}
-                  plusieurs={restants.length > 1}
-                  busy={p.busy}
-                  onTerminer={p.onTerminer}
-                  onCloture={p.onCloture}
-                  onTelephone={p.onTelephone}
-                  onHoraires={p.onHoraires}
-                  onFiche={p.onFiche}
-                  onPasser={p.onPasser}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 text-center">
-              <p className="font-display text-lg font-bold">Tournée terminée 🎉</p>
-              <button type="button" className="btn-primary !py-3" onClick={p.onFermer}>
-                {fige ? "Retour à la tournée" : "Retour à la liste pour clôturer"}
-              </button>
-            </div>
-          )
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex gap-2">
-              <label className="relative block flex-1">
-                <span className="sr-only">Rechercher dans la tournée</span>
-                <input className="input" type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Adresse, client, n° de colis…" />
-              </label>
-              {!fige && (
-                <button type="button" className="btn-secondary shrink-0 !px-3 text-xs" disabled={p.busy} onClick={() => void p.onReoptimiser()}>
-                  {p.busy ? "Calcul…" : "Recalculer l'ordre"}
-                </button>
+        {feuille === "reduite" ? (
+          <div id="go-feuille-contenu" className="relative flex items-center gap-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5">
+            <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-navy/20" aria-hidden="true" />
+            <button type="button" className="flex min-h-[52px] min-w-0 flex-1 touch-none flex-col justify-center text-left" aria-label={libellePoignee} {...poignee}>
+              {cible ? (
+                <>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-teal-ink">
+                    Arrêt {numero(cible)} / {stops.length}
+                    {cible.parcel_count > 1 && ` · ${cible.parcel_count} colis`}
+                  </span>
+                  <span className="truncate text-sm font-bold leading-snug text-navy">{adresseCourte(cible.address)}</span>
+                </>
+              ) : (
+                <span className="text-sm font-bold text-navy">Tournée terminée 🎉</span>
               )}
-            </div>
-            {terme && visibles.length === 0 && <p className="text-center text-sm text-navy/60">Aucun arrêt restant ne correspond.</p>}
-            <ZoneTri ordre={ordreTri} onDeposer={(id, c) => void p.onDeposer(id, c)} actif={triActif}>
-              <ol className="flex flex-col gap-2">
-                {visibles.map((s) => {
-                  const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
-                    <li
-                      ref={props?.ref}
-                      style={props?.style}
-                      className={`relative flex items-center gap-2.5 overflow-hidden rounded-xl bg-surface py-2.5 pr-2 shadow-card ${s.id === cible?.id ? "ring-2 ring-teal" : ""} ${estRamasse(s) || estPointRelais(s) ? "pl-4" : "pl-2.5"}`}
-                    >
-                      <EncocheArret stop={s} />
-                      {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
-                      <button type="button" className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => choisirDansListe(s)} aria-label={`Naviguer vers l'arrêt ${numero(s)} — ${s.address}`}>
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{numero(s)}</span>
-                        <span className="min-w-0">
-                          {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
-                            <span className="mb-1 flex flex-wrap gap-1">
-                              <BadgeArret stop={s} />
-                              {!s.phone && <BadgeSansTelephone />}
-                            </span>
-                          )}
-                          <span className="block text-sm font-semibold leading-snug">{s.address}</span>
-                          <span className="block truncate text-xs text-navy/60">{[multi && nomListe(s), s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</span>
-                          <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
-                        </span>
-                      </button>
-                      {!fige && (
-                        <button type="button" className="shrink-0 rounded-full border border-navy/15 px-2.5 py-2 text-xs font-semibold text-navy/80" onClick={() => p.onCloture(s, "choix")} aria-label={`Clôturer ${s.recipient ?? s.address}`}>
-                          Clôturer
-                        </button>
-                      )}
-                      {s.phone && (
-                        <a href={lienTel(s.phone)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address}`}>
-                          <IconPhone className="h-4 w-4" />
-                        </a>
-                      )}
-                    </li>
-                  );
-                  return triActif ? <ArretTriable key={s.id} id={s.id} rendu={rendu} /> : <Fragment key={s.id}>{rendu(null, null)}</Fragment>;
-                })}
-              </ol>
-            </ZoneTri>
-            {faits > 0 && (
-              <button type="button" className="btn-ghost justify-center text-sm text-navy/60" onClick={p.onFermer}>
-                {faits} arrêt{faits > 1 ? "s" : ""} terminé{faits > 1 ? "s" : ""} : voir dans la liste
+            </button>
+            {cible && !fige ? (
+              <button type="button" className="btn-primary min-h-[52px] shrink-0 justify-center !px-4 text-base" onClick={() => p.onTerminer(cible)}>
+                {estRamasse(cible) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(cible) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(cible)}
               </button>
+            ) : (
+              !cible && (
+                <button type="button" className="btn-primary min-h-[52px] shrink-0 !px-3 text-sm" onClick={p.onFermer}>
+                  {fige ? "Retour" : "Clôturer"}
+                </button>
+              )
             )}
+            <button
+              type="button"
+              className="flex h-[52px] w-11 shrink-0 items-center justify-center rounded-xl bg-navy/[0.06] text-xl font-bold text-navy"
+              onClick={() => setFeuille("moyenne")}
+              aria-label="Plus d'actions : agrandir la carte de l'arrêt"
+              aria-expanded={false}
+              aria-controls="go-feuille-contenu"
+            >
+              ⋯
+            </button>
           </div>
+        ) : (
+          <>
+            <button type="button" className="flex min-h-[44px] w-full touch-none flex-col items-center justify-center gap-1 pb-1 pt-1.5" aria-label={libellePoignee} {...poignee}>
+              <span className="h-1.5 w-10 rounded-full bg-navy/20" aria-hidden="true" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-navy/55">
+                {restants.length} restant{restants.length > 1 ? "s" : ""}
+                {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis`} · {feuille === "pleine" ? "réduire ▾" : "tous les arrêts ▴"}
+              </span>
+            </button>
+
+            {feuille === "moyenne" ? (
+              restants.length ? (
+                <div
+                  id="go-feuille-contenu"
+                  ref={defile}
+                  onScroll={auDefilement}
+                  className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[6%] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-0.5 [scrollbar-width:none]"
+                  aria-label="Arrêts à faire (glisser pour passer d'un arrêt à l'autre)"
+                >
+                  {restants.map((s) => (
+                    <CarteArret
+                      key={s.id}
+                      stop={s}
+                      numero={numero(s)}
+                      total={stops.length}
+                      suivi={s.id === cible?.id}
+                      prochain={s.id === restants[0]?.id}
+                      nomListe={multi ? nomListe(s) : null}
+                      horaires={horaires}
+                      fige={fige}
+                      plusieurs={restants.length > 1}
+                      busy={p.busy}
+                      onTerminer={p.onTerminer}
+                      onCloture={p.onCloture}
+                      onTelephone={p.onTelephone}
+                      onHoraires={p.onHoraires}
+                      onFiche={p.onFiche}
+                      onPasser={p.onPasser}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div id="go-feuille-contenu" className="flex flex-col items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 text-center">
+                  <p className="font-display text-lg font-bold">Tournée terminée 🎉</p>
+                  <button type="button" className="btn-primary !py-3" onClick={p.onFermer}>
+                    {fige ? "Retour à la tournée" : "Retour à la liste pour clôturer"}
+                  </button>
+                </div>
+              )
+            ) : (
+              <div id="go-feuille-contenu" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <div className="flex gap-2">
+                  <label className="relative block flex-1">
+                    <span className="sr-only">Rechercher dans la tournée</span>
+                    <input className="input" type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Adresse, client, n° de colis…" />
+                  </label>
+                  {!fige && (
+                    <button type="button" className="btn-secondary shrink-0 !px-3 text-xs" disabled={p.busy} onClick={() => void p.onReoptimiser()}>
+                      {p.busy ? "Calcul…" : "Recalculer l'ordre"}
+                    </button>
+                  )}
+                </div>
+                {terme && visibles.length === 0 && <p className="text-center text-sm text-navy/60">Aucun arrêt restant ne correspond.</p>}
+                <ZoneTri ordre={ordreTri} onDeposer={(id, c) => void p.onDeposer(id, c)} actif={triActif}>
+                  <ol className="flex flex-col gap-2">
+                    {visibles.map((s) => {
+                      const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
+                        <li
+                          ref={props?.ref}
+                          style={props?.style}
+                          className={`relative flex items-center gap-2.5 overflow-hidden rounded-xl bg-surface py-2.5 pr-2 shadow-card ${s.id === cible?.id ? "ring-2 ring-teal" : ""} ${estRamasse(s) || estPointRelais(s) ? "pl-4" : "pl-2.5"}`}
+                        >
+                          <EncocheArret stop={s} />
+                          {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
+                          <button type="button" className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => choisirDansListe(s)} aria-label={`Naviguer vers l'arrêt ${numero(s)} — ${s.address}`}>
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{numero(s)}</span>
+                            <span className="min-w-0">
+                              {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
+                                <span className="mb-1 flex flex-wrap gap-1">
+                                  <BadgeArret stop={s} />
+                                  {!s.phone && <BadgeSansTelephone />}
+                                </span>
+                              )}
+                              <span className="block text-sm font-semibold leading-snug">{s.address}</span>
+                              <span className="block truncate text-xs text-navy/60">{[multi && nomListe(s), s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`].filter(Boolean).join(" · ") || " "}</span>
+                              <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
+                            </span>
+                          </button>
+                          {!fige && (
+                            <button type="button" className="shrink-0 rounded-full border border-navy/15 px-2.5 py-2 text-xs font-semibold text-navy/80" onClick={() => p.onCloture(s, "choix")} aria-label={`Clôturer ${s.recipient ?? s.address}`}>
+                              Clôturer
+                            </button>
+                          )}
+                          {s.phone && (
+                            <a href={lienTel(s.phone)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address}`}>
+                              <IconPhone className="h-4 w-4" />
+                            </a>
+                          )}
+                        </li>
+                      );
+                      return triActif ? <ArretTriable key={s.id} id={s.id} rendu={rendu} /> : <Fragment key={s.id}>{rendu(null, null)}</Fragment>;
+                    })}
+                  </ol>
+                </ZoneTri>
+                {faits > 0 && (
+                  <button type="button" className="btn-ghost justify-center text-sm text-navy/60" onClick={p.onFermer}>
+                    {faits} arrêt{faits > 1 ? "s" : ""} terminé{faits > 1 ? "s" : ""} : voir dans la liste
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -989,7 +1167,7 @@ function IconeHautParleur({ actif, className }: { actif: boolean; className?: st
   );
 }
 
-/** Carte d'un arrêt dans la feuille : adresse, client, horaires et toutes les actions. */
+/** Carte d'un arrêt dans la feuille (position moyenne), compacte : adresse, client, livré / échec, puis appel, horaires, fiche et « Plus ». */
 function CarteArret({
   stop: s,
   numero,
@@ -1019,82 +1197,84 @@ function CarteArret({
   plusieurs: boolean;
   busy: boolean;
 } & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser">) {
+  const secondaire = [s.business_name, s.recipient].filter((v): v is string => Boolean(v) && !repeteAdresse(v, s.address)).join(" · ");
+  const [plus, setPlus] = useState(false);
+  const pastilleBase = "inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-xs font-semibold";
+  const pastilleAction = `${pastilleBase} bg-navy/[0.05]`;
   return (
     <section
-      className={`relative flex w-[88%] max-w-md shrink-0 snap-center flex-col gap-3 overflow-hidden rounded-2xl border-2 bg-surface p-4 shadow-card ${suivi ? bordureArret(s, "border-teal/70") : "border-transparent"}`}
+      className={`relative flex max-h-full w-[88%] max-w-md shrink-0 snap-center flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border-2 bg-surface px-3.5 py-3 shadow-card ${suivi ? bordureArret(s, "border-teal/70") : "border-transparent"}`}
       aria-label={`Arrêt ${numero} sur ${total}${suivi ? ", en cours de navigation" : ""}`}
     >
       <EncocheArret stop={s} large />
       <div>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-ink">
           <BadgeArret stop={s} />
           <span>
             Arrêt {numero} / {total}
             {prochain ? " · prochain" : ""}
             {s.parcel_count > 1 && ` · ${s.parcel_count} colis${estRamasse(s) ? " à ramasser" : estPointRelais(s) ? " à déposer" : ""}`}
             {formatPoids(s.weight_kg) && ` · ${formatPoids(s.weight_kg)}`}
+            {nomListe && <span className="normal-case tracking-normal text-navy/55"> · {nomListe}</span>}
           </span>
         </p>
-        {nomListe && <p className="mt-0.5 text-[11px] font-semibold text-navy/55">{nomListe}</p>}
-        <p className="mt-1 font-display text-lg font-bold leading-snug">{s.address}</p>
-        {(s.recipient || s.business_name) && <p className="text-sm text-navy/75">{[s.business_name, s.recipient].filter(Boolean).join(" · ")}</p>}
-        {s.notes && <p className="mt-0.5 line-clamp-2 text-xs text-navy/65">{s.notes}</p>}
-        {s.lat === null && <p className="mt-0.5 text-xs font-semibold text-orange-ink">Adresse non localisée : ouvrez-la dans Waze ou Google Maps.</p>}
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
-          <button type="button" className="rounded-full bg-navy/[0.05] px-2.5 py-1 text-xs font-semibold" onClick={() => onHoraires(s)}>
-            🕘 Horaires
-          </button>
-          <button type="button" className="rounded-full bg-navy/[0.05] px-2.5 py-1 text-xs font-semibold" onClick={() => onFiche(s)}>
-            Fiche
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        {s.phone ? (
-          <>
-            <a href={lienTel(s.phone)} className="btn-secondary col-span-2 justify-center border-teal/70 !px-2 !py-3 text-sm text-teal-ink">
-              <IconPhone className="h-4 w-4" /> Appeler
-            </a>
-            <a href={lienSms(s.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !px-2 !py-3" aria-label="Envoyer un SMS « j'arrive »">
-              <IconMessage className="h-4 w-4" />
-            </a>
-          </>
-        ) : (
-          <button type="button" className="btn-secondary col-span-3 justify-center !px-2 !py-3 text-sm" disabled={fige} onClick={() => onTelephone(s)}>
-            <IconPhone className="h-4 w-4" /> Ajouter le n°
-          </button>
-        )}
-        <details className="relative">
-          <summary className="btn-secondary h-full list-none justify-center !px-2 !py-3 [&::-webkit-details-marker]:hidden" aria-label="Ouvrir dans Waze ou Google Maps">
-            <IconNavigation className="h-4 w-4" />
-          </summary>
-          <div className="absolute bottom-full right-0 z-10 mb-2 flex w-44 flex-col gap-1 rounded-xl bg-surface p-2 shadow-pop">
-            <a href={waze(s)} target="_blank" rel="noreferrer" className="btn-ghost justify-start !py-2 text-sm">
-              <IconNavigation className="h-4 w-4" /> Waze
-            </a>
-            <a href={gmaps(s)} target="_blank" rel="noreferrer" className="btn-ghost justify-start !py-2 text-sm">
-              <IconMapPin className="h-4 w-4" /> Google Maps
-            </a>
-          </div>
-        </details>
+        <p className="mt-0.5 line-clamp-2 text-lg font-bold leading-snug">{s.address}</p>
+        {secondaire && <p className="truncate text-sm text-navy/75">{secondaire}</p>}
+        {s.notes && <p className="line-clamp-1 text-xs text-navy/65">{s.notes}</p>}
+        {s.lat === null && <p className="text-xs font-semibold text-orange-ink">Adresse non localisée : ouvrez-la dans Waze ou Google Maps.</p>}
       </div>
 
       {!fige && (
         <div className="grid grid-cols-[2fr_1fr] gap-2">
-          <button type="button" className="btn-primary justify-center !py-3.5 text-base" onClick={() => onTerminer(s)}>
+          <button type="button" className="btn-primary min-h-[48px] justify-center !py-2.5 text-base" onClick={() => onTerminer(s)}>
             {estRamasse(s) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(s) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(s)}
           </button>
-          <button type="button" className="btn-secondary justify-center !py-3.5 text-orange-ink" onClick={() => onCloture(s, "echec")}>
+          <button type="button" className="btn-secondary min-h-[48px] justify-center !px-2 !py-2.5 text-orange-ink" onClick={() => onCloture(s, "echec")}>
             <IconX className="h-5 w-5" /> Échec
           </button>
         </div>
       )}
-      {!fige && plusieurs && (
-        <button type="button" className="btn-ghost -mt-1 justify-center !py-1.5 text-xs text-navy/60" disabled={busy} onClick={() => onPasser(s)}>
-          Passer plus tard (en fin de tournée)
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
+        {s.phone ? (
+          <a href={lienTel(s.phone)} className={`${pastilleBase} bg-teal/15 text-teal-ink`} aria-label={`Appeler ${s.recipient ?? s.address}`}>
+            <IconPhone className="h-4 w-4" /> Appeler
+          </a>
+        ) : (
+          <button type="button" className={pastilleAction} disabled={fige} onClick={() => onTelephone(s)}>
+            <IconPhone className="h-4 w-4" /> Ajouter le n°
+          </button>
+        )}
+        <button type="button" className={pastilleAction} onClick={() => onHoraires(s)}>
+          🕘 Horaires
         </button>
+        <button type="button" className={pastilleAction} onClick={() => onFiche(s)}>
+          Fiche
+        </button>
+        <button type="button" className={pastilleAction} onClick={() => setPlus((v) => !v)} aria-expanded={plus} aria-controls={`go-plus-${s.id}`}>
+          ⋯ Plus
+        </button>
+      </div>
+      {plus && (
+        <div id={`go-plus-${s.id}`} className="grid grid-cols-2 gap-1.5">
+          {s.phone && (
+            <a href={lienSms(s.phone, SMS_ARRIVEE)} className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
+              <IconMessage className="h-4 w-4" /> SMS « j&apos;arrive »
+            </a>
+          )}
+          <a href={waze(s)} target="_blank" rel="noreferrer" className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
+            <IconNavigation className="h-4 w-4" /> Waze
+          </a>
+          <a href={gmaps(s)} target="_blank" rel="noreferrer" className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
+            <IconMapPin className="h-4 w-4" /> Google Maps
+          </a>
+          {!fige && plusieurs && (
+            <button type="button" className="btn-ghost col-span-2 min-h-[44px] justify-center !py-2 text-sm text-navy/70" disabled={busy} onClick={() => onPasser(s)}>
+              Passer plus tard (en fin de tournée)
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

@@ -11,6 +11,12 @@ export const COULEURS_CARTE = {
   teal: "#1BE4C1",
   tealEncre: "#0F766E",
   orange: "#FF6B35",
+  /** Orange foncé GODAC (token « orange-ink ») : itinéraire restant vers l'arrêt, 5,7:1 sur le papier. */
+  orangeEncre: "#C2410C",
+  /** Portion de l'itinéraire déjà parcourue : orange clair désaturé (affichée semi-transparente). */
+  orangeParcouru: "#F2B08E",
+  /** Suite de la tournée (pointillés) : gris-orange clair, discret. */
+  suiteTournee: "#C9A08C",
   gold: "#F5C842",
   relais: "#A78BFA",
   paper: "#F6F7FB",

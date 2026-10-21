@@ -54,9 +54,12 @@ export default function ConfidentialitePage() {
             <strong>Position pendant une tournée colis en cours :</strong> si l&apos;entreprise utilise le module Tournée
             colis, la position du chauffeur est partagée avec l&apos;encadrement pour suivre la livraison (fin de tournée
             estimée, réponse aux clients), <strong>uniquement pendant la tournée en cours</strong> et application ouverte.
-            Seule la dernière position est conservée (aucun historique de trajet) ; elle est effacée à la clôture de la
-            tournée, et le chauffeur peut la masquer à tout moment (pause). En dehors de ces moments, GODAC ne suit
-            jamais vos déplacements.
+            La dernière position est effacée à la clôture de la tournée. Pour analyser les trajets (km réellement
+            parcourus, durée de conduite, arrêts prolongés), le trajet emprunté est aussi enregistré pendant la tournée en
+            cours seulement (un point tous les 20 m environ, ou toutes les 30 s à l&apos;arrêt), signalé au chauffeur par
+            l&apos;indication « Trajet enregistré », visible par le chauffeur pour ses tournées et par la direction et
+            les managers de l&apos;entreprise, et conservé 1 an. Le chauffeur peut masquer sa position à tout moment
+            (pause) : rien n&apos;est alors enregistré. En dehors de ces moments, GODAC ne suit jamais vos déplacements.
           </li>
           <li>
             <strong>Amendes :</strong> avis de contravention liés aux véhicules, pour permettre à l&apos;entreprise
@@ -173,7 +176,8 @@ export default function ConfidentialitePage() {
             de travail et la paie.
           </li>
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
-          <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée (aucun historique).</li>
+          <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée.</li>
+          <li>Trajet enregistré pendant une tournée colis en cours* : 1 an, puis effacé.</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>
           <li>

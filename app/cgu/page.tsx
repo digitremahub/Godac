@@ -49,7 +49,8 @@ export default function CguPage() {
           comme sous-traitant. Le détail figure dans la{" "}
           <Link href="/confidentialite" className={lien}>politique de confidentialité</Link>. La position GPS n’est relevée
           qu’au moment du pointage et, pour les chauffeurs, pendant une tournée colis en cours (suivi de la livraison par
-          l’Entreprise, dernière position seulement, effacée à la clôture, masquable pendant une pause). En dehors de ces
+          l’Entreprise : dernière position effacée à la clôture, trajet emprunté conservé 1 an pour l’analyse des trajets,
+          masquable pendant une pause). En dehors de ces
           moments, GODAC ne suit jamais les déplacements.
         </p>
       </Article>
