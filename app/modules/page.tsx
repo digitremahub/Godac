@@ -10,15 +10,11 @@ import { libellePalier } from "@/lib/organization/paliers";
 export const metadata = {
   title: "Modules & tarifs — GODAC",
   description:
-    "Tarifs GODAC : contrôle du carburant inclus dans tous les plans, puis Tournée colis avec GO Navigation, planning duplicable, paie transport et autres modules à la carte.",
+    "Tarifs GODAC : contrôle du carburant inclus dans tous les plans, puis flotte, planning duplicable, paie transport et autres modules à la carte, dont la Tournée colis avec GO Navigation.",
 };
 
 /** Nouveautés mises en avant (texte seul : les prix restent ceux du catalogue ci-dessous). */
 const NOUVEAUTES = [
-  {
-    titre: "Tournée colis + GO Navigation",
-    texte: "Scan et lecture d'étiquette, optimisation sur les km routiers avec les horaires des pros, navigation intégrée en vue conduite, ramasses, points relais et preuves de livraison.",
-  },
   {
     titre: "Planning duplicable",
     texte: "Grille chauffeurs × jours, glisser-déposer, duplication d'une journée ou de la semaine jusqu'à 8 semaines, copier-coller et modèles de tournées.",
@@ -26,6 +22,10 @@ const NOUVEAUTES = [
   {
     titre: "Paie transport",
     texte: "Modèle IDCC 16 (paniers, primes, heures sup., prélèvement à la source, net social), validation par la direction, acomptes déduits automatiquement.",
+  },
+  {
+    titre: "Tournée colis + GO Navigation",
+    texte: "Scan et lecture d'étiquette, optimisation sur les km routiers avec les horaires des pros, navigation intégrée en vue conduite, ramasses, points relais et preuves de livraison.",
   },
 ];
 

@@ -28,14 +28,15 @@ import {
 } from "@/components/layout/icons";
 
 const TRUST_STATS = [
-  { icon: IconNavigation, label: "Tournée colis guidée" },
   { icon: IconDroplet, label: "Chaque litre tracé" },
   { icon: IconCalendar, label: "Planning dupliqué en un clic" },
   { icon: IconCoins, label: "Paie transport" },
+  { icon: IconNavigation, label: "Tournée colis guidée" },
 ];
 
 /**
- * Tournée colis + GO Navigation, le différenciateur : du bureau au
+ * Tournée colis + GO Navigation, présentée en dernier sur l'accueil
+ * (avant-première, pour éveiller la curiosité) : du bureau au
  * terrain, puis le suivi. Chaque point correspond à une fonction livrée
  * (components/colis, app/api/colis).
  */
@@ -209,7 +210,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 Vos opérations, <span className="text-teal">mieux optimisées</span>.
               </h1>
               <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                GODAC réunit les outils essentiels pour organiser vos ressources, planifier les opérations, suivre leur exécution et piloter votre activité. La première spécialisation est le transport : la Tournée colis avec GO Navigation pour vos chauffeurs, le planning, le carburant, la flotte et la paie. Le socle est conçu pour accueillir progressivement d’autres métiers et leurs besoins spécifiques.
+                GODAC réunit les outils essentiels pour organiser vos ressources, planifier les opérations, suivre leur exécution et piloter votre activité. La première spécialisation est le transport, avec le carburant au cœur : pleins, cuves, écarts et TICPE. Viennent ensuite la flotte, le planning, la paie et les équipes, et, pour vos chauffeurs, GO Navigation. Le socle est conçu pour accueillir progressivement d’autres métiers et leurs besoins spécifiques.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
@@ -220,9 +221,9 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                   <IconPlay className="h-4 w-4 text-teal" />
                   Voir la démo
                 </a>
-                <a href="#tournee-colis" className="inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-teal hover:underline">
-                  <IconNavigation className="h-4 w-4" />
-                  Découvrir GO Navigation
+                <a href="#carburant" className="inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-teal hover:underline">
+                  Le module carburant
+                  <IconArrowRight className="h-4 w-4" />
                 </a>
               </div>
               <ul className="flex flex-wrap gap-x-6 gap-y-2">
@@ -251,8 +252,8 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                   <IconCheck className="h-5 w-5" />
                 </span>
                 <span>
-                  <span className="block text-sm font-bold">Arrêt livré · QR code scanné</span>
-                  <span className="block text-xs text-navy/60">Historique visible par la direction</span>
+                  <span className="block text-sm font-bold">Écart carburant traité · plein justifié</span>
+                  <span className="block text-xs text-navy/60">Chaque litre tracé jusqu&apos;à la TICPE</span>
                 </span>
               </div>
             </div>
@@ -272,79 +273,6 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               </li>
             ))}
           </ul>
-        </div>
-      </section>
-
-      {/* ── Tournée colis + GO Navigation : le différenciateur ── */}
-      <section id="tournee-colis" className="scroll-mt-6 bg-surface py-20 lg:py-24">
-        <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <div>
-              <p className="kicker !text-teal-ink">Tournée colis + GO Navigation</p>
-              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du scan du colis à la dernière livraison, dans un seul écran.</h2>
-              <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-                La Tournée colis prépare la journée depuis le planning, puis GO Navigation guide le chauffeur sur le terrain, aux
-                couleurs GODAC&nbsp;: navigation, arrêts, ramasses, points relais et preuves de livraison, sans changer d&apos;application.
-              </p>
-              <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link href="/contact?essai=go-navigation" className="btn-primary !px-6 !py-3.5 text-base">
-                  Demander un essai
-                  <IconArrowRight className="h-5 w-5" />
-                </Link>
-                <a href="/demo?as=chauffeur" className="btn-secondary !px-5 !py-3.5 text-base">
-                  <IconPlay className="h-4 w-4" />
-                  Démo côté chauffeur
-                </a>
-              </div>
-              <p className="mt-3 text-sm text-navy/60">Essai GO Navigation de 30 jours, sur invitation, après un premier échange avec notre équipe.</p>
-            </div>
-            <MaquetteGoNavigation />
-          </div>
-          <ul className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {TOURNEE_COLIS.map((bloc) => (
-              <li key={bloc.title} className="card flex flex-col gap-4">
-                <span className="flex items-center gap-3">
-                  <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
-                    <bloc.icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="text-lg">{bloc.title}</h3>
-                </span>
-                <ul className="flex flex-col gap-2.5">
-                  {bloc.points.map((point) => (
-                    <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
-                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── Planning duplicable + Paie transport ── */}
-      <section id="planning-paie" className="scroll-mt-6 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-5 sm:px-6 lg:grid-cols-2">
-          {PLANNING_PAIE.map((bloc) => (
-            <div key={bloc.kicker} className="card flex flex-col gap-4">
-              <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal text-marine">
-                <bloc.icon className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="kicker !text-teal-ink">{bloc.kicker}</p>
-                <h2 className="mt-2 text-2xl leading-tight sm:text-[28px]">{bloc.title}</h2>
-              </div>
-              <ul className="flex flex-col gap-2.5">
-                {bloc.points.map((point) => (
-                  <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
-                    <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -374,6 +302,74 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             Inclus dès le plan Essentiel, avec la lecture automatique des tickets.
           </p>
         </div>
+      </section>
+
+      {/* ── Planning duplicable + Paie transport ── */}
+      <section id="planning-paie" className="scroll-mt-6 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-5 sm:px-6 lg:grid-cols-2">
+          {PLANNING_PAIE.map((bloc) => (
+            <div key={bloc.kicker} className="card flex flex-col gap-4">
+              <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal text-marine">
+                <bloc.icon className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="kicker !text-teal-ink">{bloc.kicker}</p>
+                <h2 className="mt-2 text-2xl leading-tight sm:text-[28px]">{bloc.title}</h2>
+              </div>
+              <ul className="flex flex-col gap-2.5">
+                {bloc.points.map((point) => (
+                  <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
+                    <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Modules ── */}
+      <section className="bg-surface py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-5 sm:px-6">
+          <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-xl">
+              <p className="kicker !text-teal-ink">Tout-en-un</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Et le reste, sans un outil de plus.</h2>
+              <p className="mt-3 text-pretty text-navy/65">
+                Activez les modules dont vous avez besoin, quand vous en avez besoin&nbsp;: ils remplacent les logiciels de
+                flotte, de messagerie d&apos;équipe et de suivi RH que vous payez à part.
+              </p>
+            </div>
+            <Link href="/modules" className="btn-secondary w-fit">
+              Modules & tarifs
+              <IconArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <li key={feature.title} className="card flex flex-col gap-3 transition-[border-color,box-shadow] hover:border-navy/15 hover:shadow-raised">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
+                  <feature.icon className="h-5 w-5" />
+                </span>
+                <h3 className="text-lg">{feature.title}</h3>
+                <p className="text-pretty text-sm leading-relaxed text-navy/65">{feature.description}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section id="comment-ca-marche" className="mx-auto max-w-6xl scroll-mt-6 px-5 py-20 sm:px-6 lg:py-28">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <p className="kicker !text-teal-ink">Comment ça marche</p>
+          <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
+          <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+            Des ressources au suivi opérationnel, retrouvez les fonctionnalités disponibles dans un environnement de gestion unifié.
+          </p>
+        </div>
+        <ImageCarousel slides={HOME_SLIDES} />
       </section>
 
       {/* ── Demo ── */}
@@ -414,43 +410,48 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section id="comment-ca-marche" className="mx-auto max-w-6xl scroll-mt-6 px-5 py-20 sm:px-6 lg:py-28">
-        <div className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="kicker !text-teal-ink">Comment ça marche</p>
-          <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
-          <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-            Des ressources au suivi opérationnel, retrouvez les fonctionnalités disponibles dans un environnement de gestion unifié.
-          </p>
-        </div>
-        <ImageCarousel slides={HOME_SLIDES} />
-      </section>
-
-      {/* ── Modules ── */}
-      <section className="bg-surface py-20 lg:py-28">
+      {/* ── GO Navigation : en dernier, pour éveiller la curiosité ── */}
+      <section id="tournee-colis" className="scroll-mt-6 bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="max-w-xl">
-              <p className="kicker !text-teal-ink">Tout-en-un</p>
-              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Et le reste, sans un outil de plus.</h2>
-              <p className="mt-3 text-pretty text-navy/65">
-                Activez les modules dont vous avez besoin, quand vous en avez besoin&nbsp;: ils remplacent les logiciels de
-                flotte, de messagerie d&apos;équipe et de suivi RH que vous payez à part.
+          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div>
+              <p className="kicker !text-teal-ink">En avant-première · Tournée colis + GO Navigation</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du scan du colis à la dernière livraison, dans un seul écran.</h2>
+              <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+                La Tournée colis prépare la journée depuis le planning, puis GO Navigation guide le chauffeur sur le terrain, aux
+                couleurs GODAC&nbsp;: navigation, arrêts, ramasses, points relais et preuves de livraison, sans changer d&apos;application.
               </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3">
+                <Link href="/contact?essai=go-navigation" className="btn-primary !px-6 !py-3.5 text-base">
+                  Demander un essai
+                  <IconArrowRight className="h-5 w-5" />
+                </Link>
+                <a href="/demo?as=chauffeur" className="btn-secondary !px-5 !py-3.5 text-base">
+                  <IconPlay className="h-4 w-4" />
+                  Démo côté chauffeur
+                </a>
+              </div>
+              <p className="mt-3 text-sm text-navy/60">Essai GO Navigation de 30 jours, sur invitation, après un premier échange avec notre équipe.</p>
             </div>
-            <Link href="/modules" className="btn-secondary w-fit">
-              Modules & tarifs
-              <IconArrowRight className="h-4 w-4" />
-            </Link>
+            <MaquetteGoNavigation />
           </div>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <li key={feature.title} className="card flex flex-col gap-3 transition-[border-color,box-shadow] hover:border-navy/15 hover:shadow-raised">
-                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
-                  <feature.icon className="h-5 w-5" />
+          <ul className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {TOURNEE_COLIS.map((bloc) => (
+              <li key={bloc.title} className="card flex flex-col gap-4">
+                <span className="flex items-center gap-3">
+                  <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
+                    <bloc.icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="text-lg">{bloc.title}</h3>
                 </span>
-                <h3 className="text-lg">{feature.title}</h3>
-                <p className="text-pretty text-sm leading-relaxed text-navy/65">{feature.description}</p>
+                <ul className="flex flex-col gap-2.5">
+                  {bloc.points.map((point) => (
+                    <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
+                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
