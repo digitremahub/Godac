@@ -28,6 +28,12 @@ export const ACTIONS_AUDIT = {
   registre_personnel_modifie: "Registre du personnel : fiche complétée",
   registre_personnel_export: "Registre du personnel exporté",
   inscription_go_navigation: "Compte d'essai GO Navigation créé (invitation)",
+  amende_creee: "Amende enregistrée (avis joint)",
+  amende_responsable_valide: "Amende : responsable validé et notifié",
+  amende_statut_modifie: "Amende réglée / contestée / classée",
+  contestation_creee: "Contestation client enregistrée (pièces jointes)",
+  contestation_responsable_valide: "Contestation client : responsable validé et notifié",
+  contestation_cloturee: "Contestation client réglée / contestée / classée",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 
