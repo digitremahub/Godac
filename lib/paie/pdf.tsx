@@ -389,7 +389,7 @@ function BulletinDoc({ d, logo }: { d: BulletinPdfData; logo: LogoPdf | null }) 
                 {sec === derniereCotisation && (
                   <>
                     <Rangee s={s} style={s.total} cellStyle={s.totalCell} cells={["Total des cotisations et contributions", "", "", eur(b.totalSalarial), "", "", eur(b.totalPatronal)]} />
-                    <Rangee s={s} style={s.netAvantImpot} cellStyle={s.totalCell} cells={["Net à payer avant impôt sur le revenu", "", "", "", eur(b.netAvantImpot), "", ""]} />
+                    <Rangee s={s} style={s.netAvantImpot} cellStyle={s.totalCell} cells={["Salaire net après cotisations", "", "", "", eur(b.netAvantImpot), "", ""]} />
                   </>
                 )}
               </View>
@@ -399,14 +399,18 @@ function BulletinDoc({ d, logo }: { d: BulletinPdfData; logo: LogoPdf | null }) 
 
         <View style={s.synthese} wrap={false}>
           <View style={s.recap}>
-            <RecapLigne s={s} libelle="Net à payer avant impôt sur le revenu" montant={`${eur(b.netAvantImpot)} €`} />
+            {/* Ordre du bulletin clarifié : le « net à payer avant impôt » est ce
+                qui serait versé sans le prélèvement à la source (indemnités
+                non soumises ajoutées, acomptes et saisies déduits). */}
+            <RecapLigne s={s} libelle="Salaire net après cotisations" montant={`${eur(b.netAvantImpot)} €`} />
+            {b.fraisNonSoumis > 0 && <RecapLigne s={s} libelle="Indemnités et frais non soumis" montant={`+ ${eur(b.fraisNonSoumis)} €`} />}
+            {(b.totalRetenues ?? 0) > 0 && <RecapLigne s={s} libelle="Acomptes et saisies (détail ci-dessus)" montant={`− ${eur(b.totalRetenues)} €`} />}
+            <RecapLigne s={s} libelle="Net à payer avant impôt sur le revenu" montant={`${eur(b.netAPayer + b.montantPas)} €`} />
             <RecapLigne
               s={s}
               libelle={`Impôt sur le revenu prélevé à la source${typeTaux ? ` (${typeTaux.toLowerCase()}, ${num(b.tauxPas)} %)` : ` (${num(b.tauxPas)} %)`}`}
               montant={`− ${eur(b.montantPas)} €`}
             />
-            {b.fraisNonSoumis > 0 && <RecapLigne s={s} libelle="Indemnités et frais non soumis" montant={`+ ${eur(b.fraisNonSoumis)} €`} />}
-            {(b.totalRetenues ?? 0) > 0 && <RecapLigne s={s} libelle="Acomptes et saisies (détail ci-dessus)" montant={`− ${eur(b.totalRetenues)} €`} />}
             <View style={s.recapSep} />
             <RecapLigne s={s} libelle="Montant net social" montant={`${eur(b.netSocial)} €`} />
             <RecapLigne s={s} libelle="Net imposable" montant={`${eur(b.netImposable)} €`} />
