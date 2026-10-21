@@ -1,4 +1,4 @@
-import type { ParametresLegaux } from "@/lib/paie/types";
+import type { ParametresLegaux, ParametresMaintien } from "@/lib/paie/types";
 
 /**
  * Paramètres légaux de la paie, versionnés par date d'effet. Un seul
@@ -46,6 +46,12 @@ const BASE_2026: Omit<ParametresLegaux, "effetAu" | "smicHoraire" | "tauxNeutreP
   // RGDU (décret 2025-1446) : C = Tmin + Tdelta × [½ × (3 × SMIC / R − 1)]^1,75,
   // SMIC de référence = celui du 1er janvier 2026 (décret 2026-509).
   reductionGenerale: { smicHoraireReference: 12.02, plafondSmic: 3, tMin: 0.02, tDelta: { fnal010: 0.3781, fnal050: 0.3821 }, puissance: 1.75 },
+  // CSG sur revenus de remplacement (IJSS) : 6,2 % dont 3,8 % déductible, + CRDS 0,5 %.
+  ijss: { csgDeductible: 3.8, csgNonDeductible: 2.4, crds: 0.5 },
+  // PASS 2026 = 12 × PMSS. Contribution patronale spécifique sur la part
+  // exonérée de l'indemnité de rupture conventionnelle : 40 % depuis le
+  // 1er janvier 2026 (LFSS 2026, 30 % auparavant) — à vérifier par le comptable.
+  rupture: { pass: 48060, contributionPatronale: 40 },
 };
 
 /** Grille du taux neutre 2025, appliquée jusqu'au 30 avril 2026. */
@@ -96,19 +102,58 @@ const TAUX_NEUTRE_2026: ParametresLegaux["tauxNeutrePas"] = [
   { jusqua: null, taux: 43 },
 ];
 
+/**
+ * Versions des paramètres, la plus récente en tête. Chaque bulletin
+ * prend la version en vigueur au 1er jour de son mois.
+ */
 export const PARAMETRES: ParametresLegaux[] = [
   // SMIC revalorisé au 1er juin 2026 (arrêté du 22/05/2026).
-  { ...BASE_2026, effetAu: "2026-06-01", smicHoraire: 12.31, tauxNeutrePas: TAUX_NEUTRE_2026 },
-  { ...BASE_2026, effetAu: "2026-05-01", smicHoraire: 12.02, tauxNeutrePas: TAUX_NEUTRE_2026 },
-  { ...BASE_2026, effetAu: "2026-01-01", smicHoraire: 12.02, tauxNeutrePas: TAUX_NEUTRE_2025 },
+  { ...BASE_2026, effetAu: "2026-06-01", libelle: "SMIC du 1er juin 2026", smicHoraire: 12.31, tauxNeutrePas: TAUX_NEUTRE_2026 },
+  { ...BASE_2026, effetAu: "2026-05-01", libelle: "Taux neutre PAS 2026", smicHoraire: 12.02, tauxNeutrePas: TAUX_NEUTRE_2026 },
+  { ...BASE_2026, effetAu: "2026-01-01", libelle: "Paramètres 2026", smicHoraire: 12.02, tauxNeutrePas: TAUX_NEUTRE_2025 },
 ];
 
+/**
+ * Date jusqu'à laquelle les paramètres ci-dessus sont réputés à jour
+ * (fin de l'année civile vérifiée). Au-delà, la dernière version
+ * s'applique encore, mais les réglages affichent une alerte et le test
+ * lib/paie/__tests__/parametres.test.ts échoue un mois à l'avance :
+ * ajouter la version de l'année suivante (SMIC, PMSS, taux) et reporter
+ * cette date.
+ */
+export const PARAMETRES_A_JOUR_JUSQUAU = "2026-12-31";
+
 /** Jeu de paramètres applicable à une date (AAAA-MM-JJ). */
-export function parametresLegauxAu(date: string): ParametresLegaux {
-  const jeu = PARAMETRES.find((p) => p.effetAu <= date) ?? PARAMETRES[PARAMETRES.length - 1];
+export function parametresLegauxAu(date: string, versions: ParametresLegaux[] = PARAMETRES): ParametresLegaux {
+  const jeu = versions.find((p) => p.effetAu <= date) ?? versions[versions.length - 1];
   if (!jeu) throw new Error("Aucun paramètre de paie défini.");
   return jeu;
 }
+
+/** Version appliquée à une date, et si elle est couverte par des paramètres vérifiés. */
+export function versionParametres(date: string): { effetAu: string; libelle: string; aJour: boolean; aJourJusquau: string } {
+  const jeu = parametresLegauxAu(date);
+  return { effetAu: jeu.effetAu, libelle: jeu.libelle ?? `Paramètres du ${jeu.effetAu}`, aJour: date <= PARAMETRES_A_JOUR_JUSQUAU && date >= (PARAMETRES[PARAMETRES.length - 1]?.effetAu ?? date), aJourJusquau: PARAMETRES_A_JOUR_JUSQUAU };
+}
+
+/**
+ * Maintien de salaire légal (art. D1226-1 et D1226-2 du code du travail) :
+ * après 1 an d'ancienneté, 30 jours à 90 % puis 30 jours à 66,66 % de la
+ * rémunération brute, + 10 jours par période par tranche de 5 ans
+ * d'ancienneté au-delà de la 1re année, 90 jours au plus par période ;
+ * carence de 7 jours, sauf AT / maladie professionnelle (art. D1226-3).
+ */
+export const MAINTIEN_LEGAL: ParametresMaintien = {
+  ancienneteMinMois: 12,
+  carenceMaladie: 7,
+  carenceAt: 0,
+  taux1: 90,
+  taux2: 66.66,
+  dureeBase: 30,
+  dureeIncrement: 10,
+  trancheAnnees: 5,
+  dureeMax: 90,
+};
 
 /**
  * Modèle de paie par défaut d'une entreprise de transport (IDCC 16),

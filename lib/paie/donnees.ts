@@ -1,14 +1,15 @@
 import "server-only";
 import { statutValide, type StatutValidation } from "@/lib/paie/validation";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parametresLegauxAu, FRAIS_CONVENTIONNELS, MODELE_TRANSPORT } from "@/lib/paie/parametres";
-import { HEURES_EQUIVALENCE } from "@/lib/paie/calcul";
+import { parametresLegauxAu, FRAIS_CONVENTIONNELS, MAINTIEN_LEGAL, MODELE_TRANSPORT } from "@/lib/paie/parametres";
+import { HEURES_EQUIVALENCE, salaireMensuelContrat } from "@/lib/paie/calcul";
+import { calculerSortie } from "@/lib/paie/sortie";
 import { countWeekdays } from "@/lib/business/payroll";
 import { PRESENCE_STATUS } from "@/lib/organization/poles";
 import { acomptesDuBulletin, type AcomptesDuBulletin } from "@/lib/paie/acomptes";
 import { acomptesJusquAu } from "@/lib/paie/acomptes-serveur";
-import { periodesDuMois, soldeConges, type Reprise, type SoldeConges } from "@/lib/paie/conges";
-import type { ParametresEntreprise, ParametresLegaux, ProfilSalarie, RegimeTransport, VariablesMois } from "@/lib/paie/types";
+import { debutPeriode, natureAbsenceConges, periodesDuMois, soldeConges, type Reprise, type SoldeConges } from "@/lib/paie/conges";
+import type { ArretTravail, ElementsSortie, MotifSortie, ParametresEntreprise, ParametresLegaux, ParametresMaintien, ProfilSalarie, RegimeTransport, TypeArret, VariablesMois } from "@/lib/paie/types";
 
 /** "2026-10" → bornes du mois (fin incluse). */
 export function bornesMois(mois: string): { debut: string; fin: string } {
@@ -29,9 +30,26 @@ export async function parametresEntreprise(supabase: SupabaseClient, organizatio
   // Colonnes du modèle transport (migration 20261024000003) : absentes = modèle par défaut.
   const ccnSal = "ccn_salarial_rate" in p ? nombre(p.ccn_salarial_rate) : MODELE_TRANSPORT.entreprise.conventionnelles.salarial;
   const ccnPat = "ccn_patronal_rate" in p ? nombre(p.ccn_patronal_rate) : MODELE_TRANSPORT.entreprise.conventionnelles.patronal;
+  // Maintien conventionnel (migration 20261026000002) : absent = légal seul.
+  const maintien: ParametresMaintien | null =
+    "sick_pay_rate_1" in p
+      ? {
+          ancienneteMinMois: nombre(p.sick_pay_min_seniority_months) ?? MAINTIEN_LEGAL.ancienneteMinMois,
+          carenceMaladie: nombre(p.sick_pay_waiting_days) ?? MAINTIEN_LEGAL.carenceMaladie,
+          carenceAt: nombre(p.sick_pay_waiting_days_at) ?? MAINTIEN_LEGAL.carenceAt,
+          taux1: nombre(p.sick_pay_rate_1) ?? MAINTIEN_LEGAL.taux1,
+          taux2: nombre(p.sick_pay_rate_2) ?? MAINTIEN_LEGAL.taux2,
+          dureeBase: nombre(p.sick_pay_base_days) ?? MAINTIEN_LEGAL.dureeBase,
+          dureeIncrement: nombre(p.sick_pay_step_days) ?? MAINTIEN_LEGAL.dureeIncrement,
+          trancheAnnees: nombre(p.sick_pay_step_years) ?? MAINTIEN_LEGAL.trancheAnnees,
+          dureeMax: nombre(p.sick_pay_max_days) ?? MAINTIEN_LEGAL.dureeMax,
+        }
+      : null;
   const santeSal = nombre(p.health_pmss_salarial_rate);
   const santePat = nombre(p.health_pmss_patronal_rate);
   return {
+    maintien,
+    subrogation: Boolean(p.subrogation_enabled),
     conventionnelles: ccnSal !== null || ccnPat !== null ? { salarial: ccnSal ?? 0, patronal: ccnPat ?? 0 } : null,
     santePmss: santeSal !== null || santePat !== null ? { salarial: santeSal ?? 0, patronal: santePat ?? 0 } : null,
     dfs: { taux: nombre(p.dfs_rate) ?? MODELE_TRANSPORT.entreprise.dfs.taux, active: Boolean(p.dfs_enabled) },
@@ -71,6 +89,16 @@ export interface ContextePaie {
   /** Solde de reprise saisi au profil (N-1, N, date). */
   repriseConges: Reprise | null;
   /** Cumuls de l'année pour le pied de bulletin (bulletins validés antérieurs). */
+  /** Sortie enregistrée (employee_exits) et son calcul ; `elements` seulement le mois de la sortie. */
+  sortie: {
+    enregistrement: LigneSortie;
+    duMois: boolean;
+    elements: ElementsSortie;
+    indemniteLegale: number | null;
+    avertissements: string[];
+  } | null;
+  /** Date d'entrée (employee_files). */
+  dateEntree: string | null;
   cumulsPied: { heures: number; heuresSup: number; brut: number; plafondSs: number; netImposable: number; chargesPatronales: number; coutGlobal: number; totalVerse: number; allegements: number };
   bulletinExistant: {
     id: string;
@@ -80,6 +108,38 @@ export interface ContextePaie {
     valideLe: string | null;
   } | null;
 }
+
+export interface LigneSortie {
+  exit_date: string;
+  reason: MotifSortie;
+  notice_type: "effectue" | "paye" | "non_paye" | "sans";
+  notice_days: number | null;
+  notice_amount: number | null;
+  severance_amount: number | null;
+  jobs_held: string | null;
+  notes: string | null;
+}
+
+/** Arrêt de work_stoppages → arrêt du moteur. */
+export function arretDepuisLigne(l: Record<string, unknown>): ArretTravail {
+  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    id: String(l.id),
+    type: String(l.stoppage_type) as TypeArret,
+    du: String(l.start_date),
+    au: String(l.end_date),
+    prolongationDu: (l.extension_of as string | null) ?? null,
+    ijssBrutesJour: n(l.daily_ijss_gross),
+    ijssNettesJour: n(l.daily_ijss_net),
+    joursIjss: n(l.ijss_days),
+    maintienManuel: n(l.manual_maintenance),
+  };
+}
+
+const decaleMois = (iso: string, n: number) => {
+  const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1, 12)).toISOString().slice(0, 10);
+};
 
 /**
  * Tout ce qu'il faut pour préparer le bulletin d'un salarié pour un mois :
@@ -146,6 +206,40 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     // Demandes d'acompte acceptées jusqu'à ce mois (lib/paie/acomptes.ts).
     acomptesJusquAu(supabase, userId, debut),
   ]);
+  // Arrêts, sortie, date d'entrée, bulletins validés des deux dernières
+  // années (dixième, salaire de référence). Tables de la migration
+  // 20261026000002 absentes : erreurs ignorées, sans arrêt ni sortie.
+  const depuis = `${Number(mois.slice(0, 4)) - 2}-06-01`;
+  const [arretsLignes, sortieLigne, { data: dossier }, { data: historique }] = await Promise.all([
+    supabase.from("work_stoppages").select("*").eq("user_id", userId).gte("end_date", depuis).lte("start_date", fin).order("start_date"),
+    supabase.from("employee_exits").select("*").eq("user_id", userId).maybeSingle(),
+    supabase.from("employee_files").select("hire_date").eq("user_id", userId).maybeSingle(),
+    supabase
+      .from("payslips")
+      .select("period_start, gross_amount, ijss:details->ijssBrutes")
+      .eq("user_id", userId)
+      .eq("validation_status", "valide")
+      .gte("period_start", depuis)
+      .lt("period_start", debut)
+      .order("period_start"),
+  ]);
+  const arretsTous = (arretsLignes.error ? [] : (arretsLignes.data ?? [])).map((l) => arretDepuisLigne(l as Record<string, unknown>));
+  const dateEntree = (dossier?.hire_date as string | null | undefined) ?? null;
+  const bulletinsValides = (historique ?? []).map((p) => ({
+    debut: String(p.period_start),
+    // Brut hors IJSS reprises en subrogation.
+    brut: Math.max(0, Number(p.gross_amount ?? 0) - Number((p as { ijss?: unknown }).ijss ?? 0)),
+  }));
+  const brutEntre = (du: string, au: string) => {
+    const l = bulletinsValides.filter((b) => b.debut >= du && b.debut <= au);
+    return { brut: Math.round(l.reduce((t, b) => t + b.brut, 0) * 100) / 100, nombre: l.length };
+  };
+  // Dixième : période de référence close (1er juin – 31 mai précédents).
+  const finRef = new Date(Date.parse(`${debutPeriode(debut)}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const debutRef = `${Number(finRef.slice(0, 4)) - 1}-06-01`;
+  const ref = brutEntre(debutRef, finRef);
+  const cpReference = ref.nombre > 0 && ref.brut > 0 ? { brut: ref.brut, joursAcquis: Math.min(30, ref.nombre * 2.5), du: debutRef, au: finRef } : null;
+
   // Congés validés des deux dernières périodes : compteurs N-1 / N.
   const { data: congesValides } = await supabase
     .from("leave_requests")
@@ -205,7 +299,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       ? { au: String(profil.leave_balance_date), n1: Number(profil.leave_balance_n1 ?? 0), n: Number(profil.leave_balance_n ?? 0) }
       : null;
   const listeConges = (congesValides ?? []).map((c) => ({ du: String(c.start_date), au: String(c.end_date) }));
-  const compteursConges = soldeConges({ reprise: repriseConges, aujourdhui: fin, valides: listeConges.filter((c) => c.du <= fin) });
+  const absencesConges = arretsTous.map((a) => ({ du: a.du, au: a.au, nature: natureAbsenceConges(a.type) }));
+  const compteursConges = soldeConges({ reprise: repriseConges, aujourdhui: fin, valides: listeConges.filter((c) => c.du <= fin), absences: absencesConges });
 
   const cumuls = (anterieurs ?? []).reduce(
     (c, p) => ({
@@ -215,6 +310,64 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     }),
     { brut: 0, netImposable: 0, heuresSupExonerees: 0 },
   );
+
+  const salarie: ProfilSalarie = {
+    regime,
+    cadre: Boolean(profil?.is_cadre),
+    groupe: (profil?.job_group as string | null | undefined) ?? null,
+    tauxRepas: profil?.meal_rate === null || profil?.meal_rate === undefined ? null : Number(profil.meal_rate),
+    tauxHoraire: Math.round(tauxHoraire * 10000) / 10000,
+    heuresContractuelles: heuresContrat,
+    tauxPas: profil?.pas_rate !== null && profil?.pas_rate !== undefined ? Number(profil.pas_rate) : null,
+    dateEntree,
+  };
+  const legal = parametresLegauxAu(debut);
+
+  // Sortie : éléments calculés à la date de sortie (ICCP, préavis, indemnité).
+  let sortie: ContextePaie["sortie"] = null;
+  const ls = sortieLigne.error ? null : (sortieLigne.data as Record<string, unknown> | null);
+  if (ls?.exit_date) {
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const enregistrement: LigneSortie = {
+      exit_date: String(ls.exit_date),
+      reason: String(ls.reason) as MotifSortie,
+      notice_type: (String(ls.notice_type ?? "sans") as LigneSortie["notice_type"]),
+      notice_days: n(ls.notice_days),
+      notice_amount: n(ls.notice_amount),
+      severance_amount: n(ls.severance_amount),
+      jobs_held: (ls.jobs_held as string | null) ?? null,
+      notes: (ls.notes as string | null) ?? null,
+    };
+    const dateSortie = enregistrement.exit_date;
+    const soldeSortie = soldeConges({ reprise: repriseConges, aujourdhui: dateSortie, valides: listeConges.filter((c) => c.du <= dateSortie), absences: absencesConges });
+    // Mois en cours de sortie : acquisition au prorata non comptée (simplifié).
+    const douzeMois = bulletinsValides.filter((b) => b.debut >= decaleMois(dateSortie, -12) && b.debut < decaleMois(dateSortie, 0));
+    const anneePrecedente = brutEntre(`${Number(dateSortie.slice(0, 4)) - 1}-01-01`, `${Number(dateSortie.slice(0, 4)) - 1}-12-31`);
+    const refSortie = brutEntre(`${Number(debutPeriode(dateSortie).slice(0, 4)) - 1}-06-01`, dateSortie);
+    const calcul = calculerSortie(
+      {
+        date: dateSortie,
+        motif: enregistrement.reason,
+        entree: dateEntree,
+        preavis: { type: enregistrement.notice_type, jours: enregistrement.notice_days, montant: enregistrement.notice_amount },
+        montantRupture: enregistrement.severance_amount,
+        joursCpRestants: Math.max(0, soldeSortie.disponible),
+        salaireMensuel: salaireMensuelContrat(salarie),
+        salairesMensuels: douzeMois.map((b) => b.brut),
+        remunerationAnnuellePrecedente: anneePrecedente.brut,
+        referenceCp: refSortie.nombre > 0 ? { brut: refSortie.brut, joursAcquis: Math.min(60, refSortie.nombre * 2.5) } : null,
+      },
+      parametresLegauxAu(dateSortie),
+    );
+    if (!douzeMois.length) calcul.avertissements.push("Aucun bulletin validé sur les 12 derniers mois : salaire de référence de l'indemnité de licenciement indisponible.");
+    sortie = {
+      enregistrement,
+      duMois: dateSortie >= debut && dateSortie <= fin,
+      elements: calcul.elements,
+      indemniteLegale: calcul.licenciement?.montant ?? null,
+      avertissements: calcul.avertissements,
+    };
+  }
 
   const acomptes = acomptesDuBulletin({
     demandes: demandesAcompte,
@@ -226,17 +379,11 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     mois,
     debut,
     fin,
-    legal: parametresLegauxAu(debut),
+    legal,
     entreprise,
-    salarie: {
-      regime,
-      cadre: Boolean(profil?.is_cadre),
-      groupe: (profil?.job_group as string | null | undefined) ?? null,
-      tauxRepas: profil?.meal_rate === null || profil?.meal_rate === undefined ? null : Number(profil.meal_rate),
-      tauxHoraire: Math.round(tauxHoraire * 10000) / 10000,
-      heuresContractuelles: heuresContrat,
-      tauxPas: profil?.pas_rate !== null && profil?.pas_rate !== undefined ? Number(profil.pas_rate) : null,
-    },
+    salarie,
+    sortie,
+    dateEntree,
     profilComplet: Boolean(profil?.hourly_rate),
     coefficient: profil?.coefficient ?? null,
     prefill: {
@@ -263,6 +410,11 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       retenues: ((precedent?.variables as VariablesMois | null)?.retenues ?? []).filter((r) => r.type !== "acompte" && !r.demandeId).concat(acomptes.retenues),
       personnesACharge: (precedent?.variables as VariablesMois | null)?.personnesACharge ?? 0,
       cumulHeuresSupExonereesAnnee: cumuls.heuresSupExonerees,
+      // Arrêts du mois (work_stoppages), cumuls de référence CP, sortie.
+      arrets: arretsTous.filter((a) => a.du <= fin && a.au >= debut),
+      subrogation: null,
+      cpReference,
+      sortie: sortie?.duMois ? sortie.elements : null,
       joursTravailles,
     },
     cumuls,

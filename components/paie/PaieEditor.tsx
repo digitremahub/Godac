@@ -6,6 +6,9 @@ import { Card } from "@/components/ui";
 import { calculerBulletin, HEURES_EQUIVALENCE, LIBELLE_RETENUE, LIBELLE_TYPE_TAUX_PAS } from "@/lib/paie/calcul";
 import { MODES_PAIEMENT, paiementDuBulletin } from "@/lib/paie/paiement";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { TYPES_ARRET } from "@/lib/paie/arrets";
+import { LIBELLE_MOTIF } from "@/lib/paie/sortie";
+import type { ArretTravail, TypeArret } from "@/lib/paie/types";
 import type { ModePaiement, ParametresEntreprise, ParametresLegaux, PeriodeConges, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, TypeTauxPas, VariablesMois } from "@/lib/paie/types";
 import { joursOuvrables } from "@/lib/paie/conges";
 
@@ -115,6 +118,8 @@ export function PaieEditor({
   const [datePaiement, setDatePaiement] = useState(paiementInitial.datePaiement);
   const [modePaiement, setModePaiement] = useState<ModePaiement>(paiementInitial.modePaiement);
   const [typeTauxPas, setTypeTauxPas] = useState<TypeTauxPas | "">(prefill.typeTauxPas ?? "");
+  const [arrets, setArrets] = useState<ArretTravail[]>(prefill.arrets ?? []);
+  const [subrogation, setSubrogation] = useState<boolean>(prefill.subrogation ?? entreprise.subrogation ?? false);
 
   const [busy, setBusy] = useState<"profil" | "bulletin" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -148,9 +153,16 @@ export function PaieEditor({
     datePaiement: datePaiement || null,
     modePaiement,
     typeTauxPas: typeTauxPas || null,
+    arrets: arrets.filter((a) => a.du && a.au && a.au >= a.du),
+    subrogation,
+    // Relus côté serveur à la génération : affichés ici pour l'aperçu.
+    cpReference: prefill.cpReference ?? null,
+    sortie: prefill.sortie ?? null,
   };
+  const [annee, numMois] = mois.split("-").map(Number) as [number, number];
+  const periode = { debut: `${mois}-01`, fin: new Date(Date.UTC(annee, numMois, 0)).toISOString().slice(0, 10) };
   const bulletin = useMemo(
-    () => (salarie.tauxHoraire > 0 ? calculerBulletin({ legal, entreprise, salarie, variables }) : null),
+    () => (salarie.tauxHoraire > 0 ? calculerBulletin({ legal, entreprise, salarie, variables, periode }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(salarie), JSON.stringify(variables)],
   );
@@ -313,6 +325,82 @@ export function PaieEditor({
           <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setPeriodes([...periodes, { du: "", au: "", jours: 0 }])}>
             + Période de congés
           </button>
+          <p className="label !mb-0">Arrêts de travail et congés sans solde</p>
+          {arrets.map((a, i) => {
+            const maj = (champ: Partial<ArretTravail>) => setArrets(arrets.map((x, j) => (j === i ? { ...x, ...champ } : x)));
+            const nombre = (v: string) => (v === "" ? null : Math.max(0, Number(v)));
+            return (
+              <div key={a.id ?? i} className="flex flex-col gap-2 rounded-lg border border-navy/10 p-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <select className="input w-auto !py-1.5" value={a.type} onChange={(e) => maj({ type: e.target.value as TypeArret })} aria-label="Nature de l'arrêt">
+                    {TYPES_ARRET.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input className="input w-auto !py-1.5" type="date" value={a.du} onChange={(e) => maj({ du: e.target.value })} aria-label="Du" />
+                  <input className="input w-auto !py-1.5" type="date" value={a.au} onChange={(e) => maj({ au: e.target.value })} aria-label="Au" />
+                  <button type="button" className="btn-ghost !px-2 !py-1 text-xs text-orange-ink" onClick={() => setArrets(arrets.filter((_, j) => j !== i))}>
+                    Retirer
+                  </button>
+                </div>
+                {a.type !== "sans_solde" && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <label className="block text-xs">
+                      <span className="label">Prolongation de l&apos;arrêt du</span>
+                      <input className="input !py-1.5" type="date" value={a.prolongationDu ?? ""} onChange={(e) => maj({ prolongationDu: e.target.value || null })} />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="label">IJSS brutes / jour</span>
+                      <input className="input !py-1.5 tabular-nums" type="number" step="0.01" min="0" value={a.ijssBrutesJour ?? ""} onChange={(e) => maj({ ijssBrutesJour: nombre(e.target.value) })} />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="label">IJSS nettes / jour</span>
+                      <input className="input !py-1.5 tabular-nums" type="number" step="0.01" min="0" value={a.ijssNettesJour ?? ""} onChange={(e) => maj({ ijssNettesJour: nombre(e.target.value) })} />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="label">Jours d&apos;IJSS (mois)</span>
+                      <input className="input !py-1.5 tabular-nums" type="number" step="1" min="0" value={a.joursIjss ?? ""} placeholder="calculé" onChange={(e) => maj({ joursIjss: nombre(e.target.value) })} />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="label">Maintien saisi</span>
+                      <input className="input !py-1.5 tabular-nums" type="number" step="0.01" min="0" value={a.maintienManuel ?? ""} placeholder="calculé" onChange={(e) => maj({ maintienManuel: nombre(e.target.value) })} />
+                    </label>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn-secondary w-fit !py-1.5 text-sm"
+              onClick={() => setArrets([...arrets, { id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : undefined, type: "maladie", du: "", au: "" }])}
+            >
+              + Arrêt ou absence
+            </button>
+            {arrets.length > 0 && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={subrogation} onChange={(e) => setSubrogation(e.target.checked)} />
+                Subrogation (l&apos;employeur perçoit les IJSS)
+              </label>
+            )}
+          </div>
+          {arrets.length > 0 && (
+            <p className="-mt-1 text-xs text-navy/55">
+              Absence en jours calendaires ; carence IJSS 3 j (maladie) ; maintien légal après 1 an d&apos;ancienneté{profil.dateEntree ? ` (entrée le ${new Date(`${profil.dateEntree}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" })})` : " — date d'entrée inconnue"}, carence 7 j sauf AT/MP.
+              Enregistrés dans la fiche du salarié à la génération du bulletin.
+            </p>
+          )}
+          {prefill.sortie && (
+            <div role="note" className="rounded-lg border border-orange/30 bg-orange/5 px-3 py-2 text-xs text-navy">
+              <p className="font-semibold">
+                Bulletin de sortie — {LIBELLE_MOTIF[prefill.sortie.motif]} le {new Date(`${prefill.sortie.date}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" })}
+              </p>
+              <p>Indemnités calculées depuis la fiche de sortie (ci-dessous) : modifiez-la pour les changer.</p>
+            </div>
+          )}
           <p className="label !mb-0">Paiement et impôt</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -528,8 +616,8 @@ export function PaieEditor({
               ))}
             </dl>
             <p className="text-xs text-navy/55">
-              Calcul sur un mois complet, heures décomptées au mois. Entrée ou sortie en cours de mois, maladie avec indemnités journalières ou
-              décompte trimestriel : à ajuster en prime ou retenue. L&apos;employeur reste responsable du bulletin.
+              Heures décomptées au mois. Arrêts, congés payés (maintien ou dixième) et sortie calculés selon des règles simplifiées documentées ;
+              entrée en cours de mois ou décompte trimestriel : à ajuster en prime ou retenue. L&apos;employeur reste responsable du bulletin.
             </p>
           </>
         )}
