@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
 import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
+import { confirmer } from "@/lib/ui/confirmation";
 import {
   CATEGORIES_TICPE,
   LIBELLES_CATEGORIE_COURTS,
@@ -107,7 +108,12 @@ export function SurchargesTicpe({ surcharges, modifiable }: { surcharges: Surcha
   }
 
   async function revoquer(id: string) {
-    if (!window.confirm("Révoquer ce taux particulier ? Le barème GODAC s'appliquera de nouveau. La ligne reste visible pour la traçabilité.")) return;
+    const ok = await confirmer({
+      titre: "Révoquer ce taux particulier ?",
+      message: "Le barème GODAC s'appliquera de nouveau. La ligne reste visible pour la traçabilité.",
+      action: "Révoquer",
+    });
+    if (!ok) return;
     setRefus(null);
     const r = await fetchGodac(`/api/ticpe/surcharges/${id}`, { method: "PATCH" });
     if (!r.ok) return setRefus(r.refus);
