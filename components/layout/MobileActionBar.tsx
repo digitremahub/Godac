@@ -4,16 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole } from "@/lib/types/domain";
 import { boutonsBarreMobile, type IconeBarre } from "@/lib/acces/barre-mobile";
-import { IconCalendar, IconChatBubble, IconClock, IconFlag, IconMenu, IconPlusCircle, IconQrCode, IconWrench } from "@/components/layout/icons";
+import { IconCalendar, IconChatBubble, IconFlag, IconMenu, IconNavigation, IconPlusCircle, IconQrCode, IconTruck, IconWrench } from "@/components/layout/icons";
 
 const ICONES: Record<IconeBarre, (props: { className?: string }) => React.ReactNode> = {
-  depart: IconClock,
+  depart: IconTruck,
   retour: IconFlag,
   plein: IconPlusCircle,
   colis: IconQrCode,
   planning: IconCalendar,
   messages: IconChatBubble,
   signaler: IconWrench,
+  navigation: IconNavigation,
 };
 
 /**

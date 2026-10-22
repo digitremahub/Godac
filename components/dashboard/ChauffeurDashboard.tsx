@@ -13,6 +13,10 @@ import { presenceByDay } from "@/lib/planning/presence";
 import { addDays, addMonths, firstOfMonth, parisCalendarDate } from "@/lib/planning/dates";
 import type { AppUser } from "@/lib/auth/session";
 import { coverageForEntries } from "@/lib/tours/renfort";
+import { chargerAlertes, compterNotificationsNonLues } from "@/lib/alerts/charger";
+import { ecranOuvrable } from "@/lib/acces/tuiles-accueil";
+import { urlDe } from "@/lib/acces/catalogue";
+import { IconArrowRight, IconPlusCircle, IconQrCode } from "@/components/layout/icons";
 
 type Supabase = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -67,6 +71,11 @@ export async function ChauffeurDashboard({
   const planningEnabled = enabledModules.includes("planning");
   const timeClockEnabled = enabledModules.includes("time_clock");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
+  const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
+  // Démarrer / terminer une tournée exige le module Planning : sans lui, la
+  // première action proposée est le plein (ou la tournée colis).
+  const tourneeOuvrable = ecranOuvrable("moi.tournee_depart", ctx);
+  const colisOuvrable = ecranOuvrable("exploitation.colis", ctx);
 
   const now = new Date().toISOString();
   const thisMonth = parisCalendarDate(now).slice(0, 7);
@@ -116,13 +125,10 @@ export async function ChauffeurDashboard({
           .eq("requested_by", appUser.id)
           .not("status", "in", "(done,cancelled)")
       : Promise.resolve({ count: null }),
-    supabase
-      .from("alerts")
-      .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
+    // Ses notifications ouvertes, non lues d'abord, et le nombre de non lues
+    // (même compte que la cloche : il baisse quand il les marque comme lues).
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
+    compterNotificationsNonLues(supabase, appUser.id),
     timeClockEnabled
       ? supabase.from("organizations").select("auto_clock_enabled").eq("id", appUser.organization_id).single()
       : Promise.resolve({ data: null }),
@@ -151,7 +157,8 @@ export async function ChauffeurDashboard({
     });
   }
   const recentEntries = (recentEntriesRes.data ?? []) as any[];
-  const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const openAlerts = openAlertsRes;
+  const nonLues = openAlertsCountRes;
   const presence = presenceByDay((presenceRes.data ?? []) as { start_at: string; end_at: string | null; status: string }[], month);
 
   // Team leader(s) of the driver's service(s), and the villages of
@@ -179,7 +186,23 @@ export async function ChauffeurDashboard({
       )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TourHeroCard openTour={openTour} showPlanningLink={planningEnabled} />
+        {tourneeOuvrable ? (
+          <TourHeroCard openTour={openTour} showPlanningLink={planningEnabled} />
+        ) : (
+          <div className="flex flex-col justify-between gap-4 rounded-2xl bg-marine p-6 text-white shadow-raised">
+            <p className="font-display text-xl font-bold leading-tight">Aujourd’hui</p>
+            <div className="flex flex-col gap-3">
+              <Link href={`${urlDe("carburant.pleins")}?new=1`} className="btn-primary w-full !py-3.5 text-base">
+                <IconPlusCircle className="h-5 w-5" /> Faire un plein
+              </Link>
+              {colisOuvrable && (
+                <Link href="/livreur" className="btn-secondary w-full justify-center">
+                  <IconQrCode className="h-5 w-5" /> Ma tournée colis <IconArrowRight className="h-4 w-4" />
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-4">
           <QrCodeBadge type="driver" id={appUser.id} title={appUser.full_name} subtitle="Mon badge chauffeur — à présenter à la pompe" />
@@ -188,7 +211,9 @@ export async function ChauffeurDashboard({
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
+        <Link href={urlDe("communication.alertes")} className="block">
+          <StatTile label="Notifications non lues" value={String(nonLues)} accent={nonLues ? "orange" : "teal"} />
+        </Link>
         {maintenanceEnabled && (
           <Link href="/moi/signaler" className="block">
             <StatTile label="Mes demandes d'entretien en cours" value={String(myMaintenanceRes.count ?? 0)} accent="gold" />
@@ -280,13 +305,18 @@ export async function ChauffeurDashboard({
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg">Mes derniers ravitaillements</h2>
-            <Link href="/carburant/pleins" className="text-sm text-teal-ink hover:underline">
-              Voir tout
-            </Link>
+            <h2 className="text-lg">Mes derniers pleins</h2>
+            <div className="flex items-center gap-3">
+              <Link href={`${urlDe("carburant.pleins")}?new=1`} className="text-sm font-semibold text-teal-ink hover:underline">
+                + Nouveau plein
+              </Link>
+              <Link href="/carburant/pleins" className="text-sm text-teal-ink hover:underline">
+                Voir tout
+              </Link>
+            </div>
           </div>
           {recentEntries.length === 0 ? (
-            <EmptyState title="Aucun ravitaillement enregistré" />
+            <EmptyState title="Aucun plein enregistré" />
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {recentEntries.map((e) => (
@@ -306,7 +336,7 @@ export async function ChauffeurDashboard({
       {openAlerts.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} conduit={appUser.conduit} modules={enabledModules} />
         </div>
       )}
     </div>

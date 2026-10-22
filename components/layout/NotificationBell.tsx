@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconBell, IconCalendar, IconChatBubble, IconWrench, IconAlertTriangle } from "@/components/layout/icons";
+import { IconBell, IconCalendar, IconChatBubble, IconCoins, IconDroplet, IconWrench, IconAlertTriangle } from "@/components/layout/icons";
 
 interface Item {
   id: string;
@@ -20,6 +20,8 @@ function iconFor(type: string) {
   if (type.startsWith("planning")) return IconCalendar;
   if (type === "new_message" || type === "group_message") return IconChatBubble;
   if (type.startsWith("maintenance") || type.startsWith("vehicle")) return IconWrench;
+  if (type.startsWith("payslip") || type === "salary_advance") return IconCoins;
+  if (type.startsWith("fuel") || type.endsWith("_anomaly")) return IconDroplet;
   return IconAlertTriangle;
 }
 
@@ -37,7 +39,7 @@ function ago(iso: string) {
  * (and any other alert) for the signed-in user, with an unread count —
  * polled every 30 s, the same no-realtime approach as the chat widget.
  */
-export function NotificationBell() {
+export function NotificationBell({ lienToutes = true }: { lienToutes?: boolean } = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
@@ -158,9 +160,12 @@ export function NotificationBell() {
               })}
             </ul>
           )}
-          <a href="/communication/alertes" className="border-t border-navy/[0.08] px-4 py-3 text-center text-sm font-semibold text-teal-ink hover:bg-navy/[0.03]">
-            Voir toutes les alertes
-          </a>
+          {/* Comptes GO Navigation : le centre de notifications est hors de l'offre. */}
+          {lienToutes && (
+            <a href="/communication/alertes" className="border-t border-navy/[0.08] px-4 py-3 text-center text-sm font-semibold text-teal-ink hover:bg-navy/[0.03]">
+              Voir toutes les notifications
+            </a>
+          )}
         </div>
       )}
     </div>

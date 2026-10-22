@@ -258,7 +258,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <p className="text-sm text-navy/65">{u.auth_method === "pin" ? "Connexion" : "Email"}</p>
+          <p className="text-sm text-navy/65">{u.auth_method === "pin" ? "Connexion" : "E-mail"}</p>
           <p>{u.auth_method === "pin" ? (u.pin_set_at ? "Badge + PIN" : "Badge — PIN non créé") : u.email}</p>
         </Card>
         <Card>
@@ -501,7 +501,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       {showFuelHistory && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-base">Historique des ravitaillements</h3>
+            <h3 className="text-base">Historique des pleins</h3>
             <Link href={`/carburant/pleins?driver=${id}`} className="text-sm text-teal-ink hover:underline">
               Voir tout l&apos;historique →
             </Link>
@@ -509,7 +509,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           <FuelHistoryTable
             entries={(fuelHistory ?? []) as any}
             showDriver={false}
-            emptyDescription="Aucun ravitaillement enregistré pour ce chauffeur."
+            emptyDescription="Aucun plein enregistré pour ce chauffeur."
           />
         </div>
       )}

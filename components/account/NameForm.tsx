@@ -105,7 +105,7 @@ export function NameForm({
       </div>
       {showContactEmail && (
         <div>
-          <label className="block"><span className="label">Email de notification (optionnel)</span>
+          <label className="block"><span className="label">E-mail de notification (optionnel)</span>
           <input
             className="input"
             type="email"

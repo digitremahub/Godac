@@ -8,6 +8,7 @@ import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
 import type { UserRole } from "@/lib/types/domain";
 import { OfflineSyncStatus } from "@/components/offline/OfflineSyncStatus";
 import { BandeauMenuReorganise } from "@/components/layout/BandeauMenuReorganise";
+import { MARQUEUR_GO_NAVIGATION } from "@/lib/acces/catalogue";
 
 export function DashboardShell({
   role,
@@ -58,6 +59,9 @@ export function DashboardShell({
   }, [drawerOpen]);
 
   const showActionBar = conduit;
+  // Compte d'essai GO Navigation : menu réduit, pas de bandeau « menu
+  // réorganisé » (il cite des sections que l'essai n'a pas).
+  const goNavigation = enabledModuleKeys.includes(MARQUEUR_GO_NAVIGATION);
 
   return (
     <div className="flex min-h-screen">
@@ -95,9 +99,9 @@ export function DashboardShell({
             </a>
           </div>
         )}
-        <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} />
+        <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} goNavigation={goNavigation} />
         <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
-          <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus /><BandeauMenuReorganise userId={currentUserId} />{children}</div>
+          <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{!goNavigation && <BandeauMenuReorganise userId={currentUserId} />}{children}</div>
         </main>
       </div>
       {showActionBar && <MobileActionBar role={role} conduit={conduit} enabledModuleKeys={enabledModuleKeys} hasActiveTour={hasActiveTour} onPlus={() => setDrawerOpen(true)} />}

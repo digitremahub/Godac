@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
+import { libelleGravite, libelleStatutAlerte } from "@/lib/alerts/lecture";
 import type { UserRole } from "@/lib/types/domain";
 
 interface Alert {
@@ -13,11 +14,13 @@ interface Alert {
   severity: "info" | "warning" | "critical";
   message: string;
   status: "open" | "acknowledged" | "resolved";
-  notified_at: string | null;
+  notified_at?: string | null;
   created_at: string;
   related_table: string | null;
   related_id: string | null;
   recipient_user_id?: string | null;
+  /** Lue par la personne connectée (alert_reads). Absent : non suivi. */
+  lu?: boolean;
 }
 
 const SEVERITY_BADGE: Record<Alert["severity"], string> = {
@@ -27,17 +30,30 @@ const SEVERITY_BADGE: Record<Alert["severity"], string> = {
 };
 
 /**
- * Resolve/acknowledge are decisions, not something a plain chauffeur
- * should be doing — a driver only reads their own alerts (a new
- * message, a planning change). Managers act on what concerns their
- * service, direction/comptable act on anything org-wide; RLS already
- * scopes which alerts each of them even sees, this just hides the
- * action buttons for the one role that shouldn't get them at all.
+ * Notifications de la personne connectée. « Marquer comme lu » est
+ * personnel (alert_reads, comme la cloche) et ouvert à tous, chauffeur
+ * compris : son compteur de non lues baisse. « Prendre en compte » et
+ * « Résoudre » changent le statut partagé de l'alerte : c'est une
+ * décision de l'encadrement, pas du chauffeur (la RLS limite déjà les
+ * alertes que chacun voit).
  */
-export function AlertList({ alerts, viewerRole }: { alerts: Alert[]; viewerRole: UserRole }) {
+export function AlertList({
+  alerts,
+  viewerRole,
+  conduit,
+  modules,
+}: {
+  alerts: Alert[];
+  viewerRole: UserRole;
+  /** La personne conduit (lien d'un rappel personnel de planning, par exemple). */
+  conduit?: boolean;
+  /** Modules actifs : le lien ne mène qu'à un écran qui s'ouvre. */
+  modules?: readonly string[];
+}) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const canAct = viewerRole !== "chauffeur";
+  const nonLues = alerts.filter((a) => a.lu === false).map((a) => a.id);
 
   async function updateStatus(id: string, status: "acknowledged" | "resolved") {
     setBusyId(id);
@@ -53,51 +69,77 @@ export function AlertList({ alerts, viewerRole }: { alerts: Alert[]; viewerRole:
     }
   }
 
+  async function marquerLu(ids: string[], cle: string) {
+    if (ids.length === 0) return;
+    setBusyId(cle);
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (alerts.length === 0) {
-    return <EmptyState title="Aucune alerte" description="Tout est sous contrôle." />;
+    return <EmptyState title="Aucune notification" description="Tout est sous contrôle." />;
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {alerts.map((alert) => (
-        <Card key={alert.id} className="flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 flex items-center gap-2">
-              <span className={SEVERITY_BADGE[alert.severity]}>{alert.severity}</span>
-              <span className="text-xs text-navy/60">{new Date(alert.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</span>
-              {!alert.notified_at && <span className="badge-neutral">Email non envoyé</span>}
+      {nonLues.length > 1 && (
+        <div className="flex justify-end">
+          <button type="button" className="btn-secondary min-h-[44px] text-sm" disabled={busyId === "tout"} onClick={() => marquerLu(nonLues, "tout")}>
+            Tout marquer comme lu ({nonLues.length})
+          </button>
+        </div>
+      )}
+      {alerts.map((alert) => {
+        const lien = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, {
+          recipientUserId: alert.recipient_user_id,
+          role: viewerRole,
+          conduit,
+          modules,
+        });
+        return (
+          <Card key={alert.id} className={`flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between ${alert.lu === false ? "border-l-4 border-l-teal" : ""}`}>
+            <div className="min-w-0">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                {alert.lu === false && <span className="badge-teal">Nouveau</span>}
+                <span className={SEVERITY_BADGE[alert.severity]}>{libelleGravite(alert.severity)}</span>
+                <span className="text-xs text-navy/60">{new Date(alert.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</span>
+              </div>
+              <p className={`text-sm ${alert.lu === false ? "font-semibold" : ""}`}>{alert.message}</p>
+              {lien && (
+                <Link href={lien} className="mt-1 inline-flex min-h-[44px] items-center text-sm text-teal-ink underline">
+                  Voir →
+                </Link>
+              )}
             </div>
-            <p className="text-sm">{alert.message}</p>
-            {resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: viewerRole }) && (
-              <Link
-                href={resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: viewerRole })!}
-                className="mt-1 inline-block text-xs text-teal-ink underline"
-              >
-                Voir →
-              </Link>
-            )}
-          </div>
-          {alert.status === "open" && canAct && (
-            <div className="flex shrink-0 gap-2">
-              <button
-                className="btn-secondary !px-3 !py-1.5 text-xs"
-                disabled={busyId === alert.id}
-                onClick={() => updateStatus(alert.id, "acknowledged")}
-              >
-                Prendre en compte
-              </button>
-              <button
-                className="btn-primary !px-3 !py-1.5 text-xs"
-                disabled={busyId === alert.id}
-                onClick={() => updateStatus(alert.id, "resolved")}
-              >
-                Résoudre
-              </button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {alert.lu === false && (
+                <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" disabled={busyId === alert.id} onClick={() => marquerLu([alert.id], alert.id)}>
+                  Marquer comme lu
+                </button>
+              )}
+              {alert.status === "open" && canAct && (
+                <>
+                  <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" disabled={busyId === alert.id} onClick={() => updateStatus(alert.id, "acknowledged")}>
+                    Prendre en compte
+                  </button>
+                  <button type="button" className="btn-primary min-h-[44px] !px-3 text-sm" disabled={busyId === alert.id} onClick={() => updateStatus(alert.id, "resolved")}>
+                    Résoudre
+                  </button>
+                </>
+              )}
+              {alert.status !== "open" && <span className="badge-neutral">{libelleStatutAlerte(alert.status)}</span>}
             </div>
-          )}
-          {alert.status !== "open" && <span className="badge-neutral shrink-0">{alert.status}</span>}
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }

@@ -3,21 +3,29 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
 import { BarChartCard, type BarDatum } from "@/components/reporting/BarChartCard";
-import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import { getFleetConsumptionRanking } from "@/lib/vehicles/consumption";
 import { addDays } from "@/lib/planning/dates";
-import { TRUSTED_FUEL_STATUSES } from "@/lib/fuel/totals";
+import { summarizeFuelRows, TRUSTED_FUEL_STATUSES, type FuelTotalsRow } from "@/lib/fuel/totals";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
-import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/paris-time";
+import { parisDay, parisMidnightIso, parisMonthStartIso } from "@/lib/utils/paris-time";
 import type { AppUser } from "@/lib/auth/session";
-import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { chargerAlertes } from "@/lib/alerts/charger";
+import { filtreDestinataire } from "@/lib/alerts/lecture";
+import { ecranTourneesEnCours, SUITE_ECARTS_A_TRAITER, tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
+import { chargerEcartsATraiter } from "@/lib/fuel/ecarts-serveur";
+import { bulletinsAValider, suiteMoisPaie } from "@/lib/paie/accueil";
+import { currentMonth } from "@/lib/planning/dates";
+import { urlDe } from "@/lib/acces/catalogue";
 
 /**
- * Direction sees the whole organization: fleet + headcount KPIs,
- * pending approvals across every service, and (when BI reporting is
- * enabled) the same consolidated charts as the dedicated /dashboard/reporting
- * page, surfaced here so the big picture doesn't require a second
- * click every morning.
+ * Accueil de la direction, toute l'organisation, dans l'ordre :
+ * 1. ce qui attend une décision (écarts carburant d'abord, bulletins à
+ *    valider, inscriptions, congés, entretien) ;
+ * 2. les indicateurs, coût carburant du mois en premier ;
+ * 3. les tournées colis en cours, le reporting, la consommation et les
+ *    notifications.
+ * Les codes de secours des chauffeurs sont dans Équipe › Utilisateurs.
  */
 export async function DirectionDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
   const supabase = await createServerSupabaseClient();
@@ -25,9 +33,10 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const payslipsEnabled = enabledModules.includes("payslips");
+  const ctx = { role: appUser.role, modules: new Set(enabledModules) };
 
   // Bornes en heure de Paris (pas minuit UTC ni l'heure du serveur).
-  const monthStartDate = parisMonthStartDay();
+  const monthStartISO = parisMonthStartIso();
   const since30d = parisMidnightIso(addDays(parisDay(), -30));
 
   const [
@@ -39,8 +48,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     pendingSignupsRes,
     pendingLeaveRes,
     openMaintenanceRes,
-    activeUsersRes,
-    payslipUserIdsRes,
+    pendingPayslipsRes,
+    monthFuelRes,
+    ecartsRes,
     fuelRowsRes,
     tourRowsRes,
   ] = await Promise.all([
@@ -54,13 +64,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       // le chargement, avant que le chauffeur ne démarre officiellement.
       .in("status", ["loading", "in_progress"])
       .order("started_at", { ascending: false }),
-    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
-    supabase
-      .from("alerts")
-      .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    // Alertes de la direction (diffusées ou personnelles), jamais le rappel personnel d'un chauffeur.
+    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open").or(filtreDestinataire(appUser.id)),
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
     supabase.from("users").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("pending_approval", true),
     leaveEnabled
       ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending")
@@ -68,12 +74,16 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     maintenanceEnabled
       ? supabase.from("vehicle_interventions").select("id", { count: "exact", head: true }).not("status", "in", "(done,cancelled)")
       : Promise.resolve({ count: null }),
+    // Bulletins en attente de la direction, tous mois confondus.
     payslipsEnabled
-      ? supabase.from("users").select("id").eq("organization_id", appUser.organization_id).eq("active", true)
+      ? supabase.from("payslips").select("period_start, validation_status").eq("validation_status", "en_attente")
       : Promise.resolve({ data: null }),
-    payslipsEnabled
-      ? supabase.from("payslips").select("user_id").gte("period_start", monthStartDate)
-      : Promise.resolve({ data: null }),
+    // Coût carburant du mois (pleins de confiance, toutes les lignes).
+    fetchAllRows<FuelTotalsRow>((a, b) =>
+      supabase.from("fuel_entries").select("liters, total_amount, status, product").in("status", [...TRUSTED_FUEL_STATUSES]).gte("occurred_at", monthStartISO).order("id").range(a, b),
+    ),
+    // Écarts carburant à traiter (compteur global, axe principal de GODAC).
+    chargerEcartsATraiter(supabase),
     // Pleins de confiance uniquement, toutes les lignes (pas de .limit()
     // qui tronquait les totaux en silence).
     biEnabled
@@ -100,7 +110,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       : Promise.resolve(null),
   ]);
 
-  const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const openAlerts = openAlertsRes;
   const ongoingRuns = (ongoingRunsRes.data ?? []) as {
     id: string; name: string | null; run_date: string; started_at: string | null;
     driver_id: string | null; service_id: string | null; vehicle_id: string | null;
@@ -116,30 +126,10 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const driverNameById = new Map((activeRunDrivers ?? []).map((r) => [r.id, r.full_name]));
   const serviceNameById = new Map((activeRunServices ?? []).map((r) => [r.id, r.name]));
   const vehicleById = new Map((activeRunVehicles ?? []).map((r) => [r.id, r.registration]));
-  const { data: pinDrivers } = await supabase
-    .from("users")
-    .select("id, full_name, phone")
-    .eq("organization_id", appUser.organization_id)
-    .eq("auth_method", "pin")
-    .eq("active", true)
-    .eq("pending_approval", false)
-    .order("full_name");
-
-  const consumptionRanking = (
-    await Promise.all(
-      ((activeVehiclesRes.data ?? []) as { id: string; registration: string }[]).map(async (v) => ({
-        registration: v.registration,
-        consumption: await getVehicleConsumption(supabase, v.id, 30),
-      })),
-    )
-  )
-    .filter((v): v is { registration: string; consumption: number } => v.consumption !== null)
-    .sort((a, b) => b.consumption - a.consumption)
-    .slice(0, 5);
-
-  const missingPayslips = payslipsEnabled
-    ? (activeUsersRes.data ?? []).length - new Set((payslipUserIdsRes.data ?? []).map((p: any) => p.user_id)).size
-    : null;
+  // Une seule série de requêtes pour toute la flotte (plus une par véhicule).
+  const consumptionRanking = await getFleetConsumptionRanking(supabase, (activeVehiclesRes.data ?? []) as { id: string; registration: string }[], 30);
+  const fuelTotals = summarizeFuelRows(monthFuelRes.rows);
+  const aValider = bulletinsAValider((pendingPayslipsRes.data ?? []) as { period_start: string; validation_status: string | null }[]);
 
   let fuelCostByVehicle: BarDatum[] = [];
   let toursByService: BarDatum[] = [];
@@ -161,45 +151,68 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     toursByService = Array.from(toursByServiceMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }
 
-  const pendingTiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/equipe/inscriptions" },
-  ];
-  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
-  if (maintenanceEnabled)
-    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
-  if (payslipsEnabled && missingPayslips !== null)
-    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/equipe/paie/fiches" });
+  const ecranTournees = ecranTourneesEnCours(ctx);
+  const pendingTiles = tuilesOuvrables(
+    [
+      { libelle: "Écarts carburant à traiter", valeur: String(ecartsRes.ids.length), accent: ecartsRes.ids.length ? "orange" : "teal", ecran: "carburant.pleins", suite: SUITE_ECARTS_A_TRAITER },
+      payslipsEnabled && { libelle: "Bulletins à valider", valeur: String(aValider.nombre), accent: aValider.nombre ? "orange" : "teal", ecran: "equipe.paie", suite: suiteMoisPaie(aValider.mois, currentMonth()) },
+      { libelle: "Nouveaux chauffeurs à valider", valeur: String(pendingSignupsRes.count ?? 0), accent: "teal", ecran: "equipe.inscriptions" },
+      leaveEnabled && { libelle: "Congés à valider", valeur: String(pendingLeaveRes.count ?? 0), accent: "gold", ecran: "equipe.conges" },
+      maintenanceEnabled && { libelle: "Demandes d'entretien ouvertes", valeur: String(openMaintenanceRes.count ?? 0), accent: "orange", ecran: "flotte.entretien" },
+    ],
+    ctx,
+  );
 
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Vue d'ensemble de l'organisation." />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {/* À traiter d'abord : écarts carburant, bulletins à valider… */}
+      <h2 className="mb-3 text-lg">À traiter</h2>
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {pendingTiles.map((t) => (
+          <Link key={t.libelle} href={t.href} className="block">
+            <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
+          </Link>
+        ))}
+      </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <StatTile label={`Carburant ce mois${monthFuelRes.truncated ? " (tronqué)" : ""}`} value={`${Math.round(fuelTotals.cost).toLocaleString("fr-FR")} €`} accent="gold" />
         <StatTile label="Véhicules actifs" value={String((activeVehiclesRes.data ?? []).length)} />
         <StatTile label="Chauffeurs actifs" value={String(activeDriversRes.count ?? 0)} accent="gold" />
-        <Link href="/exploitation/historique" className="block">
-          <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
-        </Link>
-        <Link href="/communication/alertes" className="block">
-          <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
-        </Link>
+        {tuilesOuvrables(
+          [
+            ecranTournees && { libelle: "Tournées colis en cours", valeur: String(ongoingRuns.length), accent: "teal", ecran: ecranTournees },
+            { libelle: "Notifications à traiter", valeur: String(openAlertsCountRes.count ?? 0), accent: openAlertsCountRes.count ? "orange" : "teal", ecran: "communication.alertes" },
+          ],
+          ctx,
+        ).map((t) => (
+          <Link key={t.libelle} href={t.href} className="block">
+            <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
+          </Link>
+        ))}
       </div>
 
       <Card className="mb-6">
         {ongoingRunsRes.error && (
           <p role="alert" className="mb-3 rounded-lg border border-orange/40 bg-orange/10 p-3 text-sm text-orange-ink">
-            Le suivi des tournées est momentanément indisponible. Vérifiez les droits d’accès Supabase sur les fiches chauffeur.
+            Le suivi des tournées est momentanément indisponible. Réessayez dans quelques minutes ou contactez le support.
           </p>
         )}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg">Tournées actuellement effectuées</h2>
-            <p className="text-sm text-navy/60">Suivi des fiches chauffeur réellement démarrées.</p>
+            <h2 className="text-lg">Tournées colis en cours</h2>
+            <p className="text-sm text-navy/60">Tournées colis démarrées ou en chargement.</p>
           </div>
-          <Link href="/exploitation/historique" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
+          {ecranTournees && (
+            <Link href={urlDe(ecranTournees)} className="text-sm text-teal-ink hover:underline">
+              {ecranTournees === "exploitation.suivi" ? "Suivi en direct →" : "Voir le détail →"}
+            </Link>
+          )}
         </div>
         {ongoingRuns.length === 0 ? (
-          <p className="text-sm text-navy/60">Aucune fiche chauffeur en cours pour le moment.</p>
+          <p className="text-sm text-navy/60">Aucune tournée colis en cours pour le moment.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {ongoingRuns.map((r) => (
@@ -218,15 +231,6 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
         )}
       </Card>
 
-      <DriverRecoveryCodePanel drivers={(pinDrivers ?? []) as { id: string; full_name: string; phone: string | null }[]} />
-
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {pendingTiles.map((t) => (
-          <Link key={t.label} href={t.href} className="block">
-            <StatTile label={t.label} value={String(t.value)} accent={t.accent} />
-          </Link>
-        ))}
-      </div>
 
       {biEnabled && (
         <div className="mb-6">
@@ -265,7 +269,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
 
         <div>
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} conduit={appUser.conduit} modules={enabledModules} />
         </div>
       </div>
     </div>

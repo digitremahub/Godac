@@ -1,16 +1,18 @@
-import { ecran, urlDe } from "@/lib/acces/catalogue";
+import { ACCUEIL_GO_NAVIGATION } from "@/lib/go-navigation/offre";
+import { deciderAcces, ecran, horsOffreGoNavigation, urlDe } from "@/lib/acces/catalogue";
 import type { UserRole } from "@/lib/types/domain";
 
 /**
  * Lien d'une alerte : la page où le problème se traite. Partagé par le
- * centre d'alertes (components/alerts/AlertList.tsx), la cloche
+ * centre de notifications (components/alerts/AlertList.tsx), la cloche
  * (app/api/notifications) et les e-mails et notifications push
  * (app/api/webhooks/supabase-alerts, une URL par rôle destinataire).
  *
  * Toutes les adresses viennent du catalogue (urlDe) : aucun lien ne passe
- * par une redirection. Quand le rôle du destinataire est connu et qu'il ne
- * peut pas ouvrir l'écran, on prend l'alternative prévue par le catalogue
- * (ex. amendes → Mes amendes pour un chauffeur), sinon le centre d'alertes.
+ * par une redirection. Quand le destinataire est connu et qu'il ne peut
+ * pas ouvrir l'écran (rôle, conduite, module : deciderAcces), on prend
+ * l'alternative prévue par le catalogue (ex. amendes → Mes amendes pour
+ * un chauffeur), sinon le centre de notifications.
  */
 
 /** Écran de traitement par table liée. */
@@ -37,6 +39,12 @@ type Cible = { id: string; params?: Record<string, string>; suite?: string } | {
  */
 const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   planning_validated: () => ({ id: "moi.planning" }),
+  // Résumé de la semaine à venir : envoyé au chauffeur (alerte personnelle).
+  weekly_planning_digest: () => ({ id: "moi.planning", suite: "?view=week" }),
+  // Conflit d'affectation, changement de véhicule : le Planning, au jour de
+  // la tournée concernée (?entry= : la page en déduit la date).
+  planning_conflict: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
+  vehicle_swap: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
   planning_assignment: (id) => ({ id: "moi.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
   new_message: (id) => ({ id: "communication.messenger", suite: id ? `?with=${encodeURIComponent(id)}` : "" }),
   // Groupe d'équipe du Messenger : related_id = message_groups.id.
@@ -53,9 +61,12 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   // Demande d'acompte : à traiter (direction, comptable ; un salarié est
   // renvoyé à ses demandes par l'alternative du catalogue).
   salary_advance: () => ({ id: "equipe.paie_acomptes" }),
-  // Écart carburant (explication demandée au chauffeur, ou sa réponse) :
-  // le plein ouvert dans l'historique, fiche dépliée.
+  // Écart carburant (explication demandée au chauffeur, ou sa réponse) et
+  // consommation anormale liée à un plein : le plein ouvert, fiche dépliée.
   fuel_gap_explanation: (id) => ({ id: "carburant.pleins", suite: id ? `?plein=${encodeURIComponent(id)}` : "" }),
+  consumption_anomaly: (id) => ({ id: "carburant.pleins", suite: id ? `?plein=${encodeURIComponent(id)}` : "" }),
+  // Bulletin validé par la direction : le salarié ouvre ses fiches de paie.
+  payslip_available: () => ({ id: "moi.fiches_paie" }),
   // Amende (contestation ou explication du chauffeur) : la fiche, côté encadrement.
   fine_notification: (id) => ({ id: "flotte.amendes", suite: id ? `?amende=${encodeURIComponent(id)}` : "" }),
   // Contestation client : la fiche (le chauffeur attributaire ouvre la même page, limitée aux siennes).
@@ -66,16 +77,33 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
 export interface ContexteDestinataire {
   /** alerts.recipient_user_id : alerte personnelle. */
   recipientUserId?: string | null;
-  /** Rôle de la personne qui ouvre l'alerte (centre d'alertes, cloche, destinataire d'un e-mail). */
+  /** Rôle de la personne qui ouvre l'alerte (centre de notifications, cloche, destinataire d'un e-mail). */
   role?: UserRole | string | null;
+  /**
+   * La personne conduit (chauffeur, ou « conduit aussi »). Inconnu : un
+   * chauffeur conduit ; une alerte personnelle vise la personne qui conduit
+   * (rappel de planning, réponse sur son plein…).
+   */
+  conduit?: boolean | null;
+  /** Modules actifs de l'organisation ; absents : pas de contrôle de module. */
+  modules?: ReadonlySet<string> | readonly string[] | null;
 }
 
-/** URL d'une cible pour ce rôle : l'écran, son alternative, ou le centre d'alertes. */
-function urlPour(cible: Cible, role?: string | null): string {
+/** URL d'une cible pour ce destinataire : l'écran, son alternative, ou le centre de notifications. */
+function urlPour(cible: Cible, contexte?: ContexteDestinataire): string {
   if ("url" in cible) return cible.url;
   const e = ecran(cible.id);
-  if (role && !e.roles.includes(role as UserRole)) {
-    return e.alternative?.[role as UserRole] ?? urlDe("communication.alertes");
+  const role = contexte?.role as UserRole | null | undefined;
+  if (role) {
+    const modules = contexte?.modules ? new Set(contexte.modules) : null;
+    const conduit = contexte?.conduit ?? (role === "chauffeur" || Boolean(contexte?.recipientUserId));
+    // Sans liste de modules (e-mail), on ne juge que le rôle et la conduite.
+    const decision = deciderAcces(e, role, modules ?? new Set([...(e.modules ?? []), ...(e.modulesAuMoinsUn ?? [])]), conduit);
+    if (modules && horsOffreGoNavigation(e.id, modules)) return ACCUEIL_GO_NAVIGATION;
+    if (!decision.ok) {
+      if (decision.motif === "role" && decision.redirection) return decision.redirection;
+      return modules && horsOffreGoNavigation("communication.alertes", modules) ? ACCUEIL_GO_NAVIGATION : urlDe("communication.alertes");
+    }
   }
   return urlDe(cible.id, cible.params) + (cible.suite ?? "");
 }
@@ -86,7 +114,10 @@ export function resolveAlertUrl(relatedTable: string | null, type?: string | nul
     return urlDe("moi.amendes") + (relatedId ? `?amende=${encodeURIComponent(relatedId)}` : "");
   }
   const parType = type ? CIBLE_PAR_TYPE[type] : undefined;
-  if (parType) return urlPour(parType(relatedId ?? null), contexte?.role);
+  if (parType) return urlPour(parType(relatedId ?? null), contexte);
   const id = relatedTable ? ECRAN_PAR_TABLE[relatedTable] : undefined;
-  return id ? urlPour({ id }, contexte?.role) : null;
+  if (!id) return null;
+  // Toute alerte liée à un plein ouvre ce plein (écart de prix, de totaliseur…).
+  const suite = relatedTable === "fuel_entries" && relatedId ? `?plein=${encodeURIComponent(relatedId)}` : undefined;
+  return urlPour({ id, suite }, contexte);
 }

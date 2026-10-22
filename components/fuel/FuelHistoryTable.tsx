@@ -58,7 +58,7 @@ export function FuelHistoryTable({
   entries,
   showVehicle = true,
   showDriver = true,
-  emptyDescription = "Aucun ravitaillement enregistré pour l'instant.",
+  emptyDescription = "Aucun plein enregistré pour l'instant.",
   initialOpenId,
 }: {
   entries: FuelHistoryRow[];

@@ -159,6 +159,7 @@ export type IconeId =
   | "lifebuoy"
   | "card"
   | "shield"
+  | "navigation"
   | "user";
 
 export interface Ecran {
@@ -177,6 +178,11 @@ export interface Ecran {
   conducteur?: boolean;
   /** Rôles qui voient l'entrée dans le menu (par défaut : `roles`). */
   rolesMenu?: readonly UserRole[];
+  /**
+   * Entrée de menu réservée aux personnes qui conduisent (l'écran reste
+   * ouvert par URL ou QR aux autres rôles de `roles`).
+   */
+  menuConducteur?: boolean;
   /** Modules tous requis (ET). */
   modules?: readonly CleModule[];
   /** Au moins un de ces modules (OU). */
@@ -271,7 +277,11 @@ export const ECRANS: readonly Ecran[] = [
     href: "/moi/signaler",
     // Tout rôle qui conduit ou reçoit un véhicule peut signaler (QR véhicule).
     roles: ["chauffeur", "manager", "exploitation", "direction"],
-    rolesMenu: ["chauffeur"],
+    // Au menu de toute personne qui conduit (chauffeur, manager ou
+    // exploitation avec « conduit aussi ») ; l'encadrement qui ne conduit
+    // pas traite les demandes dans Flotte › Entretien.
+    rolesMenu: TERRAIN,
+    menuConducteur: true,
     modules: ["maintenance_requests"],
     icone: "wrench",
     mobile: "plus",
@@ -355,6 +365,19 @@ export const ECRANS: readonly Ecran[] = [
     icone: "qr",
     aussiActif: ["/exploitation/suivi"],
     note: "chauffeur : sa tournée",
+  }),
+  E({
+    id: "exploitation.go_navigation",
+    section: "exploitation",
+    libelle: "GO Navigation",
+    // App chauffeur plein écran (hors de l'espace à menu) : carte et trajet
+    // vers l'arrêt en cours. Avant-première (décision client).
+    href: "/livreur/navigation",
+    roles: TERRAIN,
+    conducteur: true,
+    modules: ["route_optimizer"],
+    icone: "navigation",
+    note: "avant-première ; tournée colis démarrée",
   }),
   E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/exploitation/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map", menu: "onglet" }),
   E({
@@ -501,7 +524,7 @@ export const ECRANS: readonly Ecran[] = [
 
   // ── Carburant ────────────────────────────────────────────────────
   E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/carburant/pleins", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
-  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Revue OCR", href: "/carburant/revue-ocr", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
+  E({ id: "carburant.revue_ocr", section: "carburant", libelle: "Tickets à vérifier", href: "/carburant/revue-ocr", roles: ENCADREMENT, modules: ["ocr"], icone: "camera" }),
   E({
     id: "carburant.cuves",
     section: "carburant",
@@ -683,7 +706,7 @@ export const ECRANS: readonly Ecran[] = [
     icone: "megaphone",
     mobile: "plus",
   }),
-  E({ id: "communication.alertes", section: "communication", libelle: "Alertes", href: "/communication/alertes", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
+  E({ id: "communication.alertes", section: "communication", libelle: "Notifications", href: "/communication/alertes", roles: TOUS_LES_ROLES, icone: "bell", mobile: "plus" }),
   E({ id: "communication.assistance", section: "communication", libelle: "Demandes d'assistance", libelleOnglet: "Assistance", href: "/communication/assistance", roles: ENCADREMENT, modules: ["assistant"], icone: "lifebuoy" }),
 
   // ── Administration ───────────────────────────────────────────────
@@ -774,6 +797,7 @@ function estOuvrableEnOnglet(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
   if (e.menu === "cache") return false;
   if (horsOffreGoNavigation(e.id, modulesActifs)) return false;
   if (!(e.rolesMenu ?? e.roles).includes(role)) return false;
+  if (e.menuConducteur && !conduit) return false;
   return deciderAcces(e, role, modulesActifs, conduit).ok;
 }
 

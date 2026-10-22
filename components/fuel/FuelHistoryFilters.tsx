@@ -19,12 +19,17 @@ interface Option {
 export function FuelHistoryFilters({
   vehicles,
   drivers,
+  aTraiter = null,
 }: {
   vehicles: Option[];
   drivers: Option[] | null;
+  /** Nombre GLOBAL d'écarts à traiter (encadrement) ; null : pas de filtre « À traiter ». */
+  aTraiter?: number | null;
 }) {
+
   const router = useRouter();
   const searchParams = useSearchParams();
+  const filtreActif = searchParams.get("a_traiter") === "1";
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -37,6 +42,17 @@ export function FuelHistoryFilters({
 
   return (
     <div className="mb-4 flex flex-wrap gap-3">
+      {aTraiter !== null && (
+        <div role="group" aria-label="Pleins affichés" className="flex rounded-xl border border-navy/[0.12] bg-surface p-1">
+          <button type="button" aria-pressed={!filtreActif} className={`min-h-[40px] rounded-lg px-3 text-sm font-semibold ${!filtreActif ? "bg-navy/[0.08] text-navy" : "text-navy/65"}`} onClick={() => setParam("a_traiter", "")}>
+            Tous
+          </button>
+          <button type="button" aria-pressed={filtreActif} className={`min-h-[40px] rounded-lg px-3 text-sm font-semibold ${filtreActif ? "bg-navy/[0.08] text-navy" : "text-navy/65"}`} onClick={() => setParam("a_traiter", "1")}>
+            À traiter{" "}
+            <span className={aTraiter > 0 ? "badge-orange" : "badge-neutral"}>{aTraiter}</span>
+          </button>
+        </div>
+      )}
       <select aria-label="Filtrer par véhicule"
         className="input !w-auto"
         value={searchParams.get("vehicle") ?? ""}
@@ -71,7 +87,7 @@ export function FuelHistoryFilters({
         au
         <input type="date" aria-label="Jusqu'au" className="input !w-auto" value={searchParams.get("to") ?? ""} onChange={(e) => setParam("to", e.target.value)} />
       </label>
-      {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page") || searchParams.get("plein")) && (
+      {(searchParams.get("vehicle") || searchParams.get("driver") || searchParams.get("from") || searchParams.get("to") || searchParams.get("page") || searchParams.get("plein") || searchParams.get("a_traiter")) && (
         <button className="btn-secondary !px-3 !py-1.5 text-sm" onClick={() => router.push("/carburant/pleins")}>
           Réinitialiser
         </button>

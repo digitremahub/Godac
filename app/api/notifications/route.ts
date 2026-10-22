@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
+import { filtreDestinataire } from "@/lib/alerts/lecture";
+import { modulesActifs } from "@/lib/acces/modules-requete";
 
 const WINDOW_DAYS = 30;
 
@@ -23,7 +25,7 @@ export async function GET() {
   const { data: alerts, error } = await supabase
     .from("alerts")
     .select("id, type, severity, message, created_at, related_table, related_id, recipient_user_id")
-    .or(`recipient_user_id.is.null,recipient_user_id.eq.${appUser.id}`)
+    .or(filtreDestinataire(appUser.id))
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -34,6 +36,8 @@ export async function GET() {
     ? await supabase.from("alert_reads").select("alert_id").eq("user_id", appUser.id).in("alert_id", ids)
     : { data: [] as { alert_id: string }[] };
   const readSet = new Set((reads ?? []).map((r) => r.alert_id));
+  // Lien vers un écran qui s'ouvre pour cette personne (rôle, conduite, modules).
+  const modules = await modulesActifs(appUser.organization_id);
 
   const items = (alerts ?? []).map((a) => ({
     id: a.id,
@@ -41,7 +45,9 @@ export async function GET() {
     severity: a.severity,
     message: a.message,
     createdAt: a.created_at,
-    href: resolveAlertUrl(a.related_table, a.type, a.related_id, { recipientUserId: a.recipient_user_id, role: appUser.role }) ?? "/communication/alertes",
+    href:
+      resolveAlertUrl(a.related_table, a.type, a.related_id, { recipientUserId: a.recipient_user_id, role: appUser.role, conduit: appUser.conduit, modules }) ??
+      "/communication/alertes",
     read: readSet.has(a.id),
   }));
   return NextResponse.json({ items, unread: items.filter((i) => !i.read).length });

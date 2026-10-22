@@ -25,7 +25,7 @@ export default async function LivreurPage() {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-paper p-6 text-center">
         <p className="font-display text-lg font-bold">Module Tournée colis non activé</p>
-        <p className="text-sm text-navy/65">La direction peut l&apos;activer depuis Modules &amp; tarifs.</p>
+        <p className="text-sm text-navy/65">La direction peut l&apos;activer depuis Abonnement &amp; modules.</p>
         <Link href="/dashboard" className="btn-secondary">
           Retour à GODAC
         </Link>

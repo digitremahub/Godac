@@ -61,7 +61,7 @@ export function VehicleActionsPanel({
 
       {canDriveTours && (
         <Link href={`/moi/tournee/collegue?vehicle=${vehicleId}`} className="btn-ghost min-h-[52px] w-full justify-center text-center text-base">
-          <IconUsers className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> J&apos;entre le départ / retour / ravitaillement d&apos;un collègue
+          <IconUsers className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> J&apos;entre le départ / retour / plein d&apos;un collègue
         </Link>
       )}
 

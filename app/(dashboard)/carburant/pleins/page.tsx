@@ -10,7 +10,7 @@ import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
 import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
-import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
+import { chargerEcartsATraiter, chargerSuiviEcarts, FENETRE_ECARTS_JOURS } from "@/lib/fuel/ecarts-serveur";
 import { ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
 
 const PAGE_SIZE = 50;
@@ -30,7 +30,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default async function FuelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string; plein?: string }>;
+  searchParams: Promise<{ vehicle?: string; driver?: string; status?: string; tank?: string; new?: string; from?: string; to?: string; page?: string; plein?: string; a_traiter?: string }>;
 }) {
   const params = await searchParams;
   const g = await garderPage("carburant.pleins");
@@ -39,7 +39,11 @@ export default async function FuelPage({
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
   const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "exploitation", "direction", "comptable"]);
+  // Saisir un plein pour un autre chauffeur : encadrement seulement.
   const canCreate = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
+  // Bouton « + Nouveau plein » : l'encadrement et toute personne qui
+  // conduit (sur ordinateur ou tablette, la barre mobile n'est plus là).
+  const peutSaisir = canCreate || appUser.conduit;
   // Un manager qui conduit est lui-même chauffeur — "soi-même" reste un
   // choix valide par défaut. Un manager/la direction ne le sont jamais :
   // les laisser sur ce défaut soumettrait le plein au nom de leur
@@ -67,11 +71,11 @@ export default async function FuelPage({
     return (
       <div className="mx-auto max-w-lg">
         <PageHeader
-          title="Nouveau ravitaillement"
-          description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un ravitaillement oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
+          title="Nouveau plein"
+          description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un plein oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
           actions={
             <Link href="/carburant/pleins" className="btn-secondary">
-              ← Historique
+              ← Pleins
             </Link>
           }
         />
@@ -98,6 +102,23 @@ export default async function FuelPage({
   const page = Math.max(1, Math.floor(Number(params.page)) || 1);
   const from = params.from && DAY_RE.test(params.from) ? params.from : null;
   const to = params.to && DAY_RE.test(params.to) ? params.to : null;
+  // Lien d'une alerte d'écart (?plein=) : ce plein seul, fiche ouverte.
+  const pleinCible = params.plein && UUID_RE.test(params.plein) ? params.plein : null;
+
+  // Écarts à traiter : compteur GLOBAL (90 jours, mêmes filtres véhicule,
+  // chauffeur et dates), pour l'encadrement qui les traite.
+  const ecartsATraiter = canCreate && !pleinCible
+    ? await chargerEcartsATraiter(supabase, {
+        vehicule: params.vehicle,
+        chauffeur: params.driver,
+        du: from ? parisMidnightIso(from) : null,
+        avant: to ? parisMidnightIso(nextDay(to)) : null,
+      })
+    : null;
+  // Filtre « À traiter » : la page affiche ces pleins seuls, 50 par page.
+  const filtreATraiter = Boolean(params.a_traiter) && ecartsATraiter !== null;
+  const idsPage = filtreATraiter ? ecartsATraiter!.ids.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
+
   let query = supabase
     .from("fuel_entries")
     .select(
@@ -105,17 +126,20 @@ export default async function FuelPage({
       { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+    .order("id", { ascending: false });
 
-  // Lien d'une alerte d'écart (?plein=) : ce plein seul, fiche ouverte.
-  const pleinCible = params.plein && UUID_RE.test(params.plein) ? params.plein : null;
-  if (pleinCible) query = query.eq("id", pleinCible);
-  if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
-  if (params.driver) query = query.eq("driver_id", params.driver);
-  if (params.status) query = query.eq("status", params.status);
-  if (from) query = query.gte("occurred_at", parisMidnightIso(from));
-  if (to) query = query.lt("occurred_at", parisMidnightIso(nextDay(to)));
+  if (filtreATraiter) {
+    // Aucun plein à traiter : identifiant nul pour une page vide.
+    query = query.in("id", idsPage.length > 0 ? idsPage : ["00000000-0000-0000-0000-000000000000"]);
+  } else {
+    query = query.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+    if (pleinCible) query = query.eq("id", pleinCible);
+    if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
+    if (params.driver) query = query.eq("driver_id", params.driver);
+    if (params.status) query = query.eq("status", params.status);
+    if (from) query = query.gte("occurred_at", parisMidnightIso(from));
+    if (to) query = query.lt("occurred_at", parisMidnightIso(nextDay(to)));
+  }
 
   const [{ data: entries, error, count }, { data: vehicles }, { data: drivers }] = await Promise.all([
     query,
@@ -133,17 +157,18 @@ export default async function FuelPage({
       suivi.traitements.get(e.id) ?? [],
     ),
   }));
-  const aTraiter = lignes.filter((l) => l.statut_ecart === "ouvert" || l.statut_ecart === "reponse_recue").length;
+  const aTraiter = ecartsATraiter?.ids.length ?? 0;
+  const total = filtreATraiter ? aTraiter : (count ?? 0);
 
   return (
     <div>
       <PageHeader
-        title="Historique carburant"
-        description="Tous les ravitaillements — filtrez par véhicule ou par chauffeur pour voir qui a eu quoi, quand."
+        title="Pleins"
+        description={canSeeOtherDrivers ? "Tous les pleins : filtrez par véhicule ou par chauffeur pour voir qui a eu quoi, quand." : "Vos pleins, du plus récent au plus ancien."}
         actions={
-          canCreate ? (
+          peutSaisir ? (
             <Link href="/carburant/pleins?new=1" className="btn-primary">
-              + Nouveau ravitaillement
+              + Nouveau plein
             </Link>
           ) : undefined
         }
@@ -153,6 +178,7 @@ export default async function FuelPage({
       <FuelHistoryFilters
         vehicles={(vehicles ?? []).map((v) => ({ id: v.id, label: v.registration }))}
         drivers={canSeeOtherDrivers ? (drivers ?? []).map((d) => ({ id: d.id, label: d.full_name })) : null}
+        aTraiter={ecartsATraiter ? aTraiter : null}
       />
 
       {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
@@ -161,19 +187,23 @@ export default async function FuelPage({
         <Card className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
           <span>Plein ouvert depuis une alerte d&apos;écart.</span>
           <Link href="/carburant/pleins" className="text-teal-ink underline">
-            Voir tout l&apos;historique
+            Voir tous les pleins
           </Link>
         </Card>
       )}
-      {!pleinCible && canCreate && aTraiter > 0 && (
+      {ecartsATraiter && aTraiter > 0 && (
         <p className="mb-3 text-sm text-orange-ink">
-          {aTraiter} écart{aTraiter > 1 ? "s" : ""} à traiter sur cette page — ouvrez « Détails » pour justifier / classer ou demander une explication.
+          {aTraiter} écart{aTraiter > 1 ? "s" : ""} à traiter sur les {FENETRE_ECARTS_JOURS} derniers jours
+          {ecartsATraiter.tronque ? " (compte incomplet : trop de pleins sur la période)" : ""}. Ouvrez « Détails » pour justifier, classer ou demander une explication.
         </p>
+      )}
+      {filtreATraiter && aTraiter === 0 && (
+        <Card className="mb-4 text-sm">Aucun écart à traiter sur les {FENETRE_ECARTS_JOURS} derniers jours.</Card>
       )}
 
       <FuelHistoryTable entries={lignes as any} initialOpenId={pleinCible ?? undefined} />
 
-      <FuelHistoryPager params={params} page={page} total={count ?? 0} />
+      <FuelHistoryPager params={params} page={page} total={total} />
     </div>
   );
 }
@@ -199,7 +229,7 @@ function FuelHistoryPager({ params, page, total }: { params: Record<string, stri
         <span />
       )}
       <span className="text-navy/60">
-        Page {Math.min(page, pages)} / {pages} · {total} ravitaillement{total > 1 ? "s" : ""}
+        Page {Math.min(page, pages)} / {pages} · {total} plein{total > 1 ? "s" : ""}
       </span>
       {page < pages ? (
         <Link href={href(page + 1)} className="btn-secondary !px-3 !py-1.5">

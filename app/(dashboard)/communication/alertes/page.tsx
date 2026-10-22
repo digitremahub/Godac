@@ -1,26 +1,27 @@
 import { garderPage } from "@/lib/acces/garde-page";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
+import { chargerAlertes } from "@/lib/alerts/charger";
+import type { UserRole } from "@/lib/types/domain";
+
+/** Texte d'introduction selon le rôle : le chauffeur ne traite ni totaliseur ni ticket. */
+function description(role: UserRole): string {
+  if (role === "chauffeur") return "Vos rappels de planning, messages, réponses à vos demandes et bulletins disponibles.";
+  if (role === "comptable") return "Factures, carburant, paie et demandes à traiter, aussi envoyés par e-mail.";
+  return "Écarts carburant, entretien, planning et demandes à traiter, aussi envoyés par e-mail.";
+}
 
 export default async function AlertsPage() {
   const g = await garderPage("communication.alertes");
   if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  const { data: alerts } = await supabase
-    .from("alerts")
-    .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id, recipient_user_id")
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const { appUser, supabase, modules } = g;
+  // Diffusées et personnelles (jamais le rappel d'un collègue), non lues d'abord.
+  const alerts = await chargerAlertes(supabase, appUser.id, { limite: 100 });
 
   return (
     <div>
-      <PageHeader
-        title="Centre d'alertes"
-        description="Écarts de totaliseur, anomalies de prix, échecs OCR — centralisés ici et par email."
-      />
-      <AlertList alerts={alerts ?? []} viewerRole={appUser.role} />
+      <PageHeader title="Notifications" description={description(appUser.role)} />
+      <AlertList alerts={alerts} viewerRole={appUser.role} conduit={appUser.conduit} modules={[...modules]} />
     </div>
   );
 }

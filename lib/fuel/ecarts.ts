@@ -166,6 +166,23 @@ export function statutEcart(nbEcarts: number, traitements: readonly TraitementEc
   return nbEcarts > 0 ? "ouvert" : "aucun";
 }
 
+/** Écart qui attend l'encadrement : jamais traité, ou réponse du chauffeur reçue. */
+export function estATraiter(statut: StatutEcart): boolean {
+  return statut === "ouvert" || statut === "reponse_recue";
+}
+
+/**
+ * Pleins dont l'écart est « à traiter », dans l'ordre reçu. Sert au
+ * compteur global (accueils, page Pleins) et au filtre « À traiter ».
+ */
+export function pleinsATraiter<P extends PleinPourEcarts & { id: string }>(
+  pleins: readonly P[],
+  alertes: ReadonlyMap<string, readonly AlerteLiee[]>,
+  traitements: ReadonlyMap<string, readonly TraitementEcart[]>,
+): string[] {
+  return pleins.filter((p) => estATraiter(statutEcart(ecartsDuPlein(p, alertes.get(p.id) ?? []).length, traitements.get(p.id) ?? []))).map((p) => p.id);
+}
+
 export interface DroitsEcart {
   /** Justifier / classer, demander une explication. */
   traiter: boolean;

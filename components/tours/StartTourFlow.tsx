@@ -72,7 +72,6 @@ export function StartTourFlow({
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
   const [problemPhotoFile, setProblemPhotoFile] = useState<File | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -167,8 +166,7 @@ export function StartTourFlow({
     vehicleOk !== null &&
     (vehicleOk || problemDescription.trim().length > 0) &&
     (!vehicleChanged || (changeReason.trim().length > 0 && photosManquantes(changeType, changePhotos).length === 0)) &&
-    (!polyvalentServices || Boolean(serviceId)) &&
-    confirmed;
+    (!polyvalentServices || Boolean(serviceId));
 
   async function submit() {
     if (!vehicleId || vehicleOk === null) return;
@@ -481,13 +479,8 @@ export function StartTourFlow({
         </p>
       )}
 
-      <label className="flex min-h-[44px] items-center gap-2 text-sm">
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-        Je confirme démarrer la tournée avec le véhicule{registration ? ` ${registration}` : ""}.
-      </label>
-
       <button className="btn-primary w-full justify-center text-base" disabled={!canSubmit || busy} onClick={submit}>
-        {busy ? "Envoi…" : scanUploadBusy || sheetUploadBusy ? "Attendez la fin de l’envoi des documents…" : "Valider mon départ"}
+        {busy ? "Envoi…" : scanUploadBusy || sheetUploadBusy ? "Attendez la fin de l’envoi des documents…" : `Valider mon départ${registration ? ` avec ${registration}` : ""}`}
       </button>
     </Card>
   );

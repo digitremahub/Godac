@@ -89,7 +89,7 @@ export function HelpColleagueFlow({
           title: step.hasOpenTour ? "Son retour" : "Son départ",
           hint: step.hasOpenTour ? "Clôturer sa tournée en cours" : "Ouvrir sa tournée du jour",
         },
-        { action: "fuel" as const, icon: IconDroplet, title: "Son ravitaillement", hint: "Plein cuve ou station, à son nom" },
+        { action: "fuel" as const, icon: IconDroplet, title: "Son plein", hint: "Plein cuve ou station, à son nom" },
       ];
       return (
         <div className="flex flex-col gap-4">

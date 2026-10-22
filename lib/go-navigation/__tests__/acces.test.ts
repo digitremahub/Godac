@@ -32,9 +32,21 @@ describe("menu réduit des comptes GO Navigation", () => {
     expect(horsOffreGoNavigation("dashboard.accueil", new Set(["route_optimizer"]))).toBe(false);
   });
 
-  it("barre mobile : Tournée et GO Nav, sans Plein", () => {
+  it("barre mobile : Tournée et GO Navigation (un seul nom, icône navigation), sans Plein", () => {
     const b = boutonsBarreMobile("manager", modulesGo, false, true);
-    expect(b.map((x) => x.libelle)).toEqual(["Tournée", "GO Nav"]);
+    expect(b.map((x) => x.libelle)).toEqual(["Tournée", "GO Navigation"]);
     expect(b.map((x) => x.href)).toContain("/livreur/navigation");
+    expect(b[1]!.icone).toBe("navigation");
+  });
+
+  it("entrée de menu « GO Navigation » (avant-première), pour l'essai comme pour toute personne qui conduit", () => {
+    expect(ecransVisibles("manager", modulesGo, true).map((e) => e.libelle)).toContain("GO Navigation");
+    const classique = new Set(["route_optimizer", "planning"]);
+    expect(ecransVisibles("chauffeur", classique).map((e) => e.id)).toContain("exploitation.go_navigation");
+    expect(ecransVisibles("manager", classique, true).map((e) => e.id)).toContain("exploitation.go_navigation");
+    // Ni l'encadrement qui ne conduit pas, ni sans la Tournée colis.
+    expect(ecransVisibles("manager", classique, false).map((e) => e.id)).not.toContain("exploitation.go_navigation");
+    expect(ecransVisibles("direction", classique).map((e) => e.id)).not.toContain("exploitation.go_navigation");
+    expect(ecransVisibles("chauffeur", new Set(["planning"])).map((e) => e.id)).not.toContain("exploitation.go_navigation");
   });
 });

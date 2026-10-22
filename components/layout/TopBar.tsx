@@ -19,11 +19,14 @@ export function TopBar({
   role,
   roleTitle,
   onMenuClick,
+  goNavigation = false,
 }: {
   fullName: string;
   role: UserRole;
   roleTitle?: string | null;
   onMenuClick?: () => void;
+  /** Compte d'essai GO Navigation : pas de lien vers le centre de notifications. */
+  goNavigation?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-navy/[0.08] bg-surface/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
@@ -50,7 +53,7 @@ export function TopBar({
       </div>
 
       <div className="flex min-w-0 items-center gap-1 sm:gap-3">
-        <NotificationBell />
+        <NotificationBell lienToutes={!goNavigation} />
         <Link href="/account" className="flex min-w-0 items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-navy/[0.04]">
           <div
             aria-hidden="true"

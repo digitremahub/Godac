@@ -491,7 +491,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
                     onClick={() => changerVue(v)}
                     className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
                   >
-                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "Naviguer"}
+                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
                   </button>
                 ))}
               </div>
@@ -653,7 +653,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
             <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
-              <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Navigation</a>
+              <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Google Maps</a>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
@@ -734,7 +734,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
 
             {run.status === "in_progress" && (
               <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={() => changerVue("navigation")}>
-                <IconNavigation className="h-5 w-5 text-teal" /> Naviguer avec GO
+                <IconNavigation className="h-5 w-5 text-teal" /> Ouvrir GO Navigation
               </button>
             )}
             <div className="grid grid-cols-2 gap-2">

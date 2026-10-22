@@ -35,7 +35,7 @@ export function EtatAcces(props: Props) {
         titre = "Réservé aux personnes qui conduisent";
         texte = (
           <>
-            {props.ecran ? <>« {props.ecran} » </> : "Cet écran "}est réservé aux chauffeurs et aux managers qui conduisent aussi. La direction peut cocher « Conduit aussi » sur votre fiche.
+            {props.ecran ? <>« {props.ecran} » </> : "Cet écran "}est réservé aux chauffeurs et aux managers qui conduisent aussi. La direction ou l&apos;exploitation peut cocher « Conduit aussi » sur votre fiche.
           </>
         );
         break;

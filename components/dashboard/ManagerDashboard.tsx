@@ -5,15 +5,18 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
 import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import { AssistedClock } from "@/components/time-clock/AssistedClock";
-import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import { getFleetConsumptionRanking } from "@/lib/vehicles/consumption";
+import { chargerEcartsATraiter } from "@/lib/fuel/ecarts-serveur";
 import type { AppUser } from "@/lib/auth/session";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
+import { chargerAlertes } from "@/lib/alerts/charger";
+import { ecranOuvrable, ecranTourneesEnCours, SUITE_ECARTS_A_TRAITER, tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
 
 /**
- * A manager runs one or more services day-to-day: who's on the road
- * right now, what's waiting for a decision (OCR tickets, leave
- * requests, new drivers), and which vehicles are drinking too much
- * fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
+ * A manager runs one or more services day-to-day: fuel gaps to handle
+ * first (GODAC's main axis), who's on the road right now, what's waiting
+ * for a decision (tickets to check, leave requests, new drivers), and
+ * which vehicles are drinking too much fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
  * they also get the same start/end-tour action a plain chauffeur has.
  *
  * Also the dashboard of the « exploitation » role: same tiles, over the
@@ -24,6 +27,9 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
   const isManagerChauffeur = appUser.conduit;
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
+  const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
+  // Carte « Démarrer / Terminer ma tournée » : seulement si l'écran s'ouvre (module Planning).
+  const tourneeOuvrable = isManagerChauffeur && ecranOuvrable("moi.tournee_depart", ctx);
 
   const { data: myServices } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
   const myServiceIds = (myServices ?? []).map((s) => s.service_id);
@@ -40,6 +46,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     pendingSignupsRes,
     openMaintenanceRes,
     openAlertsRes,
+    ecartsRes,
   ] = await Promise.all([
     isManagerChauffeur
       ? supabase
@@ -71,12 +78,11 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     maintenanceEnabled
       ? supabase.from("vehicle_interventions").select("id", { count: "exact", head: true }).not("status", "in", "(done,cancelled)")
       : Promise.resolve({ count: null }),
-    supabase
-      .from("alerts")
-      .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    // Diffusées et personnelles, jamais le rappel personnel d'un chauffeur.
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
+    // Écarts carburant à traiter, compteur global (RLS : son service, ou toute
+    // l'organisation pour l'exploitation).
+    chargerEcartsATraiter(supabase),
   ]);
 
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
@@ -87,32 +93,30 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     vehicles: { registration: string } | null;
     users: { full_name: string } | null;
   }[];
-  const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const openAlerts = openAlertsRes;
 
   const pendingSignups = ((pendingSignupsRes.data ?? []) as any[]).filter((u) => {
     const services = (u.user_services ?? []).map((s: any) => s.service_id);
     return toutLOrganisation || services.length === 0 || services.some((id: string) => myServiceIds.includes(id));
   });
 
-  const consumptionRanking = (
-    await Promise.all(
-      ((fleetVehiclesRes.data ?? []) as { id: string; registration: string }[]).map(async (v) => ({
-        registration: v.registration,
-        consumption: await getVehicleConsumption(supabase, v.id, 30),
-      })),
-    )
-  )
-    .filter((v): v is { registration: string; consumption: number } => v.consumption !== null)
-    .sort((a, b) => b.consumption - a.consumption)
-    .slice(0, 5);
+  // Toute la flotte en trois requêtes (plus une série par véhicule).
+  const consumptionRanking = await getFleetConsumptionRanking(supabase, (fleetVehiclesRes.data ?? []) as { id: string; registration: string }[], 30);
 
-  const tiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Tournées en cours", value: ongoingTours.length, accent: "teal", href: "/exploitation/historique" },
-    { label: "Tickets OCR en attente", value: pendingOcrRes.count ?? 0, accent: "gold", href: "/carburant/revue-ocr" },
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignups.length, accent: "teal", href: "/equipe/inscriptions" },
-  ];
-  if (leaveEnabled) tiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
-  if (maintenanceEnabled) tiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
+  // Seulement les tuiles dont l'écran s'ouvre (rôle, conduite, modules).
+  const ecranTournees = ecranTourneesEnCours(ctx);
+  const tiles = tuilesOuvrables(
+    [
+      // L'axe principal de GODAC en tête : les écarts carburant.
+      { libelle: "Écarts carburant à traiter", valeur: String(ecartsRes.ids.length), accent: ecartsRes.ids.length ? "orange" : "teal", ecran: "carburant.pleins", suite: SUITE_ECARTS_A_TRAITER },
+      ecranTournees && { libelle: "Tournées en cours", valeur: String(ongoingTours.length), accent: "teal", ecran: ecranTournees },
+      { libelle: "Tickets à vérifier", valeur: String(pendingOcrRes.count ?? 0), accent: "gold", ecran: "carburant.revue_ocr" },
+      { libelle: "Nouveaux chauffeurs à valider", valeur: String(pendingSignups.length), accent: "teal", ecran: "equipe.inscriptions" },
+      leaveEnabled && { libelle: "Congés à valider", valeur: String(pendingLeaveRes.count ?? 0), accent: "gold", ecran: "equipe.conges" },
+      maintenanceEnabled && { libelle: "Demandes d'entretien ouvertes", valeur: String(openMaintenanceRes.count ?? 0), accent: "orange", ecran: "flotte.entretien" },
+    ],
+    ctx,
+  );
 
   // Pointage assisté only concerns someone who also drives.
   const autoClockEnabled =
@@ -130,15 +134,15 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
 
       {isManagerChauffeur && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TourHeroCard openTour={openTour} />
+          {tourneeOuvrable && <TourHeroCard openTour={openTour} />}
           <QrCodeBadge type="driver" id={appUser.id} title={appUser.full_name} subtitle="Mon badge chauffeur — à présenter à la pompe" />
         </div>
       )}
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {tiles.map((t) => (
-          <Link key={t.label} href={t.href} className="block">
-            <StatTile label={t.label} value={String(t.value)} accent={t.accent} />
+          <Link key={t.libelle} href={t.href} className="block">
+            <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
           </Link>
         ))}
       </div>
@@ -184,7 +188,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
       {openAlerts.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} conduit={appUser.conduit} modules={enabledModules} />
         </div>
       )}
     </div>

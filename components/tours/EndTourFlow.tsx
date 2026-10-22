@@ -67,7 +67,6 @@ export function EndTourFlow({
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
   const [problemPhotoFile, setProblemPhotoFile] = useState<File | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -149,7 +148,6 @@ export function EndTourFlow({
     vehicleOk === false && !problemDescription.trim() ? "Décrivez le problème constaté sur le véhicule" : null,
     vehicleChanged && !changeReason.trim() ? "Précisez le motif du changement de véhicule" : null,
     vehicleChanged && photosManquantes(changeType, changePhotos).length > 0 ? "Ajoutez les photos requises pour le changement de véhicule" : null,
-    !confirmed ? "Cochez la confirmation de fin de tournée" : null,
   ].filter((item): item is string => Boolean(item));
 
   const canSubmit = missingRequirements.length === 0;
@@ -427,7 +425,7 @@ export function EndTourFlow({
       )}
 
       <label className="block">
-        <span className="label">Stops de ramasse</span>
+        <span className="label">Arrêts de ramasse</span>
         <input
           className="input"
           type="number"
@@ -438,14 +436,9 @@ export function EndTourFlow({
           onChange={(e) => setRamasses(e.target.value.replace(/[^0-9]/g, ""))}
         />
         <span className="mt-1 block text-xs text-navy/55">
-          Nombre de stops où vous avez fait une ramasse (inscrit à la main sur la feuille). Ils sont déduits des stops du scan : seuls
+          Nombre d&apos;arrêts où vous avez fait une ramasse (inscrit à la main sur la feuille). Ils sont déduits des arrêts du scan : seuls
           les arrêts de livraison sont comptés.
         </span>
-      </label>
-
-      <label className="flex min-h-[44px] items-center gap-2 text-sm">
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-        Je confirme terminer la tournée avec le véhicule{(registration ?? openTour?.vehicles?.registration) ? ` ${registration ?? openTour?.vehicles?.registration}` : ""}.
       </label>
 
       {!canSubmit && (
@@ -463,7 +456,7 @@ export function EndTourFlow({
         aria-describedby={!canSubmit ? "retour-validation-aide" : undefined}
         onClick={submit}
       >
-        {busy ? "Envoi du retour…" : canSubmit ? "Valider mon retour" : "Complétez les champs requis"}
+        {busy ? "Envoi du retour…" : canSubmit ? `Valider mon retour${(registration ?? openTour?.vehicles?.registration) ? ` avec ${registration ?? openTour?.vehicles?.registration}` : ""}` : "Complétez les champs requis"}
       </button>
     </Card>
   );

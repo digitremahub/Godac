@@ -29,13 +29,13 @@ export default async function OcrReviewPage() {
   return (
     <div>
       <PageHeader
-        title="Revue OCR"
+        title="Tickets à vérifier"
         description="Tickets en attente de validation humaine — la donnée n'est jamais enregistrée sans confirmation."
       />
       <JaugesQuotas organizationId={g.appUser.organization_id} role={g.appUser.role} fonctions={["ocr_ticket", "ocr_totalizer", "ocr_counter"]} />
 
       {withPhotoUrls.length === 0 ? (
-        <EmptyState title="Aucun ticket en attente" description="Tous les tickets OCR ont été validés." />
+        <EmptyState title="Aucun ticket en attente" description="Tous les tickets lus automatiquement ont été vérifiés." />
       ) : (
         <div className="flex flex-col gap-4">
           {withPhotoUrls.map((entry: any) => (

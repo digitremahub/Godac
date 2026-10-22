@@ -43,9 +43,10 @@ export const NOM_SERVICE_GO_NAVIGATION = "GO Navigation";
 
 /**
  * Écrans du catalogue d'accès (lib/acces/catalogue.ts) ouverts aux comptes
- * GO Navigation : Tournée colis (et son historique), Mon compte, Aide.
+ * GO Navigation : Tournée colis (et son historique), GO Navigation, Mon
+ * compte, Aide.
  */
-export const ECRANS_GO_NAVIGATION: readonly string[] = ["exploitation.colis", "exploitation.historique_colis", "aide.guide", "aide.faq", "aide.compte"];
+export const ECRANS_GO_NAVIGATION: readonly string[] = ["exploitation.colis", "exploitation.go_navigation", "exploitation.historique_colis", "aide.guide", "aide.faq", "aide.compte"];
 
 /** Page d'arrivée des comptes GO Navigation (menu réduit, accueil). */
 export const ACCUEIL_GO_NAVIGATION = "/exploitation/colis";

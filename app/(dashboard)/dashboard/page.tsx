@@ -1,6 +1,4 @@
 import { garderPage } from "@/lib/acces/garde-page";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { ChauffeurDashboard } from "@/components/dashboard/ChauffeurDashboard";
 import { ManagerDashboard } from "@/components/dashboard/ManagerDashboard";
 import { ComptableDashboard } from "@/components/dashboard/ComptableDashboard";
@@ -18,8 +16,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const g = await garderPage("dashboard.accueil");
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  const enabledModules = await getEnabledModuleKeys(supabase, appUser.organization_id);
+  // Modules actifs de la garde (déjà chargés pour la requête) : les tuiles
+  // ne montrent que les écrans qui s'ouvrent.
+  const enabledModules = [...g.modules];
 
   switch (appUser.role) {
     case "chauffeur":
