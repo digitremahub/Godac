@@ -4,6 +4,7 @@ import { AvertissementTicpe } from "@/components/ticpe/AvertissementTicpe";
 import { ReglagesTicpeForm } from "@/components/ticpe/ReglagesTicpeForm";
 import { SurchargesTicpe, TableBaremeTicpe, type SurchargeAffichee } from "@/components/ticpe/BaremeTicpe";
 import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
+import { ZonesCuves } from "@/components/ticpe/ZonesCuves";
 
 /**
  * Réglages TICPE de l'organisation (direction, comptable) : activités,
@@ -16,6 +17,8 @@ export default async function ReglagesTicpePage() {
   const { appUser, supabase } = g;
   const p = await chargerParametresTicpe(supabase, appUser.organization_id);
 
+  const cuvesRes = await supabase.from("tanks").select("id, name, ticpe_zone").order("name");
+  const cuves = cuvesRes.error ? null : ((cuvesRes.data ?? []) as { id: string; name: string; ticpe_zone: "metropole" | "corse" | null }[]);
   const auteurs = new Set(p.surcharges.map((s) => s.created_by).filter((x): x is string => Boolean(x)));
   const { data: personnes } = auteurs.size ? await supabase.from("users").select("id, full_name").in("id", [...auteurs]) : { data: [] as { id: string; full_name: string }[] };
   const surcharges: SurchargeAffichee[] = p.surcharges.map((s) => ({
@@ -50,6 +53,13 @@ export default async function ReglagesTicpePage() {
             </p>
             <SurchargesTicpe surcharges={surcharges} modifiable={!p.migrationManquante} />
           </Card>
+          {cuves && cuves.length > 0 && (
+            <Card>
+              <h3 className="mb-1 text-base">Zone des cuves</h3>
+              <p className="mb-3 text-xs text-navy/60">Les pleins faits à une cuve en Corse prennent le taux Corse. Modifiable par la direction.</p>
+              <ZonesCuves cuves={cuves} modifiable={appUser.role === "direction"} />
+            </Card>
+          )}
           <Card>
             <h3 className="mb-1 text-base">Barème GODAC</h3>
             <p className="mb-3 text-xs text-navy/60">
