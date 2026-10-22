@@ -66,7 +66,8 @@ export interface SurchargeBareme {
   revoked_at?: string | null;
 }
 
-const URL_SOURCE = "https://www.impots.gouv.fr/professionnel/questions/comment-obtenir-le-remboursement-partiel-de-laccise-sur-le-gazole";
+// Source consultée (organisation professionnelle relayant le CNR) ; les taux restent à vérifier sur impots.gouv.fr.
+const URL_SOURCE_2026 = "https://otre.org/le-cnr-communique-les-nouveaux-taux-de-remboursement-de-laccise-sur-le-gazole-trm-au-1er-janvier-2026/";
 
 /**
  * Copie du barème semé par la migration 20261031000001 : utilisée tant
@@ -74,13 +75,13 @@ const URL_SOURCE = "https://www.impots.gouv.fr/professionnel/questions/comment-o
  * une fois là, fait foi.
  */
 export const BAREME_PAR_DEFAUT: readonly LigneBareme[] = [
-  { categorie: "trm", zone: "metropole", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.56, source: "Taux 2025 (régions hors IDF et AURA)", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
-  { categorie: "trm", zone: "ile_de_france", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 17.45, source: "Taux 2025 Île-de-France", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
-  { categorie: "trm", zone: "auvergne_rhone_alpes", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.29, source: "Taux 2025 Auvergne-Rhône-Alpes", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
-  { categorie: "trm", zone: "forfait_pondere", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.71, source: "Taux forfaitaire pondéré 2025", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
+  { categorie: "trm", zone: "metropole", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.56, source: "Taux 2025 (régions hors IDF et AURA)", verifie_le: "2026-10-22", a_confirmer: true },
+  { categorie: "trm", zone: "ile_de_france", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 17.45, source: "Taux 2025 Île-de-France", verifie_le: "2026-10-22", a_confirmer: true },
+  { categorie: "trm", zone: "auvergne_rhone_alpes", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.29, source: "Taux 2025 Auvergne-Rhône-Alpes", verifie_le: "2026-10-22", a_confirmer: true },
+  { categorie: "trm", zone: "forfait_pondere", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: 15.71, source: "Taux forfaitaire pondéré 2025", verifie_le: "2026-10-22", a_confirmer: true },
   { categorie: "trm", zone: "corse", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: null, source: "À compléter", a_confirmer: true },
-  { categorie: "trm", zone: "metropole", date_debut: "2026-01-01", date_fin: null, taux_eur_hl: 15.56, source: "Taux 2026 métropole hors Corse", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
-  { categorie: "trm", zone: "corse", date_debut: "2026-01-01", date_fin: null, taux_eur_hl: 14.21, source: "Taux 2026 Corse", source_url: URL_SOURCE, verifie_le: "2026-10-31", a_confirmer: true },
+  { categorie: "trm", zone: "metropole", date_debut: "2026-01-01", date_fin: null, taux_eur_hl: 15.56, source: "Taux 2026 métropole hors Corse", source_url: URL_SOURCE_2026, verifie_le: "2026-10-22", a_confirmer: true },
+  { categorie: "trm", zone: "corse", date_debut: "2026-01-01", date_fin: null, taux_eur_hl: 14.21, source: "Taux 2026 Corse", source_url: URL_SOURCE_2026, verifie_le: "2026-10-22", a_confirmer: true },
   { categorie: "trv", zone: "metropole", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: null, source: "À compléter", a_confirmer: true },
   { categorie: "trv", zone: "corse", date_debut: "2025-01-01", date_fin: "2025-12-31", taux_eur_hl: null, source: "À compléter", a_confirmer: true },
   { categorie: "trv", zone: "metropole", date_debut: "2026-01-01", date_fin: null, taux_eur_hl: null, source: "À compléter", a_confirmer: true },
