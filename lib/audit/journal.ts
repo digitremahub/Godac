@@ -34,6 +34,7 @@ export const ACTIONS_AUDIT = {
   contestation_creee: "Contestation client enregistrée (pièces jointes)",
   contestation_responsable_valide: "Contestation client : responsable validé et notifié",
   contestation_cloturee: "Contestation client réglée / contestée / classée",
+  contestation_suite_chauffeur: "Contestation client signalée traitée / colis rendu par le chauffeur",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

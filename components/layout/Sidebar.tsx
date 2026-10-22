@@ -60,6 +60,7 @@ export const ICONES: Record<IconeId, (props: { className?: string }) => React.Re
 };
 
 const MEMO_DEPLIEES = "godac-menu-sections-depliees";
+const MEMO_SECTIONS = "godac-menu-sections";
 
 /**
  * Menu latéral généré depuis le catalogue (lib/acces/catalogue.ts) :
@@ -101,24 +102,30 @@ export function Sidebar({
     sections.flatMap((s) => s.ecrans),
     pathname,
   );
-  // Sections repliées par défaut (Administration et Aide pour la direction) :
-  // dépliées par l'utilisateur (mémorisé sur cet appareil) ou quand l'écran ouvert s'y trouve.
-  const [depliees, setDepliees] = useState<Set<SectionId>>(new Set());
+  // Toutes les sections se replient d'un clic sur leur titre. Par défaut,
+  // Administration et Aide sont repliées pour la direction et les autres
+  // ouvertes (ou ouvertes quand l'écran affiché s'y trouve) ; le choix de
+  // l'utilisateur l'emporte ensuite et est mémorisé sur cet appareil.
+  const [choix, setChoix] = useState<Partial<Record<SectionId, boolean>>>({});
   useEffect(() => {
     try {
-      const memo = JSON.parse(localStorage.getItem(MEMO_DEPLIEES) ?? "[]");
-      if (Array.isArray(memo)) setDepliees(new Set(memo as SectionId[]));
+      const memo = JSON.parse(localStorage.getItem(MEMO_SECTIONS) ?? "null");
+      if (memo && typeof memo === "object" && !Array.isArray(memo)) {
+        setChoix(memo as Partial<Record<SectionId, boolean>>);
+        return;
+      }
+      // Ancien format : liste des sections dépliées.
+      const ancien = JSON.parse(localStorage.getItem(MEMO_DEPLIEES) ?? "[]");
+      if (Array.isArray(ancien)) setChoix(Object.fromEntries((ancien as SectionId[]).map((id) => [id, true])));
     } catch {
       /* stockage indisponible */
     }
   }, []);
-  function basculer(id: SectionId) {
-    setDepliees((d) => {
-      const n = new Set(d);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+  function basculer(id: SectionId, ouverte: boolean) {
+    setChoix((c) => {
+      const n = { ...c, [id]: !ouverte };
       try {
-        localStorage.setItem(MEMO_DEPLIEES, JSON.stringify([...n]));
+        localStorage.setItem(MEMO_SECTIONS, JSON.stringify(n));
       } catch {
         /* stockage indisponible */
       }
@@ -153,27 +160,23 @@ export function Sidebar({
       </Link>
 
       {sections.map((section) => {
-        const repliable = estSectionRepliee(section.id, role);
-        const ouverte = !repliable || depliees.has(section.id) || section.ecrans.some((e) => e.id === active?.id);
+        const contientActif = section.ecrans.some((e) => e.id === active?.id);
+        const ouverte = choix[section.id] ?? (!estSectionRepliee(section.id, role) || contientActif);
         return (
         <div key={section.id} className="flex flex-col gap-0.5" role="group" aria-labelledby={`menu-${section.id}`}>
-          {repliable ? (
-            <button
-              type="button"
-              id={`menu-${section.id}`}
-              aria-expanded={ouverte}
-              aria-controls={`menu-liste-${section.id}`}
-              onClick={() => basculer(section.id)}
-              className="flex min-h-[44px] items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60 hover:bg-white/[0.06] hover:text-white/80 lg:min-h-[32px]"
-            >
-              {section.libelle}
-              <span aria-hidden="true" className="text-sm normal-case tracking-normal">{ouverte ? "▴" : `▾ ${section.ecrans.length}`}</span>
-            </button>
-          ) : (
-            <p id={`menu-${section.id}`} className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-              {section.libelle}
-            </p>
-          )}
+          <button
+            type="button"
+            id={`menu-${section.id}`}
+            aria-expanded={ouverte}
+            aria-controls={`menu-liste-${section.id}`}
+            onClick={() => basculer(section.id, ouverte)}
+            className={`flex min-h-[44px] items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-white/[0.06] hover:text-white/80 lg:min-h-[32px] ${
+              !ouverte && contientActif ? "text-white" : "text-white/60"
+            }`}
+          >
+            {section.libelle}
+            <span aria-hidden="true" className="text-sm normal-case tracking-normal">{ouverte ? "▴" : `▾ ${section.ecrans.length}`}</span>
+          </button>
           <div id={`menu-liste-${section.id}`} hidden={!ouverte} className="flex flex-col gap-0.5">
           {section.ecrans.map((item) => {
             const estActif = item.id === active?.id;

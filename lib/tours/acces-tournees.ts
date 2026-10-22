@@ -6,9 +6,9 @@ import type { UserRole } from "@/lib/types/domain";
  * - Chefs d'équipe (manager) et direction : toutes les
  *   tournées, la carte, les incohérences, et la modification des fiches.
  * - Tous les autres rôles (chauffeurs en tête) : une liste en lecture
- *   seule des tournées de leurs services (et des tournées « tous
- *   services »), plus celles sur lesquelles ils sont planifiés. Ni carte,
- *   ni modification, ni tournées d'autres services.
+ *   seule des seules tournées sur lesquelles ils sont planifiés (d'hier à
+ *   dans une semaine). Ni carte, ni modification, ni villages des
+ *   tournées des collègues.
  */
 export const GESTION_TOURNEES: UserRole[] = ["manager", "exploitation", "direction"];
 
@@ -21,10 +21,9 @@ export const peutVoirCarteTournees = peutGererTournees;
 
 export function tourneesVisibles<R extends { serviceId: string | null; tourNumber: string }>(
   routes: R[],
-  opts: { role: UserRole; myServiceIds: Iterable<string>; plannedTourNumbers: Iterable<string> },
+  opts: { role: UserRole; plannedTourNumbers: Iterable<string> },
 ): R[] {
   if (peutGererTournees(opts.role)) return routes;
-  const services = new Set(opts.myServiceIds);
   const planned = new Set(opts.plannedTourNumbers);
-  return routes.filter((r) => planned.has(r.tourNumber) || !r.serviceId || services.has(r.serviceId));
+  return routes.filter((r) => planned.has(r.tourNumber));
 }

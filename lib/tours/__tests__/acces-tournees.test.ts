@@ -20,14 +20,14 @@ describe("accès à « Tournées & villages »", () => {
     }
   });
   it("la gestion voit toutes les tournées", () => {
-    expect(tourneesVisibles(routes, { role: "direction", myServiceIds: [], plannedTourNumbers: [] })).toHaveLength(4);
+    expect(tourneesVisibles(routes, { role: "direction", plannedTourNumbers: [] })).toHaveLength(4);
   });
-  it("un chauffeur voit son service, les tournées tous services et celle où il est planifié", () => {
-    const vis = tourneesVisibles(routes, { role: "chauffeur", myServiceIds: ["s1"], plannedTourNumbers: ["T4"] });
-    expect(vis.map((r) => r.tourNumber)).toEqual(["T1", "T3", "T4"]);
+  it("un chauffeur ne voit que les tournées où il est planifié, pas celles de ses collègues", () => {
+    const vis = tourneesVisibles(routes, { role: "chauffeur", plannedTourNumbers: ["T4"] });
+    expect(vis.map((r) => r.tourNumber)).toEqual(["T4"]);
   });
-  it("un autre rôle ne voit pas les autres services", () => {
-    const vis = tourneesVisibles(routes, { role: "comptable", myServiceIds: [], plannedTourNumbers: [] });
-    expect(vis.map((r) => r.tourNumber)).toEqual(["T3"]);
+  it("sans planification, un chauffeur ne voit aucune tournée", () => {
+    expect(tourneesVisibles(routes, { role: "chauffeur", plannedTourNumbers: [] })).toEqual([]);
+    expect(tourneesVisibles(routes, { role: "comptable", plannedTourNumbers: [] })).toEqual([]);
   });
 });

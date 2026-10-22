@@ -1,6 +1,6 @@
 /**
  * Créneau horaire choisi au moment d'ajouter une adresse (saisie, scan,
- * étiquette, GO Navigation, bordereau DPD), avant le bouton d'ajout.
+ * étiquette, GO Navigation, bordereau de tournée), avant le bouton d'ajout.
  *
  * - Créneau ponctuel du jour = window_start / window_end de l'arrêt
  *   (« avant 10 h » : fin seule). Prioritaire sur les horaires de

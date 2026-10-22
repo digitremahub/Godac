@@ -41,9 +41,14 @@ type Amende = {
   run_id?: string | null;
 };
 
+/**
+ * Gestion d'une amende par l'encadrement (manager, exploitation,
+ * direction) : validation du responsable, contestation, règlement. Le
+ * chauffeur ne conteste pas lui-même : il explique via les commentaires.
+ */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await garderApi({ roles: ["direction", "manager", "exploitation", "chauffeur"], modules: ["fines"] });
+  const g = await garderApi({ roles: ["direction", "manager", "exploitation"], modules: ["fines"] });
   if (!g.ok) return g.reponse;
   const { appUser, supabase } = g;
   const parsed = bodySchema.safeParse(await req.json());
@@ -52,46 +57,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const body = parsed.data;
   const decision = Boolean(body.action || body.confirm || body.notify);
-
-  // Contestation par le chauffeur de sa propre amende (un manager qui
-  // conduit peut aussi contester la sienne) ; sinon, gestion par l'encadrement.
-  let contestationPersonnelle = appUser.role === "chauffeur";
-  if ((appUser.role === "manager" || appUser.role === "exploitation") && appUser.conduit && body.status === "contested" && !decision) {
-    const { data: sienne } = await createAdminSupabaseClient()
-      .from("fines")
-      .select("id")
-      .eq("id", id)
-      .eq("organization_id", appUser.organization_id)
-      .eq("driver_id", appUser.id)
-      .maybeSingle();
-    contestationPersonnelle = Boolean(sienne);
-  }
-  if (contestationPersonnelle) {
-    if (body.status !== "contested" || decision) {
-      return NextResponse.json({ error: "Action non autorisée." }, { status: 403 });
-    }
-    const admin = createAdminSupabaseClient();
-    const { data: ownFine } = await admin.from("fines")
-      .select("id, organization_id, driver_id, status, reference, infraction_at, vehicles(registration, service_id)")
-      .eq("id", id).eq("organization_id", appUser.organization_id).eq("driver_id", appUser.id).maybeSingle();
-    if (!ownFine) return NextResponse.json({ error: "Amende introuvable." }, { status: 404 });
-    if (ownFine.status !== "identified") return NextResponse.json({ error: "Cette amende ne peut plus être contestée depuis cet écran." }, { status: 409 });
-    const { error: updateError } = await admin.from("fines").update({ status: "contested" }).eq("id", id).eq("driver_id", appUser.id);
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-    const vehicule = ownFine.vehicles as unknown as { registration: string; service_id: string | null } | null;
-    const alertError = await notifier(admin, {
-      organizationId: appUser.organization_id,
-      type: "fine_notification",
-      severity: "info",
-      message: `${appUser.full_name} signale une contestation pour une amende${ownFine.reference ? ` (réf. ${ownFine.reference})` : ""}${vehicule ? ` — véhicule ${vehicule.registration}` : ""}.`,
-      relatedTable: "fines",
-      relatedId: id,
-      recipientRoles: ["manager", "exploitation", "direction"],
-      serviceId: vehicule?.service_id ?? null,
-    });
-    if (alertError) return NextResponse.json({ error: alertError }, { status: 500 });
-    return NextResponse.json({ ok: true });
-  }
 
   // Encadrement : la RLS limite les managers aux véhicules de leur service
   // (lecture ci-dessous : amende hors service = introuvable).

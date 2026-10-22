@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   ajouterPage,
+  codesColis,
   compter,
   fusionnerPages,
   libelleCompteur,
   lireDate,
   lireHoraires,
   lireLocalite,
+  lireNumeroColis,
   lirePlages,
+  lireTransporteur,
+  memeArret,
   normaliserBloc,
   normaliserPage,
   pageLueSchema,
@@ -39,7 +43,7 @@ const bloc = (b: Partial<BlocLu>): BlocLu => ({
 
 const page = (numero: string | null, n: number | null, blocs: BlocLu[], extra: Partial<PageLue["entete"]> = {}): PageLue => ({
   lisible: true,
-  entete: { numero, tournee: "7", date: "05.03.2026", page: n, total_colis: 6, total_poids_kg: 40, code_barres: null, ...extra },
+  entete: { transporteur: null, numero, tournee: "7", date: "05.03.2026", page: n, total_colis: 6, total_poids_kg: 40, code_barres: null, ...extra },
   blocs,
 });
 
@@ -201,8 +205,102 @@ describe("pages et colis", () => {
     expect(compter([p1, p2, p3]).complet).toBe(true);
   });
 
-  it("schéma strict de la lecture IA", () => {
+  it("schéma de la lecture IA : complet, ou tolérant aux écarts de forme", () => {
     expect(pageLueSchema.safeParse(page("1", 1, [bloc({})])).success).toBe(true);
-    expect(pageLueSchema.safeParse({ lisible: true, entete: {}, blocs: [] }).success).toBe(false);
+    // Champs omis, nombres en texte, n° de colis seuls : rien de déclaré illisible, rien d'inventé.
+    const lu = pageLueSchema.parse({
+      entete: { transporteur: "GLS", page: "2", total_poids_kg: "12,5" },
+      blocs: [{ nom: "DURAND PAUL", adresse: "4 AVENUE DU TEST", localite: "31000 TOULOUSE", colis: ["ZX12345678"], nombre_colis: "1" }, "bruit"],
+    });
+    expect(lu.lisible).toBe(true);
+    expect(lu.entete).toMatchObject({ transporteur: "GLS", numero: null, page: 2, total_poids_kg: 12.5 });
+    expect(lu.blocs).toHaveLength(1);
+    expect(lu.blocs[0]).toMatchObject({ position: null, codes: [], telephone: null, nombre_colis: 1, colis: [{ numero: "ZX12345678", poids_kg: null }] });
+    expect(pageLueSchema.parse({ lisible: false }).blocs).toEqual([]);
+  });
+});
+
+describe("autres transporteurs (données fictives)", () => {
+  it("transporteur détecté et ramené à un nom connu", () => {
+    expect(lireTransporteur("GLS France")).toBe("GLS");
+    expect(lireTransporteur("chronopost")).toBe("Chronopost");
+    expect(lireTransporteur("Relais Colis")).toBe("Relais Colis");
+    expect(lireTransporteur("COLIS PRIVE")).toBe("Colis Privé");
+    expect(lireTransporteur("dpd")).toBe("DPD");
+    expect(lireTransporteur("Transports Exemple")).toBe("Transports Exemple");
+    expect(lireTransporteur(null)).toBeNull();
+  });
+
+  it("localité sans préfixe pays, ou code postal après la ville", () => {
+    expect(lireLocalite("31000 TOULOUSE")).toEqual({ pays: null, codePostal: "31000", ville: "TOULOUSE", villeTronquee: false });
+    expect(lireLocalite("TOULOUSE 31000")).toEqual({ pays: null, codePostal: "31000", ville: "TOULOUSE", villeTronquee: false });
+    expect(lireLocalite("FR-31000 TOULOUSE")).toMatchObject({ pays: "FR", codePostal: "31000" });
+  });
+
+  it("libellés de service des autres transporteurs", () => {
+    expect(typeDepuisCodes(["Enlèvement"])).toBe("ramasse");
+    expect(typeDepuisCodes(["Collecte"])).toBe("ramasse");
+    expect(typeDepuisCodes(["Point relais"])).toBe("relais");
+    expect(typeDepuisCodes(["ParcelShop"])).toBe("relais");
+    expect(typeDepuisCodes(["Consigne"])).toBe("relais");
+    expect(typeDepuisCodes(["Livraison sur rendez-vous"])).toBe("rdv");
+    expect(typeDepuisCodes(["Express", "13H"])).toBe("livraison");
+  });
+
+  it("n° de colis : alphanumériques gardés, lettre de contrôle DPD retirée", () => {
+    expect(lireNumeroColis("6A 1234 5678 901")).toBe("6A12345678901");
+    expect(lireNumeroColis("1Z 999 AA1 01 2345 6784")).toBe("1Z999AA10123456784");
+    expect(lireNumeroColis("XY123456789FR")).toBe("XY123456789FR");
+    expect(lireNumeroColis("01234567890123 A")).toBe("01234567890123");
+    expect(lireNumeroColis("AB12")).toBeNull();
+    expect(lireNumeroColis("REF-CLIENT")).toBeNull();
+  });
+
+  it("feuille de route en tableau, sans position ni poids : pas de faux doutes, notes au nom du transporteur", () => {
+    const p = normaliserPage(
+      page(
+        "FR-TEST-01",
+        1,
+        [
+          bloc({ position: null, codes: ["Point relais"], nom: "TABAC DE LA GARE", adresse: "1 PLACE DU TEST", localite: "31000 TOULOUSE", poids_total_kg: null, colis: [{ numero: "ZX00000001", poids_kg: null }] }),
+          bloc({ position: null, codes: ["Express"], nom: "DURAND PAUL", adresse: "4 AVENUE DU TEST", localite: "TOULOUSE 31000", telephone: "06 00 00 00 01", poids_total_kg: null, colis: [{ numero: "ZX00000002", poids_kg: null }] }),
+        ],
+        { transporteur: "gls france", total_colis: 2, total_poids_kg: null },
+      ),
+    );
+    expect(p.entete).toMatchObject({ transporteur: "GLS", numero: "FRTEST01" });
+    expect(p.arrets.map((a) => a.doutes)).toEqual([[], []]);
+    expect(p.arrets.map((a) => a.type)).toEqual(["relais", "livraison"]);
+    const point = pointDepuisArret(p.arrets[1]!, p.entete.transporteur);
+    expect(point).toMatchObject({ adresse: "4 AVENUE DU TEST, 31000 TOULOUSE", code: "ZX00000002", type: "livraison", telephone: "06 00 00 00 01" });
+    expect(point.notes).toContain("Code GLS : Express");
+    expect(pointDepuisArret(p.arrets[0]!).notes).toContain("Code bordereau : Point relais");
+    // Sans position : l'ordre de la page est gardé.
+    expect(fusionnerPages([p]).map((a) => a.nom)).toEqual(["TABAC DE LA GARE", "DURAND PAUL"]);
+  });
+
+  it("numérotation qui repart à 1 à chaque page : aucun arrêt perdu, ordre des pages", () => {
+    const p1 = normaliserPage(page("9", 1, [bloc({ position: 1, nom: "ARRET UN", adresse: "1 RUE A" }), bloc({ position: 2, nom: "ARRET DEUX", adresse: "2 RUE B" })]));
+    const p2 = normaliserPage(page("9", 2, [bloc({ position: 1, nom: "ARRET TROIS", adresse: "3 RUE C" }), bloc({ position: 2, nom: "ARRET QUATRE", adresse: "4 RUE D" })]));
+    const arrets = fusionnerPages([p2, p1]);
+    expect(arrets.map((a) => a.nom)).toEqual(["ARRET UN", "ARRET DEUX", "ARRET TROIS", "ARRET QUATRE"]);
+    expect(new Set(arrets.map((a) => a.cle)).size).toBe(4);
+  });
+
+  it("bloc à cheval sur deux pages : un seul arrêt avec tous ses colis", () => {
+    const haut = normaliserPage(page("9", 1, [bloc({ position: 5, nombre_colis: null, colis: [{ numero: "10000000000005", poids_kg: 1 }] })]));
+    const bas = normaliserPage(page("9", 2, [bloc({ position: 5, nom: null, adresse: null, localite: null, nombre_colis: 2, colis: [{ numero: "10000000000006", poids_kg: 1 }] })]));
+    const arrets = fusionnerPages([haut, bas]);
+    expect(arrets).toHaveLength(1);
+    expect(arrets[0]).toMatchObject({ nom: "MARTIN ALICE", colis: ["10000000000005", "10000000000006"], nombreColis: 2 });
+    expect(memeArret(arrets[0]!, normaliserBloc(bloc({ nom: "AUTRE CLIENT", adresse: "9 RUE Z", localite: "F-31000 TOULOUSE" })))).toBe(false);
+  });
+
+  it("liste des n° de colis jamais coupée au milieu d'un n°", () => {
+    const colis = Array.from({ length: 80 }, (_, i) => `1000000000${String(i).padStart(4, "0")}`);
+    const codes = codesColis(colis)!;
+    expect(codes.length).toBeLessThanOrEqual(1000);
+    expect(codes.split(",").every((c) => c.length === 14)).toBe(true);
+    expect(codesColis([])).toBeNull();
   });
 });

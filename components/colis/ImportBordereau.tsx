@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { IconCamera, IconFileText, IconImage, IconX } from "@/components/layout/icons";
-import { imageEnBase64 } from "@/components/colis/commun";
+import { photoDocumentEnBase64 } from "@/components/colis/commun";
 import { EtapeCreneau } from "@/components/colis/EtapeCreneau";
 import { choixDepuisCreneau, colonnesCreneau, libelleChoix, validerChoix, type ChoixCreneau } from "@/lib/colis/creneau";
 import { networkErrorMessage } from "@/lib/utils/network-error";
@@ -21,8 +21,8 @@ import {
 
 /** Points envoyés par appel (limite de /api/colis/arrets/bulk : 200). */
 const LOT = 150;
-/** Photo brute acceptée avant compression (la compression ramène à ~1600 px). */
-const PHOTO_MAX = 25_000_000;
+/** Photo brute acceptée avant compression (ramenée ensuite à ~2400 px et moins de 3 Mo de base64). */
+const PHOTO_MAX = 40_000_000;
 
 const LIBELLE_TYPE: Record<TypeBloc, string> = { livraison: "Livraison", ramasse: "Ramasse", rdv: "RDV", relais: "Relais" };
 const COULEUR_TYPE: Record<TypeBloc, string> = {
@@ -40,10 +40,29 @@ interface Lecture {
   etat: "attente" | "lecture" | "ok" | "erreur";
   message?: string;
   page?: number | null;
+  /** Photo gardée en mémoire pour « Réessayer » sans la reprendre. */
+  fichier?: File;
 }
 
 /**
- * Import du « BORDEREAU DE TOURNEE » DPD par photos : le chauffeur
+ * Message d'une réponse en erreur, même quand elle n'est pas du JSON :
+ * page HTML de l'hébergeur quand la lecture est coupée (délai dépassé,
+ * 504) ou que la photo est refusée (413).
+ */
+function messageErreur(status: number, json: { error?: string }): string {
+  if (json.error) return json.error;
+  if (status === 413) return "Photo trop lourde pour l'envoi : reprenez la page.";
+  if (status === 401 || status === 403) return "Session expirée : rechargez l'écran puis réessayez.";
+  if (status === 504 || status === 502 || status === 503 || status === 500)
+    return "La lecture a été coupée (délai dépassé). Réessayez, ou photographiez la page en deux moitiés (haut, puis bas).";
+  return `Lecture impossible (erreur ${status}). Réessayez.`;
+}
+
+type Resultat = "ok" | "erreur" | "quota";
+
+/**
+ * Import du bordereau de tournée (feuille de route de DPD, GLS,
+ * Chronopost, Colissimo, Colis Privé, UPS…) par photos : le chauffeur
  * photographie les pages une à une (ou les choisit dans la galerie),
  * chaque page est lue par l'IA (/api/colis/bordereau, une lecture par
  * page), les pages re-photographiées remplacent les précédentes, puis
@@ -79,6 +98,7 @@ export function ImportBordereau({
   const compteur = useMemo(() => compter(pages, arrets), [pages, arrets]);
   const retenus = arrets.filter((a) => !decoches.has(a.cle));
   const dateBordereau = pages.find((p) => p.entete.date)?.entete.date ?? null;
+  const transporteur = pages.find((p) => p.entete.transporteur)?.entete.transporteur ?? null;
 
   function fermer() {
     setOuvert(false);
@@ -91,45 +111,72 @@ export function ImportBordereau({
     setErreur(null);
   }
 
+  const majLecture = (i: number, l: Partial<Lecture>) => setLectures((ls) => ls.map((x, k) => (k === i ? { ...x, ...l } : x)));
+
+  /** Lit une photo (entrée `i` de la liste des lectures). */
+  async function lirePage(i: number, f: File): Promise<Resultat> {
+    if (f.size > PHOTO_MAX) {
+      majLecture(i, { etat: "erreur", message: "Photo trop lourde." });
+      return "erreur";
+    }
+    majLecture(i, { etat: "lecture", message: undefined });
+    try {
+      const image = await photoDocumentEnBase64(f);
+      const res = await fetch("/api/colis/bordereau", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, image, mediaType: "image/jpeg" }) });
+      const brut = await res.text();
+      let json: { page?: PageBordereau; error?: string; code?: string } = {};
+      try {
+        json = JSON.parse(brut);
+      } catch {
+        // Page HTML de l'hébergeur (délai dépassé, photo refusée) : message selon le statut.
+      }
+      // Lecture comptée si l'IA a lu la page (même illisible) ; un échec du service ou une réponse
+      // coupée est remboursé par le serveur. Coupure de l'hébergeur (504) : comptée, faute de remboursement.
+      if (res.ok || json.code === "ILLISIBLE" || res.status === 504) setLecturesIa((n) => n + 1);
+      if (!res.ok || !json.page) {
+        majLecture(i, { etat: "erreur", message: res.ok ? "Réponse inattendue. Réessayez." : messageErreur(res.status, json) });
+        if (json.code === "QUOTA_ATTEINT") {
+          setErreur(json.error ?? "Quota de lectures atteint.");
+          return "quota";
+        }
+        return "erreur";
+      }
+      const page = json.page;
+      setPages((ps) => ajouterPage(ps, page));
+      majLecture(i, { etat: "ok", page: page.entete.page, message: `${page.arrets.length} arrêt(s)`, fichier: undefined });
+      return "ok";
+    } catch (e) {
+      majLecture(i, { etat: "erreur", message: networkErrorMessage(e) });
+      return "erreur";
+    }
+  }
+
   async function lireFichiers(fichiers: File[]) {
     if (!fichiers.length) return;
     setErreur(null);
     setBusy("lecture");
     const depart = lectures.length;
-    setLectures((l) => [...l, ...fichiers.map((f) => ({ nom: f.name || "Photo", etat: "attente" as const }))]);
-    const maj = (i: number, l: Partial<Lecture>) => setLectures((ls) => ls.map((x, k) => (k === depart + i ? { ...x, ...l } : x)));
+    setLectures((l) => [...l, ...fichiers.map((f) => ({ nom: f.name || "Photo", etat: "attente" as const, fichier: f }))]);
     // Une page à la fois : la lecture est longue, et l'ordre d'arrivée reste celui des photos.
     for (const [i, f] of fichiers.entries()) {
-      if (f.size > PHOTO_MAX) {
-        maj(i, { etat: "erreur", message: "Photo trop lourde." });
-        continue;
-      }
-      maj(i, { etat: "lecture" });
-      try {
-        const image = await imageEnBase64(f);
-        const res = await fetch("/api/colis/bordereau", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runId, image, mediaType: "image/jpeg" }) });
-        const json = (await res.json().catch(() => ({}))) as { page?: PageBordereau; error?: string; code?: string };
-        // Le quota est compté dès que la lecture est lancée, même si la page est illisible.
-        if (res.ok || json.code === "ILLISIBLE" || json.code === "LECTURE") setLecturesIa((n) => n + 1);
-        if (!res.ok || !json.page) {
-          maj(i, { etat: "erreur", message: json.error ?? "Lecture impossible." });
-          if (json.code === "QUOTA_ATTEINT") {
-            setErreur(json.error ?? "Quota de lectures atteint.");
-            for (let k = i + 1; k < fichiers.length; k++) maj(k, { etat: "erreur", message: "Non lue (quota)." });
-            break;
-          }
-          continue;
-        }
-        const page = json.page;
-        setPages((ps) => ajouterPage(ps, page));
-        maj(i, { etat: "ok", page: page.entete.page, message: `${page.arrets.length} arrêt(s)` });
-      } catch (e) {
-        maj(i, { etat: "erreur", message: networkErrorMessage(e) });
+      if ((await lirePage(depart + i, f)) === "quota") {
+        for (let k = i + 1; k < fichiers.length; k++) majLecture(depart + k, { etat: "erreur", message: "Non lue (quota)." });
+        break;
       }
     }
     setBusy(null);
     if (cameraRef.current) cameraRef.current.value = "";
     if (galerieRef.current) galerieRef.current.value = "";
+  }
+
+  /** Relit une photo en erreur, sans avoir à la reprendre. */
+  async function relire(i: number) {
+    const f = lectures[i]?.fichier;
+    if (!f || busy) return;
+    setErreur(null);
+    setBusy("lecture");
+    await lirePage(i, f);
+    setBusy(null);
   }
 
   function arretModifie(a: ArretBordereau): ArretBordereau {
@@ -157,14 +204,14 @@ export function ImportBordereau({
     const incoherent = retenus.find((a) => !validerChoix(creneauDe(a)).ok);
     if (incoherent) {
       setCreneauOuvert(incoherent.cle);
-      return setErreur(`Position ${incoherent.position ?? "?"} : créneau à corriger.`);
+      return setErreur(`${incoherent.position !== null ? `Position ${incoherent.position}` : incoherent.nom ?? "Un arrêt"} : créneau à corriger.`);
     }
     setBusy("import");
     setErreur(null);
     const points = retenus
       .map((a) => {
         const choix = validerChoix(creneauDe(a));
-        return { ...pointDepuisArret(arretModifie(a)), ...colonnesCreneau(choix.ok ? choix.creneau : null) };
+        return { ...pointDepuisArret(arretModifie(a), transporteur), ...colonnesCreneau(choix.ok ? choix.creneau : null) };
       })
       .filter((p) => p.adresse.length >= 5);
     const total = { ajoutes: 0, regroupes: 0, ignores: retenus.length - points.length, doublons: 0, sansGps: 0, horairesPro: 0 };
@@ -222,7 +269,7 @@ export function ImportBordereau({
   if (!ouvert) {
     return (
       <button type="button" className="btn-ghost w-fit !px-2 !py-1.5 text-sm" onClick={() => setOuvert(true)}>
-        <IconFileText className="h-4 w-4" /> Importer le bordereau DPD
+        <IconFileText className="h-4 w-4" /> Importer le bordereau
       </button>
     );
   }
@@ -232,13 +279,14 @@ export function ImportBordereau({
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-navy/10 p-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold">Bordereau de tournée DPD</h3>
+        <h3 className="text-base font-semibold">Bordereau de tournée</h3>
         <button type="button" className="btn-ghost !px-2 !py-1" onClick={fermer} disabled={busy === "import"} aria-label="Fermer">
           <IconX className="h-5 w-5" />
         </button>
       </div>
       <p className="text-xs text-navy/60">
-        Photographiez chaque page bien à plat, en entier et nette. Une page reprise en photo remplace la précédente. Chaque page lue compte pour une lecture IA
+        Tous transporteurs (DPD, GLS, Chronopost, Colissimo, Colis Privé, UPS…). Photographiez chaque page bien à plat, en entier et nette ; une page très
+        chargée peut se prendre en deux photos (haut, puis bas). Une page reprise en photo remplace la précédente. Chaque photo lue compte pour une lecture IA
         (comme une étiquette) : un bordereau de 20 pages = 20 lectures.
       </p>
 
@@ -256,6 +304,7 @@ export function ImportBordereau({
       {(pages.length > 0 || lectures.length > 0) && (
         <div className="flex flex-col gap-1 rounded-lg bg-navy/[0.03] px-3 py-2 text-sm">
           <p className="font-semibold">
+            {transporteur ? `${transporteur} · ` : ""}
             {compteur.numero ? `Bordereau n° ${compteur.numero} · ` : ""}
             {libelleCompteur(compteur)}
           </p>
@@ -272,8 +321,15 @@ export function ImportBordereau({
             <ul className="flex flex-col gap-0.5 text-xs">
               {lectures.map((l, i) =>
                 l.etat === "ok" ? null : (
-                  <li key={i} className={l.etat === "erreur" ? "text-orange-ink" : "text-navy/60"}>
-                    Photo {i + 1} : {l.etat === "erreur" ? l.message : l.etat === "lecture" ? "lecture…" : "en attente"}
+                  <li key={i} className={`flex flex-wrap items-center gap-x-2 ${l.etat === "erreur" ? "text-orange-ink" : "text-navy/60"}`}>
+                    <span>
+                      Photo {i + 1} : {l.etat === "erreur" ? l.message : l.etat === "lecture" ? "lecture…" : "en attente"}
+                    </span>
+                    {l.etat === "erreur" && l.fichier && (
+                      <button type="button" className="btn-ghost !min-h-[44px] !px-3 !py-1 text-xs" disabled={busy !== null} onClick={() => void relire(i)}>
+                        Réessayer
+                      </button>
+                    )}
                   </li>
                 ),
               )}
@@ -316,7 +372,7 @@ export function ImportBordereau({
                     type="checkbox"
                     className="mt-1.5 h-4 w-4 shrink-0"
                     checked={coche}
-                    aria-label={`Retenir la position ${a.position ?? "?"}`}
+                    aria-label={a.position !== null ? `Retenir la position ${a.position}` : `Retenir ${a.nom ?? "cet arrêt"}`}
                     onChange={() =>
                       setDecoches((d) => {
                         const n = new Set(d);
@@ -328,7 +384,7 @@ export function ImportBordereau({
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                      <span className="font-semibold">Pos {a.position ?? "?"}</span>
+                      {a.position !== null && <span className="font-semibold">Pos {a.position}</span>}
                       <span className={`rounded px-1.5 py-0.5 font-semibold ${COULEUR_TYPE[a.type]}`}>{LIBELLE_TYPE[a.type]}</span>
                       {a.codes.length > 0 && <span className="text-navy/50">{a.codes.join(" ")}</span>}
                       <span className="text-navy/60">
