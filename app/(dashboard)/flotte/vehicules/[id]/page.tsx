@@ -189,7 +189,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const ticpe = ticpeVisible
     ? await (async () => {
         const p = await chargerParametresTicpe(supabase, appUser.organization_id);
-        const { evalues, colonnesTicpe } = await evaluerFlotte(supabase, p.reglages, [id]);
+        const { evalues, colonnesTicpe } = await evaluerFlotte(supabase, appUser.organization_id, p.reglages, [id]);
         const e = evalues.get(id);
         return e ? { ...e, colonnesTicpe, categorieDefaut: LIBELLES_CATEGORIE_COURTS[p.reglages.categorie_par_defaut] } : null;
       })()

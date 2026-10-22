@@ -51,8 +51,8 @@ export async function calculerTicpe(
 ): Promise<CalculTicpe> {
   const parametres = await chargerParametresTicpe(supabase, organizationId);
   const [{ evalues, colonnesTicpe }, cuves, pleinsRes] = await Promise.all([
-    evaluerFlotte(supabase, parametres.reglages, opts.vehicleIds),
-    chargerCuves(supabase),
+    evaluerFlotte(supabase, organizationId, parametres.reglages, opts.vehicleIds),
+    chargerCuves(supabase, organizationId),
     chargerPleins(supabase, organizationId, opts),
   ]);
 
@@ -109,14 +109,14 @@ async function chargerPleins(supabase: SupabaseClient, organizationId: string, o
   return lire(COLONNES_PLEIN);
 }
 
-async function chargerCuves(supabase: SupabaseClient): Promise<Map<string, Cuve>> {
+async function chargerCuves(supabase: SupabaseClient, organizationId: string): Promise<Map<string, Cuve>> {
   const [avecZone, livraisons] = await Promise.all([
-    supabase.from("tanks").select("id, name, ticpe_zone"),
+    supabase.from("tanks").select("id, name, ticpe_zone").eq("organization_id", organizationId),
     fetchAllRows<{ tank_id: string }>((from, to) =>
-      supabase.from("tank_deliveries").select("tank_id").not("invoice_path", "is", null).order("tank_id").range(from, to),
+      supabase.from("tank_deliveries").select("tank_id").eq("organization_id", organizationId).not("invoice_path", "is", null).order("tank_id").range(from, to),
     ),
   ]);
-  const lignes = avecZone.error ? ((await supabase.from("tanks").select("id, name")).data ?? []) : (avecZone.data ?? []);
+  const lignes = avecZone.error ? ((await supabase.from("tanks").select("id, name").eq("organization_id", organizationId)).data ?? []) : (avecZone.data ?? []);
   const factures = new Set(livraisons.rows.map((l) => l.tank_id));
   return new Map(
     (lignes as { id: string; name: string; ticpe_zone?: string | null }[]).map((t) => [

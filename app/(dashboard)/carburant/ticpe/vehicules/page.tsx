@@ -18,7 +18,7 @@ export default async function VehiculesTicpePage({ searchParams }: { searchParam
   const { appUser, supabase } = g;
   const { filtre } = await searchParams;
   const p = await chargerParametresTicpe(supabase, appUser.organization_id);
-  const { evalues } = await evaluerFlotte(supabase, p.reglages);
+  const { evalues } = await evaluerFlotte(supabase, appUser.organization_id, p.reglages);
   const tous = [...evalues.values()];
   const aReg = tous.filter((e) => aRegulariser(e.eligibilite));
   const legers = tous.filter((e) => e.eligibilite.raisons.some((r) => r.code === "vehicule_leger"));

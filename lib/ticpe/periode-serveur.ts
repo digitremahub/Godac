@@ -31,12 +31,13 @@ export function vehiculesPourControles(calcul: CalculTicpe): Map<string, Vehicul
 }
 
 /** Pleins de la période liés à une alerte de consommation anormale non résolue (écarts carburant existants). */
-async function anomaliesConsommation(supabase: SupabaseClient, periode: PeriodeDeclaration): Promise<Set<string>> {
+async function anomaliesConsommation(supabase: SupabaseClient, organizationId: string, periode: PeriodeDeclaration): Promise<Set<string>> {
   const { depuis } = bornesPeriode(periode.debut, periode.fin);
   const { rows } = await fetchAllRows<{ related_id: string }>((from, to) =>
     supabase
       .from("alerts")
       .select("related_id")
+      .eq("organization_id", organizationId)
       .eq("type", "consumption_anomaly")
       .eq("related_table", "fuel_entries")
       .neq("status", "resolved")
@@ -56,7 +57,7 @@ export async function controlesDeLaPeriode(
 ): Promise<{ calcul: CalculTicpe; points: PointARegler[] }> {
   const calcul =
     calculExistant ?? (await calculerTicpe(supabase, organizationId, { anneeDebut: Number(periode.debut.slice(0, 4)), anneeFin: Number(periode.fin.slice(0, 4)) }));
-  const anomalies = await anomaliesConsommation(supabase, periode);
+  const anomalies = await anomaliesConsommation(supabase, organizationId, periode);
   const points = controlesPeriode({
     periode,
     lignes: calcul.lignes,

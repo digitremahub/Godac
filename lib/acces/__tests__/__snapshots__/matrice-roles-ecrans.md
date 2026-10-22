@@ -37,7 +37,8 @@
 | Carburant | Tickets à vérifier | `/carburant/revue-ocr` | — | ✅ | ✅ | — | ✅ | ocr |
 | Carburant | Cuves | `/carburant/cuves` | — | ✅ | ✅ | ✅ | ✅ | — |
 | Carburant | Approvisionnements | `/carburant/approvisionnements` | — | 🔒 | 🔒 | 🔒 | 🔒 | — |
-| Carburant | Export TICPE | `/carburant/ticpe` | — | — | ✅ | ✅ | ✅ | ticpe_export |
+| Carburant | TICPE | `/carburant/ticpe` | — | — | ✅ | ✅ | ✅ | ticpe_export |
+| Carburant | Documents TICPE | `/carburant/ticpe/documents` | — | — | 🔒 | 🔒 | 🔒 | ticpe_export |
 | Carburant | Détail export TICPE | `/carburant/ticpe/[id]` | — | — | 🔒 | 🔒 | 🔒 | ticpe_export |
 | Carburant | TICPE : à régler | `/carburant/ticpe/controles` | — | — | 🔒 | 🔒 | 🔒 | ticpe_export |
 | Carburant | Véhicules TICPE | `/carburant/ticpe/vehicules` | — | — | 🔒 | 🔒 | 🔒 | ticpe_export |

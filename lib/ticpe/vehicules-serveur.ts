@@ -26,10 +26,10 @@ export type VehiculeTicpe = VehiculeEligibilite & {
  * colonnes TICPE ; si la migration 20261031000002 n'est pas appliquée,
  * retombe sur les colonnes historiques (`colonnesTicpe: false`).
  */
-export async function chargerVehiculesTicpe(supabase: SupabaseClient, ids?: readonly string[]): Promise<{ vehicules: VehiculeTicpe[]; colonnesTicpe: boolean }> {
+export async function chargerVehiculesTicpe(supabase: SupabaseClient, organizationId: string, ids?: readonly string[]): Promise<{ vehicules: VehiculeTicpe[]; colonnesTicpe: boolean }> {
   const lire = (colonnes: string) =>
     fetchAllRows<VehiculeTicpe>((from, to) => {
-      let q = supabase.from("vehicles").select(colonnes).order("registration").order("id").range(from, to);
+      let q = supabase.from("vehicles").select(colonnes).eq("organization_id", organizationId).order("registration").order("id").range(from, to);
       if (ids) q = q.in("id", [...ids]);
       return q as unknown as PromiseLike<{ data: VehiculeTicpe[] | null; error: { message: string } | null }>;
     });
@@ -42,9 +42,9 @@ export async function chargerVehiculesTicpe(supabase: SupabaseClient, ids?: read
 }
 
 /** Véhicules dont une carte grise est jointe (vehicle_documents, lisible par l'encadrement et le comptable). */
-export async function vehiculesAvecCarteGrise(supabase: SupabaseClient): Promise<Set<string>> {
+export async function vehiculesAvecCarteGrise(supabase: SupabaseClient, organizationId: string): Promise<Set<string>> {
   const { rows } = await fetchAllRows<{ vehicle_id: string }>((from, to) =>
-    supabase.from("vehicle_documents").select("vehicle_id").eq("doc_type", DOC_CARTE_GRISE).order("vehicle_id").range(from, to),
+    supabase.from("vehicle_documents").select("vehicle_id").eq("organization_id", organizationId).eq("doc_type", DOC_CARTE_GRISE).order("vehicle_id").range(from, to),
   );
   return new Set(rows.map((r) => r.vehicle_id));
 }
@@ -56,8 +56,8 @@ export interface VehiculeEvalue {
 }
 
 /** Éligibilité de chaque véhicule de l'organisation. */
-export async function evaluerFlotte(supabase: SupabaseClient, reglages: ReglagesTicpe, ids?: readonly string[]): Promise<{ evalues: Map<string, VehiculeEvalue>; colonnesTicpe: boolean }> {
-  const [{ vehicules, colonnesTicpe }, cartes] = await Promise.all([chargerVehiculesTicpe(supabase, ids), vehiculesAvecCarteGrise(supabase)]);
+export async function evaluerFlotte(supabase: SupabaseClient, organizationId: string, reglages: ReglagesTicpe, ids?: readonly string[]): Promise<{ evalues: Map<string, VehiculeEvalue>; colonnesTicpe: boolean }> {
+  const [{ vehicules, colonnesTicpe }, cartes] = await Promise.all([chargerVehiculesTicpe(supabase, organizationId, ids), vehiculesAvecCarteGrise(supabase, organizationId)]);
   const evalues = new Map<string, VehiculeEvalue>();
   for (const v of vehicules) {
     const aCarteGrise = cartes.has(v.id);
