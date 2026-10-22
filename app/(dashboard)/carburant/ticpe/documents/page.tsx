@@ -1,103 +1,99 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
-import { TicpeExportForm } from "@/components/ticpe/TicpeExportForm";
-import { IconSparkles } from "@/components/layout/icons";
 import { AvertissementTicpe } from "@/components/ticpe/AvertissementTicpe";
+import { GenerateurDocuments } from "@/components/ticpe/GenerateurDocuments";
+import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
+import { periodeDemandee } from "@/lib/ticpe/periode-serveur";
+import { formatJour } from "@/lib/ticpe/bareme";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { parisDay } from "@/lib/utils/paris-time";
 
-export default async function DocumentsTicpePage() {
+const TYPES: Record<string, string> = { periode: "Récapitulatif 3310-TIC", era: "ERA annuel", dossier: "Dossier de contrôle (ZIP)" };
+
+/**
+ * Documents TICPE : récapitulatif 3310-TIC d'une période (évolution de
+ * l'export historique, vérifiable ligne par ligne), état récapitulatif
+ * annuel (ERA), dossier de contrôle ZIP ; liste des documents générés.
+ */
+export default async function DocumentsTicpePage({ searchParams }: { searchParams: Promise<{ periode?: string; du?: string; au?: string }> }) {
   const g = await garderPage("carburant.ticpe_documents");
   if (!g.ok) return g.ecran;
-  const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
+  const { appUser, supabase } = g;
+  const params = await searchParams;
+  const aujourdhui = parisDay();
+  const p = await chargerParametresTicpe(supabase, appUser.organization_id);
+  const periode = periodeDemandee(params, p.reglages, aujourdhui);
+  const annee = Number(aujourdhui.slice(0, 4));
+  const annees = Array.from({ length: Math.max(1, annee - 2025 + 1) }, (_, i) => annee - i).filter((a) => a >= 2025);
+  const anneeEra = aujourdhui.slice(5, 7) === "01" && annee - 1 >= 2025 ? annee - 1 : annee;
 
-
-  const [{ data: exports }, { data: eligibleVehicles }] = await Promise.all([
-    supabase
-      .from("ticpe_exports")
-      .select("id, period_start, period_end, vehicle_count, total_liters, created_at, pdf_file_path")
-      .order("created_at", { ascending: false }),
-    supabase.from("vehicles").select("id, registration, type, spec_sources").in("type", ["PL", "SPL"]),
-  ]);
-
-  // Lot A: a PL/SPL vehicle whose type only came from an unconfirmed
-  // AI estimate (lib/vehicles/ai-specs.ts) is silently excluded from
-  // the export itself (see isTicpeSafeToInclude) — surfaced here so
-  // it isn't just missing without explanation.
-  const vehiclesToConfirm = (eligibleVehicles ?? []).filter((v: any) => {
-    const source = v.spec_sources?.type;
-    return source?.origin === "ia" && !source.confirmed;
-  });
+  const colonnes = "id, period_start, period_end, vehicle_count, total_liters, created_at, pdf_file_path";
+  const lire = (c: string) => supabase.from("ticpe_exports").select(c).order("created_at", { ascending: false }).limit(200);
+  let { data: exports, error } = await lire(`${colonnes}, document_type, total_refund`);
+  if (error && estSchemaManquant(error)) ({ data: exports, error } = await lire(colonnes));
 
   return (
     <div>
       <PageHeader
         title="Documents TICPE"
-        description="Exports par période (Excel et PDF), à vérifier ligne par ligne avant de les transmettre à votre expert-comptable."
+        description="Récapitulatif à reporter sur l'annexe 3310-TIC de votre déclaration de TVA, état récapitulatif annuel (ERA) et dossier de contrôle. Les justificatifs se conservent, ils ne se joignent pas à la déclaration."
       />
-      <AvertissementTicpe />
+      <AvertissementTicpe migrationManquante={p.migrationManquante} />
+      <GenerateurDocuments debut={periode.debut} fin={periode.fin} libelle={periode.libelle} anneeEra={anneeEra} annees={annees} />
 
-      {vehiclesToConfirm.length > 0 && (
-        <Card className="mb-6 border border-gold/40 bg-gold/5">
-          <p className="mb-2 text-sm text-gold-ink">
-            <IconSparkles className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {vehiclesToConfirm.length} véhicule(s) ont un type (PL/SPL) estimé par IA, non confirmé — exclus de
-            l&apos;export tant qu&apos;un humain ne l&apos;a pas vérifié sur la fiche véhicule :
-          </p>
-          <ul className="flex flex-col gap-1 text-sm">
-            {vehiclesToConfirm.map((v: any) => (
-              <li key={v.id}>
-                <Link href={`/flotte/vehicules/${v.id}`} className="text-teal-ink hover:underline">
-                  {v.registration} ({v.type})
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <TicpeExportForm />
-
+      {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
       {!exports || exports.length === 0 ? (
-        <EmptyState title="Aucun export généré" />
+        <EmptyState title="Aucun document généré" />
       ) : (
         <Card className="overflow-x-auto">
-          <table className="w-full min-w-[600px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="text-left text-navy/60">
               <tr>
                 <th className="pb-2">Généré le</th>
+                <th className="pb-2">Document</th>
                 <th className="pb-2">Période</th>
-                <th className="pb-2">Véhicules</th>
-                <th className="pb-2">Litres totaux</th>
+                <th className="pb-2 text-right">Véhicules</th>
+                <th className="pb-2 text-right">Litres</th>
+                <th className="pb-2 text-right">Remboursement</th>
                 <th className="pb-2"></th>
               </tr>
             </thead>
             <tbody>
-              {exports.map((exp: any) => (
-                <tr key={exp.id} className="border-t border-navy/5">
-                  <td className="py-2">{new Date(exp.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
-                  <td className="py-2">
-                    {exp.period_start} → {exp.period_end}
-                  </td>
-                  <td className="py-2">{exp.vehicle_count}</td>
-                  <td className="py-2">{Number(exp.total_liters).toLocaleString("fr-FR")} L</td>
-                  <td className="py-2">
-                    <div className="flex gap-3">
-                      <Link href={`/carburant/ticpe/${exp.id}`} className="text-teal-ink hover:underline">
-                        Vérifier
-                      </Link>
-                      <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">
-                        Excel
-                      </a>
-                      {exp.pdf_file_path && (
-                        <a href={`/api/ticpe/exports/${exp.id}/download-pdf`} className="text-teal-ink hover:underline">
-                          PDF
+              {(exports as any[]).map((exp) => {
+                const type = exp.document_type ?? "periode";
+                return (
+                  <tr key={exp.id} className="border-t border-navy/5">
+                    <td className="py-2">{new Date(exp.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
+                    <td className="py-2">{TYPES[type] ?? type}</td>
+                    <td className="py-2">
+                      {formatJour(exp.period_start)} → {formatJour(exp.period_end)}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{exp.vehicle_count}</td>
+                    <td className="py-2 text-right tabular-nums">{Number(exp.total_liters).toLocaleString("fr-FR")} L</td>
+                    <td className="py-2 text-right tabular-nums">
+                      {exp.total_refund === null || exp.total_refund === undefined ? "—" : Number(exp.total_refund).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
+                    </td>
+                    <td className="py-2">
+                      <div className="flex justify-end gap-3">
+                        {type === "periode" && (
+                          <Link href={`/carburant/ticpe/${exp.id}`} className="text-teal-ink hover:underline">
+                            Vérifier
+                          </Link>
+                        )}
+                        <a href={`/api/ticpe/exports/${exp.id}/download`} className="text-teal-ink hover:underline">
+                          {type === "dossier" ? "ZIP" : "Excel"}
                         </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {exp.pdf_file_path && (
+                          <a href={`/api/ticpe/exports/${exp.id}/download-pdf`} className="text-teal-ink hover:underline">
+                            PDF
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>
