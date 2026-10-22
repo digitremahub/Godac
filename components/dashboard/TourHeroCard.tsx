@@ -25,7 +25,7 @@ export function TourHeroCard({
       <div className="relative flex items-start gap-4">
         <span
           aria-hidden="true"
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${openTour ? "bg-teal text-marine" : "bg-white/10 text-teal"}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${openTour ? "bg-teal text-on-teal" : "bg-white/10 text-teal"}`}
         >
           {openTour ? <IconTruck className="h-6 w-6" /> : <IconFlag className="h-6 w-6" />}
         </span>

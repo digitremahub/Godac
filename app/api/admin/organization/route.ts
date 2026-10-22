@@ -8,6 +8,9 @@ import { codePays } from "@/lib/pays/serveur";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getModulePlanPrices, priceFor, type PlanId } from "@/lib/organization/catalog";
 import { estEnEssai } from "@/lib/organization/facturation-modules";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur attendue au format #RRGGBB");
 
 const bodySchema = z.object({
   name: z.string().min(1).optional(),
@@ -30,6 +33,9 @@ const bodySchema = z.object({
   convention_collective: z.string().trim().min(1).nullable().optional(),
   urssaf_number: z.string().trim().min(1).nullable().optional(),
   country: z.enum(PAYS.map((p) => p.code) as [CodePays, ...CodePays[]]).optional(),
+  // Couleurs de l'interface (lib/theme/couleurs-entreprise.ts) ; null =
+  // retour aux couleurs GODAC. Les PDF gardent accent_color.
+  brand_colors: z.object({ principale: hex, secondaire: hex, menu: hex }).strict().nullable().optional(),
 });
 
 /** Module 9: org profile settings — réservé à la direction (RLS + contrôle explicite, audit F2). */
@@ -61,6 +67,7 @@ export async function PATCH(req: Request) {
     convention_collective,
     urssaf_number,
     country,
+    brand_colors,
   } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
@@ -94,6 +101,21 @@ export async function PATCH(req: Request) {
       .update(profileFields)
       .eq("id", appUser.organization_id)
       .select("id");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!modifiees || modifiees.length === 0) {
+      return NextResponse.json({ error: "Modification refusée." }, { status: 403 });
+    }
+  }
+
+  if (brand_colors !== undefined) {
+    const { data: modifiees, error } = await supabase
+      .from("organizations")
+      .update({ brand_colors })
+      .eq("id", appUser.organization_id)
+      .select("id");
+    if (estSchemaManquant(error)) {
+      return NextResponse.json({ error: "Les couleurs de l'entreprise seront disponibles après la prochaine mise à jour de GODAC." }, { status: 409 });
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!modifiees || modifiees.length === 0) {
       return NextResponse.json({ error: "Modification refusée." }, { status: 403 });

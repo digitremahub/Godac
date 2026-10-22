@@ -237,7 +237,7 @@ export async function ChauffeurDashboard({
                 {todayVillages.map((v, i) => (
                   <li key={i} className="flex flex-col gap-1 rounded-xl bg-navy/[0.045] p-2.5 text-sm">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal">{i + 1}</span>
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-marine text-[11px] font-semibold tabular-nums text-teal-sur-menu">{i + 1}</span>
                       <span className="font-semibold">{v.name}</span>
                       {v.homeTour && <span className="text-xs text-navy/55">({v.homeTour})</span>}
                     </div>

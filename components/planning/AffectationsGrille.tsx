@@ -133,7 +133,7 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
                   {mois ? (
                     <span className="flex flex-col items-center leading-tight">
                       <span className="text-[10px] font-normal">{LETTRES[r]}</span>
-                      <span className={auj ? "rounded-full bg-orange px-1.5 text-white" : ""}>{Number(d.slice(8, 10))}</span>
+                      <span className={auj ? "rounded-full bg-orange px-1.5 text-on-orange" : ""}>{Number(d.slice(8, 10))}</span>
                     </span>
                   ) : (
                     <span className={auj ? "rounded-full bg-orange/15 px-2 py-0.5" : ""}>
@@ -191,7 +191,7 @@ function EnteteLigne({ ligne }: { ligne: LigneTournee }) {
               type="button"
               onClick={() => ctx.ouvrirLigne(ligne.cle)}
               title={`Affecter un chauffeur à ${ligne.tourNumber} ${mois ? "tout le mois" : "toute la semaine"}`}
-              className={`mt-0.5 inline-flex min-h-[28px] items-center rounded-full px-2 text-xs font-semibold ${survol ? "bg-orange text-white" : "bg-navy/[0.06] text-navy/75 hover:bg-teal/20 hover:text-teal-ink"}`}
+              className={`mt-0.5 inline-flex min-h-[28px] items-center rounded-full px-2 text-xs font-semibold ${survol ? "bg-orange text-on-orange" : "bg-navy/[0.06] text-navy/75 hover:bg-teal/20 hover:text-teal-ink"}`}
             >
               ⇥ {survol ? "relâchez" : mois ? "mois" : "semaine"}
             </button>
@@ -296,7 +296,7 @@ function CaseRemplie({ entree, autres, ligne, date, survol, libelleCase }: { ent
             <>
               <Avatar id={entree.driver_id!} nom={nom} taille="sm" />
               <span className="min-w-0 flex-1 truncate font-semibold">{nomCourt(nom)}</span>
-              {deuxieme && <span className="rounded-full bg-teal px-1.5 text-[10px] font-bold text-marine">{liee ? "liée" : "2ᵉ"}</span>}
+              {deuxieme && <span className="rounded-full bg-teal px-1.5 text-[10px] font-bold text-on-teal">{liee ? "liée" : "2ᵉ"}</span>}
               {!modifiable && <span className={`h-2 w-2 shrink-0 rounded-full ${statut.point}`} aria-hidden="true" />}
               {autres > 0 && <span className="text-[10px] text-white/70">+{autres}</span>}
             </>

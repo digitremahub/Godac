@@ -183,7 +183,7 @@ export function OrganizationSettingsForm({
       </div>
 
       <div>
-        <label className="label" htmlFor="org-accent-color">Couleur d&apos;accent</label>
+        <label className="label" htmlFor="org-accent-color">Couleur des documents</label>
         <div className="flex items-center gap-3">
           <input
             id="org-accent-color"
@@ -197,7 +197,7 @@ export function OrganizationSettingsForm({
         <div className="mt-3 flex flex-col gap-2 rounded-lg bg-navy/[0.04] p-3 text-sm">
           <div className="flex items-center gap-2">
             <span className="h-5 w-5 shrink-0 rounded" style={{ backgroundColor: accent }} />
-            Sur les boutons et badges — votre couleur exacte.
+            Sur les bulletins de paie et registres — votre couleur exacte. Les couleurs de l&apos;interface se règlent dans « Couleurs de l&apos;entreprise ».
           </div>
           <div className="flex items-center gap-2">
             <span className="font-semibold" style={{ color: textSafeVariant(accent) }}>

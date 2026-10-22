@@ -108,7 +108,7 @@ export function NotificationBell({ lienToutes = true }: { lienToutes?: boolean }
       >
         <IconBell className="h-5 w-5" />
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-orange px-1 text-[11px] font-bold leading-none text-white">
+          <span className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-orange px-1 text-[11px] font-bold leading-none text-on-orange">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -144,7 +144,7 @@ export function NotificationBell({ lienToutes = true }: { lienToutes?: boolean }
                       <span
                         aria-hidden="true"
                         className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                          item.severity === "critical" ? "bg-orange/15 text-orange-ink" : "bg-marine text-teal"
+                          item.severity === "critical" ? "bg-orange/15 text-orange-ink" : "bg-marine text-teal-sur-menu"
                         }`}
                       >
                         <Icon className="h-4 w-4" />

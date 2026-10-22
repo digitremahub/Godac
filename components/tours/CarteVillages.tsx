@@ -463,7 +463,7 @@ export function CarteVillages({ routes, services, geoReady }: { routes: TourRout
             Tout voir
           </button>
           {erreurCarte && (
-            <p className="absolute inset-x-3 bottom-3 rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">
+            <p className="absolute inset-x-3 bottom-3 rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-on-orange shadow-pop">
               Fond de carte indisponible (réseau ?). Les villages et les incohérences restent listés à côté.
             </p>
           )}

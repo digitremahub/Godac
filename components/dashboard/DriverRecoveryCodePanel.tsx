@@ -98,7 +98,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
             <p className="text-sm font-semibold text-navy">Pour confirmer, saisis exactement : <span className="font-mono">{RESET_CONFIRMATION}</span></p>
             <input aria-label="Phrase de confirmation de réinitialisation" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" className="w-full rounded-lg border border-orange/40 bg-surface px-3 py-2 text-sm" />
             <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={resettingAll || confirmation !== RESET_CONFIRMATION} onClick={resetAllAccess} className="rounded-lg bg-orange px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Confirmer la réinitialisation"}</button>
+              <button type="button" disabled={resettingAll || confirmation !== RESET_CONFIRMATION} onClick={resetAllAccess} className="rounded-lg bg-orange px-3 py-2 text-sm font-semibold text-on-orange disabled:cursor-not-allowed disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Confirmer la réinitialisation"}</button>
               <button type="button" disabled={resettingAll} onClick={() => { setShowResetConfirmation(false); setConfirmation(""); }} className="rounded-lg border border-navy/20 px-3 py-2 text-sm">Annuler</button>
             </div>
           </div>
@@ -124,7 +124,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
           <p className="text-sm font-medium">Nouveau code de secours — {generated.name}</p>
           <p className="my-3 break-all font-mono text-xl font-bold tracking-wider">{generated.code}</p>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={copyCode} className="rounded-lg bg-teal px-3 py-2 text-sm font-medium text-white">{copied ? "Code copié" : "Copier le code"}</button>
+            <button type="button" onClick={copyCode} className="rounded-lg bg-teal px-3 py-2 text-sm font-medium text-on-teal">{copied ? "Code copié" : "Copier le code"}</button>
             <button type="button" onClick={() => { setGenerated(null); setCopied(false); }} className="rounded-lg border border-navy/15 px-3 py-2 text-sm">Masquer le code</button>
           </div>
           <p className="mt-2 text-xs text-navy/60">Ne fermez pas cette fenêtre avant d'avoir transmis le code au chauffeur.</p>

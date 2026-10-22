@@ -94,7 +94,9 @@ export function Sidebar({
   const pathname = usePathname() ?? "";
   // The org's accent is only ever used as a fill here (logo square,
   // active indicator) — the sidebar is navy, so text stays white.
-  const accent = accentColor || "#1BE4C1";
+  // Sans accent propre : variable --c-teal-sur-menu (teal GODAC, ou la
+  // couleur principale de l'entreprise rendue lisible sur le menu).
+  const accent = accentColor || "rgb(var(--c-teal-sur-menu))";
 
   // « Mon espace » réduit à ses trois onglets, « Mes tournées » pour le chauffeur.
   const sections = menuAffiche(role, new Set(enabledModuleKeys), conduit);

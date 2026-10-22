@@ -89,7 +89,7 @@ export function BadgeHoraires({ stop, fenetres, passage, inverse = false }: { st
         </span>
       )}
       {passage && (
-        <span className={`rounded-full px-2 py-0.5 ${alerte ? "bg-orange text-white" : fenetres ? "bg-teal/20 text-teal-ink" : pastille}`}>
+        <span className={`rounded-full px-2 py-0.5 ${alerte ? "bg-orange text-on-orange" : fenetres ? "bg-teal/20 text-teal-ink" : pastille}`}>
           Arrivée ≈ {afficherHeure(passage.arrivee)}
           {passage.attente >= 5 && ` · attente ${Math.round(passage.attente)} min`}
           {passage.statut === "hors" && " · hors horaires"}

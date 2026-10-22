@@ -195,7 +195,7 @@ export function CarteTournee({
         <button
           type="button"
           aria-pressed={suivre}
-          className={`rounded-full px-3 py-2 text-xs font-semibold shadow-pop ${suivre ? "bg-teal text-marine" : "bg-surface"}`}
+          className={`rounded-full px-3 py-2 text-xs font-semibold shadow-pop ${suivre ? "bg-teal text-on-teal" : "bg-surface"}`}
           onClick={() => {
             setSuivre((v) => !v);
             if (position.current) carte.current?.easeTo({ center: [position.current.lng, position.current.lat], zoom: 15 });
@@ -208,7 +208,7 @@ export function CarteTournee({
         </button>
       </div>
       {erreurGps && (
-        <p className="absolute inset-x-3 top-[140px] rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">
+        <p className="absolute inset-x-3 top-[140px] rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-on-orange shadow-pop">
           Position indisponible : autorisez la localisation pour voir où vous êtes sur la carte.
         </p>
       )}

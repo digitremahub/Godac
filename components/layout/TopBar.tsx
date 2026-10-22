@@ -57,7 +57,7 @@ export function TopBar({
         <Link href="/account" className="flex min-w-0 items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-navy/[0.04]">
           <div
             aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marine text-[13px] font-bold text-teal"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-marine text-[13px] font-bold text-teal-sur-menu"
           >
             {initials(fullName)}
           </div>

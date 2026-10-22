@@ -191,7 +191,7 @@ export default async function MyPlanningPage({
               <ol className="mt-2 grid gap-2 sm:grid-cols-2">
                 {[...((routeDetails as any).tour_route_villages as any[])].sort((a, b) => a.position - b.position).map((v, i) => (
                   <li key={v.id ?? v.name} className="rounded-lg bg-surface px-3 py-2 text-sm">
-                    <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{i + 1}</span>
+                    <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal-sur-menu">{i + 1}</span>
                     <span className="font-semibold">{v.name}</span>{v.postal_code ? <span className="ml-1 text-navy/60">({v.postal_code})</span> : null}
                     {v.notes && <p className="ml-8 mt-1 whitespace-pre-line text-xs text-navy/65">{v.notes}</p>}
                   </li>
