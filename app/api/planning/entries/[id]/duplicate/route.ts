@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
 import { copiesVersDates, estCopiable, jourDe, planifierCopies, type AffectationPlanning } from "@/lib/planning/semaine";
 import { affectationsAutour, inscrireCopies } from "@/lib/planning/copies-serveur";
+import { absentSelon, lireAbsences } from "@/lib/planning/absences";
 
 const bodySchema = z.object({
   /** Ancien appel : un seul jour (défaut : même jour la semaine suivante). */
@@ -23,7 +24,9 @@ const bodySchema = z.object({
  * (prévue, en cours, terminée) se duplique ; la copie est toujours
  * « prévue ». Un créneau déjà occupé (même service, tournée et départ :
  * contrainte unique de planning_entries) est ignoré, jamais en erreur ;
- * un chauffeur déjà pris à la même heure est signalé (conflit), pas bloqué.
+ * un chauffeur déjà pris à la même heure est signalé (conflit), pas bloqué ;
+ * un chauffeur en congé validé ou en arrêt ce jour-là n'est pas placé
+ * (copie créée sans chauffeur, « à remplacer »).
  * Réservé à l'encadrement ; RLS limite un manager à ses services.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -62,9 +65,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lecture du planning impossible." }, { status: 500 });
   }
-  const plan = planifierCopies(copiesVersDates([affectation], dates, { driverId: parsed.data.driver_id, vehicleId: parsed.data.vehicle_id }), existantes);
+  const triees = [...dates].sort();
+  const absences = await lireAbsences(supabase, appUser.organization_id, triees[0]!, triees[triees.length - 1]!);
+  const plan = planifierCopies(copiesVersDates([affectation], dates, { driverId: parsed.data.driver_id, vehicleId: parsed.data.vehicle_id }), existantes, { absent: absentSelon(absences) });
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
 
-  return NextResponse.json({ id: r.ids[0] ?? null, ids: r.ids, created: r.creees, skipped: r.ignorees, conflicts: r.conflits, warning: r.warning });
+  return NextResponse.json({ id: r.ids[0] ?? null, ids: r.ids, created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, warning: r.warning });
 }
