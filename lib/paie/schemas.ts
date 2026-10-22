@@ -33,7 +33,12 @@ export const parametresEntrepriseSchema = z.object({
   sick_pay_step_years: z.coerce.number().int().min(1).max(50).nullable().optional(),
   sick_pay_max_days: z.coerce.number().int().min(0).max(365).nullable().optional(),
   subrogation_enabled: z.boolean().optional(),
+  // Source des heures du bulletin (migration 20261030000001) : facultatif.
+  hours_source: z.enum(["regle", "badge", "tournees"]).optional(),
 });
+
+/** Colonnes ajoutées par 20261030000001 (source des heures). */
+export const COLONNES_ARRETS_DECLARATION = { reglages: ["hours_source"] } as const;
 
 /** Colonnes ajoutées par 20261026000002 (maintien de salaire, subrogation). */
 export const COLONNES_ARRETS_SORTIES = {

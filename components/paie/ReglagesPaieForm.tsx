@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { LIBELLE_SOURCE_HEURES, type SourceHeures } from "@/lib/paie/heures";
 
 export interface Reglages {
   headcount: number;
@@ -33,9 +34,11 @@ export interface Reglages {
   sick_pay_step_years: number | null;
   sick_pay_max_days: number | null;
   subrogation_enabled: boolean;
+  /** Source des heures du bulletin (lib/paie/heures.ts). */
+  hours_source: SourceHeures;
 }
 
-type CleNumerique = Exclude<keyof Reglages, "dfs_enabled" | "subrogation_enabled">;
+type CleNumerique = Exclude<keyof Reglages, "dfs_enabled" | "subrogation_enabled" | "hours_source">;
 
 const CHAMPS: { section: string; champs: { key: CleNumerique; label: string; suffix: string; hint?: string; optional?: boolean }[] }[] = [
   {
@@ -93,10 +96,11 @@ const CHAMPS: { section: string; champs: { key: CleNumerique; label: string; suf
 export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defauts: Record<string, number> }) {
   const router = useRouter();
   const [v, setV] = useState<Record<CleNumerique, string>>(
-    Object.fromEntries(Object.entries(initial).filter(([k]) => k !== "dfs_enabled" && k !== "subrogation_enabled").map(([k, x]) => [k, x === null ? "" : String(x)])) as Record<CleNumerique, string>,
+    Object.fromEntries(Object.entries(initial).filter(([k]) => k !== "dfs_enabled" && k !== "subrogation_enabled" && k !== "hours_source").map(([k, x]) => [k, x === null ? "" : String(x)])) as Record<CleNumerique, string>,
   );
   const [dfsActive, setDfsActive] = useState(initial.dfs_enabled);
   const [subrogation, setSubrogation] = useState(initial.subrogation_enabled);
+  const [sourceHeures, setSourceHeures] = useState<SourceHeures>(initial.hours_source);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -108,6 +112,7 @@ export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defa
         ...Object.fromEntries(CHAMPS.flatMap((s) => s.champs).map((c) => [c.key, v[c.key] === "" ? (c.optional ? null : 0) : Number(v[c.key])])),
         dfs_enabled: dfsActive,
         subrogation_enabled: subrogation,
+        hours_source: sourceHeures,
       };
       const res = await fetch("/api/paie/parametres", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
@@ -163,6 +168,20 @@ export function ReglagesPaieForm({ initial, defauts }: { initial: Reglages; defa
         <input type="checkbox" checked={subrogation} onChange={(e) => setSubrogation(e.target.checked)} />
         Subrogation par défaut : l&apos;entreprise perçoit les IJSS et les reverse sur le bulletin (modifiable sur chaque bulletin)
       </label>
+      <Card className="flex flex-col gap-2">
+        <h2 className="text-lg">Heures du bulletin</h2>
+        <p className="text-xs text-navy/60">
+          Recommandé : début au pointage d&apos;arrivée, sinon à l&apos;heure prévue au planning (picking au dépôt) ; fin au pointage de sortie, sinon au
+          retour de la dernière tournée. Personnel de bureau : pointage, sinon horaires prévus (signalés). Pauses pointées déduites. Le détail jour
+          par jour et les alertes s&apos;affichent sur chaque bulletin ; le total reste modifiable.
+        </p>
+        {(Object.keys(LIBELLE_SOURCE_HEURES) as SourceHeures[]).map((k) => (
+          <label key={k} className="flex min-h-[44px] items-center gap-2 text-sm">
+            <input type="radio" name="hours_source" checked={sourceHeures === k} onChange={() => setSourceHeures(k)} />
+            {LIBELLE_SOURCE_HEURES[k]}
+          </label>
+        ))}
+      </Card>
       {message && <p role="status" className={`rounded-lg px-3 py-2 text-sm ${message.ok ? "bg-teal/10 text-teal-ink" : "bg-orange/10 text-orange-ink"}`}>{message.text}</p>}
       <button type="button" className="btn-primary w-fit" disabled={busy} onClick={save}>
         {busy ? "Enregistrement…" : "Enregistrer"}
