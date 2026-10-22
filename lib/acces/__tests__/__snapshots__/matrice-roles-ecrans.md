@@ -39,6 +39,7 @@
 | Carburant | Approvisionnements | `/carburant/approvisionnements` | — | 🔒 | 🔒 | 🔒 | 🔒 | — |
 | Carburant | Export TICPE | `/carburant/ticpe` | — | — | ✅ | ✅ | ✅ | ticpe_export |
 | Carburant | Détail export TICPE | `/carburant/ticpe/[id]` | — | — | 🔒 | 🔒 | 🔒 | ticpe_export |
+| Carburant | Réglages TICPE | `/carburant/ticpe/reglages` | — | — | — | 🔒 | 🔒 | ticpe_export |
 | Équipe & RH | Utilisateurs | `/equipe/utilisateurs` | — | ✅ | ✅ | — | ✅ | — |
 | Équipe & RH | Fiche salarié | `/equipe/utilisateurs/[id]` | — | 🔒 | 🔒 | 🔒 | 🔒 | — |
 | Équipe & RH | Chauffeurs à valider | `/equipe/inscriptions` | — | ✅ | ✅ | — | ✅ | — |

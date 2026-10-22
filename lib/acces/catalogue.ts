@@ -595,6 +595,18 @@ export const ECRANS: readonly Ecran[] = [
     note: "exploitation : lecture et export",
   }),
   E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
+  E({
+    id: "carburant.ticpe_reglages",
+    section: "carburant",
+    libelle: "Réglages TICPE",
+    libelleSousOnglet: "Réglages",
+    href: "/carburant/ticpe/reglages",
+    roles: ["direction", "comptable"],
+    modules: ["ticpe_export"],
+    icone: "file",
+    parent: "carburant.ticpe",
+    note: "activités, régime de TVA, plafond, barème et taux particuliers",
+  }),
 
   // ── Équipe & RH ──────────────────────────────────────────────────
   E({
