@@ -4,7 +4,7 @@
 | Tableau de bord | Reporting BI | `/dashboard/reporting` | — | — | ✅ | — | ✅ | bi_reporting |
 | Mon espace | Départ | `/moi/tournee/depart` | ✅ | — | — | — | — | planning |
 | Mon espace | Retour | `/moi/tournee/retour` | 🔒 | — | — | — | — | planning |
-| Mon espace | Départ ou retour d'un collègue | `/moi/tournee/collegue` | 🔒 | ✅ | ✅ | — | 🔒 | planning |
+| Mon espace | Départ ou retour d'un collègue | `/moi/tournee/collegue` | 🔒 | 🔒 | 🔒 | — | 🔒 | planning |
 | Mon espace | Ma tournée colis | `/livreur` | ✅ | ↪ /exploitation/colis | ↪ /exploitation/colis | — | ↪ /exploitation/colis | route_optimizer |
 | Mon espace | Mon planning | `/moi/planning` | ✅ | — | — | — | — | planning |
 | Mon espace | Mon véhicule | `/moi/vehicule` | ✅ | — | — | — | — | — |

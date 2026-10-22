@@ -55,7 +55,7 @@ export function Onglets({ onglets, libelle, variante = "section" }: { onglets: r
                   ref={estActif ? refActif : undefined}
                   href={o.href}
                   aria-current={estActif ? "page" : undefined}
-                  className={`flex min-h-[40px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-teal ${
+                  className={`flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-teal ${
                     estActif ? "bg-surface text-navy shadow-sm" : "text-navy/65 hover:text-navy"
                   }`}
                 >

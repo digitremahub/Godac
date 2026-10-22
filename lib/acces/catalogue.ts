@@ -265,6 +265,10 @@ export const ECRANS: readonly Ecran[] = [
     href: "/moi/tournee/collegue",
     roles: ["chauffeur", "manager", "exploitation", "direction"],
     rolesMenu: ["chauffeur", "manager", "exploitation"],
+    // Sous-onglet de Départ / Retour pour qui conduit ; l'encadrement qui
+    // ne conduit pas l'ouvre depuis le Planning (« Saisir pour un
+    // chauffeur »), plus en tête de son Mon espace (audit, lot 3).
+    menuConducteur: true,
     modules: ["planning"],
     icone: "users",
     mobile: "plus",
@@ -463,6 +467,8 @@ export const ECRANS: readonly Ecran[] = [
     libelleOnglet: "Contestations",
     href: "/exploitation/contestations",
     roles: ["direction", "manager", "exploitation", "chauffeur"],
+    // Le chauffeur retrouve les siennes dans Mon espace › Mes documents.
+    rolesMenu: ENCADREMENT,
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
@@ -925,6 +931,124 @@ export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>, con
     });
     return { id: s.id, libelle: s.libelle, ecrans };
   }).filter((s) => s.ecrans.length > 0);
+}
+
+// ── Mon espace en 3 onglets (lot 3 de l'audit d'ergonomie) ─────────
+//
+// Les écrans personnels gardent leurs URL (/moi/…, /livreur, /carburant/
+// pleins?new=1, /exploitation/contestations) ; ils sont regroupés en trois
+// onglets — Ma journée, Mes documents, Mes demandes — au lieu de neuf qui
+// défilaient hors de l'écran sur téléphone. Le menu latéral n'affiche plus
+// que ces trois entrées dans « Mon espace ».
+
+export type GroupeMonEspaceId = "journee" | "documents" | "demandes";
+
+interface ElementGroupe {
+  id: string;
+  /** Libellé dans le groupe (par défaut : libellé d'onglet de l'écran). */
+  libelle?: string;
+  /** Lien propre (ex. formulaire de plein ouvert). */
+  href?: string;
+  /** Réservé à ces rôles (ex. contestations : seulement celles du chauffeur). */
+  roles?: readonly UserRole[];
+  /** Réservé aux personnes qui conduisent. */
+  conducteur?: boolean;
+}
+
+export const GROUPES_MON_ESPACE: readonly { id: GroupeMonEspaceId; libelle: string; icone: IconeId; elements: readonly ElementGroupe[] }[] = [
+  {
+    id: "journee",
+    libelle: "Ma journée",
+    icone: "flag",
+    elements: [
+      { id: "moi.tournee_depart" },
+      { id: "moi.tournee_colis" },
+      { id: "moi.planning" },
+      { id: "moi.pointage" },
+      { id: "carburant.pleins", libelle: "Faire un plein", href: "/carburant/pleins?new=1", conducteur: true },
+      { id: "moi.vehicule" },
+      { id: "moi.signaler", libelle: "Signaler" },
+    ],
+  },
+  {
+    id: "documents",
+    libelle: "Mes documents",
+    icone: "file",
+    elements: [{ id: "moi.fiches_paie" }, { id: "moi.amendes" }, { id: "exploitation.contestations", libelle: "Mes contestations", roles: ["chauffeur"] }],
+  },
+  {
+    id: "demandes",
+    libelle: "Mes demandes",
+    icone: "calendar",
+    elements: [{ id: "moi.conges" }, { id: "moi.acomptes", libelle: "Acomptes" }],
+  },
+];
+
+export interface GroupeMonEspace {
+  id: GroupeMonEspaceId;
+  libelle: string;
+  icone: IconeId;
+  /** Lien de l'onglet : premier écran du groupe sous /moi (sinon le premier). */
+  href: string;
+  /** Chemins qui allument l'onglet (écrans du groupe sous /moi, et leurs sous-onglets). */
+  prefixes: string[];
+  onglets: OngletEcran[];
+}
+
+/**
+ * Les onglets de Mon espace pour ce rôle : un groupe n'apparaît que s'il
+ * contient au moins un écran ouvrable. Mêmes règles que le menu (rôle,
+ * conduite, modules, offre GO Navigation) ; aucun droit en plus.
+ */
+export function ongletsMonEspace(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): GroupeMonEspace[] {
+  const vus = new Set<string>();
+  return GROUPES_MON_ESPACE.flatMap((g) => {
+    const onglets = g.elements
+      .filter((x) => {
+        const e = PAR_ID.get(x.id);
+        if (!e || vus.has(e.id)) return false;
+        if (x.roles && !x.roles.includes(role)) return false;
+        if (x.conducteur && !conduit) return false;
+        if (horsOffreGoNavigation(e.id, modulesActifs)) return false;
+        if (e.menuConducteur && !conduit) return false;
+        // Entrées « Mon espace » : rôles du menu ; écrans d'autres sections : accès seul.
+        if (e.section === "moi" && !(e.rolesMenu ?? e.roles).includes(role)) return false;
+        return deciderAcces(e, role, modulesActifs, conduit).ok;
+      })
+      .map((x) => {
+        const e = ecran(x.id);
+        vus.add(e.id);
+        return { ...versOnglet(e), href: x.href ?? e.href, libelle: x.libelle ?? e.libelleOnglet ?? e.libelle };
+      });
+    if (onglets.length === 0) return [];
+    const href = (onglets.find((o) => chemin(o.href).startsWith("/moi/")) ?? onglets[0]!).href;
+    const prefixes = onglets.flatMap((o) => [chemin(o.href), ...o.prefixes]).filter((p) => p.startsWith("/moi/"));
+    return [{ id: g.id, libelle: g.libelle, icone: g.icone, href, prefixes, onglets }];
+  });
+}
+
+/** Libellé d'une section pour ce rôle : « Mes tournées » pour qui n'encadre pas. */
+export function libelleSection(section: SectionId, role: UserRole): string {
+  if (section === "exploitation" && !ENCADREMENT.includes(role)) return "Mes tournées";
+  return SECTIONS.find((s) => s.id === section)?.libelle ?? section;
+}
+
+/**
+ * Menu affiché (Sidebar, tiroir « Plus » de la barre mobile) : le menu du
+ * catalogue, avec « Mon espace » réduit à ses trois onglets et la section
+ * Exploitation renommée « Mes tournées » pour le chauffeur.
+ */
+export function menuAffiche(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
+  const groupes = ongletsMonEspace(role, modulesActifs, conduit);
+  const base = menuPour(role, modulesActifs, conduit);
+  return SECTIONS.flatMap((sec): SectionMenu[] => {
+    if (sec.id === "moi") {
+      if (groupes.length === 0) return [];
+      const ecrans: Ecran[] = groupes.map((g) => ({ id: `moi.groupe.${g.id}`, section: "moi", libelle: g.libelle, href: g.href, roles: [role], icone: g.icone, aussiActif: g.prefixes }));
+      return [{ id: "moi", libelle: sec.libelle, ecrans }];
+    }
+    return base.filter((b) => b.id === sec.id).map((b) => ({ ...b, libelle: libelleSection(b.id, role) }));
+  });
 }
 
 export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): Ecran[] {

@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { ECRANS, MODULES_AVEC_CODE, SECTIONS, TOUS_LES_ROLES, deciderAcces, menuPour } from "@/lib/acces/catalogue";
+import { ECRANS, MODULES_AVEC_CODE, SECTIONS, TOUS_LES_ROLES, deciderAcces, menuPour, ongletsMonEspace } from "@/lib/acces/catalogue";
 
-/** Instantané relu : qui ouvre quoi (✅ menu, 🔒 accès sans entrée de menu, — refusé), tous modules actifs. */
+/**
+ * Instantané relu : qui ouvre quoi (✅ menu ou onglet de Mon espace, 🔒
+ * accès sans entrée de menu, ↪ renvoi vers un autre écran, — refusé),
+ * tous modules actifs.
+ */
 function matrice(): string {
   const tout = new Set<string>(MODULES_AVEC_CODE);
-  const menus = Object.fromEntries(TOUS_LES_ROLES.map((r) => [r, new Set(menuPour(r, tout).flatMap((s) => s.ecrans.map((e) => e.id)))]));
+  const menus = Object.fromEntries(
+    TOUS_LES_ROLES.map((r) => [r, new Set([...menuPour(r, tout).flatMap((s) => s.ecrans.map((e) => e.id)), ...ongletsMonEspace(r, tout).flatMap((g) => g.onglets.map((o) => o.id))])]),
+  );
   const lignes = ["| Section | Écran | URL | " + TOUS_LES_ROLES.join(" | ") + " | Modules |", "|" + "---|".repeat(TOUS_LES_ROLES.length + 4)];
   for (const s of SECTIONS) {
     for (const e of ECRANS.filter((x) => x.section === s.id)) {

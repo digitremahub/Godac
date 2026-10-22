@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole } from "@/lib/types/domain";
-import { entreeActive, menuPour, type IconeId } from "@/lib/acces/catalogue";
+import { entreeActive, menuAffiche, type IconeId } from "@/lib/acces/catalogue";
 import {
   IconGrid,
   IconDroplet,
@@ -92,7 +92,8 @@ export function Sidebar({
   // active indicator) — the sidebar is navy, so text stays white.
   const accent = accentColor || "#1BE4C1";
 
-  const sections = menuPour(role, new Set(enabledModuleKeys), conduit);
+  // « Mon espace » réduit à ses trois onglets, « Mes tournées » pour le chauffeur.
+  const sections = menuAffiche(role, new Set(enabledModuleKeys), conduit);
   const active = entreeActive(
     sections.flatMap((s) => s.ecrans),
     pathname,
