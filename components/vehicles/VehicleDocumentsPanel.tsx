@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { IconFileText, IconPaperclip, IconTrash } from "@/components/layout/icons";
 import { VEHICLE_DOC_TYPES, expiryStatus, type VehicleDocument } from "@/lib/vehicles/document-types";
+import { confirmer } from "@/lib/ui/confirmation";
 
 const EXPIRY_BADGE = {
   expired: { cls: "badge-orange", label: "Expiré" },
@@ -77,7 +78,7 @@ export function VehicleDocumentsPanel({ vehicleId, documents, today }: { vehicle
   }
 
   async function remove(doc: VehicleDocument) {
-    if (!window.confirm(`Supprimer « ${doc.docType} » ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer « ${doc.docType} » ?`, message: "", action: "Supprimer", danger: true }))) return;
     setRowBusy(doc.id);
     await fetch(`/api/vehicles/${vehicleId}/documents/${doc.id}`, { method: "DELETE" });
     setRowBusy(null);

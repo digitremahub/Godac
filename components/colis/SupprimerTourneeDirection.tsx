@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/components/colis/commun";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /**
  * Suppression d'une tournée colis depuis l'historique, réservée à la
@@ -17,9 +18,9 @@ export function SupprimerTourneeDirection({ runId, nom, cloturee, retour }: { ru
 
   async function supprimer() {
     const texte = cloturee
-      ? `Supprimer définitivement la tournée clôturée « ${nom} » et tout son historique de livraison (preuves comprises) ? L'action sera inscrite au journal d'audit.`
-      : `Supprimer définitivement la tournée « ${nom} » et ses arrêts ?`;
-    if (!confirm(texte)) return;
+      ? `La tournée colis clôturée « ${nom} » et tout son historique de livraison (preuves comprises) seront supprimés. L'action sera inscrite au journal d'audit.`
+      : `La tournée colis « ${nom} » et ses arrêts seront supprimés.`;
+    if (!(await confirmer({ titre: "Supprimer définitivement la tournée colis ?", message: texte, action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setErreur(null);
     try {

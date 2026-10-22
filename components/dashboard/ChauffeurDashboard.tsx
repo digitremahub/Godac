@@ -72,10 +72,10 @@ export async function ChauffeurDashboard({
   const timeClockEnabled = enabledModules.includes("time_clock");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
-  // Démarrer / terminer une tournée exige le module Planning : sans lui, la
+  // Départ / Retour exige le module Planning : sans lui, la
   // première action proposée est le plein (ou la tournée colis).
   const tourneeOuvrable = ecranOuvrable("moi.tournee_depart", ctx);
-  const colisOuvrable = ecranOuvrable("exploitation.colis", ctx);
+  const colisOuvrable = ecranOuvrable("moi.tournee_colis", ctx);
 
   const now = new Date().toISOString();
   const thisMonth = parisCalendarDate(now).slice(0, 7);
@@ -196,7 +196,7 @@ export async function ChauffeurDashboard({
                 <IconPlusCircle className="h-5 w-5" /> Faire un plein
               </Link>
               {colisOuvrable && (
-                <Link href="/livreur" className="btn-secondary w-full justify-center">
+                <Link href={urlDe("moi.tournee_colis")} className="btn-secondary w-full justify-center">
                   <IconQrCode className="h-5 w-5" /> Ma tournée colis <IconArrowRight className="h-4 w-4" />
                 </Link>
               )}

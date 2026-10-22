@@ -9,6 +9,7 @@ import { networkErrorMessage } from "@/lib/utils/network-error";
 import { renfortCandidates, renfortLabel } from "@/lib/tours/renfort";
 import { AddressQrScanner } from "@/components/tours/AddressQrScanner";
 import { cleVillage, rechercherVillages } from "@/lib/tours/recherche-villages";
+import { confirmer } from "@/lib/ui/confirmation";
 
 // La carte (MapLibre) n'est chargée que si l'on ouvre l'onglet.
 const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").then((m) => m.CarteVillages), {
@@ -394,7 +395,7 @@ function RouteCard({
     finally { if (numero === derniereRechercheVillage.current) setSearchingVillages(false); }
   }
 
-  function addVillageFromSearch(item: { name: string; postal_code: string | null }) {
+  async function addVillageFromSearch(item: { name: string; postal_code: string | null }) {
     const name = item.name.trim();
     const postalCode = item.postal_code ?? null;
     const sameVillage = (v: Village) =>
@@ -407,8 +408,8 @@ function RouteCard({
     const otherRoutes = allRoutes.filter((r) => r.id !== route.id && !r.isRenfort && r.villages.some(sameVillage));
     if (otherRoutes.length > 0) {
       const tours = otherRoutes.map((r) => r.tourNumber).join(", ");
-      if (!window.confirm(`Attention : ${name} est déjà présent dans la/les tournée(s) ${tours}. Voulez-vous vraiment l'ajouter aussi à la tournée ${route.tourNumber} ?`)) return;
-      if (!window.confirm(`Deuxième confirmation : le village ${name} sera affecté à plusieurs tournées. Confirmez-vous l'ajout à la tournée ${route.tourNumber} ?`)) return;
+      if (!(await confirmer({ titre: `${name} est déjà dans la tournée ${tours}`, message: `Voulez-vous vraiment l'ajouter aussi à la tournée ${route.tourNumber} ?`, action: "Ajouter aussi" }))) return;
+      if (!(await confirmer({ titre: "Deuxième confirmation", message: `Le village ${name} sera affecté à plusieurs tournées. Confirmez-vous l'ajout à la tournée ${route.tourNumber} ?`, action: "Confirmer l'ajout" }))) return;
     }
     setError(null);
     setVillages((current) => [...current, {
@@ -451,7 +452,7 @@ function RouteCard({
   }
 
   async function remove() {
-    if (!confirm(`Supprimer la fiche de la tournée ${route.tourNumber} et ses villages ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer la fiche de la tournée ${route.tourNumber} et ses villages ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     try {
       await send(`/api/tour-routes/${route.id}`, "DELETE");
@@ -617,10 +618,10 @@ function RouteCard({
                   <section className="flex flex-col gap-2 rounded-lg bg-navy/[0.025] p-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div><h3 className="text-sm font-semibold">Ramasses et points relais</h3><p className="text-xs text-navy/60">Chaque arrêt possède sa propre fiche.</p></div>
-                      <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold">{(v.planned_stops ?? []).length} arrêt(s)</span>
+                      <span className="rounded-full bg-surface px-2 py-1 text-xs font-semibold">{(v.planned_stops ?? []).length} arrêt(s)</span>
                     </div>
                     {(v.planned_stops ?? []).map((stop, stopIndex) => (
-                      <div key={stop.id ?? stopIndex} className="flex flex-col gap-2 rounded-lg border border-navy/10 bg-white p-3">
+                      <div key={stop.id ?? stopIndex} className="flex flex-col gap-2 rounded-lg border border-navy/10 bg-surface p-3">
                         <div className="flex items-center gap-2">
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{stopIndex + 1}</span>
                           <select className="input flex-1 !py-1.5 text-sm" value={stop.type} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, type: e.target.value as PlannedStop["type"] } : s) })} aria-label={`Type de l'arrêt ${stopIndex + 1}`}>
@@ -636,7 +637,7 @@ function RouteCard({
                             <input className="input !py-1.5 text-sm" value={stopAddressQuery?.key === `${i}-${stopIndex}` ? stopAddressQuery.value : stop.address} onChange={(e) => void searchStopAddress(`${i}-${stopIndex}`, e.target.value)} placeholder="Tapez une rue, une entreprise ou une adresse…" autoComplete="off" />
                           </label>
                           {searchingStopAddress && stopAddressQuery?.key === `${i}-${stopIndex}` && <p className="mt-1 text-xs text-navy/60">Recherche d’adresses…</p>}
-                          {stopAddressQuery?.key === `${i}-${stopIndex}` && stopAddressSuggestions.length > 0 && <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-navy/15 bg-white shadow-lg">{stopAddressSuggestions.map((item, suggestionIndex) => <button type="button" key={`${item.label}-${suggestionIndex}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: item.label } : s) }); setStopAddressQuery(null); setStopAddressSuggestions([]); }}>{item.label}</button>)}</div>}
+                          {stopAddressQuery?.key === `${i}-${stopIndex}` && stopAddressSuggestions.length > 0 && <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-navy/15 bg-surface shadow-lg">{stopAddressSuggestions.map((item, suggestionIndex) => <button type="button" key={`${item.label}-${suggestionIndex}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => { update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, address: item.label } : s) }); setStopAddressQuery(null); setStopAddressSuggestions([]); }}>{item.label}</button>)}</div>}
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <p className="text-xs text-navy/55">Sélectionnez une suggestion pour remplir l’adresse complète.</p>
                             <button type="button" className="btn-secondary !px-2 !py-1 text-xs" onClick={() => setScanAddressKey(scanAddressKey === `${i}-${stopIndex}` ? null : `${i}-${stopIndex}`)}>Scanner un QR code</button>
@@ -691,7 +692,7 @@ function RouteCard({
                   <input className="input" value={villageSearch} onChange={(e) => void searchVillages(e.target.value)} placeholder="Nom de la commune ou code postal…" autoComplete="off" />
                 </label>
                 {searchingVillages && <p className="text-xs text-navy/60">Recherche…</p>}
-                {villageSuggestions.length > 0 && <div className="max-w-xl overflow-hidden rounded-lg border border-navy/15 bg-white">{villageSuggestions.map((item, index) => <button type="button" key={`${item.name}-${item.postal_code}-${index}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => addVillageFromSearch(item)}><span className="font-semibold">{item.name}</span>{item.postal_code ? ` · ${item.postal_code}` : ""}{item.context ? <span className="ml-1 text-xs text-navy/55">({item.context})</span> : null}</button>)}</div>}
+                {villageSuggestions.length > 0 && <div className="max-w-xl overflow-hidden rounded-lg border border-navy/15 bg-surface">{villageSuggestions.map((item, index) => <button type="button" key={`${item.name}-${item.postal_code}-${index}`} className="block w-full border-b border-navy/10 px-3 py-2 text-left text-sm last:border-0 hover:bg-navy/[0.04]" onClick={() => addVillageFromSearch(item)}><span className="font-semibold">{item.name}</span>{item.postal_code ? ` · ${item.postal_code}` : ""}{item.context ? <span className="ml-1 text-xs text-navy/55">({item.context})</span> : null}</button>)}</div>}
                 <button type="button" className="btn-secondary w-fit !py-1.5 text-sm" onClick={() => setVillages([...villages, { name: "", postal_code: null, notes: null, pickup_addresses: [], planned_stops: [] }])}>+ Ajouter un village manuellement</button>
               </div>
             </>

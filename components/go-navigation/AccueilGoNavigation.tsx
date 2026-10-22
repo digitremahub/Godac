@@ -28,7 +28,7 @@ export async function AccueilGoNavigation({ organizationId }: { organizationId: 
         </Link>
       </div>
       <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-navy/80">
-        <li>Créez votre tournée ci-dessous (« Nouvelle tournée »).</li>
+        <li>Créez votre tournée colis ci-dessous (« + Nouvelle tournée colis »).</li>
         <li>Ajoutez vos colis : scan du code-barres, photo de l&apos;étiquette ou saisie de l&apos;adresse.</li>
         <li>Optimisez l&apos;ordre de passage, puis lancez la navigation.</li>
       </ol>

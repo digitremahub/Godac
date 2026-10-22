@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   }
   const { colleague_id: colleagueId, pin } = parsed.data;
   if (colleagueId === appUser.id) {
-    return NextResponse.json({ error: "C'est votre propre badge — utilisez Démarrer / Terminer une tournée." }, { status: 400 });
+    return NextResponse.json({ error: "C'est votre propre badge — utilisez Départ / Retour." }, { status: 400 });
   }
 
   const admin = createAdminSupabaseClient();

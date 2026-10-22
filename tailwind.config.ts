@@ -32,6 +32,10 @@ const config: Config = {
         "orange-ink": "rgb(var(--c-orange-ink) / <alpha-value>)",
         "gold-ink": "rgb(var(--c-gold-ink) / <alpha-value>)",
         "relais-ink": "rgb(var(--c-relais-ink) / <alpha-value>)",
+        // Succès (présence, validé) : distinct de l'accent dans les thèmes
+        // Orange GODAC (vert), égal au teal sinon (app/globals.css).
+        success: "rgb(var(--c-success) / <alpha-value>)",
+        "success-ink": "rgb(var(--c-success-ink) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-heading)", "sans-serif"],

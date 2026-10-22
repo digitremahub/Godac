@@ -133,11 +133,11 @@ describe("libellés", () => {
   });
   it("question posée à l'encadrement", () => {
     expect(questionRegroupement({ existantes: [{ tour_number: "12", heure: "07:30" }], fiches_ouvertes: [] })).toBe(
-      "Ce chauffeur a déjà la tournée n°12 à 07:30 ce jour-là. Fiches colis séparées (recommandé) ou reliées en une seule tournée ?",
+      "Ce chauffeur a déjà la tournée n°12 à 07:30 ce jour-là. Tournées colis séparées (recommandé) ou reliées en une seule ?",
     );
     expect(questionRegroupement({ existantes: [{ tour_number: "1", heure: "06:00" }, { tour_number: "2", heure: "13:00" }], fiches_ouvertes: [] })).toContain(
       "la tournée n°1 à 06:00 et la tournée n°2 à 13:00",
     );
-    expect(questionRegroupement({ existantes: [], fiches_ouvertes: [{ id: "f", name: "Libre" }] })).toContain("fiche Tournée colis ouverte ce jour-là (« Libre »)");
+    expect(questionRegroupement({ existantes: [], fiches_ouvertes: [{ id: "f", name: "Libre" }] })).toContain("une tournée colis ouverte ce jour-là (« Libre »)");
   });
 });

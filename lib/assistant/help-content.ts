@@ -21,7 +21,7 @@ interface HelpGuide {
 const ALL_ROLES: UserRole[] = ["chauffeur", "manager", "exploitation", "comptable", "direction"];
 
 const GUIDES: HelpGuide[] = [
-  { slug: "tournee", title: "Démarrer et terminer une tournée", roles: ["chauffeur", "manager", "exploitation"], file: "tournee.md" },
+  { slug: "tournee", title: "Départ et retour de tournée", roles: ["chauffeur", "manager", "exploitation"], file: "tournee.md" },
   {
     slug: "carburant",
     title: "Saisir un ravitaillement et scanner un QR",

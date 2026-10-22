@@ -1,7 +1,7 @@
 import type { UserRole } from "@/lib/types/domain";
 
 /**
- * Qui voit quoi sur « Tournées & villages ».
+ * Qui voit quoi sur « Modèles de tournées & villages ».
  *
  * - Chefs d'équipe (manager) et direction : toutes les
  *   tournées, la carte, les incohérences, et la modification des fiches.

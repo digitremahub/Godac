@@ -218,7 +218,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
             <th className="pb-2">Colis</th>
             <th className="pb-2">Priorité</th>
             <th className="pb-2">Manquants</th>
-            <th className="pb-2" title="Stops de ramasse">Ramasses</th>
+            <th className="pb-2" title="Arrêts de ramasse">Ramasses</th>
             <th className="pb-2" title="Colis collectés lors des ramasses">Colis ramassés</th>
             <th className="pb-2">Ramenés dépôt</th>
             <th className="pb-2">En relais</th>

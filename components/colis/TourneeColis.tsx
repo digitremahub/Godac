@@ -35,6 +35,7 @@ import { EtapeCreneau, useHorairesOuverture } from "@/components/colis/EtapeCren
 import { CRENEAU_AUCUN, choixDepuisCreneau, validerChoix, type ChoixCreneau, type CreneauSaisi } from "@/lib/colis/creneau";
 import { dateParis } from "@/lib/colis/heure-paris";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface Draft {
   adresse: string;
@@ -118,7 +119,33 @@ function libelleCourt(c: CreneauSaisi): string {
  * tournées (chauffeur, ou manager qui conduit) : « Nouvelle tournée » crée
  * alors sa propre fiche au lieu d'ouvrir l'affectation à un chauffeur.
  */
-export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false, conduit = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean; conduit?: boolean }) {
+export function TourneeColis({
+  lectureEtiquette,
+  pays = "FR",
+  encadrement = false,
+  conduit = false,
+  integre = false,
+  runInitial = null,
+  onEtat,
+  onDemarrer,
+}: {
+  lectureEtiquette: boolean;
+  pays?: string;
+  encadrement?: boolean;
+  conduit?: boolean;
+  /**
+   * Intégrée au parcours « Ma tournée colis » (/livreur, lib/colis/parcours.ts) :
+   * pas de second arrêt en cours ni de lien vers l'application chauffeur,
+   * « Démarrer » passe la main au parcours.
+   */
+  integre?: boolean;
+  /** Tournée colis à ouvrir d'abord (celle que le parcours affiche déjà). */
+  runInitial?: string | null;
+  /** Tournée colis affichée et ses arrêts, à chaque changement (parcours). */
+  onEtat?: (run: Run | null, stops: Stop[]) => void;
+  /** « Vérifier la tournée et démarrer » dans le parcours. */
+  onDemarrer?: (runId: string) => void;
+}) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -227,7 +254,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   async function supprimerTournee() {
     if (!run) return;
     if (run.status === "done") { setToast({ ok: false, text: "Une tournée clôturée ne peut pas être supprimée." }); return; }
-    if (!confirm(`Supprimer « ${run.name ?? "cette tournée"} » et ses ${stops.length} arrêt(s) ? C'est définitif.`)) return;
+    if (!(await confirmer({ titre: "Supprimer la tournée colis ?", message: `« ${run.name ?? "Tournée colis"} » et ses ${stops.length} arrêt(s) seront supprimés. C'est définitif.`, action: "Supprimer", danger: true }))) return;
     setBusy("suppr");
     try {
       await api(`/api/colis/tournees/${run.id}`, { method: "DELETE" });
@@ -251,9 +278,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   useEffect(() => {
-    recharger();
+    recharger(runInitial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Parcours « Ma tournée colis » : l'étape courante suit la tournée affichée ici.
+  useEffect(() => {
+    // Pas pendant le chargement d'une autre tournée (évite un « aucune tournée » transitoire).
+    if (runs && (run || !activeId)) onEtat?.(run, stops);
+  }, [runs, run, stops, activeId, onEtat]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -519,7 +551,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   async function supprimer(s: Stop) {
-    if (!confirm(`Retirer « ${s.address} » de la tournée ?`)) return;
+    if (!(await confirmer({ titre: "Retirer cet arrêt ?", message: `« ${s.address} » sera retiré de la tournée colis.`, action: "Retirer", danger: true }))) return;
     setStops((all) => all.filter((x) => x.id !== s.id));
     await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger(run?.id));
   }
@@ -632,7 +664,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   /** Une liste vide est supprimée ; une liste avec des arrêts les range d'abord dans `vers`. */
   async function supprimerListe(l: Liste, nbArrets: number, vers?: string) {
     if (nbArrets && !vers) return setSuppression({ id: l.id, vers: lists.find((x) => x.id !== l.id)?.id ?? "" });
-    if (!nbArrets && !confirm(`Supprimer la liste « ${l.name} » ?`)) return;
+    if (!nbArrets && !(await confirmer({ titre: `Supprimer la liste « ${l.name} » ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusy("liste");
     try {
       await api(`/api/colis/listes/${l.id}${vers ? `?vers=${encodeURIComponent(vers)}` : ""}`, { method: "DELETE" });
@@ -710,7 +742,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         </button>
       ))}
       <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy !== null} onClick={nouvelleTournee}>
-        + Nouvelle tournée
+        + Nouvelle tournée colis
       </button>
     </div>
   );
@@ -729,9 +761,9 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         )}
         <Card className="flex flex-col items-start gap-3">
           <h2 className="text-lg">Aucune tournée colis en cours</h2>
-          <p className="text-sm text-navy/65">Créez une tournée, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
+          <p className="text-sm text-navy/65">Créez une tournée colis, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            Créer une tournée
+            Créer une tournée colis
           </button>
         </Card>
       </div>
@@ -900,7 +932,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
             Renommer
           </button>
           {run.status !== "done" && <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
-            Supprimer la tournée
+            Supprimer la tournée colis
           </button>}
         </div>
       </div>
@@ -939,7 +971,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         </p>
       )}
 
-      {enLivraison && prochain ? (
+      {enLivraison && prochain && integre ? null : enLivraison && prochain ? (
         <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${bordureArret(prochain, "border-teal/50")}`}>
           <EncocheArret stop={prochain} large />
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
@@ -982,7 +1014,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/livreur" className="btn-secondary !py-1.5 text-sm">
-              Mode chauffeur plein écran
+              Ma tournée colis (plein écran)
             </Link>
             <button type="button" className="btn-ghost w-fit !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(true)}>
               Réoptimiser depuis ma position
@@ -994,16 +1026,16 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           <p className="font-display text-lg font-bold">Tournée terminée 🎉</p>
           <p className="mt-1 text-sm text-navy/65">{livres} arrêt(s) livré(s) sur {stops.length}.</p>
           <button type="button" className="btn-primary mt-3" onClick={() => phase("done")}>
-            Clôturer la tournée
+            Clôturer la tournée colis
           </button>
         </Card>
       ) : run.status === "done" ? (
         <Card className="flex flex-col items-start gap-3">
           <p className="text-sm text-navy/70">
-            Tournée clôturée : {livres} arrêt(s) livré(s) sur {stops.length}.
+            Tournée colis clôturée et verrouillée : {livres} arrêt(s) livré(s) sur {stops.length}.
           </p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            + Nouvelle tournée
+            + Nouvelle tournée colis (supplémentaire)
           </button>
         </Card>
       ) : (
@@ -1415,7 +1447,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
 
       {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
-          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => router.push("/livreur")}>
+          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => (integre && onDemarrer ? onDemarrer(run.id) : router.push("/livreur"))}>
             Vérifier la tournée et démarrer ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
           </button>
         </div>

@@ -10,6 +10,7 @@ import type { UserRole } from "@/lib/types/domain";
 import { grouperParPole } from "@/lib/organization/poles";
 import { PoleBadge } from "@/components/shared/PoleBadge";
 import { peutGererCompte, rolesAttribuables } from "@/lib/roles/perimetre";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface UserRow {
   id: string;
@@ -151,7 +152,7 @@ export function UsersPanel({ users, services, acteur = "direction" }: { users: U
   }
 
   async function resetPin(user: UserRow) {
-    if (!window.confirm(`Réinitialiser le code PIN de ${user.full_name} ? Il devra en créer un nouveau avec le code d'activation qui va s'afficher.`)) {
+    if (!(await confirmer({ titre: `Réinitialiser le code PIN de ${user.full_name} ?`, message: `Il devra en créer un nouveau avec le code d'activation qui va s'afficher.`, action: "Réinitialiser" }))) {
       return;
     }
     setBusy(true);
@@ -198,7 +199,7 @@ export function UsersPanel({ users, services, acteur = "direction" }: { users: U
   }
 
   async function toggleActive(user: UserRow) {
-    if (user.active && !window.confirm(`Désactiver ${user.full_name} ? Son compte ne pourra plus se connecter.`)) {
+    if (user.active && !(await confirmer({ titre: `Désactiver ${user.full_name} ?`, message: `Son compte ne pourra plus se connecter.`, action: "Désactiver", danger: true }))) {
       return;
     }
     setBusy(true);

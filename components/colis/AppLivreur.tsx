@@ -25,6 +25,8 @@ import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } fr
 import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
+import { TourneeColis } from "@/components/colis/TourneeColis";
+import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
@@ -45,12 +47,15 @@ const ENVOI_POSITION_MS = 60_000;
 const MEMO = "godac-tournee-colis";
 
 /**
- * Application chauffeur : l'arrêt en cours en grand (adresse, client,
- * appel, SMS, navigation, livré / absent), puis la liste des adresses
- * suivantes avec leur bouton d'appel. L'écran reste allumé pendant la
- * tournée quand le téléphone le permet.
+ * « Ma tournée colis » : point d'entrée unique du conducteur, qui enchaîne
+ * Préparer (scan, photo d'étiquette, bordereau, adresse avec créneau,
+ * ramasses, points relais) → Démarrer (vérification des villages) →
+ * Livrer (arrêt en cours en grand, GO Navigation, carte) → Clôturer. La
+ * préparation réutilise l'écran de la tournée colis (<TourneeColis
+ * integre>) ; l'étape courante vient de lib/colis/parcours.ts. L'écran
+ * reste allumé pendant la tournée quand le téléphone le permet.
  */
-export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: string | null; pays?: string; vueInitiale?: Vue }) {
+export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette = true }: { prenom: string | null; pays?: string; vueInitiale?: Vue; lectureEtiquette?: boolean }) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -72,6 +77,10 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
   const [maPosition, setMaPosition] = useState<{ lat: number; lng: number } | null>(null);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
+  /** Préparation ouverte à la demande pendant la livraison (« Ajouter ou modifier des colis »). */
+  const [preparationDemandee, setPreparationDemandee] = useState(false);
+  const preparationDemandeeRef = useRef(false);
+  preparationDemandeeRef.current = preparationDemandee;
   const horaires = useHoraires(run, stops, maPosition);
   const dernierEnvoi = useRef(0);
 
@@ -173,6 +182,28 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
   useEffect(() => {
     charger();
   }, [charger]);
+
+  /**
+   * L'écran de préparation intégré signale la tournée colis qu'il affiche :
+   * l'étape du parcours la suit. Une tournée démarrée bascule sur la
+   * livraison (rechargée avec ses listes), sauf préparation demandée.
+   */
+  const surEtatPreparation = useCallback(
+    (r: Run | null, s: Stop[]) => {
+      if (r?.status === "in_progress" && !preparationDemandeeRef.current) {
+        void charger(r.id);
+        return;
+      }
+      setRun(r);
+      setStops(s);
+    },
+    [charger],
+  );
+
+  function fermerPreparation() {
+    setPreparationDemandee(false);
+    void charger(run?.id);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -414,9 +445,11 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
       minutesItineraire: itineraire && !itineraire.approx ? itineraire.dureeMin : null,
     },
   );
-  const enCarte = vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
+  const etape = etapeParcours({ statut: run?.status ?? null, arrets: stops.length, restants: pending.length });
+  const enPreparation = runs !== null && afficherPreparation(etape, preparationDemandee);
+  const enCarte = !enPreparation && vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
   // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
-  const enNavigation = vue === "navigation" && run !== null && run.status === "in_progress";
+  const enNavigation = !enPreparation && vue === "navigation" && run !== null && run.status === "in_progress";
   const rechargerRun = useCallback(() => charger(run?.id), [charger, run?.id]);
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
@@ -425,15 +458,30 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
       {!enNavigation && (
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/exploitation/colis" className="flex items-center gap-2 text-sm text-white/75" aria-label="Retour à la tournée colis">
+          <Link href="/dashboard" className="flex min-h-[44px] items-center gap-2 text-sm text-white/75" aria-label="Retour à l'accueil GODAC">
             <span aria-hidden="true" className="text-lg leading-none">‹</span>
             <Wordmark inverted height={22} />
           </Link>
-          <button type="button" className="rounded-full p-2 text-white/80 hover:bg-white/10" onClick={() => charger(run?.id)} aria-label="Actualiser">
+          <h1 className="min-w-0 truncate font-display text-base font-bold">Ma tournée colis</h1>
+          <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:bg-white/10" onClick={() => charger(run?.id)} aria-label="Actualiser">
             <IconRefresh className="h-5 w-5" />
           </button>
         </div>
-        {run && (
+        {runs !== null && (
+          <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[11px] font-semibold" aria-label="Étapes de la tournée colis">
+            {etatsEtapes(etape).map((x, i) => (
+              <li
+                key={x.id}
+                aria-current={x.etat === "en_cours" ? "step" : undefined}
+                className={`rounded-full px-1 py-1 ${x.etat === "en_cours" ? "bg-teal text-marine" : x.etat === "faite" ? "bg-white/15 text-white" : "text-white/55"}`}
+              >
+                {x.etat === "faite" ? "✓" : `${i + 1}.`} {x.libelle}
+                {x.etat === "en_cours" && <span className="sr-only"> (étape en cours)</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+        {run && !enPreparation && (
           <div className="mt-2">
             <div className="flex items-baseline justify-between gap-2">
               {actives.length > 1 ? (
@@ -489,7 +537,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
                     role="tab"
                     aria-selected={vue === v}
                     onClick={() => changerVue(v)}
-                    className={`rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
+                    className={`min-h-[44px] rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
                   >
                     {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
                   </button>
@@ -665,31 +713,41 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
 
       {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}
 
-      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte || enNavigation ? "hidden" : "flex"}`}>
-        {runs === null ? (
-          <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée…</p>
-        ) : !run ? (
-          <section className="flex flex-col items-center gap-3 py-10 text-center">
-            <p className="font-display text-xl font-bold">{prenom ? `Bonjour ${prenom}` : "Bonjour"}</p>
-            <p className="text-sm text-navy/65">Aucune tournée colis en cours. Chargez vos colis pour commencer.</p>
-            <Link href="/exploitation/colis" className="btn-primary !py-3">
-              Charger mes colis
-            </Link>
-          </section>
-        ) : run.status === "loading" ? (
-          <section className="flex flex-col gap-3 rounded-2xl bg-surface p-5 shadow-card">
-            <p className="font-display text-lg font-bold">Tournée pas encore démarrée</p>
-            <p className="text-sm text-navy/65">
-              {stops.length} adresse(s) chargée(s). GODAC calcule le meilleur ordre puis vous guide arrêt par arrêt.
-            </p>
-            <button type="button" className="btn-primary !py-3.5 text-base" disabled={busy || !stops.length} onClick={demanderDemarrage}>
-              Vérifier les villages et démarrer
+      {enPreparation && (
+        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          {preparationDemandee && run?.status === "in_progress" ? (
+            <button type="button" className="btn-secondary min-h-[44px] w-full justify-center" onClick={fermerPreparation}>
+              ‹ Retour à la livraison
             </button>
-            <Link href="/exploitation/colis" className="btn-ghost w-fit !px-2 text-sm">
-              Ajouter ou modifier des colis
-            </Link>
-          </section>
-        ) : prochain ? (
+          ) : (
+            etape !== "terminee" && (
+              <p className="text-sm text-navy/70">
+                {prenom ? `Bonjour ${prenom}. ` : ""}
+                {etape === "preparer"
+                  ? "Ajoutez vos colis : scan, photo d'étiquette, bordereau ou adresse. GODAC calcule ensuite l'ordre de passage."
+                  : `${stops.length} arrêt${stops.length > 1 ? "s" : ""} chargé${stops.length > 1 ? "s" : ""}. Ajoutez-en d'autres ou démarrez la tournée colis.`}
+              </p>
+            )
+          )}
+          <TourneeColis
+            integre
+            conduit
+            lectureEtiquette={lectureEtiquette}
+            pays={pays}
+            runInitial={run?.id ?? null}
+            onEtat={surEtatPreparation}
+            onDemarrer={(id) => {
+              setPreparationDemandee(false);
+              void charger(id).then(demanderDemarrage);
+            }}
+          />
+        </main>
+      )}
+
+      <main className={`mx-auto w-full max-w-xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${enCarte || enNavigation || enPreparation ? "hidden" : "flex"}`}>
+        {runs === null ? (
+          <p className="py-10 text-center text-sm text-navy/60">Chargement de la tournée colis…</p>
+        ) : !run || run.status === "loading" ? null : prochain ? (
           <section
             className={`relative flex flex-col gap-4 overflow-hidden rounded-2xl border-2 bg-surface p-5 shadow-card ${bordureArret(prochain, "border-teal/60")}`}
             aria-label={estRamasse(prochain) ? "Ramasse en cours" : estPointRelais(prochain) ? "Dépôt au point relais en cours" : "Arrêt en cours"}
@@ -761,17 +819,26 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale }: { prenom: strin
           </section>
         ) : (
           <section className="flex flex-col items-center gap-3 rounded-2xl bg-surface p-6 text-center shadow-card">
-            <p className="font-display text-xl font-bold">Tournée terminée 🎉</p>
+            <p className="font-display text-xl font-bold">Tous les arrêts sont traités 🎉</p>
             <p className="text-sm text-navy/65">
               {stops.filter((s) => s.status === "delivered" && !estRamasse(s)).length} livré(s)
               {stops.some(estRamasse) && `, ${stops.filter((s) => s.status === "delivered" && estRamasse(s)).length} ramasse(s) faite(s)`}, {stops.filter((s) => s.status === "failed").length} absent(s).
             </p>
             {run.status !== "done" && (
-              <button type="button" className="btn-primary !py-3" onClick={cloturer}>
-                Clôturer la tournée
-              </button>
+              <>
+                <button type="button" className="btn-primary min-h-[44px] !py-3" onClick={cloturer}>
+                  Clôturer la tournée colis
+                </button>
+                <p className="text-xs text-navy/60">Une fois clôturée, la tournée colis est verrouillée. Vous pourrez en ouvrir une autre (tournée supplémentaire).</p>
+              </>
             )}
           </section>
+        )}
+
+        {run?.status === "in_progress" && (
+          <button type="button" className="btn-secondary min-h-[44px] justify-center" onClick={() => setPreparationDemandee(true)}>
+            <IconQrCode className="h-5 w-5" /> Ajouter ou modifier des colis
+          </button>
         )}
 
         {run && run.status !== "loading" && stops.length > 1 && (

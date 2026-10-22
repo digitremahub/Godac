@@ -89,7 +89,7 @@ export function FormulaireGoNavigation({ jeton }: { jeton: string }) {
           </span>
         </label>
         {erreur && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-orange-ink">
             {erreur}
           </p>
         )}

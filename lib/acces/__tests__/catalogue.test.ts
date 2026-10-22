@@ -253,7 +253,7 @@ describe("onglets de section (lot 4)", () => {
   it("chaque écran (hors /v, /account et l'app chauffeur plein écran /livreur) vit sous le préfixe de sa section", () => {
     for (const e of ECRANS) {
       const h = e.href.split("?")[0]!;
-      if (h.startsWith("/v/") || h === "/account" || h.startsWith("/livreur/")) continue;
+      if (h.startsWith("/v/") || h === "/account" || h === "/livreur" || h.startsWith("/livreur/")) continue;
       const p = PREFIXE_SECTION[e.section];
       expect(h === p || h.startsWith(`${p}/`), `${e.id} → ${h}`).toBe(true);
     }

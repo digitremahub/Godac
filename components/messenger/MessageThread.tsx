@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconTrash } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface MessageRow {
   id: string;
@@ -32,7 +33,7 @@ export function MessageThread({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function del(id: string) {
-    if (!confirm("Supprimer ce message ?")) return;
+    if (!(await confirmer({ titre: "Supprimer ce message ?", message: "", action: "Supprimer", danger: true }))) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/messenger/${id}`, { method: "DELETE" });

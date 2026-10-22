@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface TankRow {
   id: string;
@@ -79,7 +80,7 @@ export function TanksPanel({ tanks, services }: { tanks: TankRow[]; services: Se
   }
 
   async function deleteTank(id: string) {
-    if (!confirm("Supprimer cette cuve ?")) return;
+    if (!(await confirmer({ titre: "Supprimer cette cuve ?", message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

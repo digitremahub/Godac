@@ -5,6 +5,7 @@ import { ROLE_LABELS } from "@/lib/roles/labels";
 import { GUIDES, guideDe, guideFiltre } from "@/lib/guides/roles";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { MARQUEUR_GO_NAVIGATION } from "@/lib/acces/catalogue";
+import { GLOSSAIRE_TOURNEE } from "@/lib/guides/glossaire";
 
 export const metadata = { title: "Guide d'utilisation — GODAC" };
 
@@ -71,6 +72,21 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           </ol>
         </Card>
       ))}
+
+      <Card className="flex flex-col gap-3">
+        <h2 className="text-lg">Vocabulaire : la tournée</h2>
+        <p className="text-sm text-navy/70">Un mot, un sens, partout dans GODAC.</p>
+        <dl className="flex flex-col gap-3">
+          {GLOSSAIRE_TOURNEE.map((t) => (
+            <div key={t.terme}>
+              <dt className="font-semibold">{t.terme}</dt>
+              <dd className="text-sm leading-relaxed text-navy/70">
+                {t.definition} <span className="text-navy/55">Exemple : {t.exemple}.</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </Card>
     </div>
   );
 }

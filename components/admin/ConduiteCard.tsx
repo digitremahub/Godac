@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /**
  * Fiche utilisateur (direction, ou exploitation pour un chauffeur ou un
@@ -38,8 +39,8 @@ export function ConduiteCard({ userId, role, canDrive, nom }: { userId: string; 
           type="button"
           className="btn-secondary !py-2 text-sm"
           disabled={busy}
-          onClick={() => {
-            if (window.confirm(`Passer ${nom} manager ? Il gardera ses écrans de conduite.`)) void envoyer({ role: "manager", can_drive: true });
+          onClick={async () => {
+            if ((await confirmer({ titre: `Passer ${nom} manager ?`, message: `Il gardera ses écrans de conduite.`, action: "Passer manager" }))) void envoyer({ role: "manager", can_drive: true });
           }}
         >
           {busy ? "Enregistrement…" : "Passer manager"}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { confirmer } from "@/lib/ui/confirmation";
 
 type Status = "suggested" | "published" | "dismissed";
 const ROLES = [
@@ -52,7 +53,7 @@ function Entry({ entry }: { entry: FaqEntry }) {
   }
 
   async function remove() {
-    if (!confirm("Supprimer définitivement cette entrée ?")) return;
+    if (!(await confirmer({ titre: "Supprimer définitivement cette entrée ?", message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     await fetch(`/api/admin/faq/${entry.id}`, { method: "DELETE" });
     router.refresh();

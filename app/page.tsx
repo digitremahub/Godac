@@ -49,7 +49,7 @@ const TOURNEE_COLIS = [
       "Alerte « sans téléphone » sur les colis à risque.",
       "Établissements pros retrouvés par leur nom, avec leurs horaires d’ouverture pris en compte dans l’optimisation.",
       "Optimisation globale sur les kilomètres routiers, listes par village créées automatiquement.",
-      "L’affectation du planning prépare la fiche colis : fiches séparées ou reliées, au choix.",
+      "L’affectation du planning prépare la tournée colis : séparées ou reliées, au choix.",
     ],
   },
   {
@@ -82,7 +82,7 @@ const PLANNING_PAIE = [
       "Grille chauffeurs × jours : ajout en un clic, déplacement par glisser-déposer.",
       "Duplication d’une affectation, d’une journée ou de toute la semaine, jusqu’à 8 semaines, avec aperçu.",
       "Copier-coller de tournées d’une case à l’autre.",
-      "Modèles de tournées récurrentes pour générer la semaine type.",
+      "Affectations récurrentes pour générer la semaine type.",
     ],
   },
   {

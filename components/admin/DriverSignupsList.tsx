@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface SignupRequest {
   id: string;
@@ -18,7 +19,7 @@ export function DriverSignupsList({ requests }: { requests: SignupRequest[] }) {
   const [error, setError] = useState<string | null>(null);
 
   async function act(id: string, action: "approve" | "reject") {
-    if (action === "reject" && !window.confirm("Refuser et supprimer cette demande ?")) return;
+    if (action === "reject" && !(await confirmer({ titre: "Refuser et supprimer cette demande ?", message: "", action: "Refuser", danger: true }))) return;
     setBusyId(id);
     setError(null);
     try {

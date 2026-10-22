@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { IconMapPin, IconNavigation } from "@/components/layout/icons";
 import { PoleIcon } from "@/components/shared/PoleBadge";
 import { POLES_BUREAU, poleDe } from "@/lib/organization/poles";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface ServiceRow {
   id: string;
@@ -104,7 +105,7 @@ export function ServicesPanel({ services, users = [] }: { services: ServiceRow[]
   }
 
   async function deleteService(id: string) {
-    if (!confirm("Supprimer ce service ? Les véhicules/cuves rattachés deviendront non assignés.")) return;
+    if (!(await confirmer({ titre: "Supprimer ce service ?", message: "Les véhicules/cuves rattachés deviendront non assignés.", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

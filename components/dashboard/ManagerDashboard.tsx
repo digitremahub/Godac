@@ -28,7 +28,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
-  // Carte « Démarrer / Terminer ma tournée » : seulement si l'écran s'ouvre (module Planning).
+  // Carte « Départ / Retour » : seulement si l'écran s'ouvre (module Planning).
   const tourneeOuvrable = isManagerChauffeur && ecranOuvrable("moi.tournee_depart", ctx);
 
   const { data: myServices } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);

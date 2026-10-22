@@ -219,6 +219,13 @@ export interface Ecran {
   alternative?: Partial<Record<UserRole, string>>;
   /** Restriction supplémentaire faite par la page (texte pour la matrice). */
   note?: string;
+  /**
+   * Section du menu latéral pour ces rôles, quand elle diffère de la
+   * section de l'URL (ex. Registre du personnel rangé dans
+   * Administration pour la direction). Les onglets de section et l'URL
+   * ne changent pas.
+   */
+  sectionMenu?: Partial<Record<UserRole, SectionId>>;
 }
 
 const E = (e: Ecran) => e;
@@ -232,20 +239,22 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "moi.tournee_depart",
     section: "moi",
-    libelle: "Démarrer une tournée",
-    libelleOnglet: "Ma tournée",
+    // Glossaire : « Départ / Retour » = prise et fin de poste avec le
+    // véhicule ; « Tournée » = l'affectation du planning (n° T106).
+    libelle: "Départ",
+    libelleOnglet: "Départ / Retour",
     libelleSousOnglet: "Départ",
     href: "/moi/tournee/depart",
     roles: TERRAIN,
     conducteur: true,
     modules: ["planning"],
-    icone: "clock",
+    icone: "flag",
     mobile: "barre",
   }),
   E({
     id: "moi.tournee_retour",
     section: "moi",
-    libelle: "Terminer une tournée",
+    libelle: "Retour",
     libelleSousOnglet: "Retour",
     href: "/moi/tournee/retour",
     roles: TERRAIN,
@@ -258,15 +267,36 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "moi.tournee_collegue",
     section: "moi",
-    libelle: "J'entre pour un collègue",
+    libelle: "Départ ou retour d'un collègue",
     libelleSousOnglet: "Pour un collègue",
     href: "/moi/tournee/collegue",
     roles: ["chauffeur", "manager", "exploitation", "direction"],
     rolesMenu: ["chauffeur", "manager", "exploitation"],
+    // Sous-onglet de Départ / Retour pour qui conduit ; l'encadrement qui
+    // ne conduit pas l'ouvre depuis le Planning (« Saisir pour un
+    // chauffeur »), plus en tête de son Mon espace (audit, lot 3).
+    menuConducteur: true,
     modules: ["planning"],
     icone: "users",
     mobile: "plus",
     parent: "moi.tournee_depart",
+  }),
+  E({
+    id: "moi.tournee_colis",
+    section: "moi",
+    libelle: "Ma tournée colis",
+    // Point d'entrée unique du conducteur (lot 3 de l'audit d'ergonomie) :
+    // préparer (scan, bordereau, adresses), démarrer, livrer (GO
+    // Navigation), clôturer. App plein écran, hors de l'espace à menu.
+    href: "/livreur",
+    roles: TERRAIN,
+    conducteur: true,
+    modules: ["route_optimizer"],
+    icone: "qr",
+    mobile: "barre",
+    // L'encadrement qui ne conduit pas prépare et affecte dans Exploitation.
+    alternative: { manager: "/exploitation/colis", exploitation: "/exploitation/colis", direction: "/exploitation/colis" },
+    note: "sa tournée colis : préparer, démarrer, livrer, clôturer",
   }),
   E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/moi/planning", roles: TERRAIN, conducteur: true, modules: ["planning"], icone: "calendar", mobile: "plus" }),
   E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/moi/vehicule", roles: TERRAIN, conducteur: true, icone: "truck", mobile: "plus" }),
@@ -348,7 +378,10 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "exploitation.tournees",
     section: "exploitation",
-    libelle: "Tournées & villages",
+    // Glossaire : « Modèle de tournée » = la tournée-modèle (numéro,
+    // villages, ramasses, points relais), pas l'affectation du jour.
+    libelle: "Modèles de tournées & villages",
+    libelleOnglet: "Modèles de tournées",
     href: "/exploitation/tournees",
     roles: ["direction", "manager", "exploitation", "chauffeur"],
     modulesAuMoinsUn: ["planning", "route_optimizer"],
@@ -358,13 +391,18 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "exploitation.colis",
     section: "exploitation",
-    libelle: "Tournée colis",
+    libelle: "Préparation des tournées colis",
+    libelleOnglet: "Tournées colis",
     href: "/exploitation/colis",
-    roles: ["direction", "manager", "exploitation", "chauffeur"],
+    // Écran de préparation et d'affectation de l'encadrement. Le
+    // chauffeur passe par « Ma tournée colis » (/livreur), qui contient
+    // la même préparation : l'ancienne adresse l'y renvoie.
+    roles: ENCADREMENT,
     modules: ["route_optimizer"],
     icone: "qr",
     aussiActif: ["/exploitation/suivi"],
-    note: "chauffeur : sa tournée",
+    alternative: { chauffeur: "/livreur" },
+    note: "manager ou exploitation qui conduit : aussi sa propre tournée colis",
   }),
   E({
     id: "exploitation.go_navigation",
@@ -436,6 +474,8 @@ export const ECRANS: readonly Ecran[] = [
     libelleOnglet: "Contestations",
     href: "/exploitation/contestations",
     roles: ["direction", "manager", "exploitation", "chauffeur"],
+    // Le chauffeur retrouve les siennes dans Mon espace › Mes documents.
+    rolesMenu: ENCADREMENT,
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
@@ -520,7 +560,8 @@ export const ECRANS: readonly Ecran[] = [
     alternative: { chauffeur: "/moi/amendes" },
     note: "manager : son service ; exploitation : toute l'organisation ; comptable : lecture",
   }),
-  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr" }),
+  // Usage rare pour la direction (impression des badges) : rangé dans Administration.
+  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr", sectionMenu: { direction: "admin" } }),
 
   // ── Carburant ────────────────────────────────────────────────────
   E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/carburant/pleins", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
@@ -691,6 +732,8 @@ export const ECRANS: readonly Ecran[] = [
     // Obligation légale de tout employeur : aucun module requis.
     roles: ["direction"],
     icone: "file",
+    // Consulté rarement (contrôle, embauche) : rangé dans Administration.
+    sectionMenu: { direction: "admin" },
     note: "nationalité et titre de travail : direction seulement",
   }),
 
@@ -891,13 +934,145 @@ export interface SectionMenu {
 export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
   const vus = new Set<string>();
   return SECTIONS.map((s) => {
-    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
+    const ecrans = ECRANS.filter((e) => (e.sectionMenu?.[role] ?? e.section) === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
       if (vus.has(e.href)) return false;
       vus.add(e.href);
       return true;
     });
     return { id: s.id, libelle: s.libelle, ecrans };
   }).filter((s) => s.ecrans.length > 0);
+}
+
+// ── Mon espace en 3 onglets (lot 3 de l'audit d'ergonomie) ─────────
+//
+// Les écrans personnels gardent leurs URL (/moi/…, /livreur, /carburant/
+// pleins?new=1, /exploitation/contestations) ; ils sont regroupés en trois
+// onglets — Ma journée, Mes documents, Mes demandes — au lieu de neuf qui
+// défilaient hors de l'écran sur téléphone. Le menu latéral n'affiche plus
+// que ces trois entrées dans « Mon espace ».
+
+export type GroupeMonEspaceId = "journee" | "documents" | "demandes";
+
+interface ElementGroupe {
+  id: string;
+  /** Libellé dans le groupe (par défaut : libellé d'onglet de l'écran). */
+  libelle?: string;
+  /** Lien propre (ex. formulaire de plein ouvert). */
+  href?: string;
+  /** Réservé à ces rôles (ex. contestations : seulement celles du chauffeur). */
+  roles?: readonly UserRole[];
+  /** Réservé aux personnes qui conduisent. */
+  conducteur?: boolean;
+}
+
+export const GROUPES_MON_ESPACE: readonly { id: GroupeMonEspaceId; libelle: string; icone: IconeId; elements: readonly ElementGroupe[] }[] = [
+  {
+    id: "journee",
+    libelle: "Ma journée",
+    icone: "flag",
+    elements: [
+      { id: "moi.tournee_depart" },
+      { id: "moi.tournee_colis" },
+      { id: "moi.planning" },
+      { id: "moi.pointage" },
+      { id: "carburant.pleins", libelle: "Faire un plein", href: "/carburant/pleins?new=1", conducteur: true },
+      { id: "moi.vehicule" },
+      { id: "moi.signaler", libelle: "Signaler" },
+    ],
+  },
+  {
+    id: "documents",
+    libelle: "Mes documents",
+    icone: "file",
+    elements: [{ id: "moi.fiches_paie" }, { id: "moi.amendes" }, { id: "exploitation.contestations", libelle: "Mes contestations", roles: ["chauffeur"] }],
+  },
+  {
+    id: "demandes",
+    libelle: "Mes demandes",
+    icone: "calendar",
+    elements: [{ id: "moi.conges" }, { id: "moi.acomptes", libelle: "Acomptes" }],
+  },
+];
+
+export interface GroupeMonEspace {
+  id: GroupeMonEspaceId;
+  libelle: string;
+  icone: IconeId;
+  /** Lien de l'onglet : premier écran du groupe sous /moi (sinon le premier). */
+  href: string;
+  /** Chemins qui allument l'onglet (écrans du groupe sous /moi, et leurs sous-onglets). */
+  prefixes: string[];
+  onglets: OngletEcran[];
+}
+
+/**
+ * Les onglets de Mon espace pour ce rôle : un groupe n'apparaît que s'il
+ * contient au moins un écran ouvrable. Mêmes règles que le menu (rôle,
+ * conduite, modules, offre GO Navigation) ; aucun droit en plus.
+ */
+export function ongletsMonEspace(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): GroupeMonEspace[] {
+  const vus = new Set<string>();
+  return GROUPES_MON_ESPACE.flatMap((g) => {
+    const onglets = g.elements
+      .filter((x) => {
+        const e = PAR_ID.get(x.id);
+        if (!e || vus.has(e.id)) return false;
+        if (x.roles && !x.roles.includes(role)) return false;
+        if (x.conducteur && !conduit) return false;
+        if (horsOffreGoNavigation(e.id, modulesActifs)) return false;
+        if (e.menuConducteur && !conduit) return false;
+        // Entrées « Mon espace » : rôles du menu ; écrans d'autres sections : accès seul.
+        if (e.section === "moi" && !(e.rolesMenu ?? e.roles).includes(role)) return false;
+        return deciderAcces(e, role, modulesActifs, conduit).ok;
+      })
+      .map((x) => {
+        const e = ecran(x.id);
+        vus.add(e.id);
+        return { ...versOnglet(e), href: x.href ?? e.href, libelle: x.libelle ?? e.libelleOnglet ?? e.libelle };
+      });
+    if (onglets.length === 0) return [];
+    const href = (onglets.find((o) => chemin(o.href).startsWith("/moi/")) ?? onglets[0]!).href;
+    const prefixes = onglets.flatMap((o) => [chemin(o.href), ...o.prefixes]).filter((p) => p.startsWith("/moi/"));
+    return [{ id: g.id, libelle: g.libelle, icone: g.icone, href, prefixes, onglets }];
+  });
+}
+
+/**
+ * Sections du menu repliées par défaut (lot 3 de l'audit) : la direction a
+ * le menu le plus long ; ses entrées rares (Administration, Aide) se
+ * déplient d'un geste. Une section qui contient l'écran ouvert est
+ * toujours dépliée. Aucune entrée retirée.
+ */
+export const SECTIONS_REPLIEES: Partial<Record<UserRole, readonly SectionId[]>> = {
+  direction: ["admin", "aide"],
+};
+
+export function estSectionRepliee(section: SectionId, role: UserRole): boolean {
+  return SECTIONS_REPLIEES[role]?.includes(section) ?? false;
+}
+
+/** Libellé d'une section pour ce rôle : « Mes tournées » pour qui n'encadre pas. */
+export function libelleSection(section: SectionId, role: UserRole): string {
+  if (section === "exploitation" && !ENCADREMENT.includes(role)) return "Mes tournées";
+  return SECTIONS.find((s) => s.id === section)?.libelle ?? section;
+}
+
+/**
+ * Menu affiché (Sidebar, tiroir « Plus » de la barre mobile) : le menu du
+ * catalogue, avec « Mon espace » réduit à ses trois onglets et la section
+ * Exploitation renommée « Mes tournées » pour le chauffeur.
+ */
+export function menuAffiche(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
+  const groupes = ongletsMonEspace(role, modulesActifs, conduit);
+  const base = menuPour(role, modulesActifs, conduit);
+  return SECTIONS.flatMap((sec): SectionMenu[] => {
+    if (sec.id === "moi") {
+      if (groupes.length === 0) return [];
+      const ecrans: Ecran[] = groupes.map((g) => ({ id: `moi.groupe.${g.id}`, section: "moi", libelle: g.libelle, href: g.href, roles: [role], icone: g.icone, aussiActif: g.prefixes }));
+      return [{ id: "moi", libelle: sec.libelle, ecrans }];
+    }
+    return base.filter((b) => b.id === sec.id).map((b) => ({ ...b, libelle: libelleSection(b.id, role) }));
+  });
 }
 
 export function ecransVisibles(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): Ecran[] {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Card } from "@/components/ui";
 import { IconCheck } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /**
  * Direction-only (see app/(dashboard)/admin/organizations/page.tsx —
@@ -33,7 +34,7 @@ export function JoinLinkCard({ token }: { token: string }) {
   }
 
   async function regenerate() {
-    if (!window.confirm("Régénérer ce lien ? L'ancien lien/QR ne fonctionnera plus — il faudra réimprimer le nouveau.")) return;
+    if (!(await confirmer({ titre: "Régénérer ce lien ?", message: "L'ancien lien/QR ne fonctionnera plus — il faudra réimprimer le nouveau.", action: "Régénérer" }))) return;
     setBusy(true);
     setError(null);
     try {

@@ -74,7 +74,7 @@ export function AffecterTourneeColis({ services, drivers, vehicles, tours }: { s
       <label className="text-sm font-medium">Tournée existante<select className="input mt-1 w-full" value={tourNumber} onChange={e => setTourNumber(e.target.value)} required disabled={filteredTours.length === 0}><option value="">Choisir une tournée</option>{filteredTours.map(t => <option key={t.id} value={t.tour_number}>{t.tour_number}</option>)}</select>{filteredTours.length === 0 && <span className="mt-1 block text-xs font-normal text-navy/60">Aucune tournée enregistrée pour ce service. Créez d’abord un modèle dans « Tournées villages ».</span>}</label>
       <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3">
         <button className="btn-primary" type="submit" disabled={busy || Boolean(choix) || !serviceId || !driverId || !vehicleId || !tourNumber.trim()}>{busy ? "Affectation…" : "Créer et affecter la tournée"}</button>
-        {message && <p role="status" className={message.ok ? "text-sm text-teal-700" : "text-sm text-red-700"}>{message.text}</p>}
+        {message && <p role="status" className={message.ok ? "text-sm text-teal-ink" : "text-sm text-orange-ink"}>{message.text}</p>}
       </div>
       {choix && <div className="sm:col-span-2 lg:col-span-3"><ChoixRegroupement choix={choix} busy={busy} onChoisir={(r) => void envoyer(r)} onAnnuler={() => setChoix(null)} /></div>}
     </form>

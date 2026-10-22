@@ -15,7 +15,7 @@ const createSchema = z.object({
   default_vehicle_id: z.string().uuid().nullable().optional(),
 });
 
-/** Liste les modèles de tournées du service (ou de tous les services pour la Direction). */
+/** Liste les affectations récurrentes (modèles de planning) du service (ou de tous les services pour la Direction). */
 export async function GET(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
   if (!g.ok) return g.reponse;
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "Impossible de charger les modèles de tournées. Vérifiez que la migration planning_tour_templates est appliquée." }, { status: 503 });
+  if (error) return NextResponse.json({ error: "Impossible de charger les affectations récurrentes. Vérifiez que la migration planning_tour_templates est appliquée." }, { status: 503 });
   return NextResponse.json({ templates: data ?? [] });
 }
 
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   if (!g2.ok) return g2.reponse;
   const appUser = g2.appUser;
   if (!writeRoles.includes(appUser.role as (typeof writeRoles)[number])) {
-    return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut créer un modèle." }, { status: 403 });
+    return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut créer une affectation récurrente." }, { status: 403 });
   }
 
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
         .select("id, service_id, route_id, name, departure_time, weekdays, default_vehicle_id, active")
         .maybeSingle();
       if (reactive) return NextResponse.json({ template: reactive }, { status: 201 });
-      return NextResponse.json({ error: "Un modèle porte déjà ce nom dans ce service." }, { status: 409 });
+      return NextResponse.json({ error: "Une affectation récurrente porte déjà ce nom dans ce service." }, { status: 409 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

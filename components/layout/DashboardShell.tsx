@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { indexFocusSuivant } from "@/lib/ui/confirmation";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileActionBar } from "@/components/layout/MobileActionBar";
 import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
@@ -49,10 +50,25 @@ export function DashboardShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Escape closes the drawer regardless of which element has focus.
+  // Tiroir ouvert (téléphone) : focus piégé dans le menu, comme la boîte de
+  // confirmation (lib/ui/confirmation.ts › indexFocusSuivant).
   useEffect(() => {
     if (!drawerOpen) return;
+    const menu = () => document.getElementById("navigation-principale");
+    const focalisables = () => Array.from(menu()?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? []).filter((el) => !el.closest("[hidden]"));
+    const enTiroir = () => !window.matchMedia("(min-width: 1024px)").matches;
+    if (enTiroir()) focalisables()[0]?.focus();
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setDrawerOpen(false);
+      if (e.key !== "Tab" || !enTiroir()) return;
+      const elements = focalisables();
+      const courant = elements.indexOf(document.activeElement as HTMLElement);
+      const dernier = e.shiftKey ? courant === 0 : courant === elements.length - 1;
+      if (courant >= 0 && !dernier) return;
+      const i = indexFocusSuivant(elements.length, courant, e.shiftKey);
+      if (i < 0) return;
+      e.preventDefault();
+      elements[i]!.focus();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);

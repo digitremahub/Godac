@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconUsers, IconX } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface GroupMemberView {
   id: string;
@@ -74,7 +75,7 @@ export function GroupInfoSheet({
   }
 
   async function supprimer() {
-    if (!confirm(`Supprimer le groupe « ${name} » et tous ses messages ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer le groupe « ${name} » et tous ses messages ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     const res = await fetch(`/api/messenger/groupes/${groupId}`, { method: "DELETE" });
     setBusy(false);
@@ -97,7 +98,7 @@ export function GroupInfoSheet({
             role="dialog"
             aria-modal="true"
             aria-label={`Infos du groupe ${name}`}
-            className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-raised sm:max-w-lg sm:rounded-2xl"
+            className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-raised sm:max-w-lg sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">

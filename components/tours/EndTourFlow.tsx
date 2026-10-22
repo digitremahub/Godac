@@ -61,7 +61,7 @@ export function EndTourFlow({
   const [returnType, setReturnType] = useState<"depot" | "domicile">("depot");
   const [sheetPhotoPath, setSheetPhotoPath] = useState("");
   const [reportFields, setReportFields] = useState<TourReportFields | null>(null);
-  // Stops de ramasse : inscrits à la main sur la feuille ou saisis ici,
+  // Arrêts de ramasse : inscrits à la main sur la feuille ou saisis ici,
   // déduits des stops du scan pour obtenir les arrêts de livraison.
   const [ramasses, setRamasses] = useState("");
   const [vehicleOk, setVehicleOk] = useState<boolean | null>(null);

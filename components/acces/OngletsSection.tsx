@@ -1,8 +1,9 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { ongletsSection, premierOngletSection, sousOnglets, SECTIONS, type SectionId } from "@/lib/acces/catalogue";
+import { ongletsMonEspace, ongletsSection, premierOngletSection, sousOnglets, SECTIONS, type SectionId } from "@/lib/acces/catalogue";
 import { modulesActifs, utilisateurCourant } from "@/lib/acces/modules-requete";
 import { Onglets } from "@/components/ui/Onglets";
+import { OngletsMonEspace } from "@/components/acces/OngletsMonEspace";
 
 /**
  * Barre d'onglets d'une section, calculée côté serveur depuis le
@@ -14,6 +15,8 @@ export async function OngletsSection({ section }: { section: SectionId }) {
   const appUser = await utilisateurCourant();
   if (!appUser) return null;
   const modules = await modulesActifs(appUser.organization_id);
+  // Mon espace : trois onglets (Ma journée, Mes documents, Mes demandes) et leurs écrans.
+  if (section === "moi") return <OngletsMonEspace groupes={ongletsMonEspace(appUser.role, modules, appUser.conduit)} />;
   const onglets = ongletsSection(section, appUser.role, modules, appUser.conduit);
   const libelle = SECTIONS.find((s) => s.id === section)?.libelle ?? section;
   return <Onglets libelle={`Onglets : ${libelle}`} onglets={onglets} />;
@@ -42,5 +45,6 @@ export async function redirigerSection(section: SectionId): Promise<never> {
   const appUser = await utilisateurCourant();
   if (!appUser) redirect("/onboarding");
   const modules = await modulesActifs(appUser.organization_id);
+  if (section === "moi") redirect(ongletsMonEspace(appUser.role, modules, appUser.conduit)[0]?.href ?? "/dashboard");
   redirect(premierOngletSection(section, appUser.role, modules, appUser.conduit) ?? "/dashboard");
 }

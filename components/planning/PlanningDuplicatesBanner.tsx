@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface DuplicateRow {
   id: string;
@@ -17,7 +18,7 @@ export function PlanningDuplicatesBanner({ duplicates }: { duplicates: Duplicate
   const [error, setError] = useState<string | null>(null);
 
   async function remove(d: DuplicateRow) {
-    if (!confirm(`Supprimer le doublon « ${d.label} » ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer le doublon « ${d.label} » ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusyId(d.id);
     setError(null);
     try {
