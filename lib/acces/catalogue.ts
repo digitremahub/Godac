@@ -232,20 +232,22 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "moi.tournee_depart",
     section: "moi",
-    libelle: "Démarrer une tournée",
-    libelleOnglet: "Ma tournée",
+    // Glossaire : « Départ / Retour » = prise et fin de poste avec le
+    // véhicule ; « Tournée » = l'affectation du planning (n° T106).
+    libelle: "Départ",
+    libelleOnglet: "Départ / Retour",
     libelleSousOnglet: "Départ",
     href: "/moi/tournee/depart",
     roles: TERRAIN,
     conducteur: true,
     modules: ["planning"],
-    icone: "clock",
+    icone: "flag",
     mobile: "barre",
   }),
   E({
     id: "moi.tournee_retour",
     section: "moi",
-    libelle: "Terminer une tournée",
+    libelle: "Retour",
     libelleSousOnglet: "Retour",
     href: "/moi/tournee/retour",
     roles: TERRAIN,
@@ -258,7 +260,7 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "moi.tournee_collegue",
     section: "moi",
-    libelle: "J'entre pour un collègue",
+    libelle: "Départ ou retour d'un collègue",
     libelleSousOnglet: "Pour un collègue",
     href: "/moi/tournee/collegue",
     roles: ["chauffeur", "manager", "exploitation", "direction"],
@@ -365,7 +367,10 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "exploitation.tournees",
     section: "exploitation",
-    libelle: "Tournées & villages",
+    // Glossaire : « Modèle de tournée » = la tournée-modèle (numéro,
+    // villages, ramasses, points relais), pas l'affectation du jour.
+    libelle: "Modèles de tournées & villages",
+    libelleOnglet: "Modèles de tournées",
     href: "/exploitation/tournees",
     roles: ["direction", "manager", "exploitation", "chauffeur"],
     modulesAuMoinsUn: ["planning", "route_optimizer"],

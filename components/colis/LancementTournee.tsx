@@ -102,7 +102,7 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-navy/70">Aucune tournée ne vous est attribuée au planning aujourd&apos;hui. Choisissez la tournée que vous faites :</p>
                 <select className="input" value={modele} onChange={(e) => setModele(e.target.value)} aria-label="Choisir ma tournée">
-                  <option value="">Sans tournée-modèle (adresses libres)</option>
+                  <option value="">Sans modèle de tournée (adresses libres)</option>
                   {donnees.modeles.map((m) => (
                     <option key={m.id} value={m.id}>
                       Tournée n°{m.tour_number}
@@ -113,7 +113,7 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
               </div>
             )}
             {(donnees.run.vehicle || donnees.run.service) && (
-              <p className="text-xs text-navy/60">Fiche colis : {[donnees.run.name, donnees.run.vehicle, donnees.run.service].filter(Boolean).join(" · ")}</p>
+              <p className="text-xs text-navy/60">Tournée colis : {[donnees.run.name, donnees.run.vehicle, donnees.run.service].filter(Boolean).join(" · ")}</p>
             )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="button" className="btn-secondary flex-1" onClick={onAnnuler}>

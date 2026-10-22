@@ -19,7 +19,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
   if (!writeRoles.includes(appUser.role as (typeof writeRoles)[number])) {
-    return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut modifier un modèle." }, { status: 403 });
+    return NextResponse.json({ error: "Seule la Direction ou un responsable autorisé peut modifier une affectation récurrente." }, { status: 403 });
   }
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Modèle invalide." }, { status: 400 });
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));

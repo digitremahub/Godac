@@ -65,17 +65,17 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
         module: "planning",
       },
       {
-        titre: "Démarrer et terminer une tournée",
+        titre: "Départ et retour",
         texte:
-          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre d'arrêts de ramasse (inscrit à la main sur la feuille) : ils sont déduits des arrêts du scan, les colis REMIS comptent comme arrêts livrés. Le bouton « Valider » suffit, sans case à cocher. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
-        lien: { href: "/moi/tournee/depart", label: "Démarrer une tournée" },
+          "La tournée, c'est votre affectation du planning (par exemple T106) ; le départ et le retour, c'est la prise et la fin de poste avec le véhicule. Au départ : « Départ » (Mon espace › Ma journée, ou bouton « Départ » en bas de l'écran), choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Retour » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre d'arrêts de ramasse (inscrit à la main sur la feuille) : ils sont déduits des arrêts du scan, les colis REMIS comptent comme arrêts livrés. Le bouton « Valider » suffit, sans case à cocher. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « Pour un collègue ».",
+        lien: { href: "/moi/tournee/depart", label: "Départ / Retour" },
         module: "planning",
       },
       {
         titre: "Les villages de ma tournée",
         texte:
-          "« Tournées & villages » donne, en liste, les villages des tournées de votre service (et de celles où vous êtes planifié), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
-        lien: { href: "/exploitation/tournees", label: "Tournées & villages" },
+          "« Modèles de tournées & villages » donne, en liste, les villages des tournées de votre service (et de celles où vous êtes planifié), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
+        lien: { href: "/exploitation/tournees", label: "Modèles de tournées & villages" },
         module: "planning",
       },
     ],
@@ -167,10 +167,10 @@ const ENCADREMENT: SectionGuide[] = [
         module: "planning",
       },
       {
-        titre: "Tournées, villages et chefs d'équipe",
+        titre: "Modèles de tournées, villages et chefs d'équipe",
         texte:
-          "Renseignez les villages de chaque tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
-        lien: { href: "/exploitation/tournees", label: "Tournées & villages" }, module: "planning" },
+          "Renseignez les villages de chaque modèle de tournée et le chef d'équipe (avec son contact) de chaque service. L'onglet « Carte » (réservé aux chefs d'équipe et à la direction) montre les incohérences. Une tournée de renfort emprunte des villages à plusieurs tournées du service : choisissez sa couverture par défaut, puis, si besoin, les villages d'un jour précis ; ils apparaissent « en renfort » sur leur tournée.",
+        lien: { href: "/exploitation/tournees", label: "Modèles de tournées & villages" }, module: "planning" },
       { titre: "Animer le groupe de l'équipe", texte: "Chaque service a son groupe Messenger, tenu à jour tout seul. Chef d'équipe et managers y publient des Infos équipe épinglées (« vu par X/Y »), peuvent réserver l'écriture aux responsables et créer des groupes ponctuels (« Créer un groupe »). Liez le compte du chef d'équipe dans Organisation > Services.", lien: { href: "/communication/messenger", label: "Messenger" }, module: "messenger" },
       { titre: "Valider les congés", texte: "Acceptez ou refusez les demandes dans « Congés & Absences » ; le chauffeur est notifié.", lien: { href: "/equipe/conges", label: "Congés & Absences" }, module: "leave_management" },
       { titre: "Valider les nouveaux chauffeurs", texte: "Un chauffeur qui s'inscrit avec le lien de l'entreprise attend votre validation dans « Chauffeurs à valider ».", lien: { href: "/equipe/inscriptions", label: "Chauffeurs à valider" } },
@@ -348,7 +348,7 @@ export const GUIDE_GO_NAVIGATION: GuideRole = {
       etapes: [
         {
           titre: "Créer la tournée",
-          texte: "Ouvrez « Tournée colis » puis « Nouvelle tournée ». Une tournée par jour suffit ; vous la retrouvez à chaque connexion.",
+          texte: "Ouvrez « Tournée colis » puis « + Nouvelle tournée colis ». Une tournée colis par jour suffit ; vous la retrouvez à chaque connexion.",
           lien: { href: "/exploitation/colis", label: "Tournée colis" },
         },
         {

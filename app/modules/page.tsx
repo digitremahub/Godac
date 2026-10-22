@@ -17,7 +17,7 @@ export const metadata = {
 const NOUVEAUTES = [
   {
     titre: "Planning duplicable",
-    texte: "Grille chauffeurs × jours, glisser-déposer, duplication d'une journée ou de la semaine jusqu'à 8 semaines, copier-coller et modèles de tournées.",
+    texte: "Grille chauffeurs × jours, glisser-déposer, duplication d'une journée ou de la semaine jusqu'à 8 semaines, copier-coller et affectations récurrentes.",
   },
   {
     titre: "Paie transport",

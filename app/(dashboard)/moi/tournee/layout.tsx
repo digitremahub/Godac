@@ -1,6 +1,6 @@
 import { SousOnglets } from "@/components/acces/OngletsSection";
 
-/** Mon espace › Ma tournée : départ, retour, saisie pour un collègue. */
+/** Mon espace › Ma journée › Départ / Retour : départ, retour, saisie pour un collègue. */
 export default function TourneeLayout({ children }: { children: React.ReactNode }) {
   return (
     <>

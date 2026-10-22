@@ -72,7 +72,7 @@ export async function ChauffeurDashboard({
   const timeClockEnabled = enabledModules.includes("time_clock");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
-  // Démarrer / terminer une tournée exige le module Planning : sans lui, la
+  // Départ / Retour exige le module Planning : sans lui, la
   // première action proposée est le plein (ou la tournée colis).
   const tourneeOuvrable = ecranOuvrable("moi.tournee_depart", ctx);
   const colisOuvrable = ecranOuvrable("moi.tournee_colis", ctx);

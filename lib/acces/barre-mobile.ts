@@ -30,7 +30,7 @@ export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>,
     b.push(
       tourneeEnCours
         ? { href: urlDe("moi.tournee_retour"), libelle: "Retour", icone: "retour" }
-        : { href: urlDe("moi.tournee_depart"), libelle: "Tournée", icone: "depart" },
+        : { href: urlDe("moi.tournee_depart"), libelle: "Départ", icone: "depart" },
     );
   }
   b.push({ href: `${urlDe("carburant.pleins")}?new=1`, libelle: "Plein", icone: "plein" });

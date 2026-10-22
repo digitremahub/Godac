@@ -94,8 +94,8 @@ export function PlanningTemplatesPanel({
         body: JSON.stringify({ service_id: serviceId, route_id: routeId, name: nom.trim(), departure_time: depart, weekdays: jours, default_vehicle_id: vehiculeId || null }),
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Création du modèle impossible : vérifiez les champs.");
-      setMessage(`Modèle « ${nom.trim()} » créé (${resumeJours(jours)}, départ ${depart}). Cochez-le puis générez la semaine.`);
+      if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Création de l'affectation récurrente impossible : vérifiez les champs.");
+      setMessage(`Affectation récurrente « ${nom.trim()} » créée (${resumeJours(jours)}, départ ${depart}). Cochez-le puis générez la semaine.`);
       setFormOuvert(false);
       setRechargement((n) => n + 1);
     } catch (e) {
@@ -106,7 +106,7 @@ export function PlanningTemplatesPanel({
   }
 
   async function retirerModele(template: Template) {
-    if (!confirm(`Retirer le modèle « ${template.name} » ? Les affectations déjà générées sont conservées.`)) return;
+    if (!confirm(`Retirer l'affectation récurrente « ${template.name} » ? Les affectations déjà générées sont conservées.`)) return;
     setRetrait(template.id);
     setError(null);
     setMessage(null);
@@ -120,7 +120,7 @@ export function PlanningTemplatesPanel({
       if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Retrait impossible.");
       setTemplates((rows) => rows.filter((row) => row.id !== template.id));
       setSelectedIds((ids) => ids.filter((id) => id !== template.id));
-      setMessage(`Modèle « ${template.name} » retiré.`);
+      setMessage(`Affectation récurrente « ${template.name} » retirée.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue.");
     } finally {
@@ -145,7 +145,7 @@ export function PlanningTemplatesPanel({
       try {
         const response = await fetch(`/api/planning/templates?service_id=${encodeURIComponent(serviceId)}`);
         const json = await response.json();
-        if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Impossible de charger les modèles.");
+        if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "Impossible de charger les affectations récurrentes.");
         if (cancelled) return;
         const rows = Array.isArray(json.templates) ? json.templates as Template[] : [];
         setTemplates(rows);
@@ -202,7 +202,7 @@ export function PlanningTemplatesPanel({
     <section className="mb-5 rounded-xl border border-navy/10 bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Préparer la semaine depuis les modèles</h2>
+          <h2 className="text-base font-semibold">Préparer la semaine depuis les affectations récurrentes</h2>
           <p className="mt-1 text-sm text-navy/65">Semaine du {weekLabel}. Cochez les tournées récurrentes à créer ; les créneaux déjà présents sont conservés.</p>
         </div>
         <span className="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal-ink">Réutilisation</span>
@@ -217,9 +217,9 @@ export function PlanningTemplatesPanel({
         </label>
 
         <div className="min-w-0">
-          {loading ? <p className="py-3 text-sm text-navy/60">Chargement des modèles…</p> : templates.length === 0 ? (
+          {loading ? <p className="py-3 text-sm text-navy/60">Chargement des affectations récurrentes…</p> : templates.length === 0 ? (
             <div className="rounded-lg bg-navy/[0.035] p-3 text-sm text-navy/70">
-              Aucun modèle actif pour ce service. Créez un modèle avec « + Nouveau modèle » : une tournée villages, son heure de départ et ses jours. Il servira ensuite à générer la semaine.
+              Aucune affectation récurrente active pour ce service. Créez-en une avec « + Nouvelle affectation récurrente » : un modèle de tournée, son heure de départ et ses jours. Elle servira ensuite à générer la semaine.
             </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -242,7 +242,7 @@ export function PlanningTemplatesPanel({
                       className="btn-ghost shrink-0 !px-2 !py-1 text-xs"
                       disabled={retrait === template.id}
                       onClick={(event) => { event.preventDefault(); void retirerModele(template); }}
-                      aria-label={`Retirer le modèle ${template.name}`}
+                      aria-label={`Retirer l'affectation récurrente ${template.name}`}
                     >
                       {retrait === template.id ? "Retrait…" : "Retirer"}
                     </button>
@@ -256,12 +256,12 @@ export function PlanningTemplatesPanel({
 
       <div className="mt-4">
         {!formOuvert ? (
-          <button type="button" className="btn-secondary" onClick={ouvrirFormulaire} disabled={!serviceId}>+ Nouveau modèle</button>
+          <button type="button" className="btn-secondary" onClick={ouvrirFormulaire} disabled={!serviceId}>+ Nouvelle affectation récurrente</button>
         ) : (
           <form onSubmit={creerModele} className="rounded-lg border border-teal/30 bg-teal/[0.04] p-3">
-            <h3 className="text-sm font-semibold">Nouveau modèle de tournée</h3>
+            <h3 className="text-sm font-semibold">Nouvelle affectation récurrente</h3>
             {routesDuService.length === 0 ? (
-              <p className="mt-2 text-sm text-navy/70">Aucune tournée villages pour ce service. Créez d’abord la tournée dans « Tournées villages », puis revenez ici.</p>
+              <p className="mt-2 text-sm text-navy/70">Aucun modèle de tournée pour ce service. Créez d’abord le modèle dans « Modèles de tournées & villages », puis revenez ici.</p>
             ) : (
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="block text-sm font-medium">
@@ -302,7 +302,7 @@ export function PlanningTemplatesPanel({
             <div className="mt-3 flex flex-wrap justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => setFormOuvert(false)} disabled={enregistrement}>Annuler</button>
               <button type="submit" className="btn-primary" disabled={enregistrement || !routeId || nom.trim().length < 2 || !jours.length}>
-                {enregistrement ? "Enregistrement…" : "Créer le modèle"}
+                {enregistrement ? "Enregistrement…" : "Créer l'affectation récurrente"}
               </button>
             </div>
           </form>
@@ -316,7 +316,7 @@ export function PlanningTemplatesPanel({
         <p className="text-xs text-navy/60">La génération crée des affectations prévues, sans chauffeur (à attribuer ensuite dans la grille). Elle ne remplace pas les affectations existantes et ne publie pas le planning.</p>
         <div className="flex flex-col items-end gap-1">
           <button type="button" className="btn-primary" onClick={generate} disabled={loading || generating || !serviceId || selectedIds.length === 0} aria-describedby={raisonGrise ? "raison-generation" : undefined} title={raisonGrise ?? undefined}>
-            {generating ? "Génération…" : `Générer ${selectedIds.length} modèle(s)`}
+            {generating ? "Génération…" : `Générer ${selectedIds.length} affectation(s) récurrente(s)`}
           </button>
           {raisonGrise && <p id="raison-generation" className="text-xs text-navy/60">{raisonGrise}</p>}
         </div>

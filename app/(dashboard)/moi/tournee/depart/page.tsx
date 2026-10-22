@@ -22,8 +22,8 @@ export default async function StartTourPage({
   return (
     <div>
       <PageHeader
-        title="Démarrer une tournée"
-        description="Scannez le véhicule, indiquez le kilométrage et l'état du véhicule, puis validez votre départ."
+        title="Départ"
+        description="Prenez votre véhicule pour la tournée du jour : scannez-le, indiquez le kilométrage et son état, puis validez votre départ."
       />
       <div className="mx-auto max-w-md">
         <StartTourFlow initialVehicleId={vehicle} requireOdometerPhoto={organization?.require_odometer_photo ?? false} />

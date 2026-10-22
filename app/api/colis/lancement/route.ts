@@ -107,7 +107,7 @@ export async function POST(req: Request) {
   let villages: VillageDuJour[];
   if (parsed.data.route_id) {
     const { data: route } = await supabase.from("tour_routes").select("id").eq("id", parsed.data.route_id).eq("organization_id", appUser.organization_id).maybeSingle();
-    if (!route) return NextResponse.json({ error: "Tournée-modèle introuvable." }, { status: 404 });
+    if (!route) return NextResponse.json({ error: "Modèle de tournée introuvable." }, { status: 404 });
     villages = await villagesDeRoute(supabase, route.id);
   } else {
     villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run), run.id)).villages;

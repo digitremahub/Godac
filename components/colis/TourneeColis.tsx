@@ -741,7 +741,7 @@ export function TourneeColis({
         </button>
       ))}
       <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy !== null} onClick={nouvelleTournee}>
-        + Nouvelle tournée
+        + Nouvelle tournée colis
       </button>
     </div>
   );
@@ -760,9 +760,9 @@ export function TourneeColis({
         )}
         <Card className="flex flex-col items-start gap-3">
           <h2 className="text-lg">Aucune tournée colis en cours</h2>
-          <p className="text-sm text-navy/65">Créez une tournée, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
+          <p className="text-sm text-navy/65">Créez une tournée colis, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            Créer une tournée
+            Créer une tournée colis
           </button>
         </Card>
       </div>
@@ -931,7 +931,7 @@ export function TourneeColis({
             Renommer
           </button>
           {run.status !== "done" && <button type="button" className="btn-ghost !px-2.5 !py-1.5 text-sm text-orange-ink" disabled={busy !== null} onClick={supprimerTournee}>
-            Supprimer la tournée
+            Supprimer la tournée colis
           </button>}
         </div>
       </div>
@@ -1025,16 +1025,16 @@ export function TourneeColis({
           <p className="font-display text-lg font-bold">Tournée terminée 🎉</p>
           <p className="mt-1 text-sm text-navy/65">{livres} arrêt(s) livré(s) sur {stops.length}.</p>
           <button type="button" className="btn-primary mt-3" onClick={() => phase("done")}>
-            Clôturer la tournée
+            Clôturer la tournée colis
           </button>
         </Card>
       ) : run.status === "done" ? (
         <Card className="flex flex-col items-start gap-3">
           <p className="text-sm text-navy/70">
-            Tournée clôturée : {livres} arrêt(s) livré(s) sur {stops.length}.
+            Tournée colis clôturée et verrouillée : {livres} arrêt(s) livré(s) sur {stops.length}.
           </p>
           <button type="button" className="btn-primary" disabled={busy !== null} onClick={nouvelleTournee}>
-            + Nouvelle tournée
+            + Nouvelle tournée colis (supplémentaire)
           </button>
         </Card>
       ) : (

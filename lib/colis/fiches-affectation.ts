@@ -141,12 +141,12 @@ export function nomFiche(numeros: string[]): string {
 
 /** Texte de la question posée à l'encadrement. */
 export function questionRegroupement(choix: Pick<ChoixRequis, "existantes" | "fiches_ouvertes">): string {
-  const suite = "Fiches colis séparées (recommandé) ou reliées en une seule tournée ?";
+  const suite = "Tournées colis séparées (recommandé) ou reliées en une seule ?";
   if (choix.existantes.length) {
     const liste = choix.existantes.map((e) => `la tournée n°${e.tour_number} à ${e.heure}`);
     const debut = liste.length === 1 ? liste[0] : `${liste.slice(0, -1).join(", ")} et ${liste.at(-1)}`;
     return `Ce chauffeur a déjà ${debut} ce jour-là. ${suite}`;
   }
   const noms = choix.fiches_ouvertes.map((f) => `« ${f.name ?? "Tournée"} »`).join(", ");
-  return `Ce chauffeur a déjà une fiche Tournée colis ouverte ce jour-là (${noms}). ${suite}`;
+  return `Ce chauffeur a déjà une tournée colis ouverte ce jour-là (${noms}). ${suite}`;
 }

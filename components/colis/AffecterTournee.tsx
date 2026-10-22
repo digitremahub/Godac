@@ -50,7 +50,7 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
       // Affectation = planning + fiche Tournée colis du chauffeur (créée ou complétée).
       const nom = data?.drivers.find((x) => x.id === driver)?.full_name ?? "le chauffeur";
       const avertissement = typeof d.warning === "string" && d.warning ? ` ${d.warning}` : "";
-      onCreated(d.fiche?.id ?? null, d.fiche?.id ? `Tournée n°${number} affectée à ${nom} : sa fiche colis est prête.${avertissement}` : `Tournée n°${number} inscrite au planning de ${nom}.${avertissement}`);
+      onCreated(d.fiche?.id ?? null, d.fiche?.id ? `Tournée n°${number} affectée à ${nom}  : sa tournée colis est prête.${avertissement}` : `Tournée n°${number} inscrite au planning de ${nom}.${avertissement}`);
     } catch (e) { setMessage(e instanceof Error ? e.message : "Création impossible"); }
     finally { setBusy(false); }
   }
