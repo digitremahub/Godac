@@ -27,6 +27,7 @@ import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { TourneeColis } from "@/components/colis/TourneeColis";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
+import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
 const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").then((m) => m.CarteTournee), {
@@ -79,6 +80,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Préparation ouverte à la demande pendant la livraison (« Ajouter ou modifier des colis »). */
   const [preparationDemandee, setPreparationDemandee] = useState(false);
+  /** Guidage vers l'arrêt : GO Navigation (par défaut), Waze ou Google Maps (mémorisé sur le téléphone). */
+  const [navPreferee, setNavPreferee] = useState<NavigationPreferee>("go");
   const preparationDemandeeRef = useRef(false);
   preparationDemandeeRef.current = preparationDemandee;
   const horaires = useHoraires(run, stops, maPosition);
@@ -130,14 +133,32 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
 
   useEffect(() => {
     // Ouverture par /livreur/navigation : la vue demandée l'emporte.
+    let nav: NavigationPreferee = "go";
+    try {
+      nav = lireNavigationPreferee(localStorage.getItem(CLE_NAVIGATION_PREFEREE));
+    } catch {
+      /* stockage indisponible */
+    }
+    setNavPreferee(nav);
     if (vueInitiale) return;
     try {
       const vueMemorisee = localStorage.getItem(MEMO_VUE);
-      if (vueMemorisee === "carte" || vueMemorisee === "navigation") setVue(vueMemorisee);
+      // Waze ou Google Maps préféré : on revient sur l'écran de livraison GODAC, pas sur GO Navigation.
+      if (vueMemorisee === "carte" || (vueMemorisee === "navigation" && nav === "go")) setVue(vueMemorisee);
     } catch {
       /* stockage indisponible */
     }
   }, [vueInitiale]);
+  function choisirNavigation(n: NavigationPreferee) {
+    setNavPreferee(n);
+    try {
+      localStorage.setItem(CLE_NAVIGATION_PREFEREE, n);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+  /** Lien de l'app externe choisie (Waze par défaut quand GO est préféré). */
+  const lienExterne = (s: Stop) => (navPreferee === "gmaps" ? gmaps(s) : waze(s));
   function changerVue(v: Vue) {
     setVue(v);
     try {
@@ -653,7 +674,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                   {arretCarte.status === "pending" && <BadgeHoraires stop={arretCarte} fenetres={horaires.fenetres.get(arretCarte.id) ?? null} passage={horaires.passages.get(arretCarte.id)} />}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <a href={waze(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm" target="_blank" rel="noreferrer">
+                  <a href={lienExterne(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm" target="_blank" rel="noreferrer">
                     <IconNavigation className="h-4 w-4" /> Y aller
                   </a>
                   {arretCarte.phone ? (
@@ -790,19 +811,55 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
               </button>
             )}
 
-            {run.status === "in_progress" && (
+            {run.status === "in_progress" && navPreferee === "go" && (
               <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={() => changerVue("navigation")}>
                 <IconNavigation className="h-5 w-5 text-teal" /> Ouvrir GO Navigation
               </button>
             )}
+            {navPreferee !== "go" && (
+              // Waze ou Google Maps préféré : « Y aller » ouvre l'app choisie ; livraison, preuves et ordre restent ici.
+              <a href={lienExterne(prochain)} className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" target="_blank" rel="noreferrer">
+                <IconNavigation className="h-5 w-5 text-teal" /> Y aller avec {libelleNavigation(navPreferee)}
+              </a>
+            )}
             <div className="grid grid-cols-2 gap-2">
-              <a href={waze(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
-                <IconNavigation className="h-4 w-4" /> Waze
-              </a>
-              <a href={gmaps(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
-                <IconMapPin className="h-4 w-4" /> Google Maps
-              </a>
+              {navPreferee !== "waze" && (
+                <a href={waze(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
+                  <IconNavigation className="h-4 w-4" /> Waze
+                </a>
+              )}
+              {navPreferee !== "gmaps" && (
+                <a href={gmaps(prochain)} className="btn-secondary justify-center !py-3" target="_blank" rel="noreferrer">
+                  <IconMapPin className="h-4 w-4" /> Google Maps
+                </a>
+              )}
+              {navPreferee !== "go" && run.status === "in_progress" && (
+                <button type="button" className="btn-secondary justify-center !py-3" onClick={() => changerVue("navigation")}>
+                  <IconNavigation className="h-4 w-4 text-teal-ink" /> GO Navigation
+                </button>
+              )}
             </div>
+            {run.status === "in_progress" && (
+              <div className="flex flex-col gap-1.5">
+                <p id="nav-preferee" className="text-xs font-semibold text-navy/60">
+                  Navigation préférée (sur ce téléphone)
+                </p>
+                <div className="grid grid-cols-3 gap-1 rounded-full bg-navy/[0.06] p-1 text-xs font-semibold" role="radiogroup" aria-labelledby="nav-preferee">
+                  {NAVIGATIONS.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={navPreferee === n.id}
+                      onClick={() => choisirNavigation(n.id)}
+                      className={`min-h-[44px] rounded-full px-1 ${navPreferee === n.id ? "bg-marine text-white shadow-card" : "text-navy/70"}`}
+                    >
+                      {n.id === "go" ? "GO" : n.libelle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {pending.length > 1 && (
               <button type="button" className="btn-ghost justify-center !py-2.5 text-sm" disabled={busy} onClick={() => passerAdresseSuivante(prochain)}>
                 Passer à l’adresse suivante (garder cet arrêt pour plus tard)
