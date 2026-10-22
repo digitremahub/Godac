@@ -26,7 +26,7 @@
   {"source": "/planning", "destination": "/exploitation/planning"},
   {"source": "/tours/routes", "destination": "/exploitation/tournees"},
   {"source": "/colis", "destination": "/exploitation/historique/colis", "has": [{"type": "query", "key": "onglet", "value": "historique"}]},
-  {"source": "/colis", "destination": "/exploitation/colis"},
+  {"source": "/colis", "destination": "/livreur"},
   {"source": "/suivi", "destination": "/exploitation/suivi"},
   {"source": "/tours/history", "destination": "/exploitation/historique"},
   {"source": "/reports", "destination": "/exploitation/historique/photos", "has": [{"type": "query", "key": "view", "value": "photos"}]},

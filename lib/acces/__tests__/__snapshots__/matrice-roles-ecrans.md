@@ -5,6 +5,7 @@
 | Mon espace | Démarrer une tournée | `/moi/tournee/depart` | ✅ | — | — | — | — | planning |
 | Mon espace | Terminer une tournée | `/moi/tournee/retour` | 🔒 | — | — | — | — | planning |
 | Mon espace | J'entre pour un collègue | `/moi/tournee/collegue` | 🔒 | ✅ | ✅ | — | 🔒 | planning |
+| Mon espace | Ma tournée colis | `/livreur` | ✅ | ↪ /exploitation/colis | ↪ /exploitation/colis | — | ↪ /exploitation/colis | route_optimizer |
 | Mon espace | Mon planning | `/moi/planning` | ✅ | — | — | — | — | planning |
 | Mon espace | Mon véhicule | `/moi/vehicule` | ✅ | — | — | — | — | — |
 | Mon espace | Signaler un problème | `/moi/signaler` | ✅ | 🔒 | 🔒 | — | 🔒 | maintenance_requests |
@@ -15,7 +16,7 @@
 | Mon espace | Mes congés | `/moi/conges` | ✅ | ✅ | ✅ | ✅ | ↪ /equipe/conges | leave_management |
 | Exploitation | Planning | `/exploitation/planning` | ↪ /moi/planning | ✅ | ✅ | — | ✅ | planning |
 | Exploitation | Tournées & villages | `/exploitation/tournees` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
-| Exploitation | Tournée colis | `/exploitation/colis` | ✅ | ✅ | ✅ | — | ✅ | route_optimizer |
+| Exploitation | Préparation des tournées colis | `/exploitation/colis` | ↪ /livreur | ✅ | ✅ | — | ✅ | route_optimizer |
 | Exploitation | GO Navigation | `/livreur/navigation` | ✅ | — | — | — | — | route_optimizer |
 | Exploitation | Suivi en direct | `/exploitation/suivi` | — | 🔒 | 🔒 | — | 🔒 | route_optimizer |
 | Exploitation | Historique des tournées | `/exploitation/historique` | ✅ | ✅ | ✅ | ✅ | ✅ | planning |

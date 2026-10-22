@@ -103,26 +103,26 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
     ],
   },
   {
-    titre: "Tournée colis et application GODAC Livreur",
+    titre: "Tournée colis : « Ma tournée colis »",
     etapes: [
       {
-        titre: "Charger les colis",
+        titre: "Préparer : charger les colis",
         texte:
-          "« Tournée colis » → scannez chaque colis (QR, Datamatrix ou code-barres), ou photographiez l'étiquette. Les adresses et le téléphone du client s'ajoutent tout seuls. Vous pouvez aussi importer un itinéraire Google Maps.",
-        lien: { href: "/exploitation/colis", label: "Tournée colis" },
+          "Ouvrez « Ma tournée colis » (bouton « Colis » en bas de l'écran, ou Mon espace › Ma journée). Scannez chaque colis (QR, Datamatrix ou code-barres), photographiez l'étiquette, importez le bordereau ou saisissez une adresse avec son créneau : l'adresse et le téléphone du client s'ajoutent tout seuls. Ramasses et points relais se choisissent à la saisie.",
+        lien: { href: "/livreur", label: "Ma tournée colis" },
         module: "route_optimizer",
       },
       {
-        titre: "Démarrer la livraison",
+        titre: "Démarrer, puis livrer",
         texte:
-          "« Démarrer la livraison » calcule le meilleur ordre et ouvre l'application chauffeur : l'arrêt en cours en grand, avec Appeler, SMS « j'arrive », Waze ou Google Maps. L'onglet « Carte » montre tous les arrêts et votre position ; en haut de l'écran, les adresses et colis restants et l'heure de fin estimée.",
-        lien: { href: "/livreur", label: "Application chauffeur" },
+          "« Vérifier la tournée et démarrer » contrôle les villages, calcule le meilleur ordre et passe à la livraison sur le même écran : l'arrêt en cours en grand, avec Appeler, SMS « j'arrive », Waze ou Google Maps. Un colis en plus ? « Ajouter ou modifier des colis », sans quitter la tournée. Quand tous les arrêts sont traités, « Clôturer la tournée colis » la verrouille ; vous pouvez ensuite en ouvrir une supplémentaire.",
+        lien: { href: "/livreur", label: "Ma tournée colis" },
         module: "route_optimizer",
       },
       {
         titre: "GO Navigation (avant-première)",
         texte:
-          "Une fois la tournée démarrée, « GO Navigation » (menu, ou onglet de l'application chauffeur) ouvre la carte plein écran avec le trajet vers l'arrêt en cours. Waze et Google Maps restent disponibles.",
+          "Une fois la tournée colis démarrée, « GO Navigation » (menu, ou onglet de « Ma tournée colis ») ouvre la carte plein écran avec le trajet vers l'arrêt en cours. Waze et Google Maps restent disponibles.",
         lien: { href: "/livreur/navigation", label: "GO Navigation" },
         module: "route_optimizer",
       },

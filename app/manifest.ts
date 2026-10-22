@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // la fenêtre existante au lieu d'en ouvrir une nouvelle (Chrome / Edge).
     ...({ launch_handler: { client_mode: ["navigate-existing", "auto"] } } as unknown as Partial<MetadataRoute.Manifest>),
     // Appui long sur l'icône GODAC : accès direct à l'application chauffeur.
-    shortcuts: [{ name: "Livraison colis", short_name: "Livraison", url: "/livreur", icons: [{ src: "/brand/app-icon-192.png", sizes: "192x192" }] }],
+    shortcuts: [{ name: "Ma tournée colis", short_name: "Colis", url: "/livreur", icons: [{ src: "/brand/app-icon-192.png", sizes: "192x192" }] }],
     icons: [
       { src: "/brand/app-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/brand/app-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

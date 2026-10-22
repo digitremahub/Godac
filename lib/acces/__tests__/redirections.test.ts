@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ECRANS } from "@/lib/acces/catalogue";
+import { ECRANS, deciderAcces, ecran, urlDe } from "@/lib/acces/catalogue";
 
 interface Regle {
   source: string;
@@ -93,6 +93,7 @@ const ANCIENNES = [
   "/planning?view=week&week=2026-10-19",
   "/tours/routes",
   "/colis",
+  "/colis?run=abc",
   "/colis?onglet=historique",
   "/suivi",
   "/tours/history",
@@ -159,6 +160,32 @@ describe("redirections des anciennes adresses", () => {
       // Une page encore présente à l'ancienne adresse serait masquée par la redirection.
       expect(pageExiste(r.source.replace(/:(\w+)/g, "x")), `${r.source} : l'ancienne page existe encore`).toBe(false);
     }
+  });
+});
+
+describe("parcours colis unifié : anciennes adresses → « Ma tournée colis »", () => {
+  it("/colis (ancienne Tournée colis) mène au point d'entrée unique /livreur, requête conservée", () => {
+    expect(rediriger("/colis")).toBe(urlDe("moi.tournee_colis"));
+    expect(rediriger("/colis?run=abc")).toBe("/livreur?run=abc");
+    // L'historique garde sa règle propre, avant la règle générale.
+    expect(rediriger("/colis?onglet=historique")?.startsWith("/exploitation/historique/colis")).toBe(true);
+  });
+
+  it("/livreur n'est jamais redirigé (application installée, raccourci du manifeste)", () => {
+    expect(rediriger("/livreur")).toBeNull();
+    expect(rediriger("/livreur/navigation")).toBeNull();
+  });
+
+  it("le chauffeur qui ouvre la préparation de l'encadrement est renvoyé (307) vers sa tournée colis", () => {
+    const tout = new Set<string>(["route_optimizer"]);
+    expect(deciderAcces(ecran("exploitation.colis"), "chauffeur", tout)).toMatchObject({ ok: false, redirection: "/livreur" });
+    // L'encadrement qui ne conduit pas fait le chemin inverse depuis /livreur ou /colis.
+    for (const role of ["manager", "exploitation", "direction"] as const) {
+      expect(deciderAcces(ecran("moi.tournee_colis"), role, tout, false)).toMatchObject({ ok: false, redirection: urlDe("exploitation.colis") });
+      expect(deciderAcces(ecran("exploitation.colis"), role, tout).ok).toBe(true);
+    }
+    expect(deciderAcces(ecran("moi.tournee_colis"), "manager", tout, true).ok).toBe(true);
+    expect(deciderAcces(ecran("moi.tournee_colis"), "comptable", tout).ok).toBe(false);
   });
 });
 

@@ -268,6 +268,23 @@ export const ECRANS: readonly Ecran[] = [
     mobile: "plus",
     parent: "moi.tournee_depart",
   }),
+  E({
+    id: "moi.tournee_colis",
+    section: "moi",
+    libelle: "Ma tournée colis",
+    // Point d'entrée unique du conducteur (lot 3 de l'audit d'ergonomie) :
+    // préparer (scan, bordereau, adresses), démarrer, livrer (GO
+    // Navigation), clôturer. App plein écran, hors de l'espace à menu.
+    href: "/livreur",
+    roles: TERRAIN,
+    conducteur: true,
+    modules: ["route_optimizer"],
+    icone: "qr",
+    mobile: "barre",
+    // L'encadrement qui ne conduit pas prépare et affecte dans Exploitation.
+    alternative: { manager: "/exploitation/colis", exploitation: "/exploitation/colis", direction: "/exploitation/colis" },
+    note: "sa tournée colis : préparer, démarrer, livrer, clôturer",
+  }),
   E({ id: "moi.planning", section: "moi", libelle: "Mon planning", href: "/moi/planning", roles: TERRAIN, conducteur: true, modules: ["planning"], icone: "calendar", mobile: "plus" }),
   E({ id: "moi.vehicule", section: "moi", libelle: "Mon véhicule", href: "/moi/vehicule", roles: TERRAIN, conducteur: true, icone: "truck", mobile: "plus" }),
   E({
@@ -358,13 +375,18 @@ export const ECRANS: readonly Ecran[] = [
   E({
     id: "exploitation.colis",
     section: "exploitation",
-    libelle: "Tournée colis",
+    libelle: "Préparation des tournées colis",
+    libelleOnglet: "Tournées colis",
     href: "/exploitation/colis",
-    roles: ["direction", "manager", "exploitation", "chauffeur"],
+    // Écran de préparation et d'affectation de l'encadrement. Le
+    // chauffeur passe par « Ma tournée colis » (/livreur), qui contient
+    // la même préparation : l'ancienne adresse l'y renvoie.
+    roles: ENCADREMENT,
     modules: ["route_optimizer"],
     icone: "qr",
     aussiActif: ["/exploitation/suivi"],
-    note: "chauffeur : sa tournée",
+    alternative: { chauffeur: "/livreur" },
+    note: "manager ou exploitation qui conduit : aussi sa propre tournée colis",
   }),
   E({
     id: "exploitation.go_navigation",

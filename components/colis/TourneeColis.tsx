@@ -118,7 +118,33 @@ function libelleCourt(c: CreneauSaisi): string {
  * tournées (chauffeur, ou manager qui conduit) : « Nouvelle tournée » crée
  * alors sa propre fiche au lieu d'ouvrir l'affectation à un chauffeur.
  */
-export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = false, conduit = false }: { lectureEtiquette: boolean; pays?: string; encadrement?: boolean; conduit?: boolean }) {
+export function TourneeColis({
+  lectureEtiquette,
+  pays = "FR",
+  encadrement = false,
+  conduit = false,
+  integre = false,
+  runInitial = null,
+  onEtat,
+  onDemarrer,
+}: {
+  lectureEtiquette: boolean;
+  pays?: string;
+  encadrement?: boolean;
+  conduit?: boolean;
+  /**
+   * Intégrée au parcours « Ma tournée colis » (/livreur, lib/colis/parcours.ts) :
+   * pas de second arrêt en cours ni de lien vers l'application chauffeur,
+   * « Démarrer » passe la main au parcours.
+   */
+  integre?: boolean;
+  /** Tournée colis à ouvrir d'abord (celle que le parcours affiche déjà). */
+  runInitial?: string | null;
+  /** Tournée colis affichée et ses arrêts, à chaque changement (parcours). */
+  onEtat?: (run: Run | null, stops: Stop[]) => void;
+  /** « Vérifier la tournée et démarrer » dans le parcours. */
+  onDemarrer?: (runId: string) => void;
+}) {
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -251,9 +277,14 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
   }
 
   useEffect(() => {
-    recharger();
+    recharger(runInitial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Parcours « Ma tournée colis » : l'étape courante suit la tournée affichée ici.
+  useEffect(() => {
+    // Pas pendant le chargement d'une autre tournée (évite un « aucune tournée » transitoire).
+    if (runs && (run || !activeId)) onEtat?.(run, stops);
+  }, [runs, run, stops, activeId, onEtat]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -939,7 +970,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
         </p>
       )}
 
-      {enLivraison && prochain ? (
+      {enLivraison && prochain && integre ? null : enLivraison && prochain ? (
         <Card className={`relative flex flex-col gap-3 overflow-hidden border-2 ${bordureArret(prochain, "border-teal/50")}`}>
           <EncocheArret stop={prochain} large />
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wide text-teal-ink">
@@ -982,7 +1013,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/livreur" className="btn-secondary !py-1.5 text-sm">
-              Mode chauffeur plein écran
+              Ma tournée colis (plein écran)
             </Link>
             <button type="button" className="btn-ghost w-fit !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(true)}>
               Réoptimiser depuis ma position
@@ -1415,7 +1446,7 @@ export function TourneeColis({ lectureEtiquette, pays = "FR", encadrement = fals
 
       {!enLivraison && run.status !== "done" && pending.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-paper via-paper to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:static lg:bg-none lg:p-0">
-          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => router.push("/livreur")}>
+          <button type="button" className="btn-primary w-full !py-3.5 text-base" disabled={busy !== null} onClick={() => (integre && onDemarrer ? onDemarrer(run.id) : router.push("/livreur"))}>
             Vérifier la tournée et démarrer ({pending.length} arrêt{pending.length > 1 ? "s" : ""})
           </button>
         </div>
