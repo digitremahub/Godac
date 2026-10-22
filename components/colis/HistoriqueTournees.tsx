@@ -167,7 +167,7 @@ function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awai
               <div className="flex items-start gap-3">
                 <span
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
-                    s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-navy/10 text-navy/70"
+                    s.status === "delivered" ? "bg-teal text-on-teal" : s.status === "failed" ? "bg-orange text-on-orange" : "bg-navy/10 text-navy/70"
                   }`}
                   aria-hidden="true"
                 >

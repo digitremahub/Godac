@@ -168,7 +168,7 @@ function ChauffeurPlace({ entree, date }: { entree: EntreeAffectation; date: str
         <span className="min-w-0 flex-1 leading-tight">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-bold">{nomCourt(nom)}</span>
-            {rang > 0 && <span className="rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-marine">2ᵉ tournée{liee ? " · liée" : ""}</span>}
+            {rang > 0 && <span className="rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-on-teal">2ᵉ tournée{liee ? " · liée" : ""}</span>}
             {!modifiable && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px]">{statut.libelle}</span>}
           </span>
           <span className="block text-xs tabular-nums text-white/70">

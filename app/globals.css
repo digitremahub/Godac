@@ -21,6 +21,13 @@
      Orange GODAC theme so success never reads as the accent. */
   --c-success: 27 228 193;
   --c-success-ink: var(--c-teal-ink);
+  /* Texte posé sur les remplissages teal / orange (boutons, badges), menu
+     latéral et en-têtes sombres (marine), accent actif du menu. Remplacés
+     par les couleurs de l'entreprise (lib/theme/couleurs-entreprise.ts). */
+  --c-on-teal: 10 15 30;
+  --c-on-orange: 255 255 255;
+  --c-marine: 10 15 30;
+  --c-teal-sur-menu: 27 228 193;
   /* Selection, focus halo and the page's soft background tints. */
   --c-halo: 15 118 110;
   --c-tint-1: 15 118 110;
@@ -266,19 +273,19 @@
     @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold leading-5 transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 sm:py-2.5;
   }
   .btn-primary {
-    @apply btn bg-teal text-marine shadow-[inset_0_-1px_0_rgba(10,15,30,0.12),0_1px_2px_rgba(10,15,30,0.08)] hover:bg-[rgb(var(--c-teal-hover))];
+    @apply btn bg-teal text-on-teal shadow-[inset_0_-1px_0_rgba(10,15,30,0.12),0_1px_2px_rgba(10,15,30,0.08)] hover:bg-[rgb(var(--c-teal-hover))];
   }
   .btn-secondary {
     @apply btn border border-navy/[0.12] bg-surface text-navy shadow-[0_1px_2px_rgba(10,15,30,0.05)] hover:border-navy/20 hover:bg-paper;
   }
   .btn-dark {
-    @apply btn bg-marine text-white ring-1 ring-inset ring-white/10 hover:bg-[#1A2236];
+    @apply btn bg-marine text-white ring-1 ring-inset ring-white/10 hover:bg-marine/90;
   }
   .btn-ghost {
     @apply btn text-navy/70 hover:bg-navy/[0.05] hover:text-navy;
   }
   .btn-danger {
-    @apply btn bg-orange text-white shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[rgb(var(--c-orange-hover))];
+    @apply btn bg-orange text-on-orange shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[rgb(var(--c-orange-hover))];
   }
 
   /* Form fields — white, 44px tall, teal focus halo. */

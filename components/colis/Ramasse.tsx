@@ -28,7 +28,7 @@ export function EncochePointRelais({ large = false }: { large?: boolean }) {
 /** Étiquette « Ramasse » (icône + libellé), dorée, lisible en thème clair et sombre. */
 export function BadgeRamasse({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md bg-gold px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-marine ${className}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md bg-gold px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-marine-fixe ${className}`}>
       <IconRamasse className="h-3.5 w-3.5" />
       Ramasse
     </span>
@@ -39,7 +39,7 @@ export function BadgeRamasse({ className = "" }: { className?: string }) {
 export function BadgePointRelais({ nom, className = "" }: { nom?: string | null; className?: string }) {
   return (
     <span className={`inline-flex min-w-0 items-center gap-1.5 ${className}`}>
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-relais px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-marine">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-relais px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-marine-fixe">
         <IconPointRelais className="h-3.5 w-3.5" />
         Point relais
       </span>
@@ -81,9 +81,9 @@ export function ChoixTypeArret({ value, onChange }: { value: TypeArret; onChange
           className={`flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors ${
             value === t.key
               ? t.key === "ramasse"
-                ? "bg-gold text-marine shadow-card"
+                ? "bg-gold text-marine-fixe shadow-card"
                 : t.key === "point_relais"
-                  ? "bg-relais text-marine shadow-card"
+                  ? "bg-relais text-marine-fixe shadow-card"
                   : "bg-surface shadow-card"
               : "text-navy/60 hover:text-navy"
           }`}

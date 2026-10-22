@@ -518,7 +518,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
               <li
                 key={x.id}
                 aria-current={x.etat === "en_cours" ? "step" : undefined}
-                className={`rounded-full px-1 py-1 ${x.etat === "en_cours" ? "bg-teal text-marine" : x.etat === "faite" ? "bg-white/15 text-white" : "text-white/55"}`}
+                className={`rounded-full px-1 py-1 ${x.etat === "en_cours" ? "bg-teal text-on-teal" : x.etat === "faite" ? "bg-white/15 text-white" : "text-white/55"}`}
               >
                 {x.etat === "faite" ? "✓" : `${i + 1}.`} {x.libelle}
                 {x.etat === "en_cours" && <span className="sr-only"> (étape en cours)</span>}
@@ -582,7 +582,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                     role="tab"
                     aria-selected={vue === v}
                     onClick={() => changerVue(v)}
-                    className={`min-h-[44px] rounded-full py-1.5 ${vue === v ? "bg-teal text-marine" : "text-white/80"}`}
+                    className={`min-h-[44px] rounded-full py-1.5 ${vue === v ? "bg-teal text-on-teal" : "text-white/80"}`}
                   >
                     {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
                   </button>
@@ -620,7 +620,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
       )}
 
       {toast && (
-        <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
+        <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
           {toast.text}
         </p>
       )}
@@ -979,7 +979,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                   <li ref={props?.ref} style={props?.style} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2.5 pr-3 shadow-card ${estMarque(s) ? "pl-4" : "pl-3"}`}>
                     <EncocheArret stop={s} />
                     {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{stops.indexOf(s) + 1}</span>
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal-sur-menu">{stops.indexOf(s) + 1}</span>
                     <div className="min-w-0 flex-1">
                       {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                         <div className="mb-1 flex flex-wrap gap-1">
@@ -1057,7 +1057,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                   <li key={s.id} className={`relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface py-2 pr-3 opacity-70 ${estMarque(s) ? "pl-4" : "pl-3"}`}>
                     <EncocheArret stop={s} />
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-marine" : "bg-orange text-white"}`}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.status === "delivered" ? "bg-teal text-on-teal" : "bg-orange text-on-orange"}`}
                       title={libelleStatut(s)}
                     >
                       {s.status === "delivered" ? "✓" : "!"}

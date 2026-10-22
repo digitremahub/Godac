@@ -205,14 +205,14 @@ export function FloatingChatWidget({
     <>
       <button
         type="button"
-        className="fixed bottom-[6.5rem] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-marine text-teal shadow-pop transition-transform hover:scale-105 lg:bottom-6"
+        className="fixed bottom-[6.5rem] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-marine text-teal-sur-menu shadow-pop transition-transform hover:scale-105 lg:bottom-6"
         onClick={() => setOpen((v) => !v)}
         aria-label="Messages et assistant"
         aria-expanded={open}
       >
         {open ? <IconX className="h-6 w-6" /> : <IconChatBubble className="h-6 w-6" />}
         {!open && totalUnread > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 text-xs font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 text-xs font-bold text-on-orange">
             {totalUnread > 9 ? "9+" : totalUnread}
           </span>
         )}
@@ -265,7 +265,7 @@ export function FloatingChatWidget({
               <button
                 type="button"
                 className={`mb-1 mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg font-semibold ${
-                  pickerOpen ? "bg-marine text-teal" : "bg-surface text-navy shadow-card hover:bg-paper"
+                  pickerOpen ? "bg-marine text-teal-sur-menu" : "bg-surface text-navy shadow-card hover:bg-paper"
                 }`}
                 onClick={togglePicker}
                 aria-label="Nouvelle conversation"
@@ -305,7 +305,7 @@ export function FloatingChatWidget({
                             className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-sm hover:bg-navy/[0.04]"
                             onClick={() => openConversation(c.id, c.full_name)}
                           >
-                            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-marine text-[11px] font-bold text-teal">
+                            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-marine text-[11px] font-bold text-teal-sur-menu">
                               {c.full_name
                                 .split(/\s+/)
                                 .map((p) => p[0])

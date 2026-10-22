@@ -17,12 +17,20 @@ const config: Config = {
         navy: "rgb(var(--c-ink) / <alpha-value>)",
         paper: "rgb(var(--c-paper) / <alpha-value>)",
         surface: "rgb(var(--c-surface) / <alpha-value>)",
-        marine: "#0A0F1E",
+        marine: "rgb(var(--c-marine) / <alpha-value>)",
+        // Marine fixe : texte foncé sur l'or, le violet relais ou le blanc,
+        // qui ne suit pas la couleur de menu de l'entreprise.
+        "marine-fixe": "#0A0F1E",
         // Accent fills, as variables so the Orange GODAC theme can swap
         // them (teal → orange GODAC, orange → rouge framboise). Defaults
         // #1BE4C1 / #FF6B35 in app/globals.css.
         teal: "rgb(var(--c-teal) / <alpha-value>)",
         orange: "rgb(var(--c-orange) / <alpha-value>)",
+        // Texte sur ces remplissages (blanc ou encre selon la couleur de
+        // l'entreprise) et accent lisible sur le menu (Sidebar).
+        "on-teal": "rgb(var(--c-on-teal) / <alpha-value>)",
+        "on-orange": "rgb(var(--c-on-orange) / <alpha-value>)",
+        "teal-sur-menu": "rgb(var(--c-teal-sur-menu) / <alpha-value>)",
         gold: "#F5C842",
         // Points relais (tournée colis) : violet, distinct de l'or des ramasses.
         relais: "#A78BFA",

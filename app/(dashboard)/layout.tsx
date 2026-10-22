@@ -4,6 +4,8 @@ import { EssaiTermine } from "@/components/go-navigation/EssaiTermine";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import { StyleCouleursEntreprise } from "@/components/layout/StyleCouleursEntreprise";
+import { couleursOrganisation } from "@/lib/theme/couleurs-entreprise-serveur";
 import type { Metadata } from "next";
 
 /** Espace privé : jamais indexé par les moteurs de recherche. */
@@ -30,12 +32,13 @@ export default async function DashboardLayout({
 
   const supabase = await createServerSupabaseClient();
   const isFieldRole = appUser.conduit;
-  const [{ modules, offre }, { data: organization }, activeTour] = await Promise.all([
+  const [{ modules, offre }, { data: organization }, activeTour, couleurs] = await Promise.all([
     etatModulesCourant(appUser.organization_id),
     supabase.from("organizations").select("name, logo_url, accent_color, is_demo").eq("id", appUser.organization_id).single(),
     isFieldRole
       ? supabase.from("planning_entries").select("id").eq("driver_id", appUser.id).eq("status", "in_progress").maybeSingle()
       : Promise.resolve({ data: null }),
+    couleursOrganisation(supabase, appUser.organization_id),
   ]);
 
   // Essai GO Navigation terminé : plus d'accès à l'espace, message clair.
@@ -50,6 +53,8 @@ export default async function DashboardLayout({
   const messengerAvailable = enabledModuleKeys.includes("messenger");
 
   return (
+    <>
+    <StyleCouleursEntreprise couleurs={couleurs} />
     <DashboardShell
       isDemo={Boolean((organization as { is_demo?: boolean } | null)?.is_demo)}
       role={appUser.role}
@@ -57,7 +62,9 @@ export default async function DashboardLayout({
       enabledModuleKeys={enabledModuleKeys}
       organizationName={organization?.name ?? "GODAC"}
       logoUrl={organization?.logo_url ?? null}
-      accentColor={organization?.accent_color ?? null}
+      // Couleurs de l'entreprise choisies : l'accent du menu suit la
+      // couleur principale (variable --c-teal-sur-menu, lisible sur le menu).
+      accentColor={couleurs ? null : (organization?.accent_color ?? null)}
       fullName={appUser.full_name}
       roleTitle={appUser.role_title}
       hasActiveTour={Boolean(activeTour.data)}
@@ -68,5 +75,6 @@ export default async function DashboardLayout({
     >
       {children}
     </DashboardShell>
+    </>
   );
 }

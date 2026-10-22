@@ -106,7 +106,7 @@ export function DashboardShell({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {isDemo && (
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-gold px-4 py-2 text-center text-sm text-marine">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-gold px-4 py-2 text-center text-sm text-marine-fixe">
             <span>
               <strong>Mode démo</strong> — entreprise et données fictives, remises à zéro chaque nuit.
             </span>
