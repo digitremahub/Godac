@@ -42,6 +42,9 @@ export interface Contestation {
   driver_name: string | null;
   driver_response: string | null;
   responded_at: string | null;
+  /** Suite signalée par le chauffeur : réglée, ou colis remis / rendu au dépôt. */
+  driver_outcome: "traitee" | "rendue" | null;
+  driver_outcome_at: string | null;
   resolution_note: string | null;
   created_at: string;
   /** Nombre de documents de la réclamation (photos, captures, PDF). */
@@ -175,6 +178,16 @@ const CHAMPS: { key: keyof Contestation; label: string; type?: string }[] = [
 ];
 
 const dateFr = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString("fr-FR") : "—");
+
+const SUITE: Record<"traitee" | "rendue", string> = {
+  traitee: "Traitée par le chauffeur",
+  rendue: "Colis rendu (remis au client ou rendu au dépôt)",
+};
+
+function SuiteChauffeur({ c }: { c: Contestation }) {
+  if (!c.driver_outcome) return null;
+  return <p className="rounded-lg bg-teal/[0.08] px-3 py-2 text-sm font-semibold text-teal-ink">{c.driver_outcome === "traitee" ? "✅" : "↩️"} {SUITE[c.driver_outcome]} · {dateFr(c.driver_outcome_at)}</p>;
+}
 
 async function patch(id: string, body: unknown) {
   const res = await fetch(`/api/contestations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -343,6 +356,7 @@ function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chau
               <p className="mt-1 whitespace-pre-line">{c.driver_response}</p>
             </div>
           )}
+          <SuiteChauffeur c={c} />
           {c.resolution_note && <p className="text-sm text-navy/70">Clôture : {c.resolution_note}</p>}
           {(c.status === "assigned" || c.status === "answered") && (
             <div className="flex flex-col gap-2">
@@ -404,7 +418,39 @@ function CarteChauffeur({ c, moi, focus }: { c: Contestation; moi: string; focus
         {!c.preuveDetaillee && <PreuveLivraison c={c} />}
       </div>
       {c.preuveDetaillee && <PreuveDetaillee p={c.preuveDetaillee} />}
+      <SuiteChauffeur c={c} />
       {c.resolution_note && <p className="text-sm text-navy/70">Clôture : {c.resolution_note}</p>}
+      {ouverte && (
+        <div className="flex flex-col gap-2 rounded-xl bg-navy/[0.04] p-3">
+          <p className="text-sm font-semibold">Où en êtes-vous ?</p>
+          <div className="flex flex-wrap gap-2">
+            {(["traitee", "rendue"] as const).map((issue) => (
+              <button
+                key={issue}
+                type="button"
+                className={`${c.driver_outcome === issue ? "btn-primary" : "btn-secondary"} !py-2 text-sm`}
+                disabled={busy}
+                aria-pressed={c.driver_outcome === issue}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await patch(c.id, { action: "signaler", issue });
+                    setMessage({ ok: true, text: "Signalé à votre responsable, qui clôturera la contestation." });
+                    router.refresh();
+                  } catch (e) {
+                    setMessage({ ok: false, text: networkErrorMessage(e) });
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {issue === "traitee" ? "✅ Traitée" : "↩️ Colis rendu"}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-navy/60">« Traitée » : le problème est réglé. « Colis rendu » : remis au client ou rendu au dépôt.</p>
+        </div>
+      )}
       {ouverte && (
         <>
           <label className="block">

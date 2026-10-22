@@ -28,6 +28,8 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("resuggerer") }),
   z.object({ action: z.literal("valider"), driver_id: z.string().uuid(), stop_id: z.string().uuid().nullable().optional(), champs: champs.partial().optional() }),
   z.object({ action: z.literal("repondre"), reponse: z.string().trim().min(3).max(4000) }),
+  /** Le chauffeur attributaire signale la suite donnée : réglée ou colis rendu. */
+  z.object({ action: z.literal("signaler"), issue: z.enum(["traitee", "rendue"]) }),
   z.object({ action: z.literal("cloturer"), statut: z.enum(["resolved", "rejected"]), note: z.string().trim().max(2000).nullable() }),
 ]);
 
@@ -79,6 +81,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: await serviceDuChauffeur(admin, appUser.id),
     });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "signaler") {
+    const { data: c } = await admin.from("customer_disputes").select("id, organization_id, driver_id, status, client_name").eq("id", id).maybeSingle();
+    if (!c || c.organization_id !== appUser.organization_id || c.driver_id !== appUser.id || !["assigned", "answered"].includes(c.status)) {
+      return NextResponse.json({ error: "Contestation introuvable." }, { status: 404 });
+    }
+    const { error } = await admin.from("customer_disputes").update({ driver_outcome: body.issue, driver_outcome_at: now, status: "answered", updated_at: now }).eq("id", id);
+    if (error) return NextResponse.json({ error: estSchemaManquant(error) ? "Fonction pas encore disponible : la base doit être mise à jour." : error.message }, { status: estSchemaManquant(error) ? 503 : 500 });
+    await notifier(admin, {
+      organizationId: c.organization_id,
+      type: "customer_dispute",
+      severity: "info",
+      message: `${appUser.full_name} signale la contestation${c.client_name ? ` de ${c.client_name}` : ""} comme ${body.issue === "traitee" ? "traitée" : "rendue (colis remis ou rendu au dépôt)"} : à vous de la clôturer.`,
+      relatedTable: "customer_disputes",
+      relatedId: id,
+      recipientRoles: ["manager", "exploitation", "direction"],
+      serviceId: await serviceDuChauffeur(admin, appUser.id),
+    });
+    await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "contestation_suite_chauffeur", targetTable: "customer_disputes", targetId: id, details: { issue: body.issue } });
     return NextResponse.json({ ok: true });
   }
 
