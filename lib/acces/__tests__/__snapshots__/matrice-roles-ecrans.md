@@ -14,6 +14,7 @@
 | Mon espace | Demander un acompte | `/moi/acomptes` | ✅ | ✅ | ✅ | ✅ | ↪ /equipe/paie/acomptes | payslips |
 | Mon espace | Mon pointage | `/moi/pointage` | ✅ | ✅ | ✅ | ✅ | ↪ /equipe/pointage | time_clock |
 | Mon espace | Mes congés | `/moi/conges` | ✅ | ✅ | ✅ | ✅ | ↪ /equipe/conges | leave_management |
+| Mon espace | Mes arrêts de travail | `/moi/arrets` | ✅ | ✅ | ✅ | ✅ | ↪ /equipe/conges/arrets | — |
 | Exploitation | Planning | `/exploitation/planning` | ↪ /moi/planning | ✅ | ✅ | — | ✅ | planning |
 | Exploitation | Modèles de tournées & villages | `/exploitation/tournees` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
 | Exploitation | Préparation des tournées colis | `/exploitation/colis` | ↪ /livreur | ✅ | ✅ | — | ✅ | route_optimizer |
@@ -45,6 +46,7 @@
 | Équipe & RH | Pointage | `/equipe/pointage` | ↪ /moi/pointage | ✅ | ✅ | ↪ /moi/pointage | ✅ | time_clock |
 | Équipe & RH | Congés & absences | `/equipe/conges` | ↪ /moi/conges | ✅ | ✅ | ↪ /moi/conges | ✅ | leave_management |
 | Équipe & RH | Calendrier des congés | `/equipe/conges/calendrier` | — | 🔒 | 🔒 | — | 🔒 | leave_management |
+| Équipe & RH | Arrêts de travail | `/equipe/conges/arrets` | ↪ /moi/arrets | 🔒 | 🔒 | ✅ | 🔒 | — |
 | Équipe & RH | Paie & salaires | `/equipe/paie` | — | — | — | ✅ | ✅ | payslips |
 | Équipe & RH | Heures & salaires | `/equipe/paie/heures` | — | — | — | 🔒 | 🔒 | planning?, time_clock? |
 | Équipe & RH | Fiches de paie | `/equipe/paie/fiches` | — | — | — | 🔒 | 🔒 | payslips |

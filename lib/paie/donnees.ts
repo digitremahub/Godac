@@ -9,6 +9,9 @@ import { PRESENCE_STATUS } from "@/lib/organization/poles";
 import { acomptesDuBulletin, type AcomptesDuBulletin } from "@/lib/paie/acomptes";
 import { acomptesJusquAu } from "@/lib/paie/acomptes-serveur";
 import { debutPeriode, natureAbsenceConges, periodesDuMois, soldeConges, type Reprise, type SoldeConges } from "@/lib/paie/conges";
+import { estConducteur } from "@/lib/roles/conducteurs";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { heuresDuMois, sourceHeures, type AbsenceJours, type EntreePlanning, type HeuresDuMois, type Pointage } from "@/lib/paie/heures";
 import type { ArretTravail, ElementsSortie, MotifSortie, ParametresEntreprise, ParametresLegaux, ParametresMaintien, ProfilSalarie, RegimeTransport, TypeArret, VariablesMois } from "@/lib/paie/types";
 
 /** "2026-10" → bornes du mois (fin incluse). */
@@ -50,6 +53,8 @@ export async function parametresEntreprise(supabase: SupabaseClient, organizatio
   return {
     maintien,
     subrogation: Boolean(p.subrogation_enabled),
+    // Source des heures (migration 20261030000001) : absente = règle par défaut.
+    sourceHeures: sourceHeures(p.hours_source),
     conventionnelles: ccnSal !== null || ccnPat !== null ? { salarial: ccnSal ?? 0, patronal: ccnPat ?? 0 } : null,
     santePmss: santeSal !== null || santePat !== null ? { salarial: santeSal ?? 0, patronal: santePat ?? 0 } : null,
     dfs: { taux: nombre(p.dfs_rate) ?? MODELE_TRANSPORT.entreprise.dfs.taux, active: Boolean(p.dfs_enabled) },
@@ -78,6 +83,13 @@ export interface ContextePaie {
   coefficient: string | null;
   /** Variables préremplies depuis GODAC (tournées, congés) — modifiables avant calcul. */
   prefill: VariablesMois & { joursTravailles: number };
+  /**
+   * Heures du mois jour par jour (source retenue : pointage, planning
+   * prévu, retour de tournée) et alertes de contrôle — lib/paie/heures.ts.
+   */
+  controleHeures: HeuresDuMois;
+  /** Arrêts refusés par l'encadrement : retirés d'un bulletin déjà généré. */
+  arretsRefuses: string[];
   cumuls: { brut: number; netImposable: number; heuresSupExonerees: number };
   /**
    * Acomptes acceptés à déduire de ce bulletin (lignes « Acompte du
@@ -136,6 +148,23 @@ export function arretDepuisLigne(l: Record<string, unknown>): ArretTravail {
   };
 }
 
+/**
+ * Affectations du salarié sur la période (UTC, marges comprises), avec le
+ * début prévu (planned_start_at, migration 20261030000001 ; absent : null).
+ */
+async function planningDuMois(supabase: SupabaseClient, organizationId: string, userId: string, avant: string, apres: string): Promise<EntreePlanning[]> {
+  const requete = (colonnes: string) =>
+    supabase.from("planning_entries").select(colonnes).eq("organization_id", organizationId).eq("driver_id", userId).gte("start_at", avant).lt("start_at", apres);
+  let r = await requete("start_at, end_at, status, planned_start_at");
+  if (r.error && estSchemaManquant(r.error)) r = await requete("start_at, end_at, status");
+  return ((r.data ?? []) as unknown as { start_at: string; end_at: string | null; status: string; planned_start_at?: string | null }[]).map((e) => ({
+    debut: e.start_at,
+    debutPrevu: e.planned_start_at ?? (e.status === "planned" || e.status === PRESENCE_STATUS ? e.start_at : null),
+    fin: e.end_at,
+    status: e.status,
+  }));
+}
+
 const decaleMois = (iso: string, n: number) => {
   const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1, 12)).toISOString().slice(0, 10);
@@ -156,20 +185,13 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   const avant = new Date(Date.parse(`${debut}T00:00:00Z`) - 86_400_000).toISOString();
   const apres = new Date(Date.parse(`${finExclue}T00:00:00Z`) + 86_400_000).toISOString();
 
-  const [entreprise, { data: profil }, { data: contrat }, { data: tours }, { data: conges }, { data: anterieurs }, { data: existant }, { data: precedent }, demandesAcompte] = await Promise.all([
+  const [entreprise, { data: profil }, { data: contrat }, tours, { data: conges }, { data: anterieurs }, { data: existant }, { data: precedent }, demandesAcompte] = await Promise.all([
     parametresEntreprise(supabase, organizationId),
     supabase.from("payroll_profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("user_contracts").select("monthly_gross_salary, contractual_monthly_hours").eq("user_id", userId).maybeSingle(),
-    supabase
-      .from("planning_entries")
-      .select("start_at, end_at, status")
-      .eq("organization_id", organizationId)
-      .eq("driver_id", userId)
-      // Tournées terminées, et présences planifiées des pôles bureau
-      // (secrétariat, comptabilité… — lib/organization/poles.ts).
-      .in("status", ["done", PRESENCE_STATUS])
-      .gte("start_at", avant)
-      .lt("start_at", apres),
+    // Tournées, affectations prévues et présences des pôles bureau
+    // (lib/organization/poles.ts), avec le début prévu quand il est connu.
+    planningDuMois(supabase, organizationId, userId, avant, apres),
     supabase
       .from("leave_requests")
       .select("start_date, end_date")
@@ -210,7 +232,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   // années (dixième, salaire de référence). Tables de la migration
   // 20261026000002 absentes : erreurs ignorées, sans arrêt ni sortie.
   const depuis = `${Number(mois.slice(0, 4)) - 2}-06-01`;
-  const [arretsLignes, sortieLigne, { data: dossier }, { data: historique }] = await Promise.all([
+  const [arretsLignes, sortieLigne, { data: dossier }, { data: historique }, { data: pointagesBruts }, { data: compte }] = await Promise.all([
     supabase.from("work_stoppages").select("*").eq("user_id", userId).gte("end_date", depuis).lte("start_date", fin).order("start_date"),
     supabase.from("employee_exits").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("employee_files").select("hire_date").eq("user_id", userId).maybeSingle(),
@@ -222,8 +244,15 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .gte("period_start", depuis)
       .lt("period_start", debut)
       .order("period_start"),
+    // Pointages du mois (direction, comptable : RLS « time_clock »).
+    supabase.from("time_clock_entries").select("clocked_in_at, clocked_out_at").eq("user_id", userId).gte("clocked_in_at", avant).lt("clocked_in_at", apres),
+    supabase.from("users").select("role, can_drive").eq("id", userId).maybeSingle(),
   ]);
-  const arretsTous = (arretsLignes.error ? [] : (arretsLignes.data ?? [])).map((l) => arretDepuisLigne(l as Record<string, unknown>));
+  const pointages: Pointage[] = ((pointagesBruts ?? []) as { clocked_in_at: string; clocked_out_at: string | null }[]).map((p) => ({ entree: p.clocked_in_at, sortie: p.clocked_out_at }));
+  // Arrêts refusés par l'encadrement (migration 20261030000001) : ni paie, ni heures.
+  const lignesArrets = (arretsLignes.error ? [] : (arretsLignes.data ?? [])) as Record<string, unknown>[];
+  const arretsRefuses = lignesArrets.filter((l) => l.status === "refuse").map((l) => String(l.id));
+  const arretsTous = lignesArrets.filter((l) => l.status !== "refuse").map((l) => arretDepuisLigne(l));
   const dateEntree = (dossier?.hire_date as string | null | undefined) ?? null;
   const bulletinsValides = (historique ?? []).map((p) => ({
     debut: String(p.period_start),
@@ -254,19 +283,23 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
   const tauxContrat = contrat?.monthly_gross_salary && contrat?.contractual_monthly_hours ? Number(contrat.monthly_gross_salary) / Number(contrat.contractual_monthly_hours) : null;
   const tauxHoraire = Number(profil?.hourly_rate ?? tauxContrat ?? 0);
 
-  const paris = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(iso));
-  // Une présence ne compte qu'une fois la journée terminée : le planning
-  // d'un jour à venir n'est pas encore du temps travaillé.
-  const maintenant = Date.now();
-  const toursMois = (tours ?? []).filter(
-    (t) =>
-      t.end_at &&
-      paris(t.start_at) >= debut &&
-      paris(t.start_at) <= fin &&
-      (t.status !== PRESENCE_STATUS || Date.parse(t.end_at) <= maintenant),
-  );
-  const heuresTours = toursMois.reduce((h, t) => h + Math.max(0, (Date.parse(t.end_at!) - Date.parse(t.start_at)) / 3_600_000), 0);
-  const joursTravailles = new Set(toursMois.map((t) => paris(t.start_at))).size;
+  // Heures du mois : pointage, sinon planning prévu / retour de tournée
+  // (conducteurs), pointage seul (bureau) ; jours d'arrêt et de congé
+  // sans heure attendue (lib/paie/heures.ts).
+  const absencesHeures: AbsenceJours[] = [
+    ...arretsTous.map((a) => ({ du: a.du, au: a.au, nature: "arret" as const })),
+    ...(conges ?? []).map((c) => ({ du: String(c.start_date), au: String(c.end_date), nature: "conges" as const })),
+  ];
+  const controleHeures = heuresDuMois({
+    debut,
+    fin,
+    pointages: pointages ?? [],
+    planning: tours,
+    absences: absencesHeures,
+    profil: { conducteur: estConducteur(String(compte?.role ?? ""), compte?.can_drive as boolean | null | undefined) },
+    source: entreprise.sourceHeures,
+  });
+  const joursTravailles = controleHeures.joursTravailles;
 
   const d0 = new Date(`${debut}T00:00:00Z`);
   const d1 = new Date(`${fin}T00:00:00Z`);
@@ -387,7 +420,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     profilComplet: Boolean(profil?.hourly_rate),
     coefficient: profil?.coefficient ?? null,
     prefill: {
-      heuresTravaillees: toursMois.length ? Math.round(heuresTours * 100) / 100 : null,
+      heuresTravaillees: controleHeures.joursTravailles ? controleHeures.total : null,
       heuresAbsenceNonPayee: 0,
       joursCongesPris: joursConges,
       // Reprises du mois précédent (bulletin validé), à vérifier : primes
@@ -417,6 +450,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       sortie: sortie?.duMois ? sortie.elements : null,
       joursTravailles,
     },
+    controleHeures,
+    arretsRefuses,
     cumuls,
     acomptes,
     conges: compteursConges,

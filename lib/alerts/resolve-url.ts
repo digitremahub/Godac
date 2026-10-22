@@ -29,6 +29,7 @@ const ECRAN_PAR_TABLE: Record<string, string> = {
   convocations: "communication.intranet",
   payslips: "equipe.paie",
   salary_advance_requests: "equipe.paie_acomptes",
+  work_stoppages: "equipe.arrets",
 };
 
 type Cible = { id: string; params?: Record<string, string>; suite?: string } | { url: string };
@@ -71,6 +72,8 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   fine_notification: (id) => ({ id: "flotte.amendes", suite: id ? `?amende=${encodeURIComponent(id)}` : "" }),
   // Contestation client : la fiche (le chauffeur attributaire ouvre la même page, limitée aux siennes).
   customer_dispute: (id) => ({ id: "exploitation.contestations", suite: id ? `?fiche=${encodeURIComponent(id)}` : "" }),
+  // Arrêt de travail déclaré : à vérifier, tournées à remplacer (encadrement du service).
+  work_stoppage: (id) => ({ id: "equipe.arrets", suite: id ? `?arret=${encodeURIComponent(id)}` : "" }),
 };
 
 /** Destinataire de l'alerte, quand le lien dépend de qui la lit. */
@@ -112,6 +115,10 @@ export function resolveAlertUrl(relatedTable: string | null, type?: string | nul
   // Amende attribuée à un chauffeur (alerte personnelle) : sa fiche dans ses amendes.
   if ((type === "fine_notification" || (relatedTable === "fines" && !type)) && contexte?.recipientUserId) {
     return urlDe("moi.amendes") + (relatedId ? `?amende=${encodeURIComponent(relatedId)}` : "");
+  }
+  // Décision sur son arrêt (alerte personnelle) : ses arrêts.
+  if ((type === "work_stoppage" || (relatedTable === "work_stoppages" && !type)) && contexte?.recipientUserId) {
+    return urlDe("moi.arrets");
   }
   const parType = type ? CIBLE_PAR_TYPE[type] : undefined;
   if (parType) return urlPour(parType(relatedId ?? null), contexte);
