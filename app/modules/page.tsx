@@ -10,18 +10,22 @@ import { libellePalier } from "@/lib/organization/paliers";
 export const metadata = {
   title: "Modules & tarifs — GODAC",
   description:
-    "Tarifs GODAC : contrôle du carburant inclus dans tous les plans, puis flotte, planning duplicable, paie transport et autres modules à la carte, dont la Tournée colis avec GO Navigation.",
+    "Tarifs GODAC : récupération de la TICPE et contrôle du carburant, puis flotte, planning, paie transport et autres modules à la carte, dont la Tournée colis avec GO Navigation.",
 };
 
 /** Nouveautés mises en avant (texte seul : les prix restent ceux du catalogue ci-dessous). */
 const NOUVEAUTES = [
   {
-    titre: "Planning duplicable",
-    texte: "Grille chauffeurs × jours, glisser-déposer, duplication d'une journée ou de la semaine jusqu'à 8 semaines, copier-coller et affectations récurrentes.",
+    titre: "TICPE sans tableur",
+    texte: "Véhicules éligibles repérés depuis la carte grise, montant calculé à chaque plein au barème daté, contrôles avant déclaration, documents prêts pour le comptable et rappels d'échéance.",
+  },
+  {
+    titre: "Planning et arrêts de travail",
+    texte: "Glisser-déposer jour, semaine ou mois, recopie de semaine qui ne replace pas les absents, publication aux chauffeurs ; arrêt déclaré en photo, repris dans la paie et les heures.",
   },
   {
     titre: "Paie transport",
-    texte: "Modèle IDCC 16 (paniers, primes, heures sup., prélèvement à la source, net social), validation par la direction, acomptes déduits automatiquement.",
+    texte: "Modèle IDCC 16 (paniers, primes, heures sup., prélèvement à la source, net social), bulletins PDF, export comptable, validation par la direction, acomptes déduits automatiquement.",
   },
   {
     titre: "Tournée colis + GO Navigation",
@@ -86,7 +90,7 @@ export default async function ModulesPage() {
               Demander un essai GO Navigation
             </Link>
           </div>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {NOUVEAUTES.map((n) => (
               <li key={n.titre} className="card flex flex-col gap-2 border-teal/30">
                 <h3 className="text-lg">{n.titre}</h3>

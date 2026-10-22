@@ -236,7 +236,7 @@ export const GUIDES: GuideRole[] = [
         titre: "Toute l'entreprise",
         etapes: [
           { titre: "Planning et tournées de tous les services", texte: "Affectez, suivez en direct et consultez l'historique et les tracés GPS des tournées de tous les services, villages et Tournée colis compris.", lien: { href: "/exploitation/planning", label: "Planning" }, module: "planning" },
-          { titre: "Carburant, cuves et écarts", texte: "Traitez les écarts de carburant et suivez les cuves de toute l'entreprise. L'export TICPE est consultable et téléchargeable.", lien: { href: "/carburant/pleins", label: "Carburant" } },
+          { titre: "Carburant, cuves et écarts", texte: "Traitez les écarts de carburant et suivez les cuves de toute l'entreprise. La TICPE (montants, contrôles et documents) est consultable et téléchargeable.", lien: { href: "/carburant/pleins", label: "Carburant" } },
           { titre: "Flotte, entretien, loueurs et amendes", texte: "Tous les véhicules, les demandes d'entretien, les loueurs, les amendes et les contestations ; vous validez comme responsable, comme un manager ou la direction.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
           { titre: "Congés", texte: "Vous validez les congés de toute l'entreprise.", lien: { href: "/equipe/conges", label: "Congés" }, module: "leave_management" },
           { titre: "Reporting", texte: "Indicateurs d'exploitation consolidés : carburant, consommation, activité (sans la paie).", lien: { href: "/dashboard/reporting", label: "Reporting BI" }, module: "bi_reporting" },
@@ -260,7 +260,7 @@ export const GUIDES: GuideRole[] = [
   {
     role: "comptable",
     titre: "Guide du comptable",
-    intro: "Vous retrouvez dans GODAC les données utiles à la comptabilité : carburant, cuves, flotte, fiches de paie et export TICPE.",
+    intro: "Vous retrouvez dans GODAC les données utiles à la comptabilité : carburant, cuves, flotte, fiches de paie et TICPE (montants calculés à chaque plein et documents prêts pour la déclaration).",
     sections: [
       {
         titre: "Vos écrans",
@@ -268,7 +268,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Carburant", texte: "Tous les pleins avec litres, montants et véhicules ; filtres par période et export.", lien: { href: "/carburant/pleins", label: "Carburant" } },
           { titre: "Cuves et approvisionnements", texte: "Livraisons de carburant en cuve et prix moyen pondéré.", lien: { href: "/carburant/cuves", label: "Cuves" } },
           { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
-          { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/carburant/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
+          { titre: "TICPE", texte: "Suivez le montant récupérable et la prochaine échéance, levez les contrôles (justificatifs, doublons, plafond), puis téléchargez le récapitulatif pour l'annexe 3310-TIC, l'état annuel par véhicule et le dossier de contrôle. La déclaration reste faite par l'entreprise ou son expert-comptable.", lien: { href: "/carburant/ticpe", label: "TICPE" }, module: "ticpe_export" },
           { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/equipe/paie", label: "Paie & salaires" }, module: "payslips" },
           { titre: "Arrêts et heures", texte: "Les arrêts déclarés (non refusés) arrivent seuls dans le bulletin du mois : saisissez-y les IJSS du relevé CPAM. Les heures sont préremplies (pointage, sinon planning prévu ou retour de tournée) avec un contrôle jour par jour à vérifier.", lien: { href: "/equipe/conges/arrets", label: "Arrêts de travail" } },
           { titre: "Notifications et intranet", texte: "Suivez les notifications de l'entreprise et les informations publiées.", lien: { href: "/communication/alertes", label: "Notifications" } },

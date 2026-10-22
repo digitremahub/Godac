@@ -27,13 +27,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     siteName: "GODAC",
-    title: "GODAC — Carburant, TICPE, flotte, planning et paie pour le transport routier",
+    title: "GODAC — Récupérez votre TICPE, maîtrisez votre carburant | Logiciel transport routier",
     description:
-      "Carburant contrôlé au plein près, cuves, écarts et TICPE, puis flotte, planning duplicable, paie transport (IDCC 16) et tournées colis : la gestion de votre entreprise de transport dans un seul outil.",
+      "Récupérez la TICPE de vos poids lourds sans tableur : montant calculé à chaque plein, contrôles et documents prêts pour votre comptable. Carburant contrôlé au plein près, puis flotte, planning, paie transport et tournées colis dans un seul outil.",
   },
-  title: "GODAC — Carburant, TICPE, flotte, planning et paie pour le transport routier",
+  title: "GODAC — Récupérez votre TICPE, maîtrisez votre carburant | Logiciel transport routier",
   description:
-    "Carburant contrôlé au plein près, cuves, écarts et TICPE, puis flotte, planning duplicable, paie transport (IDCC 16) et tournées colis : la gestion de votre entreprise de transport dans un seul outil.",
+    "Récupérez la TICPE de vos poids lourds sans tableur : montant calculé à chaque plein, contrôles et documents prêts pour votre comptable. Carburant contrôlé au plein près, puis flotte, planning, paie transport et tournées colis dans un seul outil.",
   // iOS only exposes PushManager to a page added to the home screen and
   // reopened from there — this meta (on top of app/manifest.ts) is what
   // makes "Ajouter à l'écran d'accueil" register as a standalone app
