@@ -177,7 +177,7 @@ export function Sidebar({
             {section.libelle}
             <span aria-hidden="true" className="text-sm normal-case tracking-normal">{ouverte ? "▴" : `▾ ${section.ecrans.length}`}</span>
           </button>
-          <div id={`menu-liste-${section.id}`} hidden={!ouverte} className="flex flex-col gap-0.5">
+          <div id={`menu-liste-${section.id}`} hidden={!ouverte} className={ouverte ? "flex flex-col gap-0.5" : "hidden"}>
           {section.ecrans.map((item) => {
             const estActif = item.id === active?.id;
             const Icon = ICONES[item.icone];
