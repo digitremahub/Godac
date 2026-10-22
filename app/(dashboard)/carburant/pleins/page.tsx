@@ -12,6 +12,8 @@ import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 import { chargerEcartsATraiter, chargerSuiviEcarts, FENETRE_ECARTS_JOURS } from "@/lib/fuel/ecarts-serveur";
 import { ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
+import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { jourParis, libelleLigne } from "@/lib/ticpe/montant";
 
 const PAGE_SIZE = 50;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -122,7 +124,7 @@ export default async function FuelPage({
   let query = supabase
     .from("fuel_entries")
     .select(
-      "id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, totalizer_gap, totalizer_before, totalizer_after, pmp_at_entry, ocr_raw, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
+      "id, vehicle_id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, totalizer_gap, totalizer_before, totalizer_after, pmp_at_entry, ocr_raw, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
       { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
@@ -157,6 +159,19 @@ export default async function FuelPage({
       suivi.traitements.get(e.id) ?? [],
     ),
   }));
+  // Montant TICPE de chaque plein de la page (module Export TICPE,
+  // encadrement et comptable) : plafond compté sur l'année entière.
+  if (g.modules.has("ticpe_export") && canSeeOtherDrivers && (entries ?? []).length > 0) {
+    try {
+      const vehiculesPage = [...new Set((entries ?? []).map((e: any) => e.vehicle_id as string).filter(Boolean))];
+      const annees = (entries ?? []).map((e) => Number(jourParis(e.occurred_at).slice(0, 4)));
+      const calcul = await calculerTicpe(supabase, appUser.organization_id, { anneeDebut: Math.min(...annees), anneeFin: Math.max(...annees), vehicleIds: vehiculesPage });
+      const parId = new Map(calcul.lignes.map((l) => [l.id, libelleLigne(l)]));
+      for (const l of lignes as any[]) l.ticpe = l.product === "adblue" ? null : (parId.get(l.id) ?? null);
+    } catch (err) {
+      console.error("TICPE historique", err);
+    }
+  }
   const aTraiter = ecartsATraiter?.ids.length ?? 0;
   const total = filtreATraiter ? aTraiter : (count ?? 0);
 

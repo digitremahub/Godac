@@ -57,7 +57,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <ol className="flex flex-col gap-4">
             {section.etapes.map((e, i) => (
               <li key={e.titre} className="flex gap-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{i + 1}</span>
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal-sur-menu">{i + 1}</span>
                 <div className="min-w-0">
                   <p className="font-semibold">{e.titre}</p>
                   <p className="text-sm leading-relaxed text-navy/70">{e.texte}</p>

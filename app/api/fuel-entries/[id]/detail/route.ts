@@ -4,7 +4,10 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
 import { droitsEcart, ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
 import { ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
-import type { DetailPlein, PhotoPlein } from "@/lib/fuel/detail-plein";
+import type { DetailPlein, PhotoPlein, TicpeDuPlein } from "@/lib/fuel/detail-plein";
+import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { jourParis } from "@/lib/ticpe/montant";
+import { LIBELLES_CATEGORIE_COURTS, LIBELLES_ZONE } from "@/lib/ticpe/bareme";
 
 const BUCKET_TICKETS = process.env.SUPABASE_STORAGE_BUCKET ?? "fuel-tickets";
 const DUREE_URL_SECONDES = 600;
@@ -29,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const g = await garderApi({ ecran: "carburant.pleins" });
   if (!g.ok) return g.reponse;
-  const { appUser, supabase } = g;
+  const { appUser, supabase, modules } = g;
 
   const { data: e, error } = await supabase
     .from("fuel_entries")
@@ -98,6 +101,36 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const ticket = ticketExtrasFromOcrRaw(e.ocr_raw);
   const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
+  // TICPE : montant du plein (plafond compté sur l'année du véhicule).
+  let ticpe: TicpeDuPlein | null = null;
+  if (modules.has("ticpe_export") && appUser.role !== "chauffeur" && e.product === "gazole") {
+    try {
+      const annee = Number(jourParis(e.occurred_at).slice(0, 4));
+      const calcul = await calculerTicpe(supabase, appUser.organization_id, { anneeDebut: annee, anneeFin: annee, vehicleIds: [e.vehicle_id] });
+      const l = calcul.lignes.find((x) => x.id === id);
+      if (l) {
+        ticpe = {
+          statut: l.statut,
+          raison: l.raison,
+          categorie: l.categorie ? LIBELLES_CATEGORIE_COURTS[l.categorie] : null,
+          zone: l.zone ? LIBELLES_ZONE[l.zone] : null,
+          origineZone: l.origineZone,
+          taux: l.taux,
+          tauxAConfirmer: l.tauxAConfirmer,
+          origineTaux: l.origineTaux,
+          litres: l.litres,
+          litresRetenus: l.litresRetenus,
+          litresHorsPlafond: l.litresHorsPlafond,
+          montant: l.montant,
+          justificatif: l.justificatif,
+          justificatifModifiable: ["manager", "exploitation", "direction"].includes(appUser.role) && !e.ticket_photo_path,
+        };
+      }
+    } catch (err) {
+      console.error("TICPE du plein", err);
+    }
+  }
+
   const detail: DetailPlein = {
     id: e.id,
     occurred_at: e.occurred_at,
@@ -143,6 +176,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     droits: suivi.traitementDisponible
       ? droitsEcart({ role: appUser.role, userId: appUser.id, driverId: e.driver_id, statut })
       : { traiter: false, repondre: false },
+    ticpe,
   };
 
   return NextResponse.json({ plein: detail });

@@ -20,6 +20,8 @@ export interface FuelHistoryRow {
   users?: { full_name: string } | null;
   /** Statut de l'écart (calculé côté serveur, lib/fuel/ecarts.ts) ; à défaut, gap_flagged. */
   statut_ecart?: StatutEcart;
+  /** Montant TICPE affiché (« 12,45 € », « taux manquant », « non éligible ») ; absent : colonne masquée. */
+  ticpe?: string | null;
 }
 
 /** « Cuve X » pour un plein à la cuve, « Station Y » pour un achat en station. */
@@ -69,6 +71,7 @@ export function FuelHistoryTable({
   initialOpenId?: string;
 }) {
   const [ouvert, setOuvert] = useState<string | null>(initialOpenId ?? null);
+  const showTicpe = entries.some((e) => e.ticpe !== undefined);
   if (entries.length === 0) {
     return <EmptyState title="Aucun historique" description={emptyDescription} />;
   }
@@ -85,6 +88,7 @@ export function FuelHistoryTable({
             <th className="pb-2">Origine</th>
             <th className="pb-2">Litres</th>
             <th className="pb-2">Montant</th>
+            {showTicpe && <th className="pb-2">TICPE</th>}
             <th className="pb-2">Statut</th>
             <th className="pb-2">
               <span className="sr-only">Détails</span>
@@ -94,7 +98,7 @@ export function FuelHistoryTable({
         <tbody>
           {entries.map((e) => {
             const estOuvert = ouvert === e.id;
-            const colonnes = 7 + (showVehicle ? 1 : 0) + (showDriver ? 1 : 0);
+            const colonnes = 7 + (showVehicle ? 1 : 0) + (showDriver ? 1 : 0) + (showTicpe ? 1 : 0);
             return (
               <Fragment key={e.id}>
                 <tr className={`border-t border-navy/5 ${estOuvert ? "bg-navy/[0.02]" : ""}`}>
@@ -105,6 +109,7 @@ export function FuelHistoryTable({
                   <td className="py-2">{sourceLabel(e)}</td>
                   <td className="py-2">{e.liters ?? "—"} L</td>
                   <td className="py-2">{e.total_amount ?? "—"} €</td>
+                  {showTicpe && <td className={`py-2 ${e.ticpe === "taux manquant" ? "text-orange-ink" : e.ticpe === "non éligible" ? "text-navy/50" : ""}`}>{e.ticpe ?? "—"}</td>}
                   <td className="py-2">
                     <StatusBadge status={e.status} gapFlagged={e.gap_flagged} statutEcart={e.statut_ecart} />
                   </td>

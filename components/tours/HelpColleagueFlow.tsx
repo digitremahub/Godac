@@ -72,7 +72,7 @@ export function HelpColleagueFlow({
     const onBehalf = { token: step.token, colleagueName: step.colleagueName };
     const banner = (
       <div className="flex items-center gap-3 rounded-xl bg-marine px-4 py-3 text-white">
-        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal text-marine">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal text-on-teal">
           <IconUsers className="h-5 w-5" />
         </span>
         <p className="text-sm">
@@ -102,7 +102,7 @@ export function HelpColleagueFlow({
                   onClick={() => setStep({ ...step, action: c.action })}
                   className="card-hover flex w-full items-center gap-4 text-left"
                 >
-                  <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-marine text-teal">
+                  <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-marine text-teal-sur-menu">
                     <c.icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">

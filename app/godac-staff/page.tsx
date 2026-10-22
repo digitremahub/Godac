@@ -57,6 +57,10 @@ export default async function GodacStaffPage() {
         <Link href="/godac-staff/go-navigation" className="font-semibold text-teal-ink hover:underline">
           Invitations GO Navigation →
         </Link>
+        {" · "}
+        <Link href="/godac-staff/ticpe" className="font-semibold text-teal-ink hover:underline">
+          Barème TICPE →
+        </Link>
       </p>
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">

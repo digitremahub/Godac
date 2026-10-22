@@ -15,6 +15,8 @@ import { JoinLinkCard } from "@/components/admin/JoinLinkCard";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { jetonInscription } from "@/lib/organization/lien-inscription";
 import { PayslipContributionLinesPanel } from "@/components/admin/PayslipContributionLinesPanel";
+import { CouleursEntreprisePanel } from "@/components/admin/CouleursEntreprisePanel";
+import { couleursOrganisation } from "@/lib/theme/couleurs-entreprise-serveur";
 
 export default async function OrganizationSettingsPage() {
   const g = await garderPage("admin.organisation");
@@ -23,6 +25,7 @@ export default async function OrganizationSettingsPage() {
   const supabase = await createServerSupabaseClient();
   const isDirection = appUser.role === "direction";
   // Audit M18 : jeton lu dans sa table réservée (page déjà limitée à la direction).
+  const couleurs = isDirection ? await couleursOrganisation(supabase, appUser.organization_id) : null;
   const jetonLien = isDirection ? await jetonInscription(createAdminSupabaseClient(), appUser.organization_id).catch(() => null) : null;
   const [{ data: organization }, ocrEnabled, assistantEnabled, payslipsEnabled, { data: services }, { data: tanks }, { data: notes }, { data: contributionLines }, { data: memberships }, { data: activeUsers }] =
     await Promise.all([
@@ -109,6 +112,7 @@ export default async function OrganizationSettingsPage() {
         urssafNumber={organization?.urssaf_number ?? null}
         country={organization?.country ?? "FR"}
       />
+      {isDirection && <CouleursEntreprisePanel actuelles={couleurs} />}
       <ServicesPanel services={servicesWithMembers} users={activeUsers ?? []} />
       <TanksPanel tanks={tanks ?? []} services={transportServices} />
       {payslipsEnabled && (

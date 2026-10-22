@@ -755,7 +755,7 @@ export function TourneeColis({
       <div className="flex flex-col gap-4">
         {modalAffectation}
         {toast && (
-          <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
+          <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
             {toast.text}
           </p>
         )}
@@ -873,7 +873,7 @@ export function TourneeColis({
   return (
     <div className="flex flex-col gap-4 pb-24">
       {toast && (
-        <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-white"}`}>
+        <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
           {toast.text}
         </p>
       )}
@@ -1245,7 +1245,7 @@ export function TourneeColis({
                         {triActif && <span className="-my-2.5 -ml-2 flex items-center">{poignee ? <BoutonPoignee poignee={poignee} libelle={s.address} /> : <span className="w-8" aria-hidden="true" />}</span>}
                         <span
                           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
-                            s.status === "delivered" ? "bg-teal text-marine" : s.status === "failed" ? "bg-orange text-white" : "bg-marine text-teal"
+                            s.status === "delivered" ? "bg-teal text-on-teal" : s.status === "failed" ? "bg-orange text-on-orange" : "bg-marine text-teal-sur-menu"
                           }`}
                         >
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}

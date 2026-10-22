@@ -521,7 +521,7 @@ function RouteCard({
                   const trouve = surlignes?.has(cleVillage(route.id, v, i)) ?? false;
                   return (
                   <li key={v.id ?? i} data-village-trouve={trouve || undefined} draggable={canEdit && !route.isRenfort} onDragStart={(e) => { e.dataTransfer.setData("application/x-godac-village", JSON.stringify({ routeId: route.id, village: v })); e.dataTransfer.effectAllowed = "copyMove"; }} className={`flex gap-3 py-2.5 ${trouve ? "-mx-2 rounded-lg bg-gold/25 px-2 ring-2 ring-gold" : ""} ${canEdit && !route.isRenfort ? "cursor-grab active:cursor-grabbing" : ""}`}>
-                    <span title={canEdit && !route.isRenfort ? "Glissez ce village vers une autre tournée" : undefined} className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">
+                    <span title={canEdit && !route.isRenfort ? "Glissez ce village vers une autre tournée" : undefined} className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal-sur-menu">
                       {i + 1}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -623,7 +623,7 @@ function RouteCard({
                     {(v.planned_stops ?? []).map((stop, stopIndex) => (
                       <div key={stop.id ?? stopIndex} className="flex flex-col gap-2 rounded-lg border border-navy/10 bg-surface p-3">
                         <div className="flex items-center gap-2">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{stopIndex + 1}</span>
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal-sur-menu">{stopIndex + 1}</span>
                           <select className="input flex-1 !py-1.5 text-sm" value={stop.type} onChange={(e) => update(i, { planned_stops: (v.planned_stops ?? []).map((s, j) => j === stopIndex ? { ...s, type: e.target.value as PlannedStop["type"] } : s) })} aria-label={`Type de l'arrêt ${stopIndex + 1}`}>
                             <option value="ramasse">Ramasse</option><option value="point_relais">Point relais</option>
                           </select>

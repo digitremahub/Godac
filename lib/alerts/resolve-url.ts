@@ -59,6 +59,8 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   rental_contract: (id) => (id ? { id: "flotte.vehicule_fiche", params: { id }, suite: "#location" } : { id: "flotte.vehicules" }),
   // Bulletins en attente de validation : Paie du mois (direction).
   payslip_validation: () => ({ id: "equipe.paie" }),
+  // Rappel TICPE (échéance de dépôt, ERA de janvier, réclamation qui expire) : tableau de bord TICPE.
+  ticpe_rappel: () => ({ id: "carburant.ticpe" }),
   // Demande d'acompte : à traiter (direction, comptable ; un salarié est
   // renvoyé à ses demandes par l'alternative du catalogue).
   salary_advance: () => ({ id: "equipe.paie_acomptes" }),

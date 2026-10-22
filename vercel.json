@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/loueurs",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/ticpe",
+      "schedule": "0 6 * * *"
     }
   ]
 }

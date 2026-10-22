@@ -817,7 +817,7 @@ export function GoNavigation(p: GoNavigationProps) {
           </div>
         </div>
         {erreurGps ? (
-          <p className="pointer-events-auto mx-auto mt-1.5 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-white shadow-pop">{erreurGps}</p>
+          <p className="pointer-events-auto mx-auto mt-1.5 max-w-xl rounded-xl bg-orange px-3 py-2 text-xs font-semibold text-on-orange shadow-pop">{erreurGps}</p>
         ) : (
           !position && <p className="mx-auto mt-1.5 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
         )}
@@ -828,7 +828,7 @@ export function GoNavigation(p: GoNavigationProps) {
             </span>
           )}
           {!fige && run.status === "in_progress" && (
-            <button type="button" onClick={() => setAjout(true)} className="min-h-[44px] rounded-full bg-teal px-3.5 text-xs font-bold text-marine shadow-pop">
+            <button type="button" onClick={() => setAjout(true)} className="min-h-[44px] rounded-full bg-teal px-3.5 text-xs font-bold text-on-teal shadow-pop">
               + Adresse
             </button>
           )}
@@ -901,7 +901,7 @@ export function GoNavigation(p: GoNavigationProps) {
           <button
             type="button"
             onClick={basculerVoix}
-            className={`flex h-11 w-11 items-center justify-center rounded-full shadow-pop ${voix ? "bg-marine text-teal" : "bg-surface text-navy/70"}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-full shadow-pop ${voix ? "bg-marine text-teal-sur-menu" : "bg-surface text-navy/70"}`}
             aria-pressed={voix}
             aria-label={voix ? "Couper le guidage vocal" : "Activer le guidage vocal"}
           >
@@ -1061,7 +1061,7 @@ export function GoNavigation(p: GoNavigationProps) {
                           <EncocheArret stop={s} />
                           {poignee && <BoutonPoignee poignee={poignee} libelle={s.recipient ?? s.address} />}
                           <button type="button" className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => choisirDansListe(s)} aria-label={`Naviguer vers l'arrêt ${numero(s)} — ${s.address}`}>
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal">{numero(s)}</span>
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal-sur-menu">{numero(s)}</span>
                             <span className="min-w-0">
                               {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
                                 <span className="mb-1 flex flex-wrap gap-1">
