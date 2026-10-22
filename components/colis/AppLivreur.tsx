@@ -26,6 +26,7 @@ import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { TourneeColis } from "@/components/colis/TourneeColis";
+import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
@@ -220,6 +221,29 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
     },
     [charger],
   );
+
+  /** Supprime la tournée démarrée (créée par erreur, en double…) ; une tournée clôturée, elle, reste à l'historique. */
+  async function supprimerTournee() {
+    if (!run || run.status === "done") return;
+    const faits = stops.filter((s) => s.status !== "pending").length;
+    const ok = await confirmer({
+      titre: "Supprimer la tournée colis ?",
+      message: `« ${run.name ?? "Tournée colis"} » et ses ${stops.length} arrêt(s)${faits ? `, dont ${faits} déjà traité(s),` : ""} seront supprimés. C'est définitif.`,
+      action: "Supprimer",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/colis/tournees/${run.id}`, { method: "DELETE" });
+      setPreparationDemandee(false);
+      setRun(null);
+      setStops([]);
+      await charger(null);
+      setToast({ ok: true, text: "Tournée supprimée." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+    }
+  }
 
   function fermerPreparation() {
     setPreparationDemandee(false);
@@ -895,6 +919,11 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
         {run?.status === "in_progress" && (
           <button type="button" className="btn-secondary min-h-[44px] justify-center" onClick={() => setPreparationDemandee(true)}>
             <IconQrCode className="h-5 w-5" /> Ajouter ou modifier des colis
+          </button>
+        )}
+        {run?.status === "in_progress" && (
+          <button type="button" className="btn-ghost min-h-[44px] justify-center text-sm text-orange-ink" onClick={supprimerTournee}>
+            Supprimer cette tournée colis
           </button>
         )}
 
