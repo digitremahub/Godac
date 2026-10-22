@@ -932,7 +932,7 @@ export function TourRoutesBoard({
         <>
           {ordered.length === 0 ? (
             <p className="text-sm text-navy/60" role={recherche.active ? "status" : undefined}>
-              {routes.length === 0 ? "Aucune tournée renseignée pour le moment." : recherche.active ? `Aucun village trouvé pour « ${query.trim()} ».` : "Aucun résultat."}
+              {routes.length === 0 ? (canEdit ? "Aucune tournée renseignée pour le moment." : "Aucune tournée planifiée pour vous d’hier à la semaine prochaine.") : recherche.active ? `Aucun village trouvé pour « ${query.trim()} ».` : "Aucun résultat."}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

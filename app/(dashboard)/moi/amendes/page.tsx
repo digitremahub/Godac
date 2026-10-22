@@ -2,7 +2,6 @@ import { garderPage } from "@/lib/acces/garde-page";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState, Card } from "@/components/ui";
-import { DriverFineActions } from "@/components/fines/DriverFineActions";
 import { Commentaires } from "@/components/rattachement/Commentaires";
 import { lireCommentaires } from "@/lib/rattachement/commentaires-serveur";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
@@ -58,7 +57,7 @@ export default async function MesAmendesPage({ searchParams }: { searchParams: P
           {f.planning && <p className="text-sm text-navy/70">Votre tournée{f.planning.tour_number ? ` n°${f.planning.tour_number}` : ""} : de {heureParis(f.planning.start_at)} à {f.planning.end_at ? heureParis(f.planning.end_at) : "—"}</p>}
           {docs > 0 && <div className="flex flex-wrap gap-2">{Array.from({ length: docs }, (_, i) => <a key={i} href={`/api/fines/${f.id}/piece?i=${i}`} target="_blank" rel="noreferrer" className="btn-secondary !py-2 text-sm">📄 Voir l’avis{docs > 1 ? ` ${i + 1}` : ""}</a>)}</div>}
           {f.notified_at && <p className="text-xs text-navy/55">Notification reçue le {dateParis(f.notified_at)}</p>}
-          {f.status === "identified" && <DriverFineActions id={f.id} />}
+          {f.status === "identified" && <p className="text-sm text-navy/70">Vous n’êtes pas d’accord ? Expliquez-le ci-dessous : votre responsable décide s’il faut contester.</p>}
           {(ouverte || echanges.length > 0) && <div className="border-t border-navy/10 pt-3">
             <p className="mb-2 text-sm font-semibold">Votre explication</p>
             <Commentaires api={`/api/fines/${f.id}`} routePiece="piece" commentaires={echanges.map((c) => ({ id: c.id, auteur: c.auteur, auteurId: c.auteurId, texte: c.texte, photos: c.photos, creeLe: c.creeLe }))} moi={user.id} placeholder="Ce qui s’est passé, qui avait le véhicule…" libelleEnvoi="Envoyer à mon responsable" ouvert={ouverte} />

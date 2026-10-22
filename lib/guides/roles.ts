@@ -74,7 +74,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Les villages de ma tournée",
         texte:
-          "« Modèles de tournées & villages » donne, en liste, les villages des tournées de votre service (et de celles où vous êtes planifié), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
+          "« Modèles de tournées & villages » donne, en liste, les villages des tournées où vous êtes planifié (d'hier à la semaine prochaine), dans l'ordre de passage. Un village repris ce jour-là par une tournée de renfort y est signalé « en renfort ». Sur une tournée de renfort, vous y trouvez les villages à couvrir du jour. Votre tableau de bord affiche aussi le contact de votre chef d'équipe.",
         lien: { href: "/exploitation/tournees", label: "Modèles de tournées & villages" },
         module: "planning",
       },
