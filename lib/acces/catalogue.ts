@@ -219,6 +219,13 @@ export interface Ecran {
   alternative?: Partial<Record<UserRole, string>>;
   /** Restriction supplémentaire faite par la page (texte pour la matrice). */
   note?: string;
+  /**
+   * Section du menu latéral pour ces rôles, quand elle diffère de la
+   * section de l'URL (ex. Registre du personnel rangé dans
+   * Administration pour la direction). Les onglets de section et l'URL
+   * ne changent pas.
+   */
+  sectionMenu?: Partial<Record<UserRole, SectionId>>;
 }
 
 const E = (e: Ecran) => e;
@@ -553,7 +560,8 @@ export const ECRANS: readonly Ecran[] = [
     alternative: { chauffeur: "/moi/amendes" },
     note: "manager : son service ; exploitation : toute l'organisation ; comptable : lecture",
   }),
-  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr" }),
+  // Usage rare pour la direction (impression des badges) : rangé dans Administration.
+  E({ id: "flotte.badges", section: "flotte", libelle: "Badges QR", href: "/flotte/badges", roles: ENCADREMENT, icone: "qr", sectionMenu: { direction: "admin" } }),
 
   // ── Carburant ────────────────────────────────────────────────────
   E({ id: "carburant.pleins", section: "carburant", libelle: "Pleins", href: "/carburant/pleins", roles: TOUS_LES_ROLES, icone: "droplet", note: "chauffeur : ses pleins" }),
@@ -724,6 +732,8 @@ export const ECRANS: readonly Ecran[] = [
     // Obligation légale de tout employeur : aucun module requis.
     roles: ["direction"],
     icone: "file",
+    // Consulté rarement (contrôle, embauche) : rangé dans Administration.
+    sectionMenu: { direction: "admin" },
     note: "nationalité et titre de travail : direction seulement",
   }),
 
@@ -924,7 +934,7 @@ export interface SectionMenu {
 export function menuPour(role: UserRole, modulesActifs: ReadonlySet<string>, conduit: boolean = role === "chauffeur"): SectionMenu[] {
   const vus = new Set<string>();
   return SECTIONS.map((s) => {
-    const ecrans = ECRANS.filter((e) => e.section === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
+    const ecrans = ECRANS.filter((e) => (e.sectionMenu?.[role] ?? e.section) === s.id && estVisibleAuMenu(e, role, modulesActifs, conduit)).filter((e) => {
       if (vus.has(e.href)) return false;
       vus.add(e.href);
       return true;
@@ -1025,6 +1035,20 @@ export function ongletsMonEspace(role: UserRole, modulesActifs: ReadonlySet<stri
     const prefixes = onglets.flatMap((o) => [chemin(o.href), ...o.prefixes]).filter((p) => p.startsWith("/moi/"));
     return [{ id: g.id, libelle: g.libelle, icone: g.icone, href, prefixes, onglets }];
   });
+}
+
+/**
+ * Sections du menu repliées par défaut (lot 3 de l'audit) : la direction a
+ * le menu le plus long ; ses entrées rares (Administration, Aide) se
+ * déplient d'un geste. Une section qui contient l'écran ouvert est
+ * toujours dépliée. Aucune entrée retirée.
+ */
+export const SECTIONS_REPLIEES: Partial<Record<UserRole, readonly SectionId[]>> = {
+  direction: ["admin", "aide"],
+};
+
+export function estSectionRepliee(section: SectionId, role: UserRole): boolean {
+  return SECTIONS_REPLIEES[role]?.includes(section) ?? false;
 }
 
 /** Libellé d'une section pour ce rôle : « Mes tournées » pour qui n'encadre pas. */

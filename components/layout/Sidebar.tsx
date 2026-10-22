@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { UserRole } from "@/lib/types/domain";
-import { entreeActive, menuAffiche, type IconeId } from "@/lib/acces/catalogue";
+import { entreeActive, estSectionRepliee, menuAffiche, type IconeId, type SectionId } from "@/lib/acces/catalogue";
 import {
   IconGrid,
   IconDroplet,
@@ -58,6 +59,8 @@ export const ICONES: Record<IconeId, (props: { className?: string }) => React.Re
   user: IconUserCircle,
 };
 
+const MEMO_DEPLIEES = "godac-menu-sections-depliees";
+
 /**
  * Menu latéral généré depuis le catalogue (lib/acces/catalogue.ts) :
  * sections Tableau de bord, Mon espace, Exploitation, Flotte, Carburant,
@@ -98,6 +101,30 @@ export function Sidebar({
     sections.flatMap((s) => s.ecrans),
     pathname,
   );
+  // Sections repliées par défaut (Administration et Aide pour la direction) :
+  // dépliées par l'utilisateur (mémorisé sur cet appareil) ou quand l'écran ouvert s'y trouve.
+  const [depliees, setDepliees] = useState<Set<SectionId>>(new Set());
+  useEffect(() => {
+    try {
+      const memo = JSON.parse(localStorage.getItem(MEMO_DEPLIEES) ?? "[]");
+      if (Array.isArray(memo)) setDepliees(new Set(memo as SectionId[]));
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
+  function basculer(id: SectionId) {
+    setDepliees((d) => {
+      const n = new Set(d);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      try {
+        localStorage.setItem(MEMO_DEPLIEES, JSON.stringify([...n]));
+      } catch {
+        /* stockage indisponible */
+      }
+      return n;
+    });
+  }
 
   return (
     <nav
@@ -125,11 +152,29 @@ export function Sidebar({
         </span>
       </Link>
 
-      {sections.map((section) => (
+      {sections.map((section) => {
+        const repliable = estSectionRepliee(section.id, role);
+        const ouverte = !repliable || depliees.has(section.id) || section.ecrans.some((e) => e.id === active?.id);
+        return (
         <div key={section.id} className="flex flex-col gap-0.5" role="group" aria-labelledby={`menu-${section.id}`}>
-          <p id={`menu-${section.id}`} className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-            {section.libelle}
-          </p>
+          {repliable ? (
+            <button
+              type="button"
+              id={`menu-${section.id}`}
+              aria-expanded={ouverte}
+              aria-controls={`menu-liste-${section.id}`}
+              onClick={() => basculer(section.id)}
+              className="flex min-h-[44px] items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60 hover:bg-white/[0.06] hover:text-white/80 lg:min-h-[32px]"
+            >
+              {section.libelle}
+              <span aria-hidden="true" className="text-sm normal-case tracking-normal">{ouverte ? "▴" : `▾ ${section.ecrans.length}`}</span>
+            </button>
+          ) : (
+            <p id={`menu-${section.id}`} className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+              {section.libelle}
+            </p>
+          )}
+          <div id={`menu-liste-${section.id}`} hidden={!ouverte} className="flex flex-col gap-0.5">
           {section.ecrans.map((item) => {
             const estActif = item.id === active?.id;
             const Icon = ICONES[item.icone];
@@ -153,8 +198,10 @@ export function Sidebar({
               </Link>
             );
           })}
+          </div>
         </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
