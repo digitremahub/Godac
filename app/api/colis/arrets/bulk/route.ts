@@ -25,7 +25,7 @@ const pointSchema = z.object({
   // Champs du bordereau de tournée (lib/colis/bordereau.ts), facultatifs :
   // une liste importée (Google Maps, fichier) n'en a aucun.
   /** N° de colis (plusieurs séparés par des virgules) : un colis déjà dans la fiche est ignoré. */
-  code: z.string().trim().max(120).nullable().optional(),
+  code: z.string().trim().max(1000).nullable().optional(),
   type: z.enum(TYPES_ARRET.map((t) => t.key) as [TypeArret, ...TypeArret[]]).optional(),
   /** Nombre de colis de l'arrêt (1 par défaut ; 0 pour une ramasse). */
   colis: z.number().int().min(0).max(500).optional(),
@@ -56,7 +56,7 @@ const bodySchema = z.object({
   list_id: z.string().uuid().nullable().optional(),
   /** …ou nom d'une nouvelle liste à créer pour cet import (ex. le nom du fichier). */
   nouvelle_liste: z.string().trim().min(1).max(60).nullable().optional(),
-  /** Import du bordereau de tournée DPD : gardé pour le rapprochement (migration 20261025000002). */
+  /** Import du bordereau de tournée (tout transporteur) : gardé pour le rapprochement (migration 20261025000002). */
   bordereau: z
     .object({
       numero: z.string().trim().min(1).max(40),
@@ -291,7 +291,7 @@ export async function POST(req: Request) {
           label: h.nom?.slice(0, 200) ?? null,
           address: h.adresse,
           weekly_schedule: { [jour]: h.plages.map((pl) => ({ open: pl.debut, close: pl.fin })) },
-          notes: "Horaires lus sur le bordereau de tournée DPD.",
+          notes: "Horaires lus sur le bordereau de tournée.",
           updated_by: appUser.id,
         });
         if (!error) horairesPro++;
@@ -306,7 +306,7 @@ export async function POST(req: Request) {
 }
 
 /**
- * N° de bordereau DPD de la fiche, pages lues, colis et poids, pour le
+ * N° de bordereau de la fiche, pages lues, colis et poids, pour le
  * rapprochement ultérieur (table delivery_run_bordereaux). Migration non
  * appliquée : ignoré sans bloquer l'import.
  */

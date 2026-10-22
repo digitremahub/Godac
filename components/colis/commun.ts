@@ -93,3 +93,42 @@ export async function imageEnBase64(file: File): Promise<string> {
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/jpeg", 0.85).split(",")[1]!;
 }
+
+/** Base64 envoyé pour une page de bordereau : le corps JSON reste loin de la limite de 4,5 Mo de Vercel. */
+export const PHOTO_DOCUMENT_MAX_CARACTERES = 3_000_000;
+
+/**
+ * Photo d'un document imprimé dense (bordereau de tournée) : plus de
+ * définition qu'une étiquette (jusqu'à 2400 px et ~3,6 Mpx, ce que l'IA lit
+ * sans réduction), puis qualité JPEG baissée par paliers — et en dernier
+ * recours la taille — jusqu'à passer sous PHOTO_DOCUMENT_MAX_CARACTERES.
+ * Orientation EXIF respectée ; format illisible : message clair en français.
+ */
+export async function photoDocumentEnBase64(file: File, maxCaracteres = PHOTO_DOCUMENT_MAX_CARACTERES): Promise<string> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Format de photo non reconnu : reprenez la page avec l'appareil photo.");
+  }
+  let scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height), Math.sqrt(3_600_000 / (bitmap.width * bitmap.height)));
+  const canvas = document.createElement("canvas");
+  try {
+    for (let essai = 0; essai < 4; essai++, scale *= 0.8) {
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d")!;
+      // Fond blanc : une capture PNG transparente ne devient pas noire en JPEG.
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const qualite of [0.85, 0.75, 0.65, 0.55]) {
+        const b64 = canvas.toDataURL("image/jpeg", qualite).split(",")[1] ?? "";
+        if (b64.length <= maxCaracteres) return b64;
+      }
+    }
+  } finally {
+    bitmap.close?.();
+  }
+  throw new Error("Photo trop lourde, même compressée : reprenez la page de plus près.");
+}

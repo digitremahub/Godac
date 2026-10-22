@@ -122,3 +122,15 @@ export async function consommer(
 
   return { ok: true, eventId: event?.id ?? null, unitesDepassement: decision.unitesDepassement };
 }
+
+/**
+ * Annule une consommation enregistrée par `consommer` quand l'appel
+ * externe a échoué de notre fait (service IA en erreur, réponse coupée) :
+ * l'utilisateur ne paie pas une lecture qu'il n'a pas eue. Sans eventId
+ * (compteur indisponible) : rien à faire. Jamais d'exception.
+ */
+export async function rembourser(admin: SupabaseClient, eventId: string | null): Promise<void> {
+  if (!eventId) return;
+  const { error } = await admin.from("usage_events").delete().eq("id", eventId);
+  if (error) console.error("rembourser: consommation non annulée", eventId, error);
+}
