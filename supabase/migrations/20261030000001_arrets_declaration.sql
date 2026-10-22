@@ -4,7 +4,7 @@
 -- (20261026000002_paie_arrets_sorties.sql), aujourd'hui saisie par la
 -- paie seule.
 --
--- Cycle : le salarié déclare (photo des volets 2 et 3 de l'avis, jamais
+-- Cycle : le salarié déclare (photo du volet destiné à l'employeur, jamais
 -- le volet 1 qui porte les éléments médicaux) → statut « recu » ;
 -- l'encadrement ou la paie valide ou refuse (motif). Un arrêt non refusé
 -- entre dans la préparation du bulletin (lib/paie/donnees.ts) et
