@@ -97,10 +97,17 @@ export async function VueFiches({ appUser, supabase, toutes }: { appUser: AppUse
                 <span className="text-xs text-navy/60">
                   {Number(p.gross_amount).toLocaleString("fr-FR")} € brut / {Number(p.net_amount).toLocaleString("fr-FR")} € net
                 </span>
-                {p.downloadUrl && (
-                  <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
-                    Télécharger
-                  </a>
+                {p.file_path && (
+                  <span className="flex gap-3">
+                    <a href={`/api/paie/bulletins/${p.id}/pdf`} className="font-semibold text-teal-ink underline">
+                      Télécharger
+                    </a>
+                    {p.downloadUrl && (
+                      <a href={p.downloadUrl} target="_blank" rel="noreferrer" className="text-navy/60 underline">
+                        Voir
+                      </a>
+                    )}
+                  </span>
                 )}
               </span>
             </div>

@@ -363,6 +363,19 @@ export const ECRANS: readonly Ecran[] = [
     mobile: "plus",
     alternative: { direction: "/equipe/conges" },
   }),
+  E({
+    id: "moi.arrets",
+    section: "moi",
+    libelle: "Mes arrêts de travail",
+    libelleOnglet: "Arrêts",
+    href: "/moi/arrets",
+    // Obligation du salarié (avis sous 48 h) : aucun module requis.
+    roles: ["chauffeur", "manager", "exploitation", "comptable"],
+    icone: "file",
+    mobile: "plus",
+    alternative: { direction: "/equipe/conges/arrets" },
+    note: "déclarer un arrêt (photo des volets employeur), suivre son statut",
+  }),
 
   // ── Exploitation ─────────────────────────────────────────────────
   E({
@@ -650,6 +663,20 @@ export const ECRANS: readonly Ecran[] = [
     icone: "calendar",
     parent: "equipe.conges",
     note: "manager : son service ; exploitation : toute l'organisation",
+  }),
+  E({
+    id: "equipe.arrets",
+    section: "equipe",
+    libelle: "Arrêts de travail",
+    libelleOnglet: "Arrêts",
+    libelleSousOnglet: "Arrêts de travail",
+    href: "/equipe/conges/arrets",
+    // Aucun module requis ; sous-onglet de Congés & absences quand le module est actif.
+    roles: [...ENCADREMENT, "comptable"],
+    icone: "file",
+    parent: "equipe.conges",
+    alternative: { chauffeur: "/moi/arrets" },
+    note: "manager : son service ; exploitation, direction, comptable : toute l'organisation",
   }),
   E({
     id: "equipe.paie",
@@ -990,7 +1017,7 @@ export const GROUPES_MON_ESPACE: readonly { id: GroupeMonEspaceId; libelle: stri
     id: "demandes",
     libelle: "Mes demandes",
     icone: "calendar",
-    elements: [{ id: "moi.conges" }, { id: "moi.acomptes", libelle: "Acomptes" }],
+    elements: [{ id: "moi.conges" }, { id: "moi.arrets", libelle: "Arrêts" }, { id: "moi.acomptes", libelle: "Acomptes" }],
   },
 ];
 

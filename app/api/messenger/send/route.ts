@@ -72,7 +72,7 @@ export async function POST(req: Request) {
   // a message-by-id view that doesn't exist.
   // alerts has no insert policy for authenticated clients at all — only
   // security-definer triggers and service-role crons write to it (see
-  // app/api/planning/validate/route.ts for the same constraint) — the
+  // app/api/planning/publier/route.ts for the same constraint) — the
   // admin client is required here, not the sender's own RLS-scoped one.
   const truncatedBody = !parsed.data.body
     ? "📷 Photo"

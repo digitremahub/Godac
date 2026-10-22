@@ -12,7 +12,7 @@ import { Card } from "@/components/ui";
  * lib/auth/provisioning.ts) until corrected here. Phone lives on the
  * same card since it's just as self-editable and just as often never
  * set at sign-up — it's what a manager's "Envoyer sur WhatsApp" link
- * on the planning grid needs (components/planning/PlanningSemaine).
+ * on the planning grid needs (components/planning/Affectations).
  *
  * Address is only shown for chauffeur (ou manager qui conduit) roles — it's
  * used exclusively to estimate the extra distance of a "retour à

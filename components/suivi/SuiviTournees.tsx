@@ -43,6 +43,8 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
   const [maj, setMaj] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  // Tournées terminées : repliées sur une ligne, dépliées au clic.
+  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
 
   const charger = useCallback(async () => {
     try {
@@ -207,11 +209,23 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
           )}
           {[...enCours, ...autres].map((t) => {
             const pct = t.adressesTotal ? Math.round((t.adressesFaites / t.adressesTotal) * 100) : 0;
+            const terminee = t.statut === "done";
+            const replie = terminee && !ouvertes.has(t.id);
             return (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setFocus((f) => (f === t.id ? null : t.id))}
+                aria-expanded={terminee ? !replie : undefined}
+                onClick={() => {
+                  setFocus((f) => (f === t.id ? null : t.id));
+                  if (terminee)
+                    setOuvertes((o) => {
+                      const n = new Set(o);
+                      if (n.has(t.id)) n.delete(t.id);
+                      else n.add(t.id);
+                      return n;
+                    });
+                }}
                 className={`rounded-xl border bg-surface p-3 text-left shadow-card transition-colors ${focus === t.id ? "border-teal" : "border-navy/10 hover:border-navy/25"}`}
               >
                 <div className="flex items-center gap-2">
@@ -224,6 +238,16 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
                 <p className="mt-0.5 truncate text-xs text-navy/60">
                   {[t.nom, t.services.map((s) => s.nom).join(", ")].filter(Boolean).join(" · ")}
                 </p>
+                {replie ? (
+                  <p className="mt-1 flex items-center justify-between text-xs text-navy/60">
+                    <span>
+                      {t.adressesFaites}/{t.adressesTotal} adresses faites
+                    </span>
+                    <span className="font-semibold text-teal-ink">Détail ▾</span>
+                  </p>
+                ) : (
+                <>
+                {terminee && <p className="mt-1 text-right text-xs font-semibold text-teal-ink">Replier ▴</p>}
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-navy/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                   <div className="h-full rounded-full bg-teal" style={{ width: `${pct}%` }} />
                 </div>
@@ -258,6 +282,8 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
                     ))}
                   </ol>
                 </div>
+                </>
+                )}
               </button>
             );
           })}

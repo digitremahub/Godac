@@ -186,7 +186,7 @@ describe("duplications", () => {
 
   it("résultat lisible et cumul", () => {
     const t = cumulerResultats([{ creees: 2, ignorees: 1 }, { creees: 1, conflits: 1 }]);
-    expect(t).toEqual({ creees: 3, ignorees: 1, conflits: 1 });
+    expect(t).toEqual({ creees: 3, ignorees: 1, conflits: 1, aRemplacer: 0 });
     expect(texteResultat(t)).toBe("3 créées, 1 ignorée (déjà occupée), 1 en conflit");
     expect(texteResultat({ creees: 0, ignorees: 2, conflits: 0 })).toBe("0 créée, 2 ignorées (déjà occupées), 0 en conflit");
   });

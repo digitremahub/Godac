@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { fetchGodac, lireRefus } from "@/lib/http/fetch-godac";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import {
@@ -12,8 +12,6 @@ import {
   joursDeLaSemaine,
   jourDe,
   libelleJour,
-  LIBELLE_ORIGINE,
-  preRemplir,
   rangJour,
   rangsJusquaFinDeSemaine,
   statutAffectation,
@@ -23,7 +21,6 @@ import {
   type AffectationPlanning,
   type CongePlanning,
   type ModelePlanning,
-  type OriginePreRemplissage,
   type VehiculePlanning,
 } from "@/lib/planning/semaine";
 import { ChoixRegroupement, lireChoixRequis, type ChoixRegroupementData } from "@/components/colis/ChoixRegroupement";
@@ -57,7 +54,7 @@ export type OnResultat = (texte: string, ton: Ton) => void;
 
 const json = (corps: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
 
-type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; warning?: string | null };
+type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; a_remplacer?: number; warning?: string | null };
 
 /**
  * Duplique des affectations une par une (POST /api/planning/entries/[id]/duplicate),
@@ -66,8 +63,8 @@ type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; wa
  */
 export async function dupliquerAffectations(
   demandes: { id: string; target_dates: string[]; driver_id?: string; vehicle_id?: string }[],
-): Promise<{ creees: number; ignorees: number; conflits: number; erreurs: string[]; avertissements: string[] }> {
-  const resultats: { creees: number; ignorees: number; conflits: number }[] = [];
+): Promise<{ creees: number; ignorees: number; conflits: number; aRemplacer: number; erreurs: string[]; avertissements: string[] }> {
+  const resultats: { creees: number; ignorees: number; conflits: number; aRemplacer: number }[] = [];
   const erreurs: string[] = [];
   const avertissements: string[] = [];
   for (const { id, ...corps } of demandes) {
@@ -76,7 +73,7 @@ export async function dupliquerAffectations(
       erreurs.push(r.refus.message);
       continue;
     }
-    resultats.push({ creees: r.data.created ?? 0, ignorees: r.data.skipped ?? 0, conflits: r.data.conflicts ?? 0 });
+    resultats.push({ creees: r.data.created ?? 0, ignorees: r.data.skipped ?? 0, conflits: r.data.conflicts ?? 0, aRemplacer: r.data.a_remplacer ?? 0 });
     if (r.data.warning) avertissements.push(r.data.warning);
   }
   return { ...cumulerResultats(resultats), erreurs: [...new Set(erreurs)], avertissements: [...new Set(avertissements)] };
@@ -85,7 +82,7 @@ export async function dupliquerAffectations(
 /** Message de fin d'une duplication : « X créées, Y ignorées (déjà occupées), Z en conflit ». */
 export function annoncerCopie(r: Awaited<ReturnType<typeof dupliquerAffectations>>, onResultat: OnResultat) {
   const texte = [texteResultat(r), ...r.erreurs, ...r.avertissements].join(" · ");
-  onResultat(texte, r.erreurs.length ? "erreur" : r.conflits || r.avertissements.length ? "attention" : "ok");
+  onResultat(texte, r.erreurs.length ? "erreur" : r.conflits || r.aRemplacer || r.avertissements.length ? "attention" : "ok");
 }
 
 function Avertissements({ messages }: { messages: string[] }) {
@@ -129,225 +126,6 @@ function SelectVehicule({ id, valeur, onChange, vehicules, serviceId }: { id: st
 }
 
 const dateLongue = (date: string) => `${JOURS_LONGS[rangJour(date)]} ${date.slice(8, 10)}/${date.slice(5, 7)}`;
-const aujourdhui = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
-
-// ---------------------------------------------------------------------------
-// Ajouter en un clic.
-// ---------------------------------------------------------------------------
-
-/**
- * Formulaire contextuel d'une case vide : chauffeur et jour déjà remplis,
- * il reste à choisir la tournée. Heure et véhicule pré-remplis
- * (lib/planning/semaine.ts › preRemplir). Entrée valide. Les conflits
- * s'affichent sans bloquer. Tournée colis active : question « séparées ou
- * reliées » si le chauffeur a déjà une tournée ce jour-là.
- */
-export function AjoutAffectation({
-  chauffeur,
-  date,
-  serviceIds,
-  serviceParDefaut,
-  donnees,
-  onFermer,
-  onResultat,
-}: {
-  chauffeur: { id: string; full_name: string };
-  date: string;
-  serviceIds: string[];
-  serviceParDefaut: string;
-  donnees: DonneesPlanning;
-  onFermer: () => void;
-  onResultat: OnResultat;
-}) {
-  const services = donnees.services.filter((s) => serviceIds.includes(s.id));
-  const [serviceId, setServiceId] = useState(serviceParDefaut || services[0]?.id || "");
-  const [recherche, setRecherche] = useState("");
-  const [tourNumber, setTourNumber] = useState("");
-  const [heure, setHeure] = useState("07:00");
-  const [vehiculeId, setVehiculeId] = useState("");
-  const [origine, setOrigine] = useState<OriginePreRemplissage>("defaut");
-  const [busy, setBusy] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [choix, setChoix] = useState<ChoixRegroupementData | null>(null);
-
-  const tournees = useMemo(() => {
-    const vus = new Set<string>();
-    return donnees.tournees
-      .filter((t) => t.serviceId === serviceId || !t.serviceId)
-      .filter((t) => (vus.has(t.tourNumber) ? false : (vus.add(t.tourNumber), true)));
-  }, [donnees.tournees, serviceId]);
-  const q = recherche.trim().toLowerCase();
-  const trouvees = q ? tournees.filter((t) => t.tourNumber.toLowerCase().includes(q)) : tournees;
-  const libre = q && !tournees.some((t) => t.tourNumber.toLowerCase() === q) ? recherche.trim() : null;
-
-  function remplir(tour: string, service = serviceId) {
-    const p = preRemplir({ driverId: chauffeur.id, serviceId: service, tourNumber: tour, date }, donnees);
-    setHeure(p.heure);
-    setVehiculeId(p.vehiculeId);
-    setOrigine(p.origine);
-  }
-
-  // Véhicule attribué au chauffeur dès l'ouverture.
-  useEffect(() => {
-    remplir("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function choisir(tour: string) {
-    setTourNumber(tour);
-    remplir(tour);
-  }
-
-  const avertissements = conflitsAffectation({ driverId: chauffeur.id, vehicleId: vehiculeId, date, heure }, donnees.affectations, donnees.conges);
-
-  async function envoyer(regroupement?: Regroupement) {
-    let tour = tourNumber;
-    let vehicule = vehiculeId;
-    if (!tour) {
-      const premier = trouvees[0]?.tourNumber ?? libre;
-      if (!premier) return setErreur("Choisissez une tournée.");
-      tour = premier;
-      const p = preRemplir({ driverId: chauffeur.id, serviceId, tourNumber: tour, date }, donnees);
-      vehicule = vehicule || p.vehiculeId;
-      setTourNumber(tour);
-      setHeure(p.heure);
-      setVehiculeId(vehicule);
-      setOrigine(p.origine);
-      if (!vehicule) return setErreur("Choisissez le véhicule.");
-    }
-    if (!vehicule) return setErreur("Choisissez le véhicule.");
-    if (!/^\d{2}:\d{2}$/.test(heure)) return setErreur("Indiquez l'heure de départ.");
-    if (date < aujourdhui() && !regroupement && !(await confirmer({ titre: "Ajouter une affectation dans le passé ?", message: `Le ${dateLongue(date)} est passé.`, action: "Ajouter quand même" }))) return;
-
-    setBusy(true);
-    setErreur(null);
-    let res: Response;
-    try {
-      res = await fetch("/api/planning/entries", json({ service_id: serviceId, driver_id: chauffeur.id, vehicle_id: vehicule, tour_number: tour, start_at: parisWallTimeToUtcISOString(date, heure), regroupement }));
-    } catch {
-      setBusy(false);
-      return setErreur("Connexion impossible. Vérifiez le réseau puis réessayez.");
-    }
-    const corps: any = await res.json().catch(() => null);
-    setBusy(false);
-    const question = lireChoixRequis(res.status, corps);
-    if (question) return setChoix(question);
-    if (!res.ok) return setErreur(lireRefus(res.status, corps).message);
-    const fiche = corps?.fiche ? " Fiche Tournée colis du chauffeur préparée." : "";
-    onResultat(`Tournée n°${tour} ajoutée pour ${chauffeur.full_name}, ${dateLongue(date)} à ${heure}.${fiche}${corps?.warning ? ` ${corps.warning}` : ""}`, corps?.warning ? "attention" : "ok");
-    onFermer();
-  }
-
-  function soumettre(e: FormEvent) {
-    e.preventDefault();
-    if (!busy && !choix) void envoyer();
-  }
-
-  return (
-    <Fenetre titre={`Ajouter une tournée`} sousTitre={`${chauffeur.full_name} · ${dateLongue(date)}`} onFermer={onFermer}>
-      <form className="flex flex-col gap-3" onSubmit={soumettre}>
-        {services.length > 1 && (
-          <label className="block">
-            <span className="label">Service</span>
-            <select
-              className="input min-h-[44px]"
-              value={serviceId}
-              onChange={(e) => {
-                setServiceId(e.target.value);
-                setTourNumber("");
-                remplir("", e.target.value);
-              }}
-            >
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <div>
-          <label className="label" htmlFor="ajout-recherche">
-            Tournée
-          </label>
-          <input
-            id="ajout-recherche"
-            data-autofocus
-            className="input min-h-[44px]"
-            placeholder="Rechercher un numéro de tournée…"
-            value={recherche}
-            autoComplete="off"
-            onChange={(e) => {
-              setRecherche(e.target.value);
-              setTourNumber("");
-            }}
-          />
-          <div role="radiogroup" aria-label="Tournées du service" className="mt-2 flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
-            {trouvees.slice(0, 40).map((t) => (
-              <button
-                key={t.tourNumber}
-                type="button"
-                role="radio"
-                aria-checked={tourNumber === t.tourNumber}
-                onClick={() => choisir(t.tourNumber)}
-                className={`min-h-[44px] min-w-[56px] rounded-lg border px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
-                  tourNumber === t.tourNumber ? "border-teal bg-teal/20 text-teal-ink" : "border-navy/15 hover:border-teal/50"
-                }`}
-              >
-                n°{t.tourNumber}
-              </button>
-            ))}
-            {libre && (
-              <button
-                type="button"
-                role="radio"
-                aria-checked={tourNumber === libre}
-                onClick={() => choisir(libre)}
-                className={`min-h-[44px] rounded-lg border border-dashed px-3 text-sm ${tourNumber === libre ? "border-teal bg-teal/20 text-teal-ink" : "border-navy/25"}`}
-              >
-                Utiliser « {libre} »
-              </button>
-            )}
-            {trouvees.length === 0 && !libre && <p className="text-sm text-navy/60">Aucune tournée enregistrée pour ce service : tapez son numéro.</p>}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-3">
-          <label className="block">
-            <span className="label">Heure</span>
-            <input className="input min-h-[44px]" type="time" value={heure} onChange={(e) => setHeure(e.target.value)} required />
-          </label>
-          <label className="block" htmlFor="ajout-vehicule">
-            <span className="label">Véhicule</span>
-            <SelectVehicule id="ajout-vehicule" valeur={vehiculeId} onChange={setVehiculeId} vehicules={donnees.vehicules} serviceId={serviceId} />
-          </label>
-        </div>
-        {origine !== "defaut" && <p className="-mt-1 text-xs text-navy/60">Heure et véhicule {LIBELLE_ORIGINE[origine]}.</p>}
-
-        <Avertissements messages={avertissements} />
-        {erreur && (
-          <p role="alert" className="text-sm text-orange-ink">
-            {erreur}
-          </p>
-        )}
-        {choix ? (
-          <ChoixRegroupement choix={choix} busy={busy} onChoisir={(r) => void envoyer(r)} onAnnuler={() => setChoix(null)} />
-        ) : (
-          <div className="flex gap-2">
-            <button type="submit" className="btn-primary min-h-[44px] flex-1" disabled={busy || (!tourNumber && !trouvees.length && !libre)}>
-              {busy ? "Ajout…" : tourNumber ? `Ajouter n°${tourNumber}` : "Ajouter"}
-            </button>
-            <button type="button" className="btn-secondary min-h-[44px]" onClick={onFermer}>
-              Annuler
-            </button>
-          </div>
-        )}
-        <p className="text-xs text-navy/55">Entrée pour valider · Échap pour fermer</p>
-      </form>
-    </Fenetre>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Modifier / supprimer / dupliquer une affectation.
@@ -387,12 +165,18 @@ export function EditionAffectation({
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [cibles, setCibles] = useState<Set<string>>(new Set());
+  const [choix, setChoix] = useState<ChoixRegroupementData | null>(null);
 
   const avertissements = modifiable ? conflitsAffectation({ driverId: chauffeurId || null, vehicleId: vehiculeId, date, heure, ignorerId: entree.id }, donnees.affectations, donnees.conges) : [];
   const tourneesDuService = donnees.tournees.filter((t) => t.serviceId === entree.service_id);
 
   async function enregistrer(e: FormEvent) {
     e.preventDefault();
+    if (!choix) await envoyer();
+  }
+
+  /** PATCH ; nouveau chauffeur qui a déjà une tournée ce jour-là : « séparées ou reliées ? » d'abord. */
+  async function envoyer(regroupement?: Regroupement) {
     if (!modifiable) return;
     const corps: Record<string, string> = {};
     if (tour.trim() && tour.trim() !== entree.tour_number) corps.tour_number = tour.trim();
@@ -403,10 +187,19 @@ export function EditionAffectation({
     if (!Object.keys(corps).length) return onFermer();
     setBusy(true);
     setErreur(null);
-    const r = await fetchGodac<{ warning?: string | null }>(`/api/planning/entries/${entree.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
+    let res: Response;
+    try {
+      res = await fetch(`/api/planning/entries/${entree.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...corps, regroupement }) });
+    } catch {
+      setBusy(false);
+      return setErreur("Connexion impossible. Vérifiez le réseau puis réessayez.");
+    }
+    const reponse: any = await res.json().catch(() => null);
     setBusy(false);
-    if (!r.ok) return setErreur(r.refus.message);
-    onResultat(`Tournée n°${corps.tour_number ?? entree.tour_number} modifiée.${r.data.warning ? ` ${r.data.warning}` : ""}`, r.data.warning ? "attention" : "ok");
+    const question = lireChoixRequis(res.status, reponse);
+    if (question) return setChoix(question);
+    if (!res.ok) return setErreur(lireRefus(res.status, reponse).message);
+    onResultat(`Tournée n°${corps.tour_number ?? entree.tour_number} modifiée.${reponse?.warning ? ` ${reponse.warning}` : ""}`, reponse?.warning ? "attention" : "ok");
     onFermer();
   }
 
@@ -495,8 +288,9 @@ export function EditionAffectation({
             </label>
           </div>
           <Avertissements messages={avertissements} />
+          {choix && <ChoixRegroupement choix={choix} busy={busy} onChoisir={(r) => void envoyer(r)} onAnnuler={() => setChoix(null)} />}
           <div className="flex flex-wrap gap-2">
-            <button type="submit" className="btn-primary min-h-[44px] flex-1" disabled={busy}>
+            <button type="submit" className="btn-primary min-h-[44px] flex-1" disabled={busy || Boolean(choix)}>
               {busy ? "Enregistrement…" : "Enregistrer"}
             </button>
             <button type="button" className="btn-secondary min-h-[44px] text-orange-ink" disabled={busy} onClick={supprimer}>
@@ -561,78 +355,10 @@ export function EditionAffectation({
 }
 
 // ---------------------------------------------------------------------------
-// Dupliquer une journée (toute l'équipe, ou un chauffeur).
-// ---------------------------------------------------------------------------
-
-export function DupliquerJournee({
-  date,
-  chauffeur,
-  entrees,
-  onFermer,
-  onResultat,
-}: {
-  date: string;
-  /** null : toutes les affectations affichées ce jour-là. */
-  chauffeur: { id: string; full_name: string } | null;
-  entrees: AffectationPlanning[];
-  onFermer: () => void;
-  onResultat: OnResultat;
-}) {
-  const lundi = addDays(date, -rangJour(date));
-  const copiables = entrees.filter(estCopiable);
-  const [cibles, setCibles] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-
-  async function valider() {
-    setBusy(true);
-    const r = await dupliquerAffectations(copiables.map((e) => ({ id: e.id, target_dates: [...cibles].sort() })));
-    setBusy(false);
-    annoncerCopie(r, onResultat);
-    onFermer();
-  }
-
-  return (
-    <Fenetre titre={chauffeur ? `Dupliquer la journée de ${chauffeur.full_name}` : `Dupliquer la journée du ${libelleJour(date)}`} sousTitre={`${copiables.length} affectation${copiables.length > 1 ? "s" : ""} du ${dateLongue(date)}, mêmes heures, chauffeurs et véhicules.`} onFermer={onFermer}>
-      {copiables.length === 0 ? (
-        <p className="text-sm text-navy/70">Rien à dupliquer ce jour-là.</p>
-      ) : (
-        <>
-          <ChoixJours
-            semaines={[
-              { titre: "Cette semaine", jours: joursDeLaSemaine(lundi) },
-              { titre: "Semaine suivante", jours: joursDeLaSemaine(addDays(lundi, 7)) },
-            ]}
-            coches={cibles}
-            onBasculer={(d) =>
-              setCibles((p) => {
-                const n = new Set(p);
-                if (n.has(d)) n.delete(d);
-                else n.add(d);
-                return n;
-              })
-            }
-            desactive={date}
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary min-h-[44px] text-sm" disabled={rangJour(date) === 6} onClick={() => setCibles(new Set(rangsJusquaFinDeSemaine(rangJour(date)).map((r) => addDays(lundi, r))))}>
-              Jusqu&apos;à la fin de la semaine
-            </button>
-            <button type="button" className="btn-primary min-h-[44px] flex-1 text-sm" disabled={busy || !cibles.size} onClick={valider}>
-              {busy ? "Duplication…" : `Dupliquer vers ${cibles.size || "…"} jour${cibles.size > 1 ? "s" : ""}`}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-navy/55">Les créneaux déjà occupés sont ignorés, rien n&apos;est écrasé.</p>
-        </>
-      )}
-    </Fenetre>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Dupliquer la semaine (1 à 8 semaines), avec aperçu.
 // ---------------------------------------------------------------------------
 
-type ReponseSemaine = { created: number; skipped: number; conflicts: number; source_count: number; warning?: string | null };
+type ReponseSemaine = { created: number; skipped: number; conflicts: number; a_remplacer?: number; source_count: number; warning?: string | null };
 
 export function DupliquerSemaine({
   lundi,
@@ -676,8 +402,8 @@ export function DupliquerSemaine({
     const r = await fetchGodac<ReponseSemaine>("/api/planning/duplicate-week", json(corps));
     setBusy(false);
     if (!r.ok) return setErreur(r.refus.message);
-    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts });
-    onResultat(`Semaine dupliquée sur ${semaines} semaine${semaines > 1 ? "s" : ""} : ${texte}.${r.data.warning ? ` ${r.data.warning}` : ""}`, r.data.conflicts ? "attention" : "ok");
+    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts, aRemplacer: r.data.a_remplacer });
+    onResultat(`Semaine dupliquée sur ${semaines} semaine${semaines > 1 ? "s" : ""} : ${texte}.${r.data.warning ? ` ${r.data.warning}` : ""}`, r.data.conflicts || r.data.a_remplacer ? "attention" : "ok");
     onFermer();
   }
 
@@ -705,7 +431,7 @@ export function DupliquerSemaine({
       </fieldset>
 
       <div className="mt-4 rounded-lg bg-navy/[0.04] p-3 text-sm" aria-live="polite">
-        {chargement ? "Calcul de l'aperçu…" : apercu ? (apercu.source_count === 0 ? "Aucune affectation à dupliquer cette semaine." : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts })}.`) : null}
+        {chargement ? "Calcul de l'aperçu…" : apercu ? (apercu.source_count === 0 ? "Aucune affectation à dupliquer cette semaine." : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts, aRemplacer: apercu.a_remplacer })}.`) : null}
       </div>
       {erreur && (
         <p role="alert" className="mt-2 text-sm text-orange-ink">

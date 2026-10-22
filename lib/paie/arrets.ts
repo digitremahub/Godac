@@ -200,3 +200,19 @@ export function calculerArret(params: {
     avertissements,
   };
 }
+
+/**
+ * Arrêts proposés sur un bulletin déjà généré : la ligne enregistrée
+ * (work_stoppages) fait foi quand elle existe — dates corrigées par
+ * l'encadrement, IJSS saisies —, les arrêts déclarés depuis la
+ * génération s'ajoutent, ceux refusés depuis disparaissent. Les arrêts
+ * du bulletin sans ligne enregistrée (table absente) sont gardés.
+ */
+export function arretsDuBulletin(bulletin: readonly ArretTravail[] | null | undefined, enBase: readonly ArretTravail[], refuses: readonly string[] = []): ArretTravail[] {
+  if (!bulletin) return [...enBase];
+  const parId = new Map(enBase.filter((a) => a.id).map((a) => [a.id!, a]));
+  const refus = new Set(refuses);
+  const garde = bulletin.filter((a) => !a.id || !refus.has(a.id)).map((a) => (a.id && parId.get(a.id)) || a);
+  const vus = new Set(garde.map((a) => a.id).filter(Boolean));
+  return [...garde, ...enBase.filter((a) => a.id && !vus.has(a.id))].sort((a, b) => a.du.localeCompare(b.du));
+}

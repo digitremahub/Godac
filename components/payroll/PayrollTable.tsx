@@ -18,6 +18,10 @@ export interface PayrollRow {
   worked_hours: number;
   /** Already has a payslip for the period currently shown — see page.tsx's periodStart/periodEnd. */
   payslip_generated: boolean;
+  /** Jours d'arrêt de travail dans le mois (arrêts non refusés). */
+  stoppage_days?: number;
+  /** Heures prévues du mois, diminuées des jours ouvrés d'arrêt. */
+  planned_hours?: number;
 }
 
 function formatHours(hours: number): string {
@@ -203,7 +207,14 @@ export function PayrollTable({
                         ? `${row.monthly_gross_salary !== null ? formatEuros(row.monthly_gross_salary) : "—"} / ${row.monthly_net_salary !== null ? formatEuros(row.monthly_net_salary) : "—"}`
                         : "—"}
                     </td>
-                    <td className="py-2">{row.contractual_monthly_hours} h</td>
+                    <td className="py-2">
+                      {row.contractual_monthly_hours} h
+                      {row.stoppage_days ? (
+                        <span className="block text-xs text-navy/60">
+                          prévues {String(row.planned_hours ?? row.contractual_monthly_hours).replace(".", ",")} h · arrêt {row.stoppage_days} j
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="py-2">
                       {rates
                         ? `${rates.grossPerHour !== null ? `${formatEuros(rates.grossPerHour)}/h` : "—"} / ${rates.netPerHour !== null ? `${formatEuros(rates.netPerHour)}/h` : "—"}`

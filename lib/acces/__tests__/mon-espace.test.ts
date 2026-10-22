@@ -13,7 +13,7 @@ describe("Mon espace en 3 onglets", () => {
     expect(ids("chauffeur")).toEqual({
       journee: ["moi.tournee_depart", "moi.tournee_colis", "moi.planning", "moi.pointage", "carburant.pleins", "moi.vehicule", "moi.signaler"],
       documents: ["moi.fiches_paie", "moi.amendes", "exploitation.contestations"],
-      demandes: ["moi.conges", "moi.acomptes"],
+      demandes: ["moi.conges", "moi.arrets", "moi.acomptes"],
     });
   });
 
@@ -21,7 +21,7 @@ describe("Mon espace en 3 onglets", () => {
     const g = groupes("chauffeur");
     const hrefs = g.flatMap((x) => x.onglets.map((o) => o.href));
     expect(hrefs).toEqual(
-      expect.arrayContaining(["/moi/tournee/depart", "/livreur", "/moi/planning", "/moi/pointage", "/carburant/pleins?new=1", "/moi/vehicule", "/moi/signaler", "/moi/fiches-de-paie", "/moi/amendes", "/exploitation/contestations", "/moi/conges", "/moi/acomptes"]),
+      expect.arrayContaining(["/moi/tournee/depart", "/livreur", "/moi/planning", "/moi/pointage", "/carburant/pleins?new=1", "/moi/vehicule", "/moi/signaler", "/moi/fiches-de-paie", "/moi/amendes", "/exploitation/contestations", "/moi/conges", "/moi/arrets", "/moi/acomptes"]),
     );
     // Lien de l'onglet : premier écran sous /moi.
     expect(g.map((x) => x.href)).toEqual(["/moi/tournee/depart", "/moi/fiches-de-paie", "/moi/conges"]);
@@ -30,7 +30,7 @@ describe("Mon espace en 3 onglets", () => {
   });
 
   it("manager qui ne conduit pas : ni écrans de conduite ni « Pour un collègue » en tête (il passe par le Planning)", () => {
-    expect(ids("manager", false)).toEqual({ journee: ["moi.pointage"], documents: ["moi.fiches_paie"], demandes: ["moi.conges", "moi.acomptes"] });
+    expect(ids("manager", false)).toEqual({ journee: ["moi.pointage"], documents: ["moi.fiches_paie"], demandes: ["moi.conges", "moi.arrets", "moi.acomptes"] });
     // L'écran reste ouvert (droits inchangés).
     expect(deciderAcces(ecran("moi.tournee_collegue"), "manager", tout, false).ok).toBe(true);
   });
@@ -44,13 +44,14 @@ describe("Mon espace en 3 onglets", () => {
   });
 
   it("comptable : pas de conduite ; direction : pas de Mon espace", () => {
-    expect(ids("comptable")).toEqual({ journee: ["moi.pointage"], documents: ["moi.fiches_paie"], demandes: ["moi.conges", "moi.acomptes"] });
+    expect(ids("comptable")).toEqual({ journee: ["moi.pointage"], documents: ["moi.fiches_paie"], demandes: ["moi.conges", "moi.arrets", "moi.acomptes"] });
     expect(groupes("direction")).toEqual([]);
   });
 
   it("modules coupés : un onglet vide disparaît, le plein reste", () => {
-    expect(ids("chauffeur", true, new Set())).toEqual({ journee: ["carburant.pleins", "moi.vehicule"] });
-    expect(groupes("comptable", false, new Set())).toEqual([]);
+    // Arrêts de travail : aucun module requis (obligation légale).
+    expect(ids("chauffeur", true, new Set())).toEqual({ journee: ["carburant.pleins", "moi.vehicule"], demandes: ["moi.arrets"] });
+    expect(ids("comptable", false, new Set())).toEqual({ demandes: ["moi.arrets"] });
   });
 
   it("compte GO Navigation : seulement sa tournée colis", () => {

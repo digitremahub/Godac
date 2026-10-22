@@ -188,12 +188,14 @@ describe("menu par rôle", () => {
     const eq = menuPour("manager", tout).find((s) => s.id === "equipe")!;
     expect(eq.ecrans.map((e) => e.href)).toEqual(expect.arrayContaining([urlDe("equipe.utilisateurs"), urlDe("equipe.pointage"), urlDe("equipe.conges")]));
     // Le calendrier est un sous-onglet des congés.
-    expect(sousOnglets("equipe.conges", "manager", tout).map((o) => o.href)).toEqual([urlDe("equipe.conges"), urlDe("equipe.conges_calendrier")]);
+    expect(sousOnglets("equipe.conges", "manager", tout).map((o) => o.href)).toEqual([urlDe("equipe.conges"), urlDe("equipe.conges_calendrier"), urlDe("equipe.arrets")]);
   });
 
   it("module coupé → entrée retirée, section vide masquée", () => {
     expect(hrefs("chauffeur", new Set())).not.toContain(urlDe("moi.amendes"));
-    expect(sections("comptable", new Set())).not.toContain("equipe");
+    // Sans module, Équipe ne garde que les arrêts de travail (obligation légale, aucun module).
+    expect(menuPour("comptable", new Set()).find((x) => x.id === "equipe")?.ecrans.map((e) => e.id)).toEqual(["equipe.arrets"]);
+    expect(sections("chauffeur", new Set())).not.toContain("equipe");
   });
 
   it("état actif : la plus longue URL, puis les préfixes aussiActif", () => {

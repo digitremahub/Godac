@@ -19,6 +19,7 @@ export const USAGE_FEATURES = [
   "import_ai",
   "assistant",
   "route_optimization",
+  "ocr_arret",
 ] as const;
 export type UsageFeature = (typeof USAGE_FEATURES)[number];
 
@@ -39,6 +40,7 @@ export const LIBELLES_FONCTION: Record<UsageFeature, string> = {
   import_ai: "l'import de fichiers assisté par IA",
   assistant: "l'assistant GODAC",
   route_optimization: "l'optimisation des tournées colis",
+  ocr_arret: "la lecture des avis d'arrêt de travail",
 };
 
 /**

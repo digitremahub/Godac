@@ -15,14 +15,24 @@ import { fusionnerRetenues } from "@/lib/paie/acomptes";
 import { rattacherAcomptes } from "@/lib/paie/acomptes-serveur";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ArretTravail } from "@/lib/paie/types";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 export const maxDuration = 60;
 
 async function synchroniserArrets(supabase: SupabaseClient, organizationId: string, auteur: string, userId: string, debut: string, fin: string, arrets: ArretTravail[]) {
-  const { data: existants, error } = await supabase.from("work_stoppages").select("id").eq("user_id", userId).lte("start_date", fin).gte("end_date", debut);
+  // Un arrêt déclaré par le salarié ou saisi par l'encadrement (declared_by),
+  // ou refusé, n'est jamais supprimé depuis le bulletin : il se refuse dans
+  // Équipe › Congés › Arrêts. Seuls les arrêts saisis par la paie le sont.
+  // Colonnes absentes (migration 20261030000001) : comportement d'origine.
+  const lire = (colonnes: string) => supabase.from("work_stoppages").select(colonnes).eq("user_id", userId).lte("start_date", fin).gte("end_date", debut);
+  let { data: existants, error } = await lire("id, declared_by, status");
+  if (error && estSchemaManquant(error)) ({ data: existants, error } = await lire("id"));
   if (error) return;
   const garder = new Set(arrets.map((a) => a.id).filter(Boolean));
-  const retires = (existants ?? []).map((e) => String(e.id)).filter((id) => !garder.has(id));
+  const retires = ((existants ?? []) as unknown as { id: string; declared_by?: string | null; status?: string | null }[])
+    .filter((e) => !e.declared_by && e.status !== "refuse")
+    .map((e) => String(e.id))
+    .filter((id) => !garder.has(id));
   if (retires.length) await supabase.from("work_stoppages").delete().eq("user_id", userId).in("id", retires);
   if (!arrets.length) return;
   const lignes = arrets.map((a) => ({

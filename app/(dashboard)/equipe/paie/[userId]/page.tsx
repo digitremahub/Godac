@@ -9,6 +9,8 @@ import { currentMonth } from "@/lib/planning/dates";
 import { PaieEditor } from "@/components/paie/PaieEditor";
 import { SortieSalarie } from "@/components/paie/SortieSalarie";
 import { fusionnerRetenues } from "@/lib/paie/acomptes";
+import { arretsDuBulletin } from "@/lib/paie/arrets";
+import { ControleHeures } from "@/components/paie/ControleHeures";
 
 export default async function PaieSalariePage({ params, searchParams }: { params: Promise<{ userId: string }>; searchParams: Promise<{ mois?: string }> }) {
   const g = await garderPage("equipe.paie_salarie");
@@ -35,7 +37,8 @@ export default async function PaieSalariePage({ params, searchParams }: { params
         ...prefill,
         ...ctx.bulletinExistant.variables,
         retenues: fusionnerRetenues(ctx.bulletinExistant.variables.retenues, ctx.acomptes.retenues),
-        arrets: ctx.bulletinExistant.variables.arrets ?? prefill.arrets,
+        // Arrêts enregistrés (déclarés, corrigés ou refusés depuis) : la ligne en base fait foi.
+        arrets: arretsDuBulletin(ctx.bulletinExistant.variables.arrets, prefill.arrets ?? [], ctx.arretsRefuses),
         cpReference: prefill.cpReference,
         sortie: prefill.sortie,
       }
@@ -74,6 +77,7 @@ export default async function PaieSalariePage({ params, searchParams }: { params
           {direction && ctx.bulletinExistant.validation !== "valide" && <ValidationBulletins ids={[ctx.bulletinExistant.id]} compact />}
         </Card>
       )}
+      <ControleHeures controle={ctx.controleHeures} />
       <PaieEditor
         peutModifierProfil={direction}
         key={`${userId}-${mois}`}

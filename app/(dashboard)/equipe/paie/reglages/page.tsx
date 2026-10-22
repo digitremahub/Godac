@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { paieIndisponible, paysOrganisation } from "@/lib/pays/serveur";
 import { ReglagesPaieForm, type Reglages } from "@/components/paie/ReglagesPaieForm";
+import { sourceHeures } from "@/lib/paie/heures";
 import { FRAIS_CONVENTIONNELS, MAINTIEN_LEGAL, MODELE_TRANSPORT, parametresLegauxAu, versionParametres } from "@/lib/paie/parametres";
 
 export default async function ReglagesPaiePage() {
@@ -50,6 +51,8 @@ export default async function ReglagesPaiePage() {
     sick_pay_step_years: r && "sick_pay_step_years" in r ? n(r.sick_pay_step_years) : MAINTIEN_LEGAL.trancheAnnees,
     sick_pay_max_days: r && "sick_pay_max_days" in r ? n(r.sick_pay_max_days) : MAINTIEN_LEGAL.dureeMax,
     subrogation_enabled: Boolean(r?.subrogation_enabled),
+    // Migration 20261030000001 : absente = règle par défaut.
+    hours_source: sourceHeures(r?.hours_source),
   };
 
   return (
