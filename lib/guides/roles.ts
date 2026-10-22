@@ -108,7 +108,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Préparer : charger les colis",
         texte:
-          "Ouvrez « Ma tournée colis » (bouton « Colis » en bas de l'écran, ou Mon espace › Ma journée). Scannez chaque colis (QR, Datamatrix ou code-barres), photographiez l'étiquette, importez le bordereau ou saisissez une adresse avec son créneau : l'adresse et le téléphone du client s'ajoutent tout seuls. Ramasses et points relais se choisissent à la saisie.",
+          "Ouvrez « Ma tournée colis » (bouton « Colis » en bas de l'écran, ou Mon espace › Ma journée). Scannez chaque colis (QR, Datamatrix ou code-barres), photographiez l'étiquette, importez le bordereau de tournée (DPD, GLS, Colissimo, Chronopost…) ou saisissez une adresse avec son créneau : l'adresse et le téléphone du client s'ajoutent tout seuls. Ramasses et points relais se choisissent à la saisie.",
         lien: { href: "/livreur", label: "Ma tournée colis" },
         module: "route_optimizer",
       },

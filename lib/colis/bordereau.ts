@@ -1,10 +1,14 @@
 /**
- * Bordereau de tournée DPD (« BORDEREAU DE TOURNEE ») photographié page par
- * page au départ : lecture brute par l'IA (lib/ocr/bordereau.ts, schéma
- * ci-dessous), puis normalisation ici — pays depuis le préfixe « F- »,
- * ville tronquée par « .. », téléphone, type d'arrêt depuis les codes
- * (CR, PRE, RDV…), horaires « 8h15 / 12h15 - 13h30/17h15 », déduplication
- * des pages re-photographiées et des colis, compteur face au total imprimé.
+ * Bordereau de tournée (feuille de route, bordereau de départ) de tout
+ * transporteur de messagerie — DPD, GLS, Chronopost, Colissimo, Colis
+ * Privé, UPS, DHL, TNT/FedEx, Geodis/Ciblex, Heppner, Relais Colis, Mondial
+ * Relay, Amazon… — photographié page par page au départ : lecture brute par
+ * l'IA (lib/ocr/bordereau.ts, schéma ci-dessous), puis normalisation ici —
+ * transporteur, pays depuis le préfixe (« F- », « B- »), ville tronquée par
+ * « .. », téléphone, type d'arrêt depuis les codes ou libellés de service
+ * (CR, PRE, RDV, Enlèvement, Point relais…), horaires « 8h15 / 12h15 -
+ * 13h30/17h15 », déduplication des pages re-photographiées et des colis,
+ * compteur face au total imprimé.
  *
  * Purement fonctionnel (testé dans lib/colis/__tests__/bordereau.test.ts),
  * utilisé côté serveur (route de lecture) et dans l'écran d'import.
@@ -16,60 +20,93 @@ import { detecterProfessionnel } from "@/lib/colis/professionnel";
 import type { TypeArret } from "@/lib/colis/livraison";
 
 // ── Lecture brute (sortie structurée de l'IA) ───────────────────────
+// Schéma tolérant : l'IA peut omettre un champ vide, écrire un nombre en
+// texte (« 3,5 ») ou rendre une liste trop longue. Ces écarts de forme ne
+// doivent pas faire déclarer toute la page illisible : un champ absent ou
+// inexploitable vaut null, une liste est bornée, rien n'est inventé.
 
-const texte = z.string().max(1000).nullable();
-const nombre = z.number().nonnegative().nullable();
+const enTexte = (v: unknown): string | null => {
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  if (typeof v !== "string") return null;
+  return v.trim() ? v.slice(0, 1000) : null;
+};
+const enNombre = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/\s/g, "").replace(",", ".").replace(/[^\d.]+$/, "")) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+const liste = (max: number, garder: (x: unknown) => boolean = () => true) => (v: unknown) => (Array.isArray(v) ? v.filter(garder).slice(0, max) : []);
+const estObjet = (x: unknown) => typeof x === "object" && x !== null && !Array.isArray(x);
 
-export const colisLuSchema = z.object({
-  /** N° de colis (14 chiffres sur un bordereau DPD). */
-  numero: texte,
-  /** Poids imprimé sur la ligne du colis, en kg. */
-  poids_kg: nombre,
-});
+const texte = z.preprocess(enTexte, z.string().nullable());
+const nombre = z.preprocess(enNombre, z.number().nullable());
+const entier = z.preprocess((v) => {
+  const n = enNombre(v);
+  return n === null ? null : Math.round(n);
+}, z.number().int().nullable());
+
+export const colisLuSchema = z.preprocess(
+  // Un n° de colis rendu seul (« 0123… ») au lieu d'un objet.
+  (v) => (typeof v === "string" || typeof v === "number" ? { numero: v } : v),
+  z.object({
+    /** N° de colis (14 chiffres chez DPD, alphanumérique chez d'autres : « 6A12345678901 », « 1Z… »). */
+    numero: texte,
+    /** Poids imprimé sur la ligne du colis, en kg. */
+    poids_kg: nombre,
+  }),
+);
 
 export const blocLuSchema = z.object({
-  position: z.number().int().nonnegative().nullable(),
-  /** Codes imprimés à gauche du bloc, tels quels (« CR », « PRE », « PRE /RDV »…). */
-  codes: z.array(z.string().max(40)).max(20),
+  /** N° d'ordre imprimé (« Pos », « N° », « Ordre »…), null si la liste n'en a pas. */
+  position: entier,
+  /** Codes ou libellés de service imprimés, tels quels (« CR », « PRE /RDV », « Enlèvement », « Point relais »…). */
+  codes: z.preprocess(
+    liste(20, (x) => typeof x === "string" && x.trim() !== ""),
+    z.array(z.string().transform((c) => c.slice(0, 40))),
+  ),
   nom: texte,
   contact: texte,
   /** Rue et numéro, sans code postal ni ville. */
   adresse: texte,
-  /** Code pays, code postal et ville tels qu'imprimés : « F-66000 PERPIGNAN », « F-66000 PERPIG.. ». */
+  /** Code postal et ville tels qu'imprimés, avec le préfixe pays s'il y en a un : « F-66000 PERPIGNAN », « 66000 PERPIG.. ». */
   localite: texte,
   telephone: texte,
   /** Expéditeur / donneur d'ordre (« DEPOT …, B-9100 … (DPD 121) »). */
   expediteur: texte,
-  colis: z.array(colisLuSchema).max(200),
-  /** « N Colis en bon état ». */
-  nombre_colis: z.number().int().nonnegative().nullable(),
+  colis: z.preprocess(liste(200, (x) => x !== null && x !== undefined), z.array(colisLuSchema)),
+  /** Nombre de colis de l'arrêt (« N Colis en bon état », colonne « Nb colis »). */
+  nombre_colis: entier,
   /** Poids total du bloc en kg. */
   poids_total_kg: nombre,
   /** Nature des marchandises (« Divers », « Pneus »). */
   nature: texte,
   /** Lignes d'enlèvement, de créneau ou d'horaires, telles qu'imprimées. */
   horaires: texte,
-  /** Mentions particulières (« Emargement obligatoire à effectuer sur le PDA »). */
+  /** Mentions particulières (« Emargement obligatoire à effectuer sur le PDA », « Contre-remboursement »). */
   mentions: texte,
   /** Adresse rappelée entre crochets, sans les crochets. */
   adresse_rappel: texte,
 });
 
 export const enteteLueSchema = z.object({
+  /** Transporteur détecté (logo, nom imprimé), tel quel ; null si rien ne l'indique. */
+  transporteur: texte,
   numero: texte,
   tournee: texte,
   date: texte,
-  page: z.number().int().positive().nullable(),
-  total_colis: z.number().int().nonnegative().nullable(),
+  page: z.preprocess((v) => {
+    const n = enNombre(v);
+    return n !== null && n >= 1 ? Math.round(n) : null;
+  }, z.number().int().positive().nullable()),
+  total_colis: entier,
   total_poids_kg: nombre,
   code_barres: texte,
 });
 
 export const pageLueSchema = z.object({
-  /** false : page floue, coupée ou qui n'est pas un bordereau de tournée. */
-  lisible: z.boolean(),
-  entete: enteteLueSchema,
-  blocs: z.array(blocLuSchema).max(60),
+  /** false : page floue, coupée ou sans liste de colis / d'arrêts. */
+  lisible: z.preprocess((v) => v !== false, z.boolean()),
+  entete: z.preprocess((v) => (estObjet(v) ? v : {}), enteteLueSchema),
+  blocs: z.preprocess(liste(80, estObjet), z.array(blocLuSchema)),
 });
 
 export type ColisLu = z.infer<typeof colisLuSchema>;
@@ -81,9 +118,10 @@ export type PageLue = z.infer<typeof pageLueSchema>;
 
 export type TypeBloc = "livraison" | "ramasse" | "rdv" | "relais";
 
-/** Préfixes pays imprimés devant le code postal (« F-66000 », « B-9100 »). */
+/** Préfixes pays imprimés devant le code postal : plaques (« F-66000 », « B-9100 ») ou codes ISO (« FR-66000 »). */
 const PAYS: Record<string, string> = {
   F: "FR", B: "BE", D: "DE", L: "LU", NL: "NL", CH: "CH", I: "IT", E: "ES", P: "PT", A: "AT", GB: "GB", IRL: "IE", MC: "MC", AND: "AD", PL: "PL", CZ: "CZ", DK: "DK", S: "SE",
+  FR: "FR", BE: "BE", DE: "DE", LU: "LU", IT: "IT", ES: "ES", PT: "PT", AT: "AT", IE: "IE", AD: "AD", SE: "SE",
 };
 
 export interface Localite {
@@ -102,11 +140,20 @@ const nettoyer = (v: string | null | undefined): string | null => {
 /** Ville coupée : se termine par « .. » ou « … ». */
 const TRONQUE = /\s*(?:\.{2,}|…)\s*$/;
 
-/** « F-66000 PERPIGNAN » → { pays: "FR", codePostal: "66000", ville: "PERPIGNAN" }. */
+/**
+ * « F-66000 PERPIGNAN » → { pays: "FR", codePostal: "66000", ville: "PERPIGNAN" } ;
+ * aussi « 66000 PERPIGNAN » (sans préfixe) et « PERPIGNAN 66000 » (code
+ * postal après la ville, vu sur certaines feuilles de route).
+ */
 export function lireLocalite(brut: string | null | undefined): Localite {
   const t = nettoyer(brut);
   if (!t) return { pays: null, codePostal: null, ville: null, villeTronquee: false };
-  const m = t.match(/^(?:([A-Z]{1,3})\s*-\s*)?(\d{4,5})\b[\s,]*(.*)$/i);
+  const m = t.match(/^(?:([A-Z]{1,3})\s*-\s*)?(\d{4,5})\b[\s,-]*(.*)$/i);
+  const apres = m ? null : t.match(/^(\D+?)[\s,-]+(\d{5})$/);
+  if (apres) {
+    const villeTronquee = TRONQUE.test(apres[1]!);
+    return { pays: null, codePostal: apres[2]!, ville: nettoyer(apres[1]!.replace(TRONQUE, "").replace(/[,.]+$/, "")), villeTronquee };
+  }
   if (!m) {
     const tronquee = TRONQUE.test(t);
     return { pays: null, codePostal: null, ville: nettoyer(t.replace(TRONQUE, "")), villeTronquee: tronquee };
@@ -136,18 +183,52 @@ export function villeDepuisRappel(rappel: string | null | undefined, codePostal:
   return null;
 }
 
+/** Enlèvement chez l'expéditeur : « CR » (DPD), « ENL », « Enlèvement », « Ramasse », « Collecte »… */
+const MOTS_RAMASSE = new Set(["CR", "ENL", "ENLEV", "ENLEVEMENT", "ENLEVEMENTS", "RAMASSE", "RAMASSES", "RAMASSAGE", "COLLECTE", "COLLECTES", "COLLECTION"]);
+/** Point relais / consigne : « REL », « Pickup » (DPD), « ParcelShop » (GLS), « Pickup Station »… */
+const MOTS_RELAIS = new Set(["REL", "RELAIS", "RELAY", "PR", "PICKUP", "P2S", "SHOP", "PARCELSHOP", "PUDO", "LOCKER", "CONSIGNE", "CONSIGNES", "A2P", "BPR", "ACCESSPOINT"]);
+/** Rendez-vous : « RDV », « Rendez-vous », « Appointment ». */
+const MOTS_RDV = new Set(["RDV", "RENDEZVOUS", "APPOINTMENT", "APPT"]);
+
 /**
- * Type d'arrêt depuis les codes imprimés à gauche du bloc : « CR »
- * (enlèvement) → ramasse ; « RDV » → rendez-vous ; relais (« REL »,
- * « RELAIS », « PR », « PICKUP », « P2S ») → point relais ; le reste
- * (« PRE » Predict, code inconnu, aucun code) → livraison.
+ * Type d'arrêt depuis les codes ou libellés de service imprimés : DPD
+ * (« CR » enlèvement, « PRE » Predict, « RDV », « REL ») et équivalents
+ * courants des autres transporteurs (« Enlèvement », « Collecte »,
+ * « Point relais », « ParcelShop », « Consigne », « Rendez-vous »…). Le
+ * reste (Predict, express, code inconnu, aucun code) → livraison.
  */
 export function typeDepuisCodes(codes: string[]): TypeBloc {
-  const mots = codes.join(" ").toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
-  if (mots.includes("CR")) return "ramasse";
-  if (mots.some((m) => m === "REL" || m === "RELAIS" || m === "PR" || m === "PICKUP" || m === "P2S" || m === "SHOP")) return "relais";
-  if (mots.includes("RDV")) return "rdv";
+  const t = codes
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    // « Rendez-vous », « Point relais », « Access Point », « Pickup Station » : mots composés recollés.
+    .replace(/RENDEZ\W*VOUS/g, "RENDEZVOUS")
+    .replace(/POINTS?\W*RELAIS/g, "RELAIS")
+    .replace(/ACCESS\W*POINT/g, "ACCESSPOINT")
+    .replace(/PARCEL\W*SHOP/g, "PARCELSHOP")
+    .replace(/PICK\W*UP/g, "PICKUP");
+  const mots = t.split(/[^A-Z0-9]+/).filter(Boolean);
+  if (mots.some((m) => MOTS_RAMASSE.has(m))) return "ramasse";
+  if (mots.some((m) => MOTS_RELAIS.has(m))) return "relais";
+  if (mots.some((m) => MOTS_RDV.has(m))) return "rdv";
   return "livraison";
+}
+
+/**
+ * N° de colis lu : lettres et chiffres seuls, en majuscules. Le n° DPD
+ * (14 chiffres) perd sa lettre de contrôle ; les autres formats sont
+ * gardés tels quels (Colissimo « 6A… », UPS « 1Z… », GLS, Chronopost
+ * « XY…FR »). Trop court, trop long ou presque sans chiffre : null.
+ */
+export function lireNumeroColis(brut: string | null | undefined): string | null {
+  const t = brut?.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!t) return null;
+  const dpd = t.match(/^(\d{14})[A-Z]$/);
+  if (dpd) return dpd[1]!;
+  if (t.length < 8 || t.length > 35) return null;
+  return (t.match(/\d/g)?.length ?? 0) >= 6 ? t : null;
 }
 
 /** Type d'arrêt GODAC : un rendez-vous reste une livraison (avec une note). */
@@ -164,7 +245,7 @@ const hhmm = (h: number, m: number) => `${String(h).padStart(2, "0")}:${String(m
 const minutes = (p: string) => Number(p.slice(0, 2)) * 60 + Number(p.slice(3, 5));
 
 /**
- * Horaires d'ouverture écrits à la main dans le système DPD : « 8h15 /
+ * Horaires d'ouverture saisis dans le système du transporteur : « 8h15 /
  * 12h15 - 13h30/17h15 », « 9h-12h 14h-18h », « 08:00-12:00 ». Les heures
  * sont prises deux à deux, dans l'ordre ; une suite qui ne monte pas est
  * rejetée (null) plutôt que devinée.
@@ -270,7 +351,7 @@ export function normaliserBloc(bloc: BlocLu, page: number | null = null, pays = 
   const villeTronquee = loc.villeTronquee && !villeRappel;
   const telBrut = nettoyer(bloc.telephone);
   const telephone = telBrut ? normaliserTelephone(telBrut.replace(TRONQUE, ""), pays) : null;
-  const colis = [...new Set(bloc.colis.map((c) => c.numero?.replace(/\D/g, "") ?? "").filter((n) => /^\d{10,20}$/.test(n)))];
+  const colis = [...new Set(bloc.colis.map((c) => lireNumeroColis(c.numero)).filter((n): n is string => n !== null))];
   const poidsColis = bloc.colis.reduce((s, c) => s + (c.poids_kg ?? 0), 0);
   const poidsKg = lirePoids(bloc.poids_total_kg) ?? lirePoids(Math.round(poidsColis * 1000) / 1000);
   const type = typeDepuisCodes(bloc.codes);
@@ -320,7 +401,9 @@ export function normaliserBloc(bloc: BlocLu, page: number | null = null, pays = 
 // ── En-tête et pages ────────────────────────────────────────────────
 
 export interface Entete {
-  /** N° de bordereau, chiffres seuls (« 377,682 » → « 377682 »). */
+  /** Transporteur détecté (« DPD », « GLS », « Colissimo »…), null s'il n'est pas indiqué. */
+  transporteur: string | null;
+  /** N° de bordereau sans séparateurs (« 377,682 » → « 377682 »). */
   numero: string | null;
   tournee: string | null;
   /** Date du bordereau au format AAAA-MM-JJ. */
@@ -342,10 +425,40 @@ export function lireDate(brut: string | null | undefined): string | null {
   return `${a}-${String(mo).padStart(2, "0")}-${String(j).padStart(2, "0")}`;
 }
 
+/** Noms connus, du plus précis au plus général (« Relais Colis » avant « Colis Privé »). */
+const TRANSPORTEURS: [RegExp, string][] = [
+  [/\bDPD\b|PREDICT|EXAPAQ/i, "DPD"],
+  [/\bGLS\b/i, "GLS"],
+  [/CHRONO/i, "Chronopost"],
+  [/COLISSIMO/i, "Colissimo"],
+  [/RELAIS\s*COLIS/i, "Relais Colis"],
+  [/MONDIAL\s*RELAY/i, "Mondial Relay"],
+  [/COLIS\s*PRIV/i, "Colis Privé"],
+  [/\bUPS\b/i, "UPS"],
+  [/\bDHL\b/i, "DHL"],
+  [/\bTNT\b/i, "TNT"],
+  [/FED\s*EX/i, "FedEx"],
+  [/CIBLEX/i, "Ciblex"],
+  [/GEODIS/i, "Geodis"],
+  [/HEPPNER/i, "Heppner"],
+  [/SCHENKER/i, "DB Schenker"],
+  [/AMAZON|\bAMZL\b/i, "Amazon"],
+  [/LA\s*POSTE/i, "La Poste"],
+];
+
+/** « dpd france », « GLS France » → « DPD », « GLS » ; un nom inconnu est gardé tel quel. */
+export function lireTransporteur(brut: string | null | undefined): string | null {
+  const t = nettoyer(brut);
+  if (!t) return null;
+  return TRANSPORTEURS.find(([re]) => re.test(t))?.[1] ?? t.slice(0, 40);
+}
+
 export function normaliserEntete(e: EnteteLue): Entete {
-  const numero = e.numero?.replace(/\D/g, "") || null;
+  // N° de bordereau sans séparateurs (« 377,682 » → « 377682 ») ; lettres gardées en majuscules.
+  const numero = e.numero?.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 40) || null;
   const codeBarres = e.code_barres?.replace(/\D/g, "") || null;
   return {
+    transporteur: lireTransporteur(e.transporteur),
     numero,
     tournee: nettoyer(e.tournee),
     date: lireDate(e.date),
@@ -361,9 +474,19 @@ export interface PageBordereau {
   arrets: ArretBordereau[];
 }
 
+/**
+ * Page lue → en-tête et arrêts. Une liste sans n° d'ordre ou sans poids
+ * (fréquent hors DPD) ne signale pas « position absente » / « poids
+ * absent » sur chaque ligne : le doute ne vaut que si d'autres lignes de
+ * la page en ont un.
+ */
 export function normaliserPage(page: PageLue, pays = "FR"): PageBordereau {
   const entete = normaliserEntete(page.entete);
-  return { entete, arrets: page.blocs.map((b) => normaliserBloc(b, entete.page, pays)) };
+  let arrets = page.blocs.map((b) => normaliserBloc(b, entete.page, pays));
+  const sansPosition = arrets.every((a) => a.position === null);
+  const sansPoids = arrets.every((a) => a.poidsKg === null);
+  if (sansPosition || sansPoids) arrets = arrets.map((a) => ({ ...a, doutes: a.doutes.filter((d) => !(d === "position" && sansPosition) && !(d === "poids" && sansPoids)) }));
+  return { entete, arrets };
 }
 
 /**
@@ -388,29 +511,70 @@ export function ajouterPage<T extends PageBordereau>(pages: T[], page: T): T[] {
   return pages.map((p, k) => (k === i ? page : p));
 }
 
+const lettres = (v: string | null) => (v ?? "").normalize("NFD").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+const differents = (x: string, y: string) => Boolean(x && y && !x.startsWith(y) && !y.startsWith(x));
+
 /**
- * Arrêts de toutes les pages, dans l'ordre des positions du bordereau,
- * sans doublon : même position (un bloc à cheval sur deux pages, ou deux
- * photos de la même page sans en-tête lisible) ou colis déjà vus. Les
- * colis déjà présents sur un arrêt précédent sont retirés du suivant.
+ * Deux lectures du même arrêt ? Un colis en commun suffit ; sinon elles
+ * diffèrent seulement si le destinataire ET la rue (ou le code postal)
+ * diffèrent — un bloc coupé en bas de page, ou relu avec une faute, reste
+ * le même arrêt.
+ */
+export function memeArret(a: ArretBordereau, b: ArretBordereau): boolean {
+  if (a.colis.some((c) => b.colis.includes(c))) return true;
+  if (a.colis.length && b.colis.length && !a.nom && !b.nom) return false;
+  return !(differents(lettres(a.nom), lettres(b.nom)) && (differents(lettres(a.rue), lettres(b.rue)) || differents(a.codePostal ?? "", b.codePostal ?? "")));
+}
+
+/**
+ * Arrêts de toutes les pages, dans l'ordre du bordereau, sans doublon.
+ *
+ * Ordre : celui des positions (DPD numérote tout le bordereau, ce qui
+ * remet en ordre des photos prises dans le désordre) ; si la numérotation
+ * repart à 1 à chaque page (même position, destinataires différents sur
+ * deux photos), ordre des pages puis des positions. Les lignes sans
+ * position gardent l'ordre de la page.
+ *
+ * Doublons : même position et même arrêt (bloc à cheval sur deux pages,
+ * page photographiée deux fois sans en-tête lisible) → une seule lecture,
+ * la plus complète, avec les colis des deux ; colis déjà vus sur un arrêt
+ * précédent retirés du suivant.
  */
 export function fusionnerPages(pages: PageBordereau[]): ArretBordereau[] {
-  const parCle = new Map<string, ArretBordereau>();
+  const items = pages.flatMap((p, photo) => p.arrets.map((a, rang) => ({ a, photo, rang, page: p.entete.page })));
+  const parPosition = new Map<number, typeof items>();
+  for (const it of items) if (it.a.position !== null) parPosition.set(it.a.position, [...(parPosition.get(it.a.position) ?? []), it]);
+  const numerotationParPage = [...parPosition.values()].some((l) => l.some((x) => l.some((y) => x.photo !== y.photo && !memeArret(x.a, y.a))));
+  const ordrePage = (x: (typeof items)[number], y: (typeof items)[number]) => (x.page !== null && y.page !== null ? x.page - y.page : x.photo - y.photo);
+  const ordrePosition = (x: (typeof items)[number], y: (typeof items)[number]) => (x.a.position ?? Infinity) - (y.a.position ?? Infinity);
+  items.sort((x, y) =>
+    numerotationParPage
+      ? ordrePage(x, y) || ordrePosition(x, y) || x.rang - y.rang
+      : ordrePosition(x, y) || (x.page ?? Infinity) - (y.page ?? Infinity) || x.photo - y.photo || x.rang - y.rang,
+  );
+
+  const sortie: ArretBordereau[] = [];
+  const cles = new Set<string>();
   const colisVus = new Set<string>();
-  const tous = pages.flatMap((p) => p.arrets).sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || (a.page ?? 0) - (b.page ?? 0));
-  for (const a of tous) {
-    const deja = parCle.get(a.cle);
-    if (deja) {
-      // Même bloc lu deux fois : on garde la lecture la plus complète.
-      if (a.doutes.length < deja.doutes.length) parCle.set(a.cle, a);
+  for (const { a, photo } of items) {
+    const i = sortie.findIndex((s) => (a.position !== null ? s.position === a.position : s.cle === a.cle) && memeArret(s, a));
+    if (i >= 0) {
+      // Même arrêt lu deux fois : la lecture la plus complète, avec les colis des deux.
+      const deja = sortie[i]!;
+      const base = a.doutes.length < deja.doutes.length ? { ...a, cle: deja.cle } : deja;
+      const ajout = [...deja.colis, ...a.colis].filter((c, k, t) => t.indexOf(c) === k && (deja.colis.includes(c) || !colisVus.has(c)));
+      for (const c of ajout) colisVus.add(c);
+      sortie[i] = { ...base, colis: ajout, nombreColis: Math.max(base.nombreColis, ajout.length) };
       continue;
     }
     const nouveaux = a.colis.filter((c) => !colisVus.has(c));
     if (a.colis.length && !nouveaux.length) continue;
     for (const c of nouveaux) colisVus.add(c);
-    parCle.set(a.cle, nouveaux.length === a.colis.length ? a : { ...a, colis: nouveaux, nombreColis: Math.max(nouveaux.length, a.nombreColis - (a.colis.length - nouveaux.length)) });
+    const cle = cles.has(a.cle) ? `${a.cle}@${a.page ?? `photo${photo}`}` : a.cle;
+    cles.add(cle);
+    sortie.push(nouveaux.length === a.colis.length ? { ...a, cle } : { ...a, cle, colis: nouveaux, nombreColis: Math.max(nouveaux.length, a.nombreColis - (a.colis.length - nouveaux.length)) });
   }
-  return [...parCle.values()];
+  return sortie;
 }
 
 export interface Compteur {
@@ -469,12 +633,12 @@ export function adresseComplete(a: Pick<ArretBordereau, "rue" | "codePostal" | "
   return [a.rue, localite, a.pays && a.pays !== "FR" ? a.pays : null].filter(Boolean).join(", ");
 }
 
-/** Notes de l'arrêt : type, nature, expéditeur, horaires, mentions. */
-export function notesArret(a: ArretBordereau): string | null {
+/** Notes de l'arrêt : type, codes du transporteur, nature, expéditeur, horaires, mentions. */
+export function notesArret(a: ArretBordereau, transporteur: string | null = null): string | null {
   const morceaux = [
     a.type === "rdv" ? "Rendez-vous (RDV)" : null,
     a.type === "ramasse" && a.nombreColis ? `Enlèvement : ${a.nombreColis} colis` : null,
-    a.codes.length ? `Code DPD : ${a.codes.join(" ")}` : null,
+    a.codes.length ? `Code ${transporteur ?? "bordereau"} : ${a.codes.join(" ")}` : null,
     a.contact ? `Contact : ${a.contact}` : null,
     a.nature ? `Nature : ${a.nature}` : null,
     a.expediteur ? `Expéditeur : ${a.expediteur}` : null,
@@ -505,12 +669,26 @@ export interface PointBordereau {
   code_postal: string | null;
 }
 
+/** Longueur maximale de la liste des n° de colis acceptée par /api/colis/arrets/bulk. */
+export const CODES_MAX = 1000;
+
+/** N° de colis séparés par des virgules, sans jamais couper un n° en deux. */
+export function codesColis(colis: string[]): string | null {
+  let out = "";
+  for (const c of colis) {
+    const suivant = out ? `${out},${c}` : c;
+    if (suivant.length > CODES_MAX) break;
+    out = suivant;
+  }
+  return out || null;
+}
+
 /**
  * Arrêt du bordereau → point d'import : créneau unique (fenêtre
  * d'enlèvement ou une seule plage) en window_start / window_end ; deux
  * plages (pause de midi) vont dans la fiche horaires pro.
  */
-export function pointDepuisArret(a: ArretBordereau): PointBordereau {
+export function pointDepuisArret(a: ArretBordereau, transporteur: string | null = null): PointBordereau {
   const plageUnique = a.plages?.length === 1 ? a.plages[0]! : null;
   const fenetre = plageUnique ?? (a.plages && a.plages.length > 1 ? null : a.fenetre);
   const type = typeArretBloc(a.type);
@@ -520,14 +698,14 @@ export function pointDepuisArret(a: ArretBordereau): PointBordereau {
     lng: null,
     nom: a.nom?.slice(0, 120) ?? null,
     telephone: a.telephone,
-    code: a.colis.length ? a.colis.join(",").slice(0, 120) : null,
+    code: codesColis(a.colis),
     type,
     colis: type === "ramasse" ? 0 : Math.max(1, a.nombreColis),
     poids: a.poidsKg,
     window_start: fenetre?.debut ?? null,
     window_end: fenetre?.fin ?? null,
     plages: a.plages && a.plages.length > 1 ? a.plages.slice(0, 2) : null,
-    notes: notesArret(a),
+    notes: notesArret(a, transporteur),
     societe: a.societe?.slice(0, 200) ?? null,
     commune: a.ville,
     code_postal: a.codePostal,
