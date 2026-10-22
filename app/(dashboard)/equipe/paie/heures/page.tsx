@@ -10,6 +10,8 @@ import { computeHourlyRates } from "@/lib/business/payroll";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { lireArrets } from "@/lib/arrets/serveur";
+import { estEnArret, heuresPrevuesDuMois } from "@/lib/arrets/declaration";
 
 interface BadgeEntry {
   user_id: string;
@@ -150,6 +152,12 @@ export default async function PayrollPage({
 
   const generatedDriverIds = (existingPayslips ?? []).map((p) => p.user_id);
 
+  // Arrêts de travail non refusés du mois : heures prévues diminuées, pas
+  // d'heures reprises du planning ces jours-là (table absente : aucun).
+  const { lignes: arretsMois } = await lireArrets(supabase, { du: monthStart, au: periodEnd, ...(selectedDriver ? { userId: selectedDriver } : {}) });
+  const arretsParSalarie = new Map<string, { du: string; au: string; statut: string }[]>();
+  for (const a of arretsMois) arretsParSalarie.set(a.userId, [...(arretsParSalarie.get(a.userId) ?? []), { du: a.du, au: a.au, statut: a.statut }]);
+
   // Le plus tôt start_at planifié ce jour-là, par chauffeur — clé
   // "driverId|YYYY-MM-DD" (calendrier Paris, voir parisCalendarDate).
   const plannedStartByDriverDay = new Map<string, string>();
@@ -216,6 +224,7 @@ export default async function PayrollPage({
   for (const [key, spans] of planningSpansByDriverDay) {
     if (badgesByDriverDay.has(key)) continue;
     const driverId = key.split("|")[0] ?? key;
+    if (estEnArret(arretsParSalarie.get(driverId) ?? [], key.split("|")[1] ?? "")) continue;
     const dayHours = spans.reduce(
       (total, s) => total + Math.max((new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 3_600_000, 0),
       0,
@@ -253,6 +262,10 @@ export default async function PayrollPage({
         tours_count: toursByDriver.get(d.id) ?? 0,
         worked_hours: hoursByDriver.get(d.id) ?? 0,
         payslip_generated: generatedDriverIds.includes(d.id),
+        ...(() => {
+          const p = heuresPrevuesDuMois(contractualHours, month, arretsParSalarie.get(d.id) ?? []);
+          return { stoppage_days: p.joursArret, planned_hours: p.heures };
+        })(),
       };
     });
 

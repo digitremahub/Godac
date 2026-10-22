@@ -8,6 +8,9 @@ import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import type { Coordinates } from "@/lib/business/fuel-profitability";
 import { IconMapPin } from "@/components/layout/icons";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
+import { lireArrets } from "@/lib/arrets/serveur";
+import { dateCourte } from "@/lib/arrets/declaration";
+import { parisDay } from "@/lib/utils/paris-time";
 
 function formatDuration(startIso: string, endIso: string | null) {
   const start = new Date(startIso).getTime();
@@ -74,10 +77,32 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
 
   const { data: entries } = await query;
 
+  // Arrêts de travail en cours (non refusés) : aucun badgeage attendu ces jours-là.
+  const aujourdhui = parisDay();
+  const { lignes: arretsDuJour } = await lireArrets(supabase, { du: aujourdhui, au: aujourdhui, ...(vueEquipe ? {} : { userId: appUser.id }) });
+  const enArret = arretsDuJour.filter((a) => a.statut !== "refuse");
+  const monArret = enArret.find((a) => a.userId === appUser.id);
+  const autres = enArret.filter((a) => a.userId !== appUser.id);
+  let nomsEnArret: string[] = [];
+  if (vueEquipe && autres.length) {
+    const { data: u } = await supabase.from("users").select("id, full_name").in("id", autres.map((a) => a.userId));
+    nomsEnArret = ((u ?? []) as { full_name: string }[]).map((x) => x.full_name).sort();
+  }
+
   return (
     <div>
       <PageHeader title="Pointeuse électronique" description="Badgez votre entrée et votre sortie de poste." />
 
+      {monArret && (
+        <p role="status" className="mb-4 max-w-xl rounded-lg bg-teal/10 px-3 py-2 text-sm text-teal-ink">
+          Vous êtes en arrêt de travail jusqu&apos;au {dateCourte(monArret.au)} : aucun badgeage n&apos;est attendu.
+        </p>
+      )}
+      {nomsEnArret.length > 0 && (
+        <p role="note" className="mb-4 max-w-xl rounded-lg bg-navy/[0.04] px-3 py-2 text-sm text-navy/75">
+          En arrêt aujourd&apos;hui, pas de badgeage attendu : {nomsEnArret.join(", ")}.
+        </p>
+      )}
       <div className="mb-6 max-w-sm">
         <ClockButton clockedIn={Boolean(openEntry)} />
       </div>

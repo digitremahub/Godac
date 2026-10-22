@@ -7,6 +7,9 @@ import { LeaveRequestForm } from "@/components/leaves/LeaveRequestForm";
 import { LeaveRequestsList } from "@/components/leaves/LeaveRequestsList";
 import { soldesConges } from "@/lib/paie/conges-serveur";
 import { joursOuvrables } from "@/lib/paie/conges";
+import Link from "next/link";
+import { urlDe } from "@/lib/acces/catalogue";
+import { lireArrets } from "@/lib/arrets/serveur";
 
 /**
  * Congés : Équipe › Congés (encadrement : décisions sur son service, avec
@@ -63,6 +66,9 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
     return { disponible: s.disponible, jours, insuffisant: r.status === "pending" && sansElle - jours < 0 };
   };
 
+  // Arrêts de travail reçus, à vérifier (encadrement) : rappel en tête.
+  const arretsAVerifier = decision ? (await lireArrets(supabase, { limite: 200 })).lignes.filter((a) => a.statut === "recu" && a.userId !== appUser.id).length : 0;
+
   return (
     <div>
       <PageHeader
@@ -73,6 +79,23 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
             : "Vos demandes de congés et leur statut."
         }
       />
+
+      {!decision && (
+        <Link href={`${urlDe("moi.arrets")}?nouveau=1`} className="card mb-4 flex min-h-[48px] items-center justify-between gap-3 !py-3 text-sm hover:border-navy/15">
+          <span>
+            <span className="font-semibold">En arrêt de travail ?</span> <span className="text-navy/70">Envoyez votre avis d&apos;arrêt (sous 48 h).</span>
+          </span>
+          <span className="font-semibold text-teal-ink">Déclarer un arrêt →</span>
+        </Link>
+      )}
+      {arretsAVerifier > 0 && (
+        <Link href={urlDe("equipe.arrets")} className="card mb-4 flex min-h-[48px] items-center justify-between gap-3 !py-3 text-sm hover:border-navy/15">
+          <span className="font-semibold">
+            {arretsAVerifier} arrêt{arretsAVerifier > 1 ? "s" : ""} de travail reçu{arretsAVerifier > 1 ? "s" : ""}, à vérifier
+          </span>
+          <span className="font-semibold text-teal-ink">Voir →</span>
+        </Link>
+      )}
 
       {/* Ses propres congés se demandent dans Mon espace ; la direction, qui n'a pas cet écran, garde le formulaire en bas de page. */}
       {!decision && (

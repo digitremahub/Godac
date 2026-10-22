@@ -45,8 +45,12 @@ export async function GET(req: Request) {
       .gte("start_at", `${tomorrow}T00:00:00`).lt("start_at", `${dayAfter}T00:00:00`)
       .in("status", ["planned", "in_progress"]).order("start_at");
     if (error || !data?.length) continue;
+    // Pas de rappel à un salarié en arrêt de travail demain (arrêts non refusés ; table absente : aucun).
+    const { data: arrets } = await supabase.from("work_stoppages").select("*")
+      .eq("organization_id", organization_id).lte("start_date", tomorrow).gte("end_date", tomorrow);
+    const enArret = new Set(((arrets ?? []) as { user_id: string; status?: string }[]).filter((a) => a.status !== "refuse").map((a) => a.user_id));
     const byDriver = new Map<string, Entry[]>();
-    for (const row of data as unknown as Entry[]) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
+    for (const row of data as unknown as Entry[]) if (!enArret.has(row.driver_id)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
     const alerts = Array.from(byDriver.entries()).map(([driverId, entries]) => {
       const lines = entries.map(e => {
         const start = new Date(e.start_at);

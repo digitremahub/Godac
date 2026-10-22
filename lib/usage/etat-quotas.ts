@@ -24,6 +24,7 @@ export const LIBELLES_JAUGE: Record<UsageFeature, string> = {
   import_ai: "Imports assistés par IA",
   assistant: "Questions à l'assistant",
   route_optimization: "Optimisations de tournée",
+  ocr_arret: "Lectures d'avis d'arrêt de travail",
 };
 
 const formuleDe = cache(async (organizationId: string) => {

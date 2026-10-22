@@ -192,6 +192,8 @@ export interface ParametresEntreprise {
   maintien?: ParametresMaintien | null;
   /** Subrogation : l'employeur perçoit les IJSS et les reverse sur le bulletin. */
   subrogation?: boolean;
+  /** Source des heures du bulletin (lib/paie/heures.ts) ; absent = règle par défaut. */
+  sourceHeures?: "regle" | "badge" | "tournees";
 }
 
 export interface ProfilSalarie {
