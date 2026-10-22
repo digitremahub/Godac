@@ -1,0 +1,176 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Fenetre } from "@/components/planning/Fenetre";
+import { Avatar, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
+import {
+  cleCaseTournee,
+  connaitTournee,
+  estAbsent,
+  etatChauffeurDuJour,
+  joursDeLaLigne,
+  libelleIndisponibilite,
+  nomCourt,
+  type LigneTournee,
+} from "@/lib/planning/affectation";
+import { chauffeursAffiches, heureDe, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
+
+export type CibleFeuille = { type: "case"; cle: string; date: string } | { type: "ligne"; cle: string };
+
+export interface ActionsFeuille {
+  placer: (ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }) => void;
+  retirer: (entree: EntreeAffectation) => void;
+  supprimer: (entree: EntreeAffectation) => void;
+  modifier: (entree: EntreeAffectation) => void;
+}
+
+/**
+ * « Affecter à… » : l'équivalent au toucher, au clic et au clavier de tous
+ * les gestes de glisser. Sur téléphone c'est le seul chemin (feuille du bas).
+ * - une case : chauffeurs disponibles d'abord, déjà pris (2ᵉ tournée)
+ *   ensuite, absents grisés ; retirer, prolonger les jours suivants,
+ *   modifier l'heure ou le véhicule, supprimer ce jour ;
+ * - une ligne (⇥ semaine / mois) : un chauffeur pour tous les jours où la
+ *   tournée roule (ses jours d'absence restent « à remplacer »).
+ */
+export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeuille; actions: ActionsFeuille; onFermer: () => void }) {
+  const ctx = useAffectations();
+  const { donnees } = ctx;
+  const ligne = ctx.lignes.find((l) => l.cle === cible.cle);
+  const [recherche, setRecherche] = useState("");
+
+  const datesCible = useMemo(() => (!ligne ? [] : cible.type === "case" ? [cible.date] : joursDeLaLigne(ligne, ctx.jours.filter((d) => d >= ctx.aujourdhui || donnees.vue === "jour"))), [cible, ligne, ctx.jours, ctx.aujourdhui, donnees.vue]);
+  const entrees: EntreeAffectation[] = cible.type === "case" && ligne ? (ctx.parCase.get(cleCaseTournee(ligne.cle, cible.date)) ?? []) : [];
+  const tenue = entrees.find((e) => e.driver_id);
+
+  const chauffeurs = useMemo(() => {
+    const visibles = chauffeursAffiches(donnees.chauffeurs, donnees.rattachements, donnees.serviceIds, ctx.affectations);
+    const q = recherche.trim().toLowerCase();
+    return visibles
+      .filter((c) => !q || c.full_name.toLowerCase().includes(q))
+      .map((c) => {
+        if (cible.type === "case") {
+          const e = etatChauffeurDuJour(c.id, cible.date, ctx.affectations, donnees.conges, donnees.arrets);
+          const sous = e.etat === "absent" && e.indispo ? libelleIndisponibilite(e.indispo) : e.etat === "pris" ? `Déjà sur ${e.tournees.join(" + ")}` : e.indispo ? `Disponible · ${libelleIndisponibilite(e.indispo).toLowerCase()}` : "Disponible";
+          return { ...c, etat: e.etat, sous: ligne && e.etat !== "absent" && connaitTournee(c.id, ligne.tourNumber, donnees.historique) ? `${sous} · connaît ${ligne.tourNumber}` : sous };
+        }
+        const absents = datesCible.filter((d) => estAbsent(c.id, d, donnees.conges, donnees.arrets));
+        const etat = absents.length === datesCible.length && datesCible.length > 0 ? ("absent" as const) : ("disponible" as const);
+        return { ...c, etat, sous: absents.length ? `${absents.length === datesCible.length ? "Absent sur toute la période" : `Absent ${absents.map((d) => libelleJour(d)).join(", ")} (restera à remplacer)`}` : "Disponible" };
+      })
+      .filter((c) => c.id !== tenue?.driver_id)
+      .sort((a, b) => ordre(a.etat) - ordre(b.etat) || a.full_name.localeCompare(b.full_name, "fr"));
+  }, [donnees, ctx.affectations, recherche, cible, ligne, datesCible, tenue]);
+
+  if (!ligne) return null;
+  const titre = cible.type === "case" ? `${tenue ? "Remplacer sur" : "Affecter"} ${ligne.tourNumber} à…` : `${ligne.tourNumber} ${donnees.vue === "mois" ? "tout le mois" : "toute la semaine"} à…`;
+  const sousTitre =
+    cible.type === "case"
+      ? `${JOURS_LONGS[rangJour(cible.date)]} ${Number(cible.date.slice(8, 10))}/${cible.date.slice(5, 7)} · ${entrees[0] ? heureDe(entrees[0].start_at) : ligne.heure}${ligne.villages.length ? ` · ${ligne.villages.slice(0, 2).join(", ")}` : ""}`
+      : datesCible.length
+        ? `${datesCible.length} jour${datesCible.length > 1 ? "s" : ""} : ${libelleJour(datesCible[0]!)} → ${libelleJour(datesCible.at(-1)!)} · ${ligne.heure}`
+        : "Aucun jour à venir où cette tournée roule.";
+
+  // Prolonger (équivalent de la poignée) : jours suivants de la même semaine.
+  const suivants = cible.type === "case" && tenue && donnees.vue !== "jour" ? ctx.jours.filter((d) => d > cible.date && d <= finDeSemaine(cible.date)) : [];
+
+  return (
+    <Fenetre titre={titre} sousTitre={sousTitre} onFermer={onFermer} large>
+      {entrees.length > 0 && (
+        <ul className="mb-3 flex flex-col gap-2">
+          {entrees.map((e) => {
+            const modifiable = e.status === "planned";
+            const nom = e.driver_id ? ctx.nomChauffeur(e.driver_id) : null;
+            return (
+              <li key={e.id} className="rounded-xl border border-navy/10 p-2.5">
+                <div className="flex items-center gap-2.5">
+                  {e.driver_id && nom ? <Avatar id={e.driver_id} nom={nom} /> : <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-orange text-orange-ink">!</span>}
+                  <span className="min-w-0 flex-1 text-sm leading-tight">
+                    <strong>{nom ?? "À remplacer"}</strong>
+                    <span className="block text-xs text-navy/60">
+                      {heureDe(e.start_at)} · {e.vehicles?.registration ?? "sans véhicule"}
+                      {modifiable ? "" : ` · ${statutAffectation(e.status).libelle.toLowerCase()}`}
+                    </span>
+                  </span>
+                </div>
+                {donnees.peutModifier && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {modifiable && e.driver_id && (
+                      <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => actions.retirer(e)}>
+                        Retirer le chauffeur
+                      </button>
+                    )}
+                    <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => actions.modifier(e)}>
+                      {modifiable ? "Heure, véhicule…" : "Détails"}
+                    </button>
+                    {modifiable && (
+                      <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm text-orange-ink" onClick={() => actions.supprimer(e)}>
+                        Supprimer ce jour
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {suivants.length > 0 && tenue?.driver_id && tenue.status === "planned" && (
+        <div className="mb-3">
+          <p className="label">Prolonger {nomCourt(ctx.nomChauffeur(tenue.driver_id))} jusqu&apos;à…</p>
+          <div className="flex flex-wrap gap-1.5">
+            {suivants.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className="btn-secondary min-h-[44px] !px-3 text-sm"
+                onClick={() => actions.placer(ligne, ctx.jours.filter((x) => x > (cible as { date: string }).date && x <= d), { id: tenue.driver_id!, full_name: ctx.nomChauffeur(tenue.driver_id) })}
+              >
+                {libelleJour(d)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {donnees.peutModifier && (cible.type === "ligne" ? datesCible.length > 0 : true) && (
+        <>
+          <p className="label">{tenue ? "Remplacer par" : "Choisir le chauffeur"}</p>
+          {chauffeurs.length > 8 && (
+            <input data-autofocus className="input mb-2 min-h-[44px]" placeholder="Rechercher un chauffeur…" value={recherche} onChange={(e) => setRecherche(e.target.value)} aria-label="Rechercher un chauffeur" />
+          )}
+          <ul className="flex max-h-[45vh] flex-col gap-1.5 overflow-y-auto overscroll-contain">
+            {chauffeurs.map((c) => {
+              const absent = c.etat === "absent";
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    disabled={absent}
+                    onClick={() => actions.placer(ligne, datesCible, c)}
+                    className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${absent ? "cursor-not-allowed border-navy/5 opacity-45" : "border-navy/10 hover:border-teal/60 hover:bg-teal/[0.06]"} ${c.etat === "pris" ? "opacity-75" : ""}`}
+                  >
+                    <Avatar id={c.id} nom={c.full_name} attenue={absent} />
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-sm font-bold">{c.full_name}</span>
+                      <span className="block truncate text-xs text-navy/60">{c.sous}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+            {chauffeurs.length === 0 && <li className="p-2 text-sm text-navy/60">Aucun chauffeur ne correspond.</li>}
+          </ul>
+        </>
+      )}
+    </Fenetre>
+  );
+}
+
+const ordre = (e: string) => (e === "disponible" ? 0 : e === "pris" ? 1 : 2);
+const finDeSemaine = (d: string) => {
+  const dt = new Date(`${d}T12:00:00Z`);
+  dt.setUTCDate(dt.getUTCDate() + (6 - rangJour(d)));
+  return dt.toISOString().slice(0, 10);
+};

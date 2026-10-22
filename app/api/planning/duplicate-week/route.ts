@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
 import { estCopiable, jourDe, joursDeLaSemaine, planifierCopies, type AffectationPlanning, type CopieDemandee } from "@/lib/planning/semaine";
 import { affectationsAutour, inscrireCopies } from "@/lib/planning/copies-serveur";
+import { absentSelon, lireAbsences } from "@/lib/planning/absences";
 
 const bodySchema = z
   .object({
@@ -26,7 +27,9 @@ const bodySchema = z
  * cible ou vers les N semaines suivantes, toujours en « prévue ».
  * - créneau déjà occupé (service + tournée + départ, la contrainte unique
  *   de planning_entries) : ignoré — les saisies faites à la main gagnent ;
- * - chauffeur déjà pris à la même heure : créée, comptée « en conflit ».
+ * - chauffeur déjà pris à la même heure : créée, comptée « en conflit » ;
+ * - chauffeur en congé validé ou en arrêt de travail ce jour-là : il n'est
+ *   PAS placé, l'affectation est créée sans chauffeur (« à remplacer »).
  * `dry_run` renvoie l'aperçu (« 42 affectations seront créées… »).
  * Réservé à l'encadrement ; RLS limite un manager à ses services, en
  * lecture comme en écriture.
@@ -69,19 +72,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ created: 0, skipped: 0, conflicts: 0, source_count: 0, dry_run: Boolean(dry_run) });
   }
 
+  const cibles = demandes.map((d) => d.date).sort();
   let existantes: AffectationPlanning[];
   try {
-    existantes = await affectationsAutour(supabase, appUser.organization_id, demandes.map((d) => d.date));
+    existantes = await affectationsAutour(supabase, appUser.organization_id, cibles);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lecture du planning impossible." }, { status: 500 });
   }
-  const plan = planifierCopies(demandes, existantes);
+  const absences = await lireAbsences(supabase, appUser.organization_id, cibles[0]!, cibles[cibles.length - 1]!);
+  const plan = planifierCopies(demandes, existantes, { absent: absentSelon(absences) });
 
   if (dry_run) {
-    return NextResponse.json({ created: plan.aCreer.length, skipped: plan.ignorees.length, conflicts: plan.conflits.length, source_count: sources.length, dry_run: true });
+    return NextResponse.json({ created: plan.aCreer.length, skipped: plan.ignorees.length, conflicts: plan.conflits.length, a_remplacer: plan.aRemplacer.length, source_count: sources.length, dry_run: true });
   }
 
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-  return NextResponse.json({ created: r.creees, skipped: r.ignorees, conflicts: r.conflits, source_count: sources.length, warning: r.warning });
+  return NextResponse.json({ created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, source_count: sources.length, warning: r.warning });
 }

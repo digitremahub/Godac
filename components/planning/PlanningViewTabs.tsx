@@ -10,15 +10,15 @@ interface ServiceOption {
 }
 
 const VIEWS: { key: string; label: string }[] = [
-  { key: "week", label: "Semaine" },
   { key: "day", label: "Jour" },
+  { key: "week", label: "Semaine" },
   { key: "month", label: "Mois" },
 ];
 
 /**
- * Choix de la vue (Semaine, Jour, Mois) et filtre par service, une seule
- * fois au-dessus de la vue active. Les boutons « Cette semaine » /
- * « Aujourd'hui » / « Ce mois-ci » sont dans chaque vue, à côté des flèches.
+ * Choix de la vue (Jour, Semaine, Mois) et filtre par service, une seule
+ * fois au-dessus de la vue active. Le retour à aujourd'hui se fait en
+ * cliquant la date, entre les flèches de chaque vue.
  */
 export function PlanningViewTabs({
   view,
@@ -32,9 +32,16 @@ export function PlanningViewTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Changer de vue garde la date regardée (semaine, jour, mois) et le service.
+  // Changer de vue garde la date regardée (jour → sa semaine, son mois) et le service.
   function goTo(nextView: string) {
     const qs = new URLSearchParams(searchParams.toString());
+    const jour = qs.get("day");
+    if (jour && nextView === "week") qs.set("week", jour);
+    if (nextView === "month" && !qs.get("month")) {
+      const ref = jour ?? qs.get("week");
+      if (ref) qs.set("month", ref.slice(0, 7));
+    }
+    if (nextView === "day" && !jour && qs.get("week")) qs.set("day", qs.get("week")!);
     qs.set("view", nextView);
     if (selectedService) qs.set("service", selectedService);
     router.push(`/exploitation/planning?${qs.toString()}`);

@@ -1,6 +1,6 @@
 /**
- * Planning semaine (lignes = chauffeurs, colonnes = jours) : logique pure
- * partagée entre l'écran (components/planning/PlanningSemaine.tsx) et les
+ * Planning (jours, congés, pré-remplissage, duplications) : logique pure
+ * partagée entre l'écran (components/planning/Affectations.tsx, FenetresPlanning.tsx) et les
  * routes de duplication (app/api/planning/duplicate-week,
  * app/api/planning/entries/[id]/duplicate). Aucun accès réseau ni base :
  * testé dans lib/planning/__tests__/semaine.test.ts.
@@ -299,6 +299,11 @@ export interface PlanDeCopie {
   ignorees: CopieDemandee[];
   /** Créées quand même, mais chauffeur déjà pris à la même heure. */
   conflits: NouvelleAffectation[];
+  /**
+   * Créées SANS chauffeur : le chauffeur recopié est absent ce jour-là
+   * (congé validé, arrêt de travail). La case reste « à remplacer ».
+   */
+  aRemplacer: NouvelleAffectation[];
 }
 
 /** Chaque source copiée vers chaque date (même heure de Paris). */
@@ -326,11 +331,19 @@ export function estCopiable(a: AffectationPlanning): boolean {
  * service + tournée + départ déjà pris, en base ou plus tôt dans le même
  * plan) et ce qui sera créé en conflit (chauffeur déjà pris à cette heure).
  * Même règle que la contrainte unique de planning_entries.
+ *
+ * `absent(chauffeur, jour)` : chauffeur en congé validé ou en arrêt ce
+ * jour-là (lib/planning/affectation.ts › estAbsent). Il n'est pas placé :
+ * l'affectation est créée sans chauffeur, « à remplacer ».
  */
-export function planifierCopies(demandes: readonly CopieDemandee[], existantes: readonly AffectationPlanning[]): PlanDeCopie {
+export function planifierCopies(
+  demandes: readonly CopieDemandee[],
+  existantes: readonly AffectationPlanning[],
+  options: { absent?: (driverId: string, date: string) => boolean } = {},
+): PlanDeCopie {
   const occupes = new Set(existantes.filter((e) => e.status !== "cancelled").map((e) => cleCreneau(e.service_id, e.tour_number, e.start_at)));
   const chauffeurs = new Set(existantes.filter((e) => e.driver_id && STATUTS_OCCUPES.has(e.status)).map((e) => `${e.driver_id}|${Date.parse(e.start_at)}`));
-  const plan: PlanDeCopie = { aCreer: [], ignorees: [], conflits: [] };
+  const plan: PlanDeCopie = { aCreer: [], ignorees: [], conflits: [], aRemplacer: [] };
 
   for (const d of demandes) {
     const startAt = parisWallTimeToUtcISOString(d.date, heureDe(d.source.start_at));
@@ -340,10 +353,13 @@ export function planifierCopies(demandes: readonly CopieDemandee[], existantes: 
       continue;
     }
     occupes.add(cle);
-    const driverId = d.driverId !== undefined && d.driverId !== null ? d.driverId : d.source.driver_id;
+    const voulu = d.driverId !== undefined && d.driverId !== null ? d.driverId : d.source.driver_id;
+    const absent = Boolean(voulu && options.absent?.(voulu, d.date));
+    const driverId = absent ? null : voulu;
     const vehicleId = d.vehicleId !== undefined && d.vehicleId !== null && d.vehicleId !== "" ? d.vehicleId : d.source.vehicle_id;
     const ligne: NouvelleAffectation = { service_id: d.source.service_id, tour_number: d.source.tour_number, driver_id: driverId, vehicle_id: vehicleId, start_at: startAt, sourceId: d.source.id };
     plan.aCreer.push(ligne);
+    if (absent) plan.aRemplacer.push(ligne);
     if (driverId) {
       const cleChauffeur = `${driverId}|${Date.parse(startAt)}`;
       if (chauffeurs.has(cleChauffeur)) plan.conflits.push(ligne);
@@ -355,23 +371,25 @@ export function planifierCopies(demandes: readonly CopieDemandee[], existantes: 
 
 const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 
-/** « 42 affectations seront créées, 3 créneaux déjà occupés ignorés, 1 en conflit » */
-export function texteApercu(r: { creees: number; ignorees: number; conflits: number }): string {
+/** « 42 affectations seront créées, 3 créneaux déjà occupés ignorés, 1 en conflit, 2 à remplacer (chauffeur absent) » */
+export function texteApercu(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number }): string {
   const parts = [`${pluriel(r.creees, "affectation sera créée", "affectations seront créées")}`];
   if (r.ignorees) parts.push(pluriel(r.ignorees, "créneau déjà occupé ignoré", "créneaux déjà occupés ignorés"));
   if (r.conflits) parts.push(`${r.conflits} en conflit (chauffeur déjà pris à la même heure)`);
+  if (r.aRemplacer) parts.push(`${r.aRemplacer} à remplacer (chauffeur en congé ou en arrêt ce jour-là)`);
   return parts.join(", ");
 }
 
-/** « 3 créées, 1 ignorée (déjà occupée), 0 en conflit » */
-export function texteResultat(r: { creees: number; ignorees: number; conflits: number }): string {
-  return `${pluriel(r.creees, "créée", "créées")}, ${pluriel(r.ignorees, "ignorée", "ignorées")} (déjà occupée${r.ignorees > 1 ? "s" : ""}), ${r.conflits} en conflit`;
+/** « 3 créées, 1 ignorée (déjà occupée), 0 en conflit » (+ « 1 à remplacer (absent) ») */
+export function texteResultat(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number }): string {
+  const base = `${pluriel(r.creees, "créée", "créées")}, ${pluriel(r.ignorees, "ignorée", "ignorées")} (déjà occupée${r.ignorees > 1 ? "s" : ""}), ${r.conflits} en conflit`;
+  return r.aRemplacer ? `${base}, ${r.aRemplacer} à remplacer (absent)` : base;
 }
 
 /** Additionne des résultats partiels (une requête par affectation copiée). */
-export function cumulerResultats(rs: readonly { creees?: number; ignorees?: number; conflits?: number }[]): { creees: number; ignorees: number; conflits: number } {
-  return rs.reduce<{ creees: number; ignorees: number; conflits: number }>(
-    (t, r) => ({ creees: t.creees + (r.creees ?? 0), ignorees: t.ignorees + (r.ignorees ?? 0), conflits: t.conflits + (r.conflits ?? 0) }),
-    { creees: 0, ignorees: 0, conflits: 0 },
+export function cumulerResultats(rs: readonly { creees?: number; ignorees?: number; conflits?: number; aRemplacer?: number }[]): { creees: number; ignorees: number; conflits: number; aRemplacer: number } {
+  return rs.reduce<{ creees: number; ignorees: number; conflits: number; aRemplacer: number }>(
+    (t, r) => ({ creees: t.creees + (r.creees ?? 0), ignorees: t.ignorees + (r.ignorees ?? 0), conflits: t.conflits + (r.conflits ?? 0), aRemplacer: t.aRemplacer + (r.aRemplacer ?? 0) }),
+    { creees: 0, ignorees: 0, conflits: 0, aRemplacer: 0 },
   );
 }
