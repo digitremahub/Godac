@@ -26,7 +26,7 @@ export function DriverCreatedRuns({
   if (runs.length === 0) return null;
 
   return (
-    <section className="mb-5 rounded-xl border border-amber-300/60 bg-amber-50/60 p-4">
+    <section className="mb-5 rounded-xl border border-gold/50 bg-gold/[0.12] p-4">
       <h2 className="font-semibold text-navy">Fiches Tournée Colis créées par les chauffeurs</h2>
       <p className="mt-1 text-sm text-navy/70">
         Ces fiches quotidiennes ne sont pas des affectations Planning. Vérifiez-les ici puis créez l’affectation correspondante si nécessaire.

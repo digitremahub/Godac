@@ -296,7 +296,7 @@ export function PlanningTemplatesPanel({
                       </label>
                     ))}
                   </div>
-                  {!jours.length && <p className="mt-1 text-xs text-red-700">Cochez au moins un jour.</p>}
+                  {!jours.length && <p className="mt-1 text-xs text-orange-ink">Cochez au moins un jour.</p>}
                 </fieldset>
               </div>
             )}
@@ -310,7 +310,7 @@ export function PlanningTemplatesPanel({
         )}
       </div>
 
-      {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-lg bg-orange/10 p-3 text-sm text-orange-ink">{error}</p>}
       {message && <p role="status" className="mt-3 rounded-lg bg-teal/10 p-3 text-sm text-teal-ink">{message}</p>}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

@@ -199,7 +199,7 @@ export default function HistoriqueCarte({ runId, stops, depot }: Props) {
         <h3 className="text-sm font-semibold text-navy">Trajet de la tournée</h3>
         <span className="text-xs text-navy/60">{stops.filter((s) => valide(coord(s.lat), coord(s.lng))).length} arrêt(s) sur la carte</span>
       </div>
-      <div ref={container} className="h-[400px] w-full bg-slate-100" aria-label="Carte du trajet de la tournée" />
+      <div ref={container} className="h-[400px] w-full bg-navy/[0.06]" aria-label="Carte du trajet de la tournée" />
       <div className="flex flex-col gap-2 bg-white px-3 py-2.5 text-xs text-navy/70">
         {trace === "chargement" ? (
           <p>Chargement du tracé réel…</p>

@@ -5,7 +5,7 @@ const COULEURS: Record<NiveauLimite, { barre: string; texte: string }> = {
   ok: { barre: "bg-teal", texte: "text-navy/65" },
   proche: { barre: "bg-gold", texte: "text-navy/75" },
   avertissement: { barre: "bg-orange", texte: "text-orange-ink" },
-  bloque: { barre: "bg-red-600", texte: "text-red-700" },
+  bloque: { barre: "bg-orange", texte: "font-semibold text-orange-ink" },
 };
 
 /**

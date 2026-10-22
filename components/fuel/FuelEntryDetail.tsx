@@ -168,7 +168,7 @@ export function FuelEntryDetail({ entryId }: { entryId: string }) {
           <div className="flex flex-wrap gap-3">
             {plein.photos.map((p) => (
               <a key={p.libelle} href={p.url} target="_blank" rel="noreferrer" className="block w-32 text-center text-xs text-navy/70 hover:text-navy">
-                <img src={p.url} alt={p.libelle} className="mb-1 h-24 w-32 rounded-lg border border-navy/10 bg-white object-cover" />
+                <img src={p.url} alt={p.libelle} className="mb-1 h-24 w-32 rounded-lg border border-navy/10 bg-surface object-cover" />
                 {p.libelle}
               </a>
             ))}
@@ -306,7 +306,7 @@ function TraitementEcartForm({
   };
 
   return (
-    <div className="rounded-lg border border-navy/10 bg-white p-3">
+    <div className="rounded-lg border border-navy/10 bg-surface p-3">
       <BandeauRefus refus={refus} onFermer={() => setRefus(null)} />
       {actions.length > 1 && (
         <div className="mb-2 flex flex-wrap gap-2">

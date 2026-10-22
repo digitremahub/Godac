@@ -11,7 +11,7 @@ const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
  * otherwise — no letters, the position says which is which.
  */
 function Ticks({ morning, evening }: { morning: boolean; evening: boolean }) {
-  const on = "stroke-emerald-500";
+  const on = "stroke-success";
   const off = "stroke-navy/20";
   return (
     <svg viewBox="0 0 22 20" aria-hidden="true" className="h-6 w-[26px] sm:h-7 sm:w-[30px]" fill="none" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
@@ -86,7 +86,7 @@ export function PresenceCalendar({
               role="gridcell"
               aria-label={`${Number(day.slice(8))} : ${p?.morning ? "départ enregistré" : "pas de départ"}, ${p?.evening ? "retour enregistré" : "pas de retour"}`}
               className={`flex min-h-[64px] flex-col justify-between rounded-lg border p-1.5 sm:p-2 ${
-                full ? "border-emerald-500/30 bg-emerald-500/[0.06]" : future ? "border-navy/[0.06] bg-transparent" : "border-navy/[0.08] bg-surface"
+                full ? "border-success/30 bg-success/[0.06]" : future ? "border-navy/[0.06] bg-transparent" : "border-navy/[0.08] bg-surface"
               } ${day === today ? "ring-2 ring-teal-ink/40" : ""}`}
             >
               <span className={`text-xs font-semibold tabular-nums ${future ? "text-navy/40" : "text-navy"}`}>

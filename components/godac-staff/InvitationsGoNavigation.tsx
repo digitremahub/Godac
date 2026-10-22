@@ -103,7 +103,7 @@ export function InvitationsGoNavigation({ invitations }: { invitations: LigneInv
           </div>
         )}
         {erreur && (
-          <p role="alert" className="mt-2 text-sm text-red-700">
+          <p role="alert" className="mt-2 text-sm text-orange-ink">
             {erreur}
           </p>
         )}

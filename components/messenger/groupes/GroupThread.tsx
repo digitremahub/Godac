@@ -45,7 +45,7 @@ function PieceJointe({ url, name, type }: { url: string; name: string | null; ty
     );
   }
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="mb-1 flex items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2 text-sm text-teal-ink underline">
+    <a href={url} target="_blank" rel="noreferrer" className="mb-1 flex items-center gap-2 rounded-lg bg-surface/70 px-2.5 py-2 text-sm text-teal-ink underline">
       <IconFileText className="h-4 w-4 shrink-0" />
       <span className="truncate">{name ?? "Document"}</span>
     </a>
@@ -198,7 +198,7 @@ export function GroupThread({
                   {m.reactions.map((r) => (
                     <button
                       key={r.emoji}
-                      className={`rounded-full px-1.5 text-xs ${r.mine ? "bg-teal/20" : "bg-white/70"}`}
+                      className={`rounded-full px-1.5 text-xs ${r.mine ? "bg-teal/20" : "bg-surface/70"}`}
                       disabled={!canReact || busyId === m.id}
                       onClick={() => act(m.id, () => patch(groupId, m.id, { reaction: r.emoji }))}
                       aria-label={`Réaction ${r.emoji}, ${r.count}`}
@@ -213,7 +213,7 @@ export function GroupThread({
                   {REACTIONS.map((e) => (
                     <button
                       key={e}
-                      className="rounded-full bg-white px-1.5 py-0.5 text-base"
+                      className="rounded-full bg-surface px-1.5 py-0.5 text-base"
                       disabled={busyId === m.id}
                       onClick={() => {
                         setPickerFor(null);

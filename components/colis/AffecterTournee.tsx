@@ -57,7 +57,7 @@ export function AffecterTournee({ onClose, onCreated }: { onClose: () => void; o
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-navy/55 p-3 sm:p-6" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="creer-tournee-direction" className="my-auto w-full max-w-3xl rounded-2xl border border-teal/30 bg-white p-5 shadow-2xl">
+      <section role="dialog" aria-modal="true" aria-labelledby="creer-tournee-direction" className="my-auto w-full max-w-3xl rounded-2xl border border-teal/30 bg-surface p-5 shadow-2xl">
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
             <h2 id="creer-tournee-direction" className="text-lg font-semibold">Créer une tournée colis</h2>

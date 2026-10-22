@@ -15,7 +15,7 @@ export function BandeauRefus({ refus, direction = false, onFermer }: { refus: Re
   return (
     <div
       role="alert"
-      className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 text-sm ${grave ? "border-red-300 bg-red-50 text-red-800" : "border-gold/50 bg-gold/[0.12] text-navy"}`}
+      className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 text-sm ${grave ? "border-orange/40 bg-orange/10 text-orange-ink" : "border-gold/50 bg-gold/[0.12] text-navy"}`}
     >
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{titreRefus(refus)}</p>

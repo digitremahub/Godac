@@ -80,7 +80,7 @@ export function PhotosChangementVehicule({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={apercus[kind]} alt={libelle} className="absolute inset-0 h-full w-full object-cover" />
                 ) : null}
-                <span className={`relative z-10 rounded px-1 font-semibold ${apercus[kind] ? "bg-white/85 text-navy" : "text-navy/70"}`}>
+                <span className={`relative z-10 rounded px-1 font-semibold ${apercus[kind] ? "bg-surface/85 text-navy" : "text-navy/70"}`}>
                   {envoi === kind ? "Envoi…" : faites.has(kind) ? `✓ ${libelle}` : `📷 ${libelle}`}
                 </span>
                 <input
