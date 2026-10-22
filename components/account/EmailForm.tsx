@@ -48,7 +48,7 @@ export function EmailForm({ currentEmail }: { currentEmail: string }) {
         </p>
       </div>
       {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
-      {sent && <p role="status" className="text-sm text-teal-ink">Email de confirmation envoyé à {email}.</p>}
+      {sent && <p role="status" className="text-sm text-teal-ink">E-mail de confirmation envoyé à {email}.</p>}
       <div>
         <label className="block"><span className="label">Nouvelle adresse</span>
         <input type="email" name="email" autoComplete="email" spellCheck={false} className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></label>

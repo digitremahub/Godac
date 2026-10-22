@@ -243,7 +243,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             <FuelHistoryTable
               entries={(fuelHistory ?? []) as any}
               showVehicle={false}
-              emptyDescription="Aucun ravitaillement enregistré pour ce véhicule."
+              emptyDescription="Aucun plein enregistré pour ce véhicule."
             />
           </div>
 

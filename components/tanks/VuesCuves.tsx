@@ -125,7 +125,7 @@ export async function TanksTab({ canManage }: { canManage: boolean }) {
 
       <Card className="mt-6 text-sm text-navy/65">
         Le <b>stock estimé</b> augmente à chaque approvisionnement enregistré
-        et diminue à chaque ravitaillement validé — c&apos;est une estimation
+        et diminue à chaque plein validé — c&apos;est une estimation
         qui part de 0 tant qu&apos;aucun approvisionnement initial n&apos;a été
         saisi. L&apos;<b>index totaliseur</b> (cumul dispensé, jamais remis à
         zéro) reste indépendant et demeure la donnée fiable utilisée pour la

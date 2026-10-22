@@ -6,7 +6,7 @@
 import type { UserRole } from "@/lib/types/domain";
 import { MARQUEUR_GO_NAVIGATION, urlDe } from "@/lib/acces/catalogue";
 
-export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler";
+export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler" | "navigation";
 
 export interface BoutonBarre {
   href: string;
@@ -21,7 +21,7 @@ export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>,
     return modules.has("route_optimizer")
       ? [
           { href: urlDe("exploitation.colis"), libelle: "Tournée", icone: "colis" },
-          { href: "/livreur/navigation", libelle: "GO Nav", icone: "depart" },
+          { href: urlDe("exploitation.go_navigation"), libelle: "GO Navigation", icone: "navigation" },
         ]
       : [];
   }
@@ -37,6 +37,8 @@ export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>,
   if (modules.has("route_optimizer")) b.push({ href: "/livreur", libelle: "Colis", icone: "colis" });
   else if (modules.has("planning")) b.push({ href: urlDe("moi.planning"), libelle: "Planning", icone: "planning" });
   if (modules.has("messenger")) b.push({ href: urlDe("communication.messenger"), libelle: "Messages", icone: "messages" });
-  else if (modules.has("maintenance_requests")) b.push({ href: urlDe("flotte.entretien"), libelle: "Signaler", icone: "signaler" });
+  // « Signaler un problème » de la personne qui conduit (pas la liste
+  // d'entretien de l'encadrement, même pour un manager qui conduit).
+  else if (modules.has("maintenance_requests")) b.push({ href: urlDe("moi.signaler"), libelle: "Signaler", icone: "signaler" });
   return b.slice(0, 4);
 }

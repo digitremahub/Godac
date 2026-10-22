@@ -74,7 +74,11 @@ export async function VueFiches({ appUser, supabase, toutes }: { appUser: AppUse
       )}
 
       {withUrls.length === 0 ? (
-        <EmptyState title="Aucun bulletin généré." />
+        isDirection ? (
+          <EmptyState title="Aucun bulletin généré." />
+        ) : (
+          <EmptyState title="Aucun bulletin disponible pour l'instant." description="Vos bulletins apparaissent ici dès que la direction les a validés." />
+        )
       ) : (
         <Card className="flex flex-col gap-1.5">
           {withUrls.map((p) => (

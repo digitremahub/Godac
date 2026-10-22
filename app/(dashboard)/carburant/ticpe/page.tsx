@@ -33,7 +33,7 @@ export default async function TicpePage() {
     <div>
       <PageHeader
         title="Export TICPE"
-        description="Périmètre PL/SPL uniquement — les VL sont exclus par règle métier, jamais par oubli de filtre."
+        description="Seuls les poids lourds (plus de 7,5 t) ouvrent droit au remboursement ; les véhicules légers sont exclus automatiquement."
       />
 
       {vehiclesToConfirm.length > 0 && (

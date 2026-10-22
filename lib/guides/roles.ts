@@ -67,7 +67,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Démarrer et terminer une tournée",
         texte:
-          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre de stops de ramasse (inscrit à la main sur la feuille) : ils sont déduits des stops du scan, les colis REMIS comptent comme stops livrés. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
+          "Au départ : « Démarrer une tournée », choisissez le véhicule et saisissez le kilométrage (photo du compteur si votre entreprise l'exige). Au retour : « Terminer une tournée » avec le kilométrage d'arrivée, la photo du compte-rendu et le nombre d'arrêts de ramasse (inscrit à la main sur la feuille) : ils sont déduits des arrêts du scan, les colis REMIS comptent comme arrêts livrés. Le bouton « Valider » suffit, sans case à cocher. Si vous changez de véhicule (hors dépannage), photographiez l'habitacle, le tableau de bord et les 4 faces du véhicule récupéré : c'est obligatoire et cela prouve son état à la prise en main. Pour aider un collègue, utilisez « J'entre pour un collègue ».",
         lien: { href: "/moi/tournee/depart", label: "Démarrer une tournée" },
         module: "planning",
       },
@@ -86,8 +86,8 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       {
         titre: "Déclarer un plein",
         texte:
-          "Page Carburant → nouveau ravitaillement : prenez le ticket en photo, GODAC lit les litres et le montant (à vérifier avant d'enregistrer), puis indiquez le kilométrage.",
-        lien: { href: "/carburant/pleins", label: "Carburant" },
+          "Bouton « Plein » de la barre du bas, ou « + Nouveau plein » en haut de la page Pleins (sur ordinateur ou tablette) : prenez le ticket en photo, GODAC lit les litres et le montant (à vérifier avant d'enregistrer), puis indiquez le kilométrage.",
+        lien: { href: "/carburant/pleins?new=1", label: "Nouveau plein" },
       },
       {
         titre: "Mon véhicule et ses papiers",
@@ -96,8 +96,8 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       },
       {
         titre: "Signaler un problème sur le véhicule",
-        texte: "« Demandes d'entretien » : décrivez le problème, ajoutez une photo et choisissez l'urgence. Votre responsable est prévenu.",
-        lien: { href: "/moi/signaler", label: "Demandes d'entretien" },
+        texte: "« Signaler un problème » : décrivez le problème, ajoutez une photo et choisissez l'urgence. Votre responsable est prévenu.",
+        lien: { href: "/moi/signaler", label: "Signaler un problème" },
         module: "maintenance_requests",
       },
     ],
@@ -133,7 +133,7 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
       { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/moi/conges", label: "Mes congés" }, module: "leave_management" },
       { titre: "Lire les convocations et notes de service", texte: "L'intranet affiche les informations de l'entreprise ; confirmez la lecture des convocations.", lien: { href: "/communication/intranet", label: "Intranet" }, module: "intranet" },
       { titre: "Échanger avec l'équipe", texte: "Messenger remplace les groupes WhatsApp : le groupe de votre équipe, les Infos équipe épinglées, @prénom pour mentionner un collègue ; messages, photos et documents restent dans l'entreprise.", lien: { href: "/communication/messenger", label: "Messenger" }, module: "messenger" },
-      { titre: "Consulter mes fiches de paie", texte: "Vos bulletins sont disponibles dans « Fiches de paie », à conserver sans limite de durée.", lien: { href: "/moi/fiches-de-paie", label: "Fiches de paie" }, module: "payslips" },
+      { titre: "Consulter mes fiches de paie", texte: "Une notification vous prévient dès que la direction a validé votre bulletin ; il est alors disponible dans « Mes fiches de paie », à conserver sans limite de durée.", lien: { href: "/moi/fiches-de-paie", label: "Fiches de paie" }, module: "payslips" },
       { titre: "Répondre à une réclamation client", texte: "Si une contestation vous est attribuée, vous recevez une notification : expliquez ce qui s'est passé dans « Contestations clients ».", lien: { href: "/exploitation/contestations", label: "Contestations" }, module: "customer_disputes" },
     ],
   },
@@ -173,8 +173,8 @@ const ENCADREMENT: SectionGuide[] = [
   {
     titre: "Carburant, flotte et entretien",
     etapes: [
-      { titre: "Contrôler les pleins", texte: "La page Carburant liste tous les pleins ; les surconsommations sont signalées dans les alertes.", lien: { href: "/carburant/pleins", label: "Carburant" } },
-      { titre: "Vérifier les lectures automatiques", texte: "« Revue OCR » regroupe les tickets et compteurs lus par l'IA à vérifier.", lien: { href: "/carburant/revue-ocr", label: "Revue OCR" }, module: "ocr" },
+      { titre: "Traiter les écarts carburant", texte: "La tuile « Écarts carburant à traiter » de l'accueil ouvre la page Pleins filtrée sur « À traiter » : ouvrez « Détails » pour justifier, classer ou demander une explication au chauffeur.", lien: { href: "/carburant/pleins?a_traiter=1", label: "Écarts à traiter" } },
+      { titre: "Vérifier les tickets", texte: "« Tickets à vérifier » regroupe les tickets et compteurs lus automatiquement, à confirmer avant enregistrement.", lien: { href: "/carburant/revue-ocr", label: "Tickets à vérifier" }, module: "ocr" },
       { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/carburant/cuves", label: "Cuves" } },
       { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
       { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/flotte/entretien", label: "Demandes d'entretien" }, module: "maintenance_requests" },
@@ -198,7 +198,7 @@ const ENCADREMENT: SectionGuide[] = [
         lien: { href: "/exploitation/contestations", label: "Contestations" },
         module: "customer_disputes",
       },
-      { titre: "Alertes", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Alertes ».", lien: { href: "/communication/alertes", label: "Alertes" } },
+      { titre: "Notifications", texte: "Échéances de documents, surconsommation, anomalies de cuve : tout arrive dans « Notifications ». Les non lues s'affichent en premier ; « Marquer comme lu » vaut pour vous seul.", lien: { href: "/communication/alertes", label: "Notifications" } },
       { titre: "Demandes d'assistance", texte: "Les questions transmises par l'assistant à un humain arrivent ici.", lien: { href: "/communication/assistance", label: "Demandes d'assistance" }, module: "assistant" },
     ],
   },
@@ -261,7 +261,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Flotte", texte: "Liste des véhicules et de leurs documents.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
           { titre: "Export TICPE", texte: "Préparez le dossier de remboursement partiel de la TICPE sur le gazole professionnel (France).", lien: { href: "/carburant/ticpe", label: "Export TICPE" }, module: "ticpe_export" },
           { titre: "Paie", texte: "Préparez et générez les bulletins du mois. Ils restent en attente jusqu'à la validation de la direction : le salarié ne les voit qu'une fois validés. Un bulletin refusé revient avec le motif, à corriger puis régénérer.", lien: { href: "/equipe/paie", label: "Paie & salaires" }, module: "payslips" },
-          { titre: "Alertes et intranet", texte: "Suivez les alertes de l'entreprise et les informations publiées.", lien: { href: "/communication/alertes", label: "Alertes" } },
+          { titre: "Notifications et intranet", texte: "Suivez les notifications de l'entreprise et les informations publiées.", lien: { href: "/communication/alertes", label: "Notifications" } },
         ],
       },
       AIDE,
@@ -294,8 +294,9 @@ export const GUIDES: GuideRole[] = [
       {
         titre: "Paie et RH",
         etapes: [
-          { titre: "Paie & salaires", texte: "Une seule page, quatre onglets : Bulletins du mois (heures des tournées, congés et frais préremplis ; vérifiez puis générez, France), Heures & salaires (heures et pointages par chauffeur), Fiches de paie (bulletins générés, à télécharger) et Réglages. Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/equipe/paie", label: "Paie & salaires" }, module: "payslips" },
-          { titre: "Salaires et heures", texte: "Sans le module Fiches de paie : synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/equipe/paie/heures", label: "Salaires" }, module: "planning" },
+          { titre: "Valider les bulletins du mois", texte: "Le comptable prépare et génère les bulletins ; rien ne prend effet sans votre validation. La tuile « Bulletins à valider » de l'accueil (et la notification) ouvre Paie & salaires : vérifiez, puis « Valider » (ou tout valider), ou refusez avec un motif. Chaque salarié est prévenu dès que son bulletin est validé.", lien: { href: "/equipe/paie", label: "Bulletins à valider" }, module: "payslips" },
+          { titre: "Paie & salaires", texte: "Une seule page et ses onglets : Bulletins du mois (heures des tournées, congés et frais préremplis ; vérifiez, générez et validez, France), Fiches de paie (bulletins générés et leur statut, à télécharger), Acomptes (demandes des salariés, à accepter ou refuser), Journal, Export comptable et Réglages. Faites valider le paramétrage par votre expert-comptable.", lien: { href: "/equipe/paie", label: "Paie & salaires" }, module: "payslips" },
+          { titre: "Heures & salaires", texte: "Sans le module Fiches de paie : synthèse des heures et sessions de pointage par chauffeur.", lien: { href: "/equipe/paie/heures", label: "Salaires" }, module: "planning" },
           { titre: "Planning des congés", texte: "Vue d'ensemble des absences de l'équipe.", lien: { href: "/equipe/conges/calendrier", label: "Planning congés" }, module: "leave_management" },
           { titre: "Amendes", texte: "Enregistrez les avis de contravention et désignez le conducteur dans les délais.", lien: { href: "/flotte/amendes", label: "Amendes" }, module: "fines" },
         ],

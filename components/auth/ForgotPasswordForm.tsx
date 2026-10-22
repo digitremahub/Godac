@@ -55,7 +55,7 @@ export function ForgotPasswordForm() {
         </p>
       </div>
       <div>
-        <label className="block"><span className="label">Email professionnel</span>
+        <label className="block"><span className="label">E-mail professionnel</span>
         <input
           type="email"
           name="email"

@@ -290,7 +290,7 @@ export function UsersPanel({ users, services, acteur = "direction" }: { users: U
           </div>
           {mode === "email" && (
             <div className="flex-1">
-              <label className="block"><span className="label">Email</span>
+              <label className="block"><span className="label">E-mail</span>
               <input className="input" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} /></label>
             </div>
           )}
@@ -376,7 +376,7 @@ export function UsersPanel({ users, services, acteur = "direction" }: { users: U
             <tr>
               <th className="pb-2">Nom</th>
               <th className="pb-2">Titre</th>
-              <th className="pb-2">Email</th>
+              <th className="pb-2">E-mail</th>
               <th className="pb-2">Téléphone</th>
               <th className="pb-2">Service / pôle</th>
               <th className="pb-2">Rôle (permissions)</th>
@@ -414,7 +414,7 @@ export function UsersPanel({ users, services, acteur = "direction" }: { users: U
                   </td>
                   <td className="py-2">
                     {isEditing && u.auth_method !== "pin" ? (
-                      <input aria-label="Email de connexion" className="input !py-1 min-w-48" type="email" autoComplete="off" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                      <input aria-label="E-mail de connexion" className="input !py-1 min-w-48" type="email" autoComplete="off" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
                     ) : u.auth_method === "pin" ? (
                       <span className="badge-neutral">{u.pin_set_at ? "Badge + PIN" : "Badge — PIN non créé"}</span>
                     ) : (

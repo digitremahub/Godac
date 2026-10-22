@@ -28,7 +28,7 @@ export default async function HelpColleaguePage({
   return (
     <div>
       <PageHeader
-        title="J'entre le départ / retour / ravitaillement d'un collègue"
+        title="J'entre le départ / retour / plein d'un collègue"
         description="Téléphone oublié ou déchargé : saisissez à sa place, avec son badge et son code PIN. Tout est enregistré à son nom."
       />
       <div className="mx-auto max-w-md">

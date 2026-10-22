@@ -64,7 +64,7 @@ export function DriverContactForm({
           <input className="input" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
         </label>
         <label className="block">
-          <span className="label">Email de contact</span>
+          <span className="label">E-mail de contact</span>
           <input className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="chauffeur@exemple.fr" />
           <span className="mt-1 block text-xs text-navy/60">Utilisé pour les notifications et convocations. Ne modifie pas l'adresse de connexion.</span>
         </label>

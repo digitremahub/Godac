@@ -11,6 +11,10 @@ import { parisDay, parisMidnightIso, parisMonthStartDay } from "@/lib/utils/pari
 import type { AppUser } from "@/lib/auth/session";
 import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { chargerAlertes } from "@/lib/alerts/charger";
+import { filtreDestinataire } from "@/lib/alerts/lecture";
+import { ecranTourneesEnCours, tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
+import { urlDe } from "@/lib/acces/catalogue";
 
 /**
  * Direction sees the whole organization: fleet + headcount KPIs,
@@ -25,6 +29,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   const leaveEnabled = enabledModules.includes("leave_management");
   const maintenanceEnabled = enabledModules.includes("maintenance_requests");
   const payslipsEnabled = enabledModules.includes("payslips");
+  const ctx = { role: appUser.role, modules: new Set(enabledModules) };
 
   // Bornes en heure de Paris (pas minuit UTC ni l'heure du serveur).
   const monthStartDate = parisMonthStartDay();
@@ -54,13 +59,9 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       // le chargement, avant que le chauffeur ne démarre officiellement.
       .in("status", ["loading", "in_progress"])
       .order("started_at", { ascending: false }),
-    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open"),
-    supabase
-      .from("alerts")
-      .select("id, type, severity, message, status, notified_at, created_at, related_table, related_id")
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    // Alertes de la direction (diffusées ou personnelles), jamais le rappel personnel d'un chauffeur.
+    supabase.from("alerts").select("id", { count: "exact", head: true }).eq("status", "open").or(filtreDestinataire(appUser.id)),
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
     supabase.from("users").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("pending_approval", true),
     leaveEnabled
       ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending")
@@ -100,7 +101,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       : Promise.resolve(null),
   ]);
 
-  const openAlerts = (openAlertsRes.data ?? []) as any[];
+  const openAlerts = openAlertsRes;
   const ongoingRuns = (ongoingRunsRes.data ?? []) as {
     id: string; name: string | null; run_date: string; started_at: string | null;
     driver_id: string | null; service_id: string | null; vehicle_id: string | null;
@@ -161,14 +162,17 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
     toursByService = Array.from(toursByServiceMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }
 
-  const pendingTiles: { label: string; value: number; accent: "teal" | "orange" | "gold"; href: string }[] = [
-    { label: "Nouveaux chauffeurs à valider", value: pendingSignupsRes.count ?? 0, accent: "teal", href: "/equipe/inscriptions" },
-  ];
-  if (leaveEnabled) pendingTiles.push({ label: "Congés à valider", value: pendingLeaveRes.count ?? 0, accent: "gold", href: "/equipe/conges" });
-  if (maintenanceEnabled)
-    pendingTiles.push({ label: "Demandes d'entretien ouvertes", value: openMaintenanceRes.count ?? 0, accent: "orange", href: "/flotte/entretien" });
-  if (payslipsEnabled && missingPayslips !== null)
-    pendingTiles.push({ label: "Fiches de paie manquantes ce mois", value: missingPayslips, accent: missingPayslips > 0 ? "orange" : "teal", href: "/equipe/paie/fiches" });
+  const ecranTournees = ecranTourneesEnCours(ctx);
+  const pendingTiles = tuilesOuvrables(
+    [
+      { libelle: "Nouveaux chauffeurs à valider", valeur: String(pendingSignupsRes.count ?? 0), accent: "teal", ecran: "equipe.inscriptions" },
+      leaveEnabled && { libelle: "Congés à valider", valeur: String(pendingLeaveRes.count ?? 0), accent: "gold", ecran: "equipe.conges" },
+      maintenanceEnabled && { libelle: "Demandes d'entretien ouvertes", valeur: String(openMaintenanceRes.count ?? 0), accent: "orange", ecran: "flotte.entretien" },
+      payslipsEnabled &&
+        missingPayslips !== null && { libelle: "Fiches de paie manquantes ce mois", valeur: String(missingPayslips), accent: missingPayslips > 0 ? "orange" : "teal", ecran: "equipe.paie_fiches" },
+    ],
+    ctx,
+  );
 
   return (
     <div>
@@ -177,29 +181,38 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="Véhicules actifs" value={String((activeVehiclesRes.data ?? []).length)} />
         <StatTile label="Chauffeurs actifs" value={String(activeDriversRes.count ?? 0)} accent="gold" />
-        <Link href="/exploitation/historique" className="block">
-          <StatTile label="Tournées en cours" value={String(ongoingRuns.length)} accent="teal" />
-        </Link>
-        <Link href="/communication/alertes" className="block">
-          <StatTile label="Alertes ouvertes" value={String(openAlertsCountRes.count ?? 0)} accent={openAlertsCountRes.count ? "orange" : "teal"} />
-        </Link>
+        {tuilesOuvrables(
+          [
+            ecranTournees && { libelle: "Tournées colis en cours", valeur: String(ongoingRuns.length), accent: "teal", ecran: ecranTournees },
+            { libelle: "Notifications à traiter", valeur: String(openAlertsCountRes.count ?? 0), accent: openAlertsCountRes.count ? "orange" : "teal", ecran: "communication.alertes" },
+          ],
+          ctx,
+        ).map((t) => (
+          <Link key={t.libelle} href={t.href} className="block">
+            <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
+          </Link>
+        ))}
       </div>
 
       <Card className="mb-6">
         {ongoingRunsRes.error && (
           <p role="alert" className="mb-3 rounded-lg border border-orange/40 bg-orange/10 p-3 text-sm text-orange-ink">
-            Le suivi des tournées est momentanément indisponible. Vérifiez les droits d’accès Supabase sur les fiches chauffeur.
+            Le suivi des tournées est momentanément indisponible. Réessayez dans quelques minutes ou contactez le support.
           </p>
         )}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg">Tournées actuellement effectuées</h2>
-            <p className="text-sm text-navy/60">Suivi des fiches chauffeur réellement démarrées.</p>
+            <h2 className="text-lg">Tournées colis en cours</h2>
+            <p className="text-sm text-navy/60">Tournées colis démarrées ou en chargement.</p>
           </div>
-          <Link href="/exploitation/historique" className="text-sm text-teal-ink hover:underline">Voir l’historique →</Link>
+          {ecranTournees && (
+            <Link href={urlDe(ecranTournees)} className="text-sm text-teal-ink hover:underline">
+              {ecranTournees === "exploitation.suivi" ? "Suivi en direct →" : "Voir le détail →"}
+            </Link>
+          )}
         </div>
         {ongoingRuns.length === 0 ? (
-          <p className="text-sm text-navy/60">Aucune fiche chauffeur en cours pour le moment.</p>
+          <p className="text-sm text-navy/60">Aucune tournée colis en cours pour le moment.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {ongoingRuns.map((r) => (
@@ -222,8 +235,8 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {pendingTiles.map((t) => (
-          <Link key={t.label} href={t.href} className="block">
-            <StatTile label={t.label} value={String(t.value)} accent={t.accent} />
+          <Link key={t.libelle} href={t.href} className="block">
+            <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
           </Link>
         ))}
       </div>
@@ -265,7 +278,7 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
 
         <div>
           <h2 className="mb-3 text-lg">Notifications</h2>
-          <AlertList alerts={openAlerts} viewerRole={appUser.role} />
+          <AlertList alerts={openAlerts} viewerRole={appUser.role} conduit={appUser.conduit} modules={enabledModules} />
         </div>
       </div>
     </div>

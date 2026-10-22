@@ -39,7 +39,11 @@ export default async function FuelPage({
   const supabase = await createServerSupabaseClient();
   const wizardMode = Boolean(params.new);
   const canSeeOtherDrivers = hasRole(appUser.role, ["manager", "exploitation", "direction", "comptable"]);
+  // Saisir un plein pour un autre chauffeur : encadrement seulement.
   const canCreate = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
+  // Bouton « + Nouveau plein » : l'encadrement et toute personne qui
+  // conduit (sur ordinateur ou tablette, la barre mobile n'est plus là).
+  const peutSaisir = canCreate || appUser.conduit;
   // Un manager qui conduit est lui-même chauffeur — "soi-même" reste un
   // choix valide par défaut. Un manager/la direction ne le sont jamais :
   // les laisser sur ce défaut soumettrait le plein au nom de leur
@@ -67,11 +71,11 @@ export default async function FuelPage({
     return (
       <div className="mx-auto max-w-lg">
         <PageHeader
-          title="Nouveau ravitaillement"
-          description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un ravitaillement oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
+          title="Nouveau plein"
+          description={hasRole(appUser.role, ["direction"]) ? "Plein à la cuve ou achat en station. La direction peut saisir un plein oublié à sa date réelle, même après coup ; les écarts de totaliseur restent signalés." : "Plein à la cuve de l'entreprise ou achat en station (ticket)."}
           actions={
             <Link href="/carburant/pleins" className="btn-secondary">
-              ← Historique
+              ← Pleins
             </Link>
           }
         />
@@ -138,12 +142,12 @@ export default async function FuelPage({
   return (
     <div>
       <PageHeader
-        title="Historique carburant"
-        description="Tous les ravitaillements — filtrez par véhicule ou par chauffeur pour voir qui a eu quoi, quand."
+        title="Pleins"
+        description={canSeeOtherDrivers ? "Tous les pleins : filtrez par véhicule ou par chauffeur pour voir qui a eu quoi, quand." : "Vos pleins, du plus récent au plus ancien."}
         actions={
-          canCreate ? (
+          peutSaisir ? (
             <Link href="/carburant/pleins?new=1" className="btn-primary">
-              + Nouveau ravitaillement
+              + Nouveau plein
             </Link>
           ) : undefined
         }
@@ -161,7 +165,7 @@ export default async function FuelPage({
         <Card className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
           <span>Plein ouvert depuis une alerte d&apos;écart.</span>
           <Link href="/carburant/pleins" className="text-teal-ink underline">
-            Voir tout l&apos;historique
+            Voir tous les pleins
           </Link>
         </Card>
       )}
@@ -199,7 +203,7 @@ function FuelHistoryPager({ params, page, total }: { params: Record<string, stri
         <span />
       )}
       <span className="text-navy/60">
-        Page {Math.min(page, pages)} / {pages} · {total} ravitaillement{total > 1 ? "s" : ""}
+        Page {Math.min(page, pages)} / {pages} · {total} plein{total > 1 ? "s" : ""}
       </span>
       {page < pages ? (
         <Link href={href(page + 1)} className="btn-secondary !px-3 !py-1.5">

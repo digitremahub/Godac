@@ -22,4 +22,10 @@ describe("barre mobile chauffeur (§ 3.3)", () => {
     expect(boutonsBarreMobile("chauffeur", m, false).map((b) => b.libelle)).toEqual(["Tournée", "Plein", "Planning", "Signaler"]);
     expect(boutonsBarreMobile("chauffeur", new Set(), false).map((b) => b.libelle)).toEqual(["Plein"]);
   });
+
+  it("« Signaler » ouvre Signaler un problème, même pour un manager qui conduit (pas la liste d'entretien)", () => {
+    const m = new Set(["planning", "maintenance_requests"]);
+    expect(boutonsBarreMobile("manager", m, false, true).at(-1)).toMatchObject({ libelle: "Signaler", href: urlDe("moi.signaler") });
+    expect(boutonsBarreMobile("chauffeur", m, false).at(-1)!.href).toBe(urlDe("moi.signaler"));
+  });
 });

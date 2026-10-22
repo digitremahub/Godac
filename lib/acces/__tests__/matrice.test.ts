@@ -54,7 +54,8 @@ describe("rôle exploitation : entre le manager et la direction", () => {
 
   it("tout ce qu'ouvre l'exploitation, la direction l'ouvre aussi (hors écrans de conduite et « Mon espace » salarié)", () => {
     const direction = ouverts("direction");
-    const horsDirection = [...ouverts("exploitation", true)].filter((id) => !direction.has(id) && !id.startsWith("moi."));
+    // Écrans de conduite (Mon espace, GO Navigation) : la direction ne conduit pas.
+    const horsDirection = [...ouverts("exploitation", true)].filter((id) => !direction.has(id) && !id.startsWith("moi.") && !ECRANS.find((e) => e.id === id)?.conducteur);
     expect(horsDirection).toEqual([]);
   });
 });

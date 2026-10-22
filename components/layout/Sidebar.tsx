@@ -28,6 +28,7 @@ import {
   IconChartBar,
   IconMapPin,
   IconShieldCheck,
+  IconNavigation,
 } from "@/components/layout/icons";
 
 export const ICONES: Record<IconeId, (props: { className?: string }) => React.ReactNode> = {
@@ -53,6 +54,7 @@ export const ICONES: Record<IconeId, (props: { className?: string }) => React.Re
   lifebuoy: IconLifeBuoy,
   card: IconCreditCard,
   shield: IconShieldCheck,
+  navigation: IconNavigation,
   user: IconUserCircle,
 };
 

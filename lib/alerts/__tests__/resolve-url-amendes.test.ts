@@ -26,7 +26,7 @@ describe("lien de l'alerte d'amende (I21)", () => {
 describe("liens d'alerte par rôle destinataire (lot 3)", () => {
   it("chaque table et type mène à une adresse du catalogue, sans redirection", () => {
     expect(resolveAlertUrl("tank_deliveries", null, null)).toBe("/carburant/approvisionnements");
-    expect(resolveAlertUrl("planning_entries", "planning_conflict", null)).toBe("/exploitation/historique");
+    expect(resolveAlertUrl("planning_entries", "planning_conflict", null)).toBe("/exploitation/planning");
     expect(resolveAlertUrl("planning_entries", "planning_assignment", "e1")).toBe("/moi/planning?entry=e1");
     expect(resolveAlertUrl("vehicles", "vehicle_document_request", "v1")).toBe("/flotte/vehicules/v1#papiers");
     expect(resolveAlertUrl("rental_maintenance_requests", null, null)).toBe("/flotte/loueurs");

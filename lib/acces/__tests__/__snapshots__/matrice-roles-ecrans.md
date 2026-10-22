@@ -16,6 +16,7 @@
 | Exploitation | Planning | `/exploitation/planning` | ↪ /moi/planning | ✅ | ✅ | — | ✅ | planning |
 | Exploitation | Tournées & villages | `/exploitation/tournees` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
 | Exploitation | Tournée colis | `/exploitation/colis` | ✅ | ✅ | ✅ | — | ✅ | route_optimizer |
+| Exploitation | GO Navigation | `/livreur/navigation` | ✅ | — | — | — | — | route_optimizer |
 | Exploitation | Suivi en direct | `/exploitation/suivi` | — | 🔒 | 🔒 | — | 🔒 | route_optimizer |
 | Exploitation | Historique des tournées | `/exploitation/historique` | ✅ | ✅ | ✅ | ✅ | ✅ | planning |
 | Exploitation | Rapports de tournée | `/exploitation/historique/rapports` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | 🔒 | planning |
@@ -32,7 +33,7 @@
 | Flotte | Amendes | `/flotte/amendes` | ↪ /moi/amendes | ✅ | ✅ | ✅ | ✅ | fines |
 | Flotte | Badges QR | `/flotte/badges` | — | ✅ | ✅ | — | ✅ | — |
 | Carburant | Pleins | `/carburant/pleins` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Carburant | Revue OCR | `/carburant/revue-ocr` | — | ✅ | ✅ | — | ✅ | ocr |
+| Carburant | Tickets à vérifier | `/carburant/revue-ocr` | — | ✅ | ✅ | — | ✅ | ocr |
 | Carburant | Cuves | `/carburant/cuves` | — | ✅ | ✅ | ✅ | ✅ | — |
 | Carburant | Approvisionnements | `/carburant/approvisionnements` | — | 🔒 | 🔒 | 🔒 | 🔒 | — |
 | Carburant | Export TICPE | `/carburant/ticpe` | — | — | ✅ | ✅ | ✅ | ticpe_export |
@@ -54,7 +55,7 @@
 | Équipe & RH | Registre du personnel | `/equipe/registre` | — | — | — | — | ✅ | — |
 | Communication | Messenger | `/communication/messenger` | ✅ | ✅ | ✅ | ✅ | ✅ | messenger |
 | Communication | Intranet & convocations | `/communication/intranet` | ✅ | ✅ | ✅ | ✅ | ✅ | intranet |
-| Communication | Alertes | `/communication/alertes` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Communication | Notifications | `/communication/alertes` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Communication | Demandes d'assistance | `/communication/assistance` | — | ✅ | ✅ | — | ✅ | assistant |
 | Administration | Organisation | `/admin/organisation` | — | — | — | — | ✅ | — |
 | Administration | Abonnement & modules | `/admin/abonnement` | — | — | — | — | ✅ | — |

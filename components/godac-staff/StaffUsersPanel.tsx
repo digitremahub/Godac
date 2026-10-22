@@ -71,7 +71,7 @@ export function StaffUsersPanel({ users }: { users: StaffUserRow[] }) {
         <thead className="text-left text-navy/60">
           <tr>
             <th className="pb-2">Nom</th>
-            <th className="pb-2">Email</th>
+            <th className="pb-2">E-mail</th>
             <th className="pb-2">Rôle</th>
             <th className="pb-2">Statut</th>
             <th className="pb-2"></th>

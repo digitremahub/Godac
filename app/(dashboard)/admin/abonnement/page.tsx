@@ -94,7 +94,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <PageHeader title="Abonnement & modules" description="Plan tarifaire et facturation GODAC (Stripe)." />
+        <PageHeader title="Abonnement & modules" description="Formule, factures et consommation." />
         {onglets}
         <BillingPanel
           plan={organization?.plan ?? "starter"}

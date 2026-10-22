@@ -213,7 +213,7 @@ export function OrganizationSettingsForm({
           <p className="font-medium">Module OCR</p>
           <p className="text-sm text-navy/65">
             Activable/désactivable par organisation — désactivé, tous les
-            ravitaillements passent en saisie 100% manuelle.
+            pleins passent en saisie 100 % manuelle.
           </p>
         </div>
         <button
