@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { seedModulesRecents, supprimerFichiersDemo } from "@/lib/demo/seed-modules";
+import { ARRET_DEMO, seedTicpeEtPlanning, supprimerFichiersTicpeDemo } from "@/lib/demo/seed-ticpe";
 
 /**
  * Mode démo — « Transports Démo », a fictional carrier a prospect can
@@ -16,7 +17,8 @@ import { seedModulesRecents, supprimerFichiersDemo } from "@/lib/demo/seed-modul
  * push, invitations, billing — see lib/demo/guard.ts). Rebuilt nightly
  * by /api/cron/reset-demo. Les modules récents (Tournée colis, modèles du
  * planning, paie transport, écarts carburant) sont construits par
- * lib/demo/seed-modules.ts, de façon tolérante.
+ * lib/demo/seed-modules.ts, la TICPE, le planning publié et l'arrêt de
+ * travail par lib/demo/seed-ticpe.ts, de façon tolérante.
  */
 
 export const DEMO_DOMAIN = "demo.godac.app";
@@ -99,6 +101,7 @@ export async function teardownDemo(admin: SupabaseClient = createAdminSupabaseCl
   const { data: orgs } = await admin.from("organizations").select("id").eq("is_demo", true);
   for (const org of orgs ?? []) {
     await supprimerFichiersDemo(admin, org.id);
+    await supprimerFichiersTicpeDemo(admin, org.id);
     // fuel_gap_reviews.created_by est ON DELETE RESTRICT vers users.
     for (const table of ["fuel_gap_reviews", "fuel_entries", "vehicle_washes", "ticpe_exports"]) {
       await admin.from(table).delete().eq("organization_id", org.id);
@@ -273,6 +276,8 @@ export async function seedDemo(admin: SupabaseClient = createAdminSupabaseClient
       const service = services[i < 3 ? 0 : 1]!;
       const startTime = `06:${String(Math.floor(between(0, 45))).padStart(2, "0")}`;
       const base = { organization_id: orgId, service_id: service.id, driver_id: userIds[drv.key], vehicle_id: veh.id, tour_number: `${service.name.startsWith("Mess") ? "L" : "V"}${100 + i}` };
+      // Arrêt de travail en cours (lib/demo/seed-ticpe.ts) : pas d'affectation, la tournée reste à pourvoir.
+      if (drv.key === ARRET_DEMO.driver && d >= ARRET_DEMO.du && d <= ARRET_DEMO.au) return;
       if (d > 0) {
         tours.push({ ...base, start_at: at(day, startTime), status: "planned" });
         return;
@@ -356,7 +361,9 @@ export async function seedDemo(admin: SupabaseClient = createAdminSupabaseClient
     "congés",
   );
 
-  await seedModulesRecents({ admin, orgId, userIds, services, vehicleByDriver, today, at, affectations, pleinsAvecEcart });
+  const contexte = { admin, orgId, userIds, services, vehicleByDriver, today, at, affectations, pleinsAvecEcart };
+  await seedModulesRecents(contexte);
+  await seedTicpeEtPlanning(contexte);
 
   return orgId;
 }

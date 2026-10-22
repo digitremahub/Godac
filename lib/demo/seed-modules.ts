@@ -44,7 +44,7 @@ const DEPOT = { label: "Dépôt Lyon Sud — 12 rue du Dépôt, 69007 Lyon", lat
 const DEPOT_VALENCE = { label: "Dépôt Valence — 4 avenue de Romans, 26000 Valence", lat: 44.9334, lng: 4.8924 };
 
 /** Insertion tolérante : une colonne inconnue du schéma (migration pas encore passée) est retirée, puis on réessaie. */
-async function inserer(admin: SupabaseClient, table: string, rows: Ligne | Ligne[], select?: string): Promise<any[]> {
+export async function inserer(admin: SupabaseClient, table: string, rows: Ligne | Ligne[], select?: string): Promise<any[]> {
   let lignes = (Array.isArray(rows) ? rows : [rows]).map((r) => ({ ...r }));
   for (let essai = 0; essai < 10; essai++) {
     const requete = admin.from(table).insert(lignes);
@@ -57,7 +57,7 @@ async function inserer(admin: SupabaseClient, table: string, rows: Ligne | Ligne
   throw new Error(`${table} : trop de colonnes absentes`);
 }
 
-async function facultatif(quoi: string, partie: () => Promise<void>) {
+export async function facultatif(quoi: string, partie: () => Promise<void>) {
   try {
     await partie();
   } catch (e) {
