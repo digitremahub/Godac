@@ -1,10 +1,10 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import { GUIDES, guideDe, guideFiltre } from "@/lib/guides/roles";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { MARQUEUR_GO_NAVIGATION } from "@/lib/acces/catalogue";
 
 export const metadata = { title: "Guide d'utilisation — GODAC" };
 
@@ -19,21 +19,22 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   if (!g.ok) return g.ecran;
   const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
-  const [{ data: organization }, modules] = await Promise.all([
-    supabase.from("organizations").select("is_demo").eq("id", appUser.organization_id).single(),
-    getEnabledModuleKeys(supabase, appUser.organization_id),
-  ]);
+  const { data: organization } = await supabase.from("organizations").select("is_demo").eq("id", appUser.organization_id).single();
+  const modules = [...g.modules];
+  // Compte d'essai GO Navigation : son guide en 5 étapes, sans les autres rôles.
+  const goNavigation = g.modules.has(MARQUEUR_GO_NAVIGATION);
   if ((organization as { is_demo?: boolean } | null)?.is_demo) {
     return <EmptyState title="Guide réservé aux entreprises clientes" description="Le guide d'utilisation complet est disponible dès la signature de votre abonnement GODAC." />;
   }
 
   const { role } = await searchParams;
-  const guide = guideFiltre(guideDe(role ?? appUser.role, (role ?? appUser.role) === appUser.role && appUser.conduit), modules);
+  const guide = guideFiltre(guideDe(role ?? appUser.role, (role ?? appUser.role) === appUser.role && appUser.conduit, { goNavigation }), modules);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={guide.titre} description={guide.intro} />
 
+      {!goNavigation && (
       <nav aria-label="Guides par rôle" className="flex flex-wrap gap-2">
         {GUIDES.map((g) => (
           <Link
@@ -47,6 +48,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           </Link>
         ))}
       </nav>
+      )}
 
       {guide.sections.map((section) => (
         <Card key={section.titre} className="flex flex-col gap-4">

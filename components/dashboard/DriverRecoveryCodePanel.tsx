@@ -81,7 +81,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   if (drivers.length === 0) return null;
 
   return (
-    <section className="mb-6 rounded-2xl border border-navy/10 bg-white p-5">
+    <section className="mb-6 rounded-2xl border border-navy/10 bg-surface p-5">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Accès chauffeurs</h2>
         <p className="mt-1 text-sm text-navy/60">Générer un nouveau code de secours pour un chauffeur qui a perdu le sien. Le code précédent sera invalidé. Le code s'affiche une seule fois : transmettez-le au chauffeur de manière confidentielle.</p>

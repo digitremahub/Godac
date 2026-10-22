@@ -2,14 +2,18 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card, EmptyState } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
-import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import { getFleetConsumptionRanking } from "@/lib/vehicles/consumption";
+import { resumeBulletinsMois, valeurBulletinsMois } from "@/lib/paie/accueil";
 import type { AppUser } from "@/lib/auth/session";
 import { summarizeFuelRows, TRUSTED_FUEL_STATUSES, type FuelTotalsRow } from "@/lib/fuel/totals";
 import { addDays } from "@/lib/planning/dates";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { parisDay, parisMonthStartDay, parisMonthStartIso } from "@/lib/utils/paris-time";
+import { currentMonth } from "@/lib/planning/dates";
 import { chargerAlertes } from "@/lib/alerts/charger";
 import { tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
+
+const MOIS = new Intl.DateTimeFormat("fr-FR", { month: "long", timeZone: "Europe/Paris" });
 
 /** Trimestre civil en cours, jours calendaires de Paris (pas ceux du fuseau du serveur). */
 function currentQuarterRange(): { start: string; end: string } {
@@ -30,6 +34,8 @@ function currentQuarterRange(): { start: string; end: string } {
 export async function ComptableDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
   const supabase = await createServerSupabaseClient();
   const ticpeEnabled = enabledModules.includes("ticpe_export");
+  const payslipsEnabled = enabledModules.includes("payslips");
+  const moisCourant = currentMonth();
   const ctx = { role: appUser.role, modules: new Set(enabledModules) };
 
   // 1er du mois à minuit, heure de Paris.
@@ -44,6 +50,8 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
     missingInvoiceDeliveriesRes,
     ticpeExportRes,
     openAlertsRes,
+    bulletinsMoisRes,
+    salariesRes,
   ] = await Promise.all([
     supabase.from("vehicles").select("id, registration").eq("status", "active"),
     supabase.from("fuel_entries").select("id", { count: "exact", head: true }).in("status", ["pending_ocr", "awaiting_validation"]),
@@ -68,6 +76,9 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
       ? supabase.from("ticpe_exports").select("id").lte("period_start", quarterEnd).gte("period_end", quarterStart).maybeSingle()
       : Promise.resolve({ data: null }),
     chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
+    // Bulletins du mois (préparés, validés, refusés à corriger) et salariés actifs.
+    payslipsEnabled ? supabase.from("payslips").select("period_start, validation_status").eq("period_start", `${moisCourant}-01`) : Promise.resolve({ data: null }),
+    payslipsEnabled ? supabase.from("users").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("active", true) : Promise.resolve({ count: null }),
   ]);
 
   const fuelTotals = summarizeFuelRows(fuelRes.rows);
@@ -76,17 +87,8 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
   const openAlerts = openAlertsRes;
   const ticpeUpToDate = ticpeEnabled ? Boolean(ticpeExportRes.data) : null;
 
-  const consumptionRanking = (
-    await Promise.all(
-      ((fleetVehiclesRes.data ?? []) as { id: string; registration: string }[]).map(async (v) => ({
-        registration: v.registration,
-        consumption: await getVehicleConsumption(supabase, v.id, 30),
-      })),
-    )
-  )
-    .filter((v): v is { registration: string; consumption: number } => v.consumption !== null)
-    .sort((a, b) => b.consumption - a.consumption)
-    .slice(0, 5);
+  // Toute la flotte en trois requêtes (plus une série par véhicule).
+  const consumptionRanking = await getFleetConsumptionRanking(supabase, (fleetVehiclesRes.data ?? []) as { id: string; registration: string }[], 30);
 
   return (
     <div>
@@ -94,7 +96,20 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {/* La vérification des tickets est réservée à l'encadrement : le comptable consulte la liste filtrée des pleins. */}
-        {tuilesOuvrables([{ libelle: "Tickets à vérifier", valeur: String(pendingOcrRes.count ?? 0), accent: "gold", ecran: "carburant.pleins", suite: "?status=awaiting_validation" }], ctx).map((t) => (
+        {tuilesOuvrables(
+          [
+            // La paie du mois en tête : sa tâche du mois.
+            payslipsEnabled && {
+              libelle: `Bulletins de ${MOIS.format(new Date(`${moisCourant}-15T12:00:00Z`))} (préparés / salariés)`,
+              valeur: valeurBulletinsMois(resumeBulletinsMois((bulletinsMoisRes.data ?? []) as { period_start: string; validation_status: string | null }[]), salariesRes.count ?? 0),
+              accent: resumeBulletinsMois((bulletinsMoisRes.data ?? []) as { period_start: string; validation_status: string | null }[]).refuses ? "orange" : "teal",
+              ecran: "equipe.paie",
+            },
+            payslipsEnabled && { libelle: "Export comptable du mois", valeur: "Ouvrir", accent: "gold", ecran: "equipe.paie_export" },
+            { libelle: "Tickets à vérifier", valeur: String(pendingOcrRes.count ?? 0), accent: "gold", ecran: "carburant.pleins", suite: "?status=awaiting_validation" },
+          ],
+          ctx,
+        ).map((t) => (
           <Link key={t.libelle} href={t.href} className="block">
             <StatTile label={t.libelle} value={t.valeur} accent={t.accent} />
           </Link>

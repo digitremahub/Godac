@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconBell, IconCalendar, IconChatBubble, IconWrench, IconAlertTriangle } from "@/components/layout/icons";
+import { IconBell, IconCalendar, IconChatBubble, IconCoins, IconDroplet, IconWrench, IconAlertTriangle } from "@/components/layout/icons";
 
 interface Item {
   id: string;
@@ -20,6 +20,8 @@ function iconFor(type: string) {
   if (type.startsWith("planning")) return IconCalendar;
   if (type === "new_message" || type === "group_message") return IconChatBubble;
   if (type.startsWith("maintenance") || type.startsWith("vehicle")) return IconWrench;
+  if (type.startsWith("payslip") || type === "salary_advance") return IconCoins;
+  if (type.startsWith("fuel") || type.endsWith("_anomaly")) return IconDroplet;
   return IconAlertTriangle;
 }
 

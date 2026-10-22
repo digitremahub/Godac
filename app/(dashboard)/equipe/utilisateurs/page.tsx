@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { UserImportPanel } from "@/components/admin/UserImportPanel";
+import { DriverRecoveryCodePanel } from "@/components/dashboard/DriverRecoveryCodePanel";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import type { UserRole } from "@/lib/types/domain";
 
@@ -72,6 +73,21 @@ export default async function AdminUsersPage() {
   // invite flow itself sets.
   const serviceIdByUser = new Map((userServices ?? []).map((r) => [r.user_id, r.service_id]));
   const usersWithService = (users ?? []).map((u) => ({ ...u, service_id: serviceIdByUser.get(u.id) ?? null }));
+  // Codes de secours des chauffeurs à badge (direction) : outil rare, ici
+  // plutôt qu'au milieu du tableau de bord.
+  const chauffeursPin =
+    appUser.role === "direction"
+      ? ((
+          await supabase
+            .from("users")
+            .select("id, full_name, phone")
+            .eq("organization_id", appUser.organization_id)
+            .eq("auth_method", "pin")
+            .eq("active", true)
+            .eq("pending_approval", false)
+            .order("full_name")
+        ).data ?? [])
+      : [];
 
   return (
     <div>
@@ -89,6 +105,11 @@ export default async function AdminUsersPage() {
         </div>
       )}
       <UsersPanel users={usersWithService} services={services ?? []} acteur={appUser.role} />
+      {appUser.role === "direction" && (
+        <div className="mt-6">
+          <DriverRecoveryCodePanel drivers={chauffeursPin as { id: string; full_name: string; phone: string | null }[]} />
+        </div>
+      )}
     </div>
   );
 }

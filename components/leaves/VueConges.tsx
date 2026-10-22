@@ -29,7 +29,9 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
     .map((row: any) => row.services)
     .filter((s: any): s is { id: string; name: string } => Boolean(s));
 
-  const rows = (leaves ?? []) as any[];
+  // Décision : les demandes à valider d'abord, puis les autres (les plus récentes en tête).
+  const rows = ((leaves ?? []) as any[]).sort((a, b) => (decision ? Number(b.status === "pending") - Number(a.status === "pending") : 0));
+  const enAttente = rows.filter((r) => r.status === "pending").length;
   const driverNameById = new Map(rows.map((r) => [r.driver_id, r.users?.full_name ?? "—"]));
   const overlapsByLeaveId = new Map<string, string[]>();
   if (isDecisionMaker) {
@@ -65,12 +67,19 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
     <div>
       <PageHeader
         title={decision ? "Congés & absences" : "Mes congés"}
-        description={decision ? "Demandes de congés avec détection de chevauchement au sein d'un même service." : "Vos demandes de congés et leur statut."}
+        description={
+          decision
+            ? `${enAttente > 0 ? `${enAttente} demande${enAttente > 1 ? "s" : ""} à valider, en tête de liste. ` : "Aucune demande à valider. "}Les chevauchements au sein d'un même service sont signalés.`
+            : "Vos demandes de congés et leur statut."
+        }
       />
 
-      <div className="mb-6">
-        <LeaveRequestForm services={serviceOptions} solde={monSolde} />
-      </div>
+      {/* Ses propres congés se demandent dans Mon espace ; la direction, qui n'a pas cet écran, garde le formulaire en bas de page. */}
+      {!decision && (
+        <div className="mb-6">
+          <LeaveRequestForm services={serviceOptions} solde={monSolde} />
+        </div>
+      )}
 
       <LeaveRequestsList
         leaves={rows.map((r) => ({
@@ -87,6 +96,15 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
         }))}
         canDecide={isDecisionMaker}
       />
+
+      {decision && appUser.role === "direction" && (
+        <details className="mt-6">
+          <summary className="min-h-[44px] cursor-pointer py-2 text-sm font-semibold text-teal-ink">Demander un congé pour moi</summary>
+          <div className="mt-3">
+            <LeaveRequestForm services={serviceOptions} solde={monSolde} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }

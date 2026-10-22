@@ -120,6 +120,13 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
         module: "route_optimizer",
       },
       {
+        titre: "GO Navigation (avant-première)",
+        texte:
+          "Une fois la tournée démarrée, « GO Navigation » (menu, ou onglet de l'application chauffeur) ouvre la carte plein écran avec le trajet vers l'arrêt en cours. Waze et Google Maps restent disponibles.",
+        lien: { href: "/livreur/navigation", label: "GO Navigation" },
+        module: "route_optimizer",
+      },
+      {
         titre: "Valider une livraison",
         texte:
           "Touchez « Livré » et indiquez où vous avez déposé le colis. La photo est obligatoire pour une boîte aux lettres ou un jardin, conseillée sinon : elle vous protège en cas de réclamation.",
@@ -325,7 +332,62 @@ function guideExploitationConducteur(): GuideRole {
   return { ...base, titre: "Guide de l'exploitation qui conduit", sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...base.sections] };
 }
 
-export function guideDe(role: string | null | undefined, conduit = false): GuideRole {
+/**
+ * Compte d'essai GO Navigation (offre go_navigation) : un guide dédié en
+ * 5 étapes, limité à ce que l'essai ouvre (Tournée colis, GO Navigation,
+ * historique, Mon compte), au lieu du guide complet du manager qui conduit.
+ */
+export const GUIDE_GO_NAVIGATION: GuideRole = {
+  role: "manager",
+  titre: "Guide GO Navigation",
+  intro:
+    "GO Navigation est présentée en avant-première : chargez vos colis, laissez GODAC calculer l'ordre de passage, puis laissez-vous guider d'arrêt en arrêt. Voici les 5 étapes d'une tournée.",
+  sections: [
+    {
+      titre: "Votre tournée en 5 étapes",
+      etapes: [
+        {
+          titre: "Créer la tournée",
+          texte: "Ouvrez « Tournée colis » puis « Nouvelle tournée ». Une tournée par jour suffit ; vous la retrouvez à chaque connexion.",
+          lien: { href: "/exploitation/colis", label: "Tournée colis" },
+        },
+        {
+          titre: "Ajouter les colis",
+          texte:
+            "Scannez chaque colis (QR, Datamatrix ou code-barres) ou photographiez l'étiquette : l'adresse et le téléphone du client s'ajoutent tout seuls. Vérifiez une adresse mal lue avant de continuer.",
+          lien: { href: "/exploitation/colis", label: "Tournée colis" },
+        },
+        {
+          titre: "Optimiser l'ordre de passage",
+          texte: "Touchez « Optimiser » : GODAC calcule le meilleur ordre des arrêts et l'heure de fin estimée. Vous pouvez encore déplacer un arrêt à la main.",
+          lien: { href: "/exploitation/colis", label: "Tournée colis" },
+        },
+        {
+          titre: "Démarrer GO Navigation",
+          texte:
+            "« Ouvrir GO Navigation » (ou le bouton « GO Navigation » en bas de l'écran sur téléphone) : carte plein écran, trajet vers l'arrêt en cours et toute la tournée dans une feuille glissable. Waze et Google Maps restent disponibles sur chaque arrêt.",
+          lien: { href: "/livreur/navigation", label: "GO Navigation" },
+        },
+        {
+          titre: "Livrer et terminer",
+          texte:
+            "À chaque arrêt, touchez « Livré » et indiquez où vous avez déposé le colis (photo obligatoire pour une boîte aux lettres ou un jardin). Les tournées terminées restent consultables dans « Tournées colis passées ».",
+          lien: { href: "/exploitation/historique/colis", label: "Tournées colis passées" },
+        },
+      ],
+    },
+    {
+      titre: "Besoin d'aide ?",
+      etapes: [
+        { titre: "Questions fréquentes", texte: "Les réponses aux questions les plus posées.", lien: { href: "/aide/faq", label: "Questions fréquentes" } },
+        { titre: "Mon compte", texte: "Nom, téléphone, mode sombre et taille du texte se règlent dans « Mon compte ».", lien: { href: "/account", label: "Mon compte" } },
+      ],
+    },
+  ],
+};
+
+export function guideDe(role: string | null | undefined, conduit = false, { goNavigation = false }: { goNavigation?: boolean } = {}): GuideRole {
+  if (goNavigation) return GUIDE_GO_NAVIGATION;
   if (role === "manager" && conduit) return GUIDE_MANAGER_CONDUCTEUR;
   if (role === "exploitation" && conduit) return guideExploitationConducteur();
   return GUIDES.find((g) => g.role === role) ?? GUIDES[0]!;

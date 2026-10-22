@@ -5,17 +5,18 @@ import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { AlertList } from "@/components/alerts/AlertList";
 import { TourHeroCard } from "@/components/dashboard/TourHeroCard";
 import { AssistedClock } from "@/components/time-clock/AssistedClock";
-import { getVehicleConsumption } from "@/lib/vehicles/consumption";
+import { getFleetConsumptionRanking } from "@/lib/vehicles/consumption";
+import { chargerEcartsATraiter } from "@/lib/fuel/ecarts-serveur";
 import type { AppUser } from "@/lib/auth/session";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 import { chargerAlertes } from "@/lib/alerts/charger";
-import { ecranOuvrable, ecranTourneesEnCours, tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
+import { ecranOuvrable, ecranTourneesEnCours, SUITE_ECARTS_A_TRAITER, tuilesOuvrables } from "@/lib/acces/tuiles-accueil";
 
 /**
- * A manager runs one or more services day-to-day: who's on the road
- * right now, what's waiting for a decision (OCR tickets, leave
- * requests, new drivers), and which vehicles are drinking too much
- * fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
+ * A manager runs one or more services day-to-day: fuel gaps to handle
+ * first (GODAC's main axis), who's on the road right now, what's waiting
+ * for a decision (tickets to check, leave requests, new drivers), and
+ * which vehicles are drinking too much fuel. A manager who also drives (users.can_drive) additionally runs their own tours, so
  * they also get the same start/end-tour action a plain chauffeur has.
  *
  * Also the dashboard of the « exploitation » role: same tiles, over the
@@ -45,6 +46,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     pendingSignupsRes,
     openMaintenanceRes,
     openAlertsRes,
+    ecartsRes,
   ] = await Promise.all([
     isManagerChauffeur
       ? supabase
@@ -78,6 +80,9 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
       : Promise.resolve({ count: null }),
     // Diffusées et personnelles, jamais le rappel personnel d'un chauffeur.
     chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
+    // Écarts carburant à traiter, compteur global (RLS : son service, ou toute
+    // l'organisation pour l'exploitation).
+    chargerEcartsATraiter(supabase),
   ]);
 
   const openTour = openTourRes.data as { id: string; tour_number: string; start_at: string; vehicles: { registration: string } | null } | null;
@@ -95,22 +100,15 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     return toutLOrganisation || services.length === 0 || services.some((id: string) => myServiceIds.includes(id));
   });
 
-  const consumptionRanking = (
-    await Promise.all(
-      ((fleetVehiclesRes.data ?? []) as { id: string; registration: string }[]).map(async (v) => ({
-        registration: v.registration,
-        consumption: await getVehicleConsumption(supabase, v.id, 30),
-      })),
-    )
-  )
-    .filter((v): v is { registration: string; consumption: number } => v.consumption !== null)
-    .sort((a, b) => b.consumption - a.consumption)
-    .slice(0, 5);
+  // Toute la flotte en trois requêtes (plus une série par véhicule).
+  const consumptionRanking = await getFleetConsumptionRanking(supabase, (fleetVehiclesRes.data ?? []) as { id: string; registration: string }[], 30);
 
   // Seulement les tuiles dont l'écran s'ouvre (rôle, conduite, modules).
   const ecranTournees = ecranTourneesEnCours(ctx);
   const tiles = tuilesOuvrables(
     [
+      // L'axe principal de GODAC en tête : les écarts carburant.
+      { libelle: "Écarts carburant à traiter", valeur: String(ecartsRes.ids.length), accent: ecartsRes.ids.length ? "orange" : "teal", ecran: "carburant.pleins", suite: SUITE_ECARTS_A_TRAITER },
       ecranTournees && { libelle: "Tournées en cours", valeur: String(ongoingTours.length), accent: "teal", ecran: ecranTournees },
       { libelle: "Tickets à vérifier", valeur: String(pendingOcrRes.count ?? 0), accent: "gold", ecran: "carburant.revue_ocr" },
       { libelle: "Nouveaux chauffeurs à valider", valeur: String(pendingSignups.length), accent: "teal", ecran: "equipe.inscriptions" },
