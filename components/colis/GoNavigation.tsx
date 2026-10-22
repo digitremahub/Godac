@@ -53,6 +53,7 @@ import {
   type EtatCamera,
 } from "@/lib/colis/conduite";
 import { CLE_FEUILLE, FEUILLE_PAR_DEFAUT, adresseCourte, decouperTrace, lirePositionFeuille, positionApresGeste, repeteAdresse, type PositionFeuille } from "@/lib/colis/feuille";
+import { etaArret, type EtaArret } from "@/lib/colis/eta";
 import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
 
 /** Fond vectoriel gratuit et sans clé déjà utilisé par l'app (OpenStreetMap via OpenFreeMap), recoloré aux couleurs GODAC. */
@@ -161,6 +162,12 @@ export function GoNavigation(p: GoNavigationProps) {
   const marqueurs = useRef<Marker[]>([]);
   const moi = useRef<Marker | null>(null);
   const [prete, setPrete] = useState(false);
+  /** Horloge de l'heure d'arrivée : avance même à l'arrêt (sans nouveau point GPS). */
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 20_000);
+    return () => clearInterval(t);
+  }, []);
   const vueRef = useRef(vue);
   vueRef.current = vue;
   const feuilleRef = useRef<HTMLDivElement>(null);
@@ -559,6 +566,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const dureeAffichee =
     trajet && trajet.dureeMin !== null && trajet.distanceKm > 0 && distanceAffichee !== null ? (trajet.dureeMin * distanceAffichee) / (trajet.distanceKm * 1000) : null;
   const arrive = directM !== null && directM < RAYON_ARRIVEE_M;
+  // Heure d'arrivée au prochain arrêt : depuis la position GPS et la durée OSRM déjà reçue (pas d'appel en plus).
+  const eta = cible && position && !arrive && !fige ? etaArret({ maintenant, distanceM: distanceAffichee, dureeMin: dureeAffichee, approx: trajet?.approx }) : null;
 
   // ——— Indications de direction (manœuvres OSRM) ———
   const trajetValide = trajet && cible && cibleTracee.current === cible.id ? trajet : null;
@@ -776,20 +785,27 @@ export function GoNavigation(p: GoNavigationProps) {
               </>
             ) : cible ? (
               <>
-                <p className="flex items-baseline gap-2">
-                  <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{arrive ? "Arrivé" : formatDistance(distanceAffichee)}</span>
-                  {!arrive && dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
-                  {trajet?.approx && !arrive && <span className="text-[11px] text-white/60">(estimation)</span>}
-                </p>
-                <p className="truncate text-xs text-white/80">
+                {arrive ? (
+                  <p className="font-display text-2xl font-bold leading-tight text-teal">Arrivé</p>
+                ) : (
+                  !eta && (
+                    <p className="flex items-baseline gap-2">
+                      <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
+                      {dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
+                      {trajet?.approx && <span className="text-[11px] text-white/60">(estimation)</span>}
+                    </p>
+                  )
+                )}
+                <p className={`truncate text-white/85 ${eta && !arrive ? "text-sm font-semibold" : "text-xs"}`}>
                   Arrêt {numero(cible)} · {cible.address}
                 </p>
               </>
             ) : (
               <p className="py-1 text-sm font-semibold">Tous les arrêts sont faits 🎉</p>
             )}
+            {eta && <BlocEta eta={eta} />}
             <p className="mt-0.5 truncate text-[11px] leading-tight text-white/65">
-              {cible && manoeuvre && courante && !arrive && (
+              {!eta && cible && manoeuvre && courante && !arrive && (
                 <>
                   {formatDistance(distanceAffichee)}
                   {dureeAffichee !== null && ` · ${formatDuree(dureeAffichee)}`} ·{" "}
@@ -966,6 +982,14 @@ export function GoNavigation(p: GoNavigationProps) {
           <>
             <button type="button" className="flex min-h-[44px] w-full touch-none flex-col items-center justify-center gap-1 pb-1 pt-1.5" aria-label={libellePoignee} {...poignee}>
               <span className="h-1.5 w-10 rounded-full bg-navy/20" aria-hidden="true" />
+              {feuille === "pleine" && eta && (
+                // Feuille pleine (elle peut cacher le bandeau) : l'heure d'arrivée reste lisible ici.
+                <span className="flex items-baseline gap-2 text-navy">
+                  <span className="font-display text-xl font-bold tabular-nums">{eta.heure}</span>
+                  <span className="text-sm font-bold text-teal-ink">{eta.dans}</span>
+                  <span className="text-sm font-semibold text-navy/70">{eta.distance}</span>
+                </span>
+              )}
               <span className="text-[11px] font-semibold uppercase tracking-wide text-navy/55">
                 {restants.length} restant{restants.length > 1 ? "s" : ""}
                 {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis`} · {feuille === "pleine" ? "réduire ▾" : "tous les arrêts ▴"}
@@ -1104,6 +1128,25 @@ const ANGLES: Partial<Record<Pictogramme, number>> = {
   "serree-droite": 135,
   "serree-gauche": -135,
 };
+
+/**
+ * Heure d'arrivée au prochain arrêt, en gros dans le bandeau (lisible en
+ * conduite et en plein soleil : blanc et accent sur marine, quel que soit
+ * le thème). Pas d'annonce au lecteur d'écran à chaque point GPS.
+ */
+function BlocEta({ eta }: { eta: EtaArret }) {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-white/15 pt-1.5" aria-live="off">
+      <p className="flex items-baseline gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Arrivée</span>
+        <span className="font-display text-[2rem] font-bold tabular-nums leading-none text-white">{eta.heure}</span>
+      </p>
+      <span className="font-display text-xl font-bold tabular-nums leading-none text-teal">{eta.dans}</span>
+      <span className="text-lg font-semibold tabular-nums leading-none text-white/90">{eta.distance}</span>
+      {eta.estimee && <span className="text-[11px] text-white/60">(estimation)</span>}
+    </div>
+  );
+}
 
 /** Flèche de la manœuvre (tout droit, gauche, droite, légère, serrée, demi-tour, rond-point avec numéro de sortie, arrivée). */
 function FlecheManoeuvre({ picto, sortie, className }: { picto: Pictogramme; sortie?: number; className?: string }) {
