@@ -596,6 +596,18 @@ export const ECRANS: readonly Ecran[] = [
   }),
   E({ id: "carburant.ticpe_detail", section: "carburant", libelle: "Détail export TICPE", href: "/carburant/ticpe/[id]", roles: ["direction", "exploitation", "comptable"], modules: ["ticpe_export"], icone: "file", menu: "cache" }),
   E({
+    id: "carburant.ticpe_controles",
+    section: "carburant",
+    libelle: "TICPE : à régler",
+    libelleSousOnglet: "À régler",
+    href: "/carburant/ticpe/controles",
+    roles: ["direction", "exploitation", "comptable"],
+    modules: ["ticpe_export"],
+    icone: "flag",
+    parent: "carburant.ticpe",
+    note: "contrôles avant déclaration (bloquants, avertissements)",
+  }),
+  E({
     id: "carburant.ticpe_vehicules",
     section: "carburant",
     libelle: "Véhicules TICPE",
