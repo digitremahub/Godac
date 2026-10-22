@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { IconLogOut } from "@/components/layout/icons";
 import { clearOfflineQueue, listOfflineMutations } from "@/lib/offline/outbox";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function SignOutButton() {
     // La file hors ligne est propre au compte : vidée à la déconnexion pour
     // qu'aucune action ne parte ensuite avec la session d'un collègue.
     const enAttente = await listOfflineMutations().then((l) => l.length).catch(() => 0);
-    if (enAttente > 0 && !window.confirm(`${enAttente} action(s) hors ligne ne sont pas encore envoyées et seront perdues. Se déconnecter quand même ?`)) return;
+    if (enAttente > 0 && !(await confirmer({ titre: "Se déconnecter quand même ?", message: `${enAttente} action(s) hors ligne ne sont pas encore envoyées et seront perdues.`, action: "Se déconnecter", danger: true }))) return;
     setBusy(true);
     await clearOfflineQueue().catch(() => undefined);
     await supabase.auth.signOut();

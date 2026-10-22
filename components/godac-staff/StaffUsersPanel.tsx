@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import type { UserRole } from "@/lib/types/domain";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface StaffUserRow {
   id: string;
@@ -46,19 +47,19 @@ export function StaffUsersPanel({ users }: { users: StaffUserRow[] }) {
     }
   }
 
-  function changeRole(user: StaffUserRow, role: UserRole) {
+  async function changeRole(user: StaffUserRow, role: UserRole) {
     if (
       user.role === "direction" &&
       role !== "direction" &&
-      !window.confirm(`${user.full_name} perdra le rôle direction. Continuer ?`)
+      !(await confirmer({ titre: "Retirer le rôle direction ?", message: `${user.full_name} perdra le rôle direction.`, action: "Retirer", danger: true }))
     ) {
       return;
     }
     patch(user.id, { role });
   }
 
-  function toggleActive(user: StaffUserRow) {
-    if (user.active && !window.confirm(`Désactiver ${user.full_name} ? Son compte ne pourra plus se connecter.`)) {
+  async function toggleActive(user: StaffUserRow) {
+    if (user.active && !(await confirmer({ titre: `Désactiver ${user.full_name} ?`, message: `Son compte ne pourra plus se connecter.`, action: "Désactiver", danger: true }))) {
       return;
     }
     patch(user.id, { active: !user.active });

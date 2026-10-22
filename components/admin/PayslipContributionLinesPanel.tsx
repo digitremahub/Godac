@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface ContributionLineRow {
   id: string;
@@ -69,7 +70,7 @@ export function PayslipContributionLinesPanel({ lines }: { lines: ContributionLi
   }
 
   async function deleteLine(id: string) {
-    if (!confirm("Supprimer cette ligne de cotisation ?")) return;
+    if (!(await confirmer({ titre: "Supprimer cette ligne de cotisation ?", message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

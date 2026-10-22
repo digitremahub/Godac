@@ -30,6 +30,7 @@ import { ChoixRegroupement, lireChoixRequis, type ChoixRegroupementData } from "
 import type { Regroupement } from "@/lib/colis/fiches-affectation";
 import { ChoixJours, Fenetre } from "@/components/planning/Fenetre";
 import { IconAlertTriangle, IconCopy, IconTrash } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 // ---------------------------------------------------------------------------
 // Données partagées par les fenêtres du planning.
@@ -216,7 +217,7 @@ export function AjoutAffectation({
     }
     if (!vehicule) return setErreur("Choisissez le véhicule.");
     if (!/^\d{2}:\d{2}$/.test(heure)) return setErreur("Indiquez l'heure de départ.");
-    if (date < aujourdhui() && !regroupement && !window.confirm(`Le ${dateLongue(date)} est passé. Ajouter quand même cette affectation ?`)) return;
+    if (date < aujourdhui() && !regroupement && !(await confirmer({ titre: "Ajouter une affectation dans le passé ?", message: `Le ${dateLongue(date)} est passé.`, action: "Ajouter quand même" }))) return;
 
     setBusy(true);
     setErreur(null);
@@ -410,7 +411,7 @@ export function EditionAffectation({
   }
 
   async function supprimer() {
-    if (!window.confirm(`Supprimer la tournée n°${entree.tour_number} du ${dateLongue(jour)} ? Le chauffeur ne la verra plus dans son planning.`)) return;
+    if (!(await confirmer({ titre: `Supprimer la tournée n°${entree.tour_number} du ${dateLongue(jour)} ?`, message: `Le chauffeur ne la verra plus dans son planning.`, action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setErreur(null);
     const r = await fetchGodac(`/api/planning/entries/${entree.id}`, { method: "DELETE" });

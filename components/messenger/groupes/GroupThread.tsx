@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconFileText, IconPin, IconTrash } from "@/components/layout/icons";
 import { REACTIONS } from "@/lib/messenger/groupes";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface GroupMessageView {
   id: string;
@@ -162,7 +163,7 @@ export function GroupThread({
   }
 
   async function del(id: string) {
-    if (!confirm("Supprimer ce message pour tout le groupe ?")) return;
+    if (!(await confirmer({ titre: "Supprimer ce message pour tout le groupe ?", message: "", action: "Supprimer", danger: true }))) return;
     await act(id, async () => {
       const res = await fetch(`/api/messenger/groupes/${groupId}/messages/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Suppression impossible.");

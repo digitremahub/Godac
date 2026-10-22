@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { confirmer } from "@/lib/ui/confirmation";
 
 type Driver = { id: string; full_name: string; phone: string | null };
 
@@ -18,7 +19,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
   const [activationCodes, setActivationCodes] = useState<{ driverId: string; fullName: string; code: string }[]>([]);
 
   async function generate(driver: Driver) {
-    const confirmed = window.confirm(`Générer un nouveau code de secours pour ${driver.full_name} ? L'ancien code sera immédiatement invalidé.`);
+    const confirmed = (await confirmer({ titre: `Générer un nouveau code de secours pour ${driver.full_name} ?`, message: `L'ancien code sera immédiatement invalidé.`, action: "Générer" }));
     if (!confirmed) return;
     setLoadingId(driver.id);
     setError(null);

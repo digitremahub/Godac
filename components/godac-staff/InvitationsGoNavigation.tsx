@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { fetchGodac } from "@/lib/http/fetch-godac";
 import { LIBELLES_STATUT_INVITATION, statutInvitation, VALIDITE_INVITATION_JOURS, type StatutInvitation } from "@/lib/go-navigation/offre";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface LigneInvitationStaff {
   id: string;
@@ -59,7 +60,7 @@ export function InvitationsGoNavigation({ invitations }: { invitations: LigneInv
   }
 
   async function revoquer(id: string) {
-    if (!window.confirm("Révoquer ce lien ? Il ne pourra plus servir à s'inscrire.")) return;
+    if (!(await confirmer({ titre: "Révoquer ce lien ?", message: "Il ne pourra plus servir à s'inscrire.", action: "Révoquer", danger: true }))) return;
     setBusy(id);
     setErreur(null);
     const r = await fetchGodac(`/api/godac-staff/go-navigation/invitations/${id}`, { method: "DELETE" });

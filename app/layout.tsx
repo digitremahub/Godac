@@ -3,6 +3,7 @@ import { SITE_URL } from "@/lib/site";
 import { Syne, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { DISPLAY_PREFERENCES_SCRIPT } from "@/lib/display/preferences";
+import { BoiteConfirmation } from "@/components/ui/BoiteConfirmation";
 
 // Brand guide (Notion — Naming & Identité de Marque V2): Syne for
 // titles and the logo, DM Sans for body copy.
@@ -65,7 +66,11 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: DISPLAY_PREFERENCES_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Boîte de confirmation unique (lib/ui/confirmation.ts › confirmer). */}
+        <BoiteConfirmation />
+      </body>
     </html>
   );
 }

@@ -8,6 +8,7 @@ import { PoleIcon } from "@/components/shared/PoleBadge";
 import { addDays, parisCalendarDate } from "@/lib/planning/dates";
 import { heuresPresence, poleDe } from "@/lib/organization/poles";
 import { formatHeures, heureParis } from "@/lib/planning/presence-bureau";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface Person {
   id: string;
@@ -112,8 +113,8 @@ export function PresencePlanning({
     if (ok) setEditingId(null);
   }
 
-  function supprimer(id: string) {
-    if (!window.confirm("Retirer cette présence du planning ?")) return;
+  async function supprimer(id: string) {
+    if (!(await confirmer({ titre: "Retirer cette présence du planning ?", message: "", action: "Retirer", danger: true }))) return;
     void call(`/api/planning/presence/${id}`, { method: "DELETE" });
   }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { LIBELLES_ACOMPTE, montantAcompte, moisDe, moisLisible, type DemandeAcompte, type StatutAcompte } from "@/lib/paie/acomptes";
+import { confirmer } from "@/lib/ui/confirmation";
 
 const eur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (iso: string | null) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) : "");
@@ -55,7 +56,7 @@ export function MesAcomptes({ demandes, plafond, mois }: { demandes: DemandeAcom
   }
 
   async function annuler(id: string) {
-    if (!window.confirm("Annuler cette demande d'acompte ?")) return;
+    if (!(await confirmer({ titre: "Annuler cette demande d'acompte ?", message: "", action: "Oui, annuler", annuler: "Non", danger: true }))) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -258,7 +259,7 @@ function LigneGestion({ d, direction, plafond }: { d: DemandeAvecNom; direction:
               type="button"
               className="btn-ghost !px-2 !py-1 text-sm text-orange-ink"
               disabled={busy}
-              onClick={() => window.confirm("Annuler cet acompte accepté ? Il ne sera pas déduit du bulletin.") && agir("annuler", "Acompte annulé.")}
+              onClick={async () => (await confirmer({ titre: "Annuler cet acompte accepté ?", message: "Il ne sera pas déduit du bulletin.", action: "Oui, annuler", annuler: "Non", danger: true })) && agir("annuler", "Acompte annulé.")}
             >
               Annuler l&apos;acompte
             </button>

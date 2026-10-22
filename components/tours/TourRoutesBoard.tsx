@@ -9,6 +9,7 @@ import { networkErrorMessage } from "@/lib/utils/network-error";
 import { renfortCandidates, renfortLabel } from "@/lib/tours/renfort";
 import { AddressQrScanner } from "@/components/tours/AddressQrScanner";
 import { cleVillage, rechercherVillages } from "@/lib/tours/recherche-villages";
+import { confirmer } from "@/lib/ui/confirmation";
 
 // La carte (MapLibre) n'est chargée que si l'on ouvre l'onglet.
 const CarteVillages = dynamic(() => import("@/components/tours/CarteVillages").then((m) => m.CarteVillages), {
@@ -394,7 +395,7 @@ function RouteCard({
     finally { if (numero === derniereRechercheVillage.current) setSearchingVillages(false); }
   }
 
-  function addVillageFromSearch(item: { name: string; postal_code: string | null }) {
+  async function addVillageFromSearch(item: { name: string; postal_code: string | null }) {
     const name = item.name.trim();
     const postalCode = item.postal_code ?? null;
     const sameVillage = (v: Village) =>
@@ -407,8 +408,8 @@ function RouteCard({
     const otherRoutes = allRoutes.filter((r) => r.id !== route.id && !r.isRenfort && r.villages.some(sameVillage));
     if (otherRoutes.length > 0) {
       const tours = otherRoutes.map((r) => r.tourNumber).join(", ");
-      if (!window.confirm(`Attention : ${name} est déjà présent dans la/les tournée(s) ${tours}. Voulez-vous vraiment l'ajouter aussi à la tournée ${route.tourNumber} ?`)) return;
-      if (!window.confirm(`Deuxième confirmation : le village ${name} sera affecté à plusieurs tournées. Confirmez-vous l'ajout à la tournée ${route.tourNumber} ?`)) return;
+      if (!(await confirmer({ titre: `${name} est déjà dans la tournée ${tours}`, message: `Voulez-vous vraiment l'ajouter aussi à la tournée ${route.tourNumber} ?`, action: "Ajouter aussi" }))) return;
+      if (!(await confirmer({ titre: "Deuxième confirmation", message: `Le village ${name} sera affecté à plusieurs tournées. Confirmez-vous l'ajout à la tournée ${route.tourNumber} ?`, action: "Confirmer l'ajout" }))) return;
     }
     setError(null);
     setVillages((current) => [...current, {
@@ -451,7 +452,7 @@ function RouteCard({
   }
 
   async function remove() {
-    if (!confirm(`Supprimer la fiche de la tournée ${route.tourNumber} et ses villages ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer la fiche de la tournée ${route.tourNumber} et ses villages ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     try {
       await send(`/api/tour-routes/${route.id}`, "DELETE");

@@ -35,6 +35,7 @@ import { EtapeCreneau, useHorairesOuverture } from "@/components/colis/EtapeCren
 import { CRENEAU_AUCUN, choixDepuisCreneau, validerChoix, type ChoixCreneau, type CreneauSaisi } from "@/lib/colis/creneau";
 import { dateParis } from "@/lib/colis/heure-paris";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface Draft {
   adresse: string;
@@ -253,7 +254,7 @@ export function TourneeColis({
   async function supprimerTournee() {
     if (!run) return;
     if (run.status === "done") { setToast({ ok: false, text: "Une tournée clôturée ne peut pas être supprimée." }); return; }
-    if (!confirm(`Supprimer « ${run.name ?? "cette tournée"} » et ses ${stops.length} arrêt(s) ? C'est définitif.`)) return;
+    if (!(await confirmer({ titre: "Supprimer la tournée colis ?", message: `« ${run.name ?? "Tournée colis"} » et ses ${stops.length} arrêt(s) seront supprimés. C'est définitif.`, action: "Supprimer", danger: true }))) return;
     setBusy("suppr");
     try {
       await api(`/api/colis/tournees/${run.id}`, { method: "DELETE" });
@@ -550,7 +551,7 @@ export function TourneeColis({
   }
 
   async function supprimer(s: Stop) {
-    if (!confirm(`Retirer « ${s.address} » de la tournée ?`)) return;
+    if (!(await confirmer({ titre: "Retirer cet arrêt ?", message: `« ${s.address} » sera retiré de la tournée colis.`, action: "Retirer", danger: true }))) return;
     setStops((all) => all.filter((x) => x.id !== s.id));
     await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger(run?.id));
   }
@@ -663,7 +664,7 @@ export function TourneeColis({
   /** Une liste vide est supprimée ; une liste avec des arrêts les range d'abord dans `vers`. */
   async function supprimerListe(l: Liste, nbArrets: number, vers?: string) {
     if (nbArrets && !vers) return setSuppression({ id: l.id, vers: lists.find((x) => x.id !== l.id)?.id ?? "" });
-    if (!nbArrets && !confirm(`Supprimer la liste « ${l.name} » ?`)) return;
+    if (!nbArrets && !(await confirmer({ titre: `Supprimer la liste « ${l.name} » ?`, message: "", action: "Supprimer", danger: true }))) return;
     setBusy("liste");
     try {
       await api(`/api/colis/listes/${l.id}${vers ? `?vers=${encodeURIComponent(vers)}` : ""}`, { method: "DELETE" });

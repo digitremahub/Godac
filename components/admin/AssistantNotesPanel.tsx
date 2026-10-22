@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { ROLE_LABELS } from "@/lib/roles/labels";
 import type { UserRole } from "@/lib/types/domain";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface Note {
   id: string;
@@ -56,7 +57,7 @@ export function AssistantNotesPanel({ notes }: { notes: Note[] }) {
   }
 
   async function remove(id: string) {
-    if (!window.confirm("Supprimer cette note ?")) return;
+    if (!(await confirmer({ titre: "Supprimer cette note ?", message: "", action: "Supprimer", danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

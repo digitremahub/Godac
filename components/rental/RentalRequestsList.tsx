@@ -12,6 +12,7 @@ import {
   type ManagerAction,
   type RentalRequestStatus,
 } from "@/lib/rental/workflow";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface RentalRequestItem {
   id: string;
@@ -65,8 +66,8 @@ export function RentalRequestsList({ requests, showVehicle = true }: { requests:
       comment = window.prompt("Motif du refus (facultatif) :", "");
       if (comment === null) return;
     }
-    if (action === "transmettre" && !window.confirm("Un nouveau lien sera envoyé au prestataire ; l'ancien ne fonctionnera plus. Continuer ?")) return;
-    if (action === "terminer" && !window.confirm("Clôturer la demande sans réponse du prestataire ?")) return;
+    if (action === "transmettre" && !(await confirmer({ titre: "Envoyer un nouveau lien au prestataire ?", message: "L'ancien lien ne fonctionnera plus.", action: "Envoyer" }))) return;
+    if (action === "terminer" && !(await confirmer({ titre: "Clôturer la demande sans réponse du prestataire ?", message: "", action: "Clôturer" }))) return;
     setBusyId(r.id);
     setMessage(null);
     try {

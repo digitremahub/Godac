@@ -43,7 +43,7 @@ export function TicpeExportLinesReview({ lines, lectureSeule = false }: { lines:
     setError(null);
   }
 
-  async function confirm(id: string) {
+  async function confirmerLigne(id: string) {
     setBusyId(id);
     setError(null);
     try {
@@ -136,7 +136,7 @@ export function TicpeExportLinesReview({ lines, lectureSeule = false }: { lines:
                     </div>
                   ) : lectureSeule ? null : (
                     <div className="flex gap-2">
-                      <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => confirm(l.id)}>
+                      <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => confirmerLigne(l.id)}>
                         <IconCheck className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Correct
                       </button>
                       <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === l.id} onClick={() => startEdit(l)}>

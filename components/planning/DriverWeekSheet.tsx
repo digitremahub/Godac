@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { IconAlertTriangle, IconPencil } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface ServiceOption {
   id: string;
@@ -162,7 +163,7 @@ export function DriverWeekSheet({
   }
 
   async function removeEntry(id: string) {
-    if (!window.confirm("Supprimer cette tournée du planning ?")) return;
+    if (!(await confirmer({ titre: "Supprimer cette tournée du planning ?", message: "", action: "Supprimer", danger: true }))) return;
     setRowBusyId(id);
     setError(null);
     try {

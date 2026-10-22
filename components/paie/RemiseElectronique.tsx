@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { DUREE_LEGALE_DISPONIBILITE, INFORMATION_REMISE, libelleEtat, type EtatRemise } from "@/lib/paie/remise-electronique";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /**
  * Mon espace › Mes fiches de paie : information sur la remise
@@ -16,7 +17,7 @@ export function RemiseElectronique({ etat }: { etat: EtatRemise }) {
   const papier = etat.mode === "papier";
 
   async function choisir(demandePapier: boolean) {
-    if (demandePapier && !window.confirm("Recevoir désormais vos bulletins sur papier ? Vous pourrez revenir à la remise électronique à tout moment.")) return;
+    if (demandePapier && !(await confirmer({ titre: "Recevoir désormais vos bulletins sur papier ?", message: "Vous pourrez revenir à la remise électronique à tout moment.", action: "Passer au papier" }))) return;
     setBusy(true);
     setMessage(null);
     try {

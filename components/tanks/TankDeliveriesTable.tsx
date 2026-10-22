@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { IconPaperclip } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 export interface TankDeliveryRow {
   id: string;
@@ -33,7 +34,7 @@ export function TankDeliveriesTable({ deliveries, canManage }: { deliveries: Tan
   const [error, setError] = useState<string | null>(null);
 
   async function cancel(d: TankDeliveryRow) {
-    if (!window.confirm(`Annuler la livraison de ${d.liters.toLocaleString("fr-FR")} L sur ${d.tankName} ? Le stock et le PMP de la cuve seront remis comme avant.`)) return;
+    if (!(await confirmer({ titre: `Annuler la livraison de ${d.liters.toLocaleString("fr-FR")} L sur ${d.tankName} ?`, message: `Le stock et le PMP de la cuve seront remis comme avant.`, action: "Oui, annuler", annuler: "Non", danger: true }))) return;
     setBusyId(d.id);
     setError(null);
     try {

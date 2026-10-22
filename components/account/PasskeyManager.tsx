@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Card } from "@/components/ui";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface Credential {
   id: string;
@@ -70,7 +71,7 @@ export function PasskeyManager() {
   }
 
   async function remove(id: string) {
-    if (!window.confirm("Retirer cette clé ? Cet appareil ne pourra plus se connecter par Face ID / empreinte.")) return;
+    if (!(await confirmer({ titre: "Retirer cette clé ?", message: "Cet appareil ne pourra plus se connecter par Face ID / empreinte.", action: "Retirer", danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

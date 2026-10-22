@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { basculerJour, JOURS_MODELE, JOURS_PAR_DEFAUT, nomModeleParDefaut, raisonGenerationImpossible, resumeJours } from "@/lib/planning/modeles";
+import { confirmer } from "@/lib/ui/confirmation";
 
 type ServiceOption = { id: string; name: string };
 type RouteOption = { id: string; tourNumber: string; serviceId: string | null };
@@ -106,7 +107,7 @@ export function PlanningTemplatesPanel({
   }
 
   async function retirerModele(template: Template) {
-    if (!confirm(`Retirer l'affectation récurrente « ${template.name} » ? Les affectations déjà générées sont conservées.`)) return;
+    if (!(await confirmer({ titre: `Retirer l'affectation récurrente « ${template.name} » ?`, message: `Les affectations déjà générées sont conservées.`, action: "Retirer", danger: true }))) return;
     setRetrait(template.id);
     setError(null);
     setMessage(null);
