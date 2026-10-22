@@ -37,6 +37,25 @@ export interface CorrectionAffichee {
   details: Record<string, unknown> | null;
 }
 
+/** Montant TICPE du plein (lib/ticpe/montant.ts) ; null si non visible pour ce rôle ou module coupé. */
+export interface TicpeDuPlein {
+  statut: "compte" | "exclu" | "taux_manquant";
+  raison: string | null;
+  categorie: string | null;
+  zone: string | null;
+  origineZone: string | null;
+  taux: number | null;
+  tauxAConfirmer: boolean;
+  origineTaux: "bareme" | "surcharge" | null;
+  litres: number;
+  litresRetenus: number;
+  litresHorsPlafond: number;
+  montant: number;
+  justificatif: { type: string | null; present: boolean; libelle: string };
+  /** L'encadrement peut déclarer un relevé de carte ou une facture. */
+  justificatifModifiable: boolean;
+}
+
 export interface DetailPlein {
   id: string;
   occurred_at: string;
@@ -75,6 +94,7 @@ export interface DetailPlein {
   /** null : non visible pour ce rôle (journal d'audit réservé à l'encadrement). */
   corrections: CorrectionAffichee[] | null;
   droits: DroitsEcart;
+  ticpe?: TicpeDuPlein | null;
 }
 
 /** Libellés des colonnes modifiables (journal « plein_modification »). */
@@ -92,6 +112,8 @@ export const LIBELLES_CHAMPS_PLEIN: Record<string, string> = {
   product: "Produit",
   vehicle_id: "Véhicule",
   tank_id: "Cuve",
+  ticpe_justificatif: "Justificatif TICPE",
+  ticpe_justificatif_ref: "Référence du justificatif",
 };
 
 export const LIBELLES_STATUT_PLEIN: Record<string, string> = {

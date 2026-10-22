@@ -20,6 +20,11 @@ import { RentalRequestsList } from "@/components/rental/RentalRequestsList";
 import { loadRentalRequests } from "@/lib/rental/load-requests";
 import { daysUntil, evaluateKmAllowance, formatKm, KM_LEVEL_LABELS } from "@/lib/rental/contract";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { VehiculeTicpePanel } from "@/components/ticpe/VehiculeTicpePanel";
+import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
+import { evaluerFlotte } from "@/lib/ticpe/vehicules-serveur";
+import { estLoue } from "@/lib/ticpe/eligibilite";
+import { LIBELLES_CATEGORIE_COURTS } from "@/lib/ticpe/bareme";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -179,6 +184,17 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     .filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !requestedInterventionIds.has(i.id))
     .map((i) => ({ id: i.id as string, type: i.type as string, created_at: i.created_at as string }));
 
+  // TICPE : statut daté et expliqué du véhicule (module Export TICPE).
+  const ticpeVisible = modules.has("ticpe_export");
+  const ticpe = ticpeVisible
+    ? await (async () => {
+        const p = await chargerParametresTicpe(supabase, appUser.organization_id);
+        const { evalues, colonnesTicpe } = await evaluerFlotte(supabase, appUser.organization_id, p.reglages, [id]);
+        const e = evalues.get(id);
+        return e ? { ...e, colonnesTicpe, categorieDefaut: LIBELLES_CATEGORIE_COURTS[p.reglages.categorie_par_defaut] } : null;
+      })()
+    : null;
+
   const canManageDocuments = hasRole(appUser.role, ["manager", "exploitation", "direction"]);
   const vehicleDocuments = canManageDocuments ? await listVehicleDocuments(supabase, id) : [];
 
@@ -315,6 +331,31 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               <p className="text-sm text-navy/60">Aucun relevé : il s&apos;affichera au premier départ de tournée ou au premier plein.</p>
             )}
           </Card>
+          {ticpe && (
+            <Card className="w-full">
+              <p className="mb-2 text-sm text-navy/65">Remboursement TICPE</p>
+              <VehiculeTicpePanel
+                vehicleId={v.id}
+                eligibilite={ticpe.eligibilite}
+                infos={{
+                  ticpe_categorie: (ticpe.vehicule as any).ticpe_categorie ?? null,
+                  pays_immatriculation: (ticpe.vehicule as any).pays_immatriculation ?? null,
+                  ticpe_location_demandeur: (ticpe.vehicule as any).ticpe_location_demandeur ?? null,
+                  flotte_entree_le: (ticpe.vehicule as any).flotte_entree_le ?? null,
+                  flotte_sortie_le: (ticpe.vehicule as any).flotte_sortie_le ?? null,
+                  cg_genre: (ticpe.vehicule as any).cg_genre ?? null,
+                  cg_energie: (ticpe.vehicule as any).cg_energie ?? null,
+                  cg_premiere_immat: (ticpe.vehicule as any).cg_premiere_immat ?? null,
+                  cg_confirmee_le: (ticpe.vehicule as any).cg_confirmee_le ?? null,
+                }}
+                loue={estLoue(ticpe.vehicule)}
+                categorieDefaut={ticpe.categorieDefaut}
+                aCarteGrise={ticpe.aCarteGrise}
+                modifiable={hasRole(appUser.role, ["manager", "exploitation", "direction"])}
+                colonnesDisponibles={ticpe.colonnesTicpe}
+              />
+            </Card>
+          )}
           {canManageRental && (
             <VehicleRentalPanel
               vehicleId={v.id}

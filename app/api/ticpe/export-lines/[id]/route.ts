@@ -5,6 +5,9 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { generateTicpePdf } from "@/lib/ticpe/generate-pdf";
 import { buildTicpeWorkbook } from "@/lib/utils/excel";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { LIBELLES_CATEGORIE_COURTS, LIBELLES_ZONE } from "@/lib/ticpe/bareme";
+import { AVERTISSEMENT_TICPE } from "@/lib/ticpe/reglages";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("confirm") }),
@@ -61,15 +64,48 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const [{ data: exportRow }, { data: organization }, { data: allLines }] = await Promise.all([
-    supabase.from("ticpe_exports").select("organization_id, period_start, period_end, file_path, pdf_file_path").eq("id", line.export_id).single(),
+    supabase
+      .from("ticpe_exports")
+      .select("organization_id, period_start, period_end, file_path, pdf_file_path, details")
+      .eq("id", line.export_id)
+      .single()
+      .then(async (r) =>
+        r.error && estSchemaManquant(r.error)
+          ? await supabase.from("ticpe_exports").select("organization_id, period_start, period_end, file_path, pdf_file_path").eq("id", line.export_id).single()
+          : r,
+      ),
     supabase.from("organizations").select("name").eq("id", appUser.organization_id).single(),
     supabase
       .from("ticpe_export_lines")
-      .select("registration, vehicle_type, entry_count, computed_total_liters, computed_total_amount, corrected_total_liters, corrected_total_amount, vehicles(ptac_kg)")
+      .select("registration, vehicle_type, entry_count, computed_total_liters, computed_total_amount, corrected_total_liters, corrected_total_amount, refund_amount, liters_over_cap, vehicles(ptac_kg)")
       .eq("export_id", line.export_id)
-      .order("registration"),
+      .order("registration")
+      .then(async (r) =>
+        r.error && estSchemaManquant(r.error)
+          ? await supabase
+              .from("ticpe_export_lines")
+              .select("registration, vehicle_type, entry_count, computed_total_liters, computed_total_amount, corrected_total_liters, corrected_total_amount, vehicles(ptac_kg)")
+              .eq("export_id", line.export_id)
+              .order("registration")
+          : r,
+      ),
   ]);
   if (!exportRow) return NextResponse.json({ error: "Export introuvable." }, { status: 404 });
+
+  // Exports avec barème (lot 6) : remboursement de chaque ligne, recalculé
+  // au prorata des litres corrigés ; récapitulatif d'origine conservé.
+  const details = (exportRow as { details?: { recap?: { categorie: string; zone: string; taux: number | null; pleins: number; hectolitres: number; montant: number }[] } | null }).details;
+  const recap = details?.recap?.map((r) => ({
+    ...r,
+    categorie: LIBELLES_CATEGORIE_COURTS[r.categorie as keyof typeof LIBELLES_CATEGORIE_COURTS] ?? r.categorie,
+    zone: LIBELLES_ZONE[r.zone as keyof typeof LIBELLES_ZONE] ?? r.zone,
+  }));
+  const remboursement = (l: any): number | null => {
+    if (l.refund_amount === null || l.refund_amount === undefined) return null;
+    const calcule = Number(l.computed_total_liters);
+    if (l.corrected_total_liters === null || !calcule) return Number(l.refund_amount);
+    return Math.round(((Number(l.refund_amount) * Number(l.corrected_total_liters)) / calcule) * 100) / 100;
+  };
 
   const pdfBuffer = await generateTicpePdf({
     organizationName: organization?.name ?? "Organisation",
@@ -82,7 +118,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       totalLiters: l.corrected_total_liters ?? l.computed_total_liters,
       totalAmount: l.corrected_total_amount ?? l.computed_total_amount,
       corrected: l.corrected_total_liters !== null,
+      refundAmount: remboursement(l),
+      litersOverCap: (l as any).liters_over_cap === null || (l as any).liters_over_cap === undefined ? null : Number((l as any).liters_over_cap),
     })),
+    recap,
+    avertissement: recap ? AVERTISSEMENT_TICPE : undefined,
   });
 
   const pdfFilePath = exportRow.pdf_file_path ?? `${exportRow.organization_id}/${line.export_id}.pdf`;
@@ -94,17 +134,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // L'Excel et le total de l'export suivent les corrections, comme le PDF.
   const lignes = (allLines ?? []).map((l: any) => ({
     registration: l.registration as string,
-    vehicleType: l.vehicle_type as "PL" | "SPL",
+    vehicleType: l.vehicle_type as string,
     ptacKg: l.vehicles?.ptac_kg !== null && l.vehicles?.ptac_kg !== undefined ? Number(l.vehicles.ptac_kg) : null,
     entryCount: l.entry_count as number,
     totalLiters: Number(l.corrected_total_liters ?? l.computed_total_liters),
     totalAmount: Number(l.corrected_total_amount ?? l.computed_total_amount),
+    refundAmount: remboursement(l),
+    litersOverCap: l.liters_over_cap === null || l.liters_over_cap === undefined ? null : Number(l.liters_over_cap),
   }));
   const workbook = await buildTicpeWorkbook({
     organizationName: organization?.name ?? "Organisation",
     periodStart: exportRow.period_start,
     periodEnd: exportRow.period_end,
     rows: lignes,
+    recap: recap?.map((r) => ({ categorie: r.categorie, zone: r.zone, taux: r.taux, pleins: r.pleins, hectolitres: r.hectolitres, montant: r.montant })),
+    avertissement: recap ? AVERTISSEMENT_TICPE : undefined,
   });
   if (exportRow.file_path) {
     const { error: xlsxError } = await supabase.storage.from("ticpe-exports").upload(exportRow.file_path, workbook, {

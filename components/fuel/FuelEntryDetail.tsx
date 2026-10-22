@@ -18,6 +18,7 @@ import {
   LIBELLES_STATUT_PLEIN,
   type DetailPlein,
 } from "@/lib/fuel/detail-plein";
+import { SectionTicpePlein } from "@/components/ticpe/SectionTicpePlein";
 
 const dateHeure = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" }) : "—";
@@ -158,6 +159,19 @@ export function FuelEntryDetail({ entryId }: { entryId: string }) {
             {confiance && <Champ libelle="Confiance">{confiance}</Champ>}
             {plein.ocr_error && <Champ libelle="Erreur OCR"><span className="text-orange-ink">{plein.ocr_error}</span></Champ>}
           </dl>
+        </Section>
+      )}
+
+      {plein.ticpe && (
+        <Section titre="Remboursement TICPE">
+          <SectionTicpePlein
+            entryId={plein.id}
+            ticpe={plein.ticpe}
+            onModifie={async () => {
+              await charger();
+              router.refresh();
+            }}
+          />
         </Section>
       )}
 
