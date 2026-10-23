@@ -143,7 +143,8 @@ const PLANNING_PAIE = [
     title: "La semaine construite une fois, publiée aux chauffeurs.",
     icon: IconCalendar,
     points: [
-      "Vue jour, semaine ou mois : on affecte et on déplace par glisser-déposer.",
+      "Vue jour, semaine ou mois : on affecte et on déplace par glisser-déposer, ou en touchant sur téléphone.",
+      "Heures modifiables tournée par tournée ; deux tournées à la même heure pour un chauffeur en combiné.",
       "Recopie de la semaine en un clic : les absents ne sont pas replacés, les trous sautent aux yeux.",
       "Publication aux chauffeurs : chacun reçoit son planning, puis seulement ce qui change.",
       "Affectations récurrentes pour générer la semaine type.",
@@ -175,8 +176,8 @@ const PLANNING_PAIE = [
 
 const ET_AUSSI = [
   {
-    title: "Rôles adaptés",
-    description: "Direction, exploitation, manager, comptable, chauffeur : chacun voit ce qui le concerne, rien de plus.",
+    title: "Rôles et validation en chaîne",
+    description: "Direction, exploitation, manager, comptable, chauffeur : chacun voit ce qui le concerne. Personne ne règle sa propre demande : elle remonte au niveau supérieur.",
     icon: IconUsers,
   },
   {
