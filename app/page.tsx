@@ -58,7 +58,7 @@ const ETAPES_TICPE = [
   },
   {
     title: "Contrôlé avant de déclarer",
-    description: "Plein sans justificatif, doublon probable, plafond de volume dépassé, consommation anormale, PTAC inconnu : vous corrigez avant, pas pendant un contrôle.",
+    description: "Plein sans justificatif, doublon probable, taux manquant, consommation anormale, PTAC inconnu : vous corrigez avant, pas pendant un contrôle.",
     icon: IconShieldCheck,
   },
   {

@@ -215,7 +215,7 @@ export function controlesPeriode(e: EntreeControles): PointARegler[] {
       cle: `plafond:${d.vehicle_id}:${d.periode}`,
       code: "plafond",
       gravite: "avertissement",
-      detail: `${immat(d.vehicle_id)} : ${L(d.litres)} sur ${d.periode.replace("-S", " semestre ")} pour un plafond de ${L(d.plafond)} ; ${L(d.litresHorsPlafond)} exclus du montant (plafond à confirmer par l'expert-comptable).`,
+      detail: `${immat(d.vehicle_id)} : ${L(d.litres)} sur ${d.periode.replace("-S", " semestre ")} pour le plafond que vous avez activé de ${L(d.plafond)} ; ${L(d.litresHorsPlafond)} exclus du montant. Ce plafond vient de vos réglages : base légale non confirmée, à confirmer par l'expert-comptable.`,
       lien: lienVehicule(d.vehicle_id),
       objet: { type: "vehicule", id: d.vehicle_id },
     });

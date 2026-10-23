@@ -4,6 +4,7 @@ import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { bornesPeriode } from "@/lib/ticpe/export";
 import { appliquerPlafond, calculerPlein, type Depassement, type LigneTicpe, type PleinTicpe } from "@/lib/ticpe/montant";
+import { plafondEffectif } from "@/lib/ticpe/reglages";
 import { chargerParametresTicpe, type ParametresTicpe } from "@/lib/ticpe/serveur";
 import { evaluerFlotte, type VehiculeEvalue } from "@/lib/ticpe/vehicules-serveur";
 
@@ -68,7 +69,7 @@ export async function calculerTicpe(
       cuveAvecFacture: cuve?.avecFacture ?? false,
     });
   });
-  const { lignes, depassements } = appliquerPlafond(brutes, parametres.reglages.plafond_litres, parametres.reglages.plafond_periode);
+  const { lignes, depassements } = appliquerPlafond(brutes, plafondEffectif(parametres.reglages), parametres.reglages.plafond_periode);
   return {
     parametres,
     evalues,

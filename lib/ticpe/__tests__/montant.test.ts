@@ -15,7 +15,7 @@ import {
   type ContextePlein,
   type PleinTicpe,
 } from "@/lib/ticpe/montant";
-import { REGLAGES_PAR_DEFAUT } from "@/lib/ticpe/reglages";
+import { REGLAGES_PAR_DEFAUT, plafondEffectif } from "@/lib/ticpe/reglages";
 
 const elig: ResultatEligibilite = eligibiliteVehicule({ type: "PL", ptac_kg: 19000, fuel_type: "Diesel" }, { reglages: REGLAGES_PAR_DEFAUT, aCarteGrise: true });
 const ctx: ContextePlein = { eligibilite: elig, reglages: REGLAGES_PAR_DEFAUT, bareme: BAREME_PAR_DEFAUT, surcharges: [] };
@@ -136,9 +136,23 @@ describe("plafond par véhicule", () => {
     expect(lignes[1]!.litresRetenus).toBe(400);
     expect(lignes[0]!.litresRetenus).toBe(0);
   });
-  it("plafond par défaut : 40 000 L / an", () => {
+  it("aucun plafond par défaut : le scénario du tracteur à 45 000 L est compté en entier (7 002 €)", () => {
+    expect(REGLAGES_PAR_DEFAUT).toMatchObject({ plafond_actif: false, plafond_litres: null });
+    expect(plafondEffectif(REGLAGES_PAR_DEFAUT)).toBeNull();
+    const l = Array.from({ length: 9 }, (_, i) => ligne(`p${i}`, `2026-0${1 + i}-10`, 5000));
+    const { lignes, depassements } = appliquerPlafond(l, plafondEffectif(REGLAGES_PAR_DEFAUT), REGLAGES_PAR_DEFAUT.plafond_periode);
+    expect(totaliser(lignes)).toMatchObject({ litres: 45000, litresRetenus: 45000, litresHorsPlafond: 0, montant: 7002 });
+    expect(depassements).toEqual([]);
+  });
+  it("un plafond saisi mais non activé ne s'applique pas", () => {
+    expect(plafondEffectif({ plafond_actif: false, plafond_litres: 40000 })).toBeNull();
+    expect(plafondEffectif({ plafond_actif: true, plafond_litres: null })).toBeNull();
+  });
+  it("plafond explicitement activé : litres au-delà visibles, jamais perdus de vue", () => {
+    const reglages = { ...REGLAGES_PAR_DEFAUT, plafond_actif: true, plafond_litres: 40000 };
+    expect(plafondEffectif(reglages)).toBe(40000);
     const l = Array.from({ length: 41 }, (_, i) => ligne(`p${String(i).padStart(2, "0")}`, `2026-0${1 + (i % 9)}-10`, 1000));
-    const { lignes, depassements } = appliquerPlafond(l, REGLAGES_PAR_DEFAUT.plafond_litres, REGLAGES_PAR_DEFAUT.plafond_periode);
+    const { lignes, depassements } = appliquerPlafond(l, plafondEffectif(reglages), reglages.plafond_periode);
     expect(totaliser(lignes)).toMatchObject({ litres: 41000, litresRetenus: 40000, litresHorsPlafond: 1000, montant: 6224 });
     expect(depassements).toHaveLength(1);
   });

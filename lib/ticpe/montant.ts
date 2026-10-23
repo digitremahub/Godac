@@ -6,9 +6,10 @@
  * taux du barème à la date du plein (heure de Paris), montant =
  * litres / 100 × taux. Pleins à la cuve : seuls les litres distribués au
  * véhicule (le plein lui-même) comptent, jamais la livraison de la cuve.
- * Le plafond de volume par véhicule (an ou semestre) s'applique ensuite
- * dans l'ordre chronologique : les litres au-delà restent visibles mais
- * ne comptent pas dans le montant.
+ * Aucun plafond de volume par défaut (base légale non confirmée). Si
+ * l'organisation en a activé un, il s'applique par véhicule (an ou
+ * semestre) dans l'ordre chronologique : les litres au-delà restent
+ * visibles mais ne comptent pas dans le montant.
  */
 
 import {
@@ -215,10 +216,12 @@ export interface Depassement {
  * chronologique des pleins comptés (et « taux manquant », qui consomment
  * aussi du volume). Renvoie de nouvelles lignes et les dépassements.
  */
-export function appliquerPlafond(lignes: readonly LigneTicpe[], plafond: number, periode: "annuel" | "semestriel"): { lignes: LigneTicpe[]; depassements: Depassement[] } {
+export function appliquerPlafond(lignes: readonly LigneTicpe[], plafond: number | null, periode: "annuel" | "semestriel"): { lignes: LigneTicpe[]; depassements: Depassement[] } {
+  // Pas de plafond activé : aucun litre n'est écarté.
+  if (plafond === null) return { lignes: [...lignes], depassements: [] };
   const cumuls = new Map<string, number>();
   const hors = new Map<string, number>();
-  const ordre = [...lignes].map((l, i) => ({ l, i })).sort((a, b) => a.l.occurred_at.localeCompare(b.l.occurred_at) || a.l.id.localeCompare(b.l.id));
+  const ordre = [...lignes].map((l, i) => ({ l, i })).sort((a, b) => Date.parse(a.l.occurred_at) - Date.parse(b.l.occurred_at) || a.l.id.localeCompare(b.l.id));
   const res: LigneTicpe[] = new Array(lignes.length);
   for (const { l, i } of ordre) {
     if (l.statut === "exclu") {

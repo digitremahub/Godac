@@ -158,7 +158,7 @@ function TicpeDocument({ data }: { data: TicpePdfData }) {
         {data.avertissement && <Text style={[styles.disclaimer, { color: "#0A0F1E" }]}>{data.avertissement}</Text>}
         <Text style={styles.disclaimer}>
           {avecBareme
-            ? "Volumes retenus après plafond par véhicule ; taux du barème GODAC (ou taux particulier de l'entreprise) à la date de chaque plein. * Ligne corrigée à la main : remboursement recalculé au prorata des litres, le récapitulatif reste celui du calcul. "
+            ? "Aucun plafond de volume sauf celui que l'entreprise a activé (base légale non confirmée, à confirmer par l'expert-comptable) ; taux du barème GODAC (ou taux particulier de l'entreprise) à la date de chaque plein. * Ligne corrigée à la main : remboursement recalculé au prorata des litres, le récapitulatif reste celui du calcul. "
             : ""}
           Document généré automatiquement à partir des ravitaillements validés (manuels ou OCR) enregistrés dans
           GODAC pour les véhicules PL/SPL sur la période indiquée. Les véhicules dont le type (PL/SPL) n&apos;a pas
@@ -248,7 +248,7 @@ function EraDocument({ data }: { data: EraPdfData }) {
         <Text style={[styles.disclaimer, { color: "#0A0F1E" }]}>{data.avertissement}</Text>
         <Text style={styles.disclaimer}>
           Modèle GODAC établi à partir des pleins de gazole validés (décret n° 2025-255 du 19/03/2025) ; présentation à confirmer par l&apos;expert-comptable.
-          Volumes retenus après plafond par véhicule. Justificatifs conservés par l&apos;entreprise : factures et tickets carburant, relevés de cartes,
+          Aucun plafond de volume sauf celui que l&apos;entreprise a activé (base légale non confirmée, à confirmer par l&apos;expert-comptable). Justificatifs conservés par l&apos;entreprise : factures et tickets carburant, relevés de cartes,
           livraisons de cuve, cartes grises.
         </Text>
       </Page>
