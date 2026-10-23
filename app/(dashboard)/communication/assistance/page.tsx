@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/ui";
 import { SupportRequestsList } from "@/components/assistant/SupportRequestsList";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision } from "@/lib/hierarchie/demandes";
 
 /**
  * Manager-like inbox for the assistant's human relay. Same
@@ -22,7 +24,7 @@ export default async function SupportPage() {
 
   let query = supabase
     .from("support_requests")
-    .select("id, question, conversation_summary, recipient, status, response, service_id, created_at, users!support_requests_requested_by_fkey(full_name)")
+    .select("id, question, conversation_summary, recipient, status, response, service_id, created_at, requested_by, users!support_requests_requested_by_fkey(full_name)")
     .order("created_at", { ascending: false });
 
   if (!voitToutLOrganisation(appUser.role)) {
@@ -32,6 +34,10 @@ export default async function SupportPage() {
   }
 
   const { data: requests } = await query;
+
+  // Hiérarchie des demandes : on ne répond pas à sa propre demande d'assistance, ni à celle d'un pair ou d'un supérieur.
+  const { directionCount } = await contexteHierarchie(supabase, appUser.organization_id);
+  const roles = await rolesParId(supabase, appUser.organization_id, (requests ?? []).map((r: any) => r.requested_by).filter(Boolean));
 
   return (
     <div>
@@ -47,6 +53,10 @@ export default async function SupportPage() {
           response: r.response,
           createdAt: r.created_at,
           requesterName: r.users?.full_name ?? "—",
+          ...(() => {
+            const d = droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: r.requested_by, role: roles.get(r.requested_by) ?? "chauffeur" }, directionCount });
+            return { peutDecider: d.peutDecider, mention: d.mention };
+          })(),
         }))}
         canAddToNotes={appUser.role === "direction"}
       />

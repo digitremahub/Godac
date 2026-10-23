@@ -9,6 +9,7 @@ import { journaliser } from "@/lib/audit/journal";
 import { messageContestationAttribuee, messageContestationCloturee } from "@/lib/rattachement/notifications";
 import { notifier, peutDesignerChauffeur, rechercherResponsableContestation, serviceDuChauffeur } from "@/lib/rattachement/serveur";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const champs = z.object({
   client_name: z.string().trim().max(200).nullable(),
@@ -80,6 +81,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       relatedId: id,
       recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: await serviceDuChauffeur(admin, appUser.id),
+      demandeurId: appUser.id,
     });
     return NextResponse.json({ ok: true });
   }
@@ -100,6 +102,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       relatedId: id,
       recipientRoles: ["manager", "exploitation", "direction"],
       serviceId: await serviceDuChauffeur(admin, appUser.id),
+      demandeurId: appUser.id,
     });
     await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "contestation_suite_chauffeur", targetTable: "customer_disputes", targetId: id, details: { issue: body.issue } });
     return NextResponse.json({ ok: true });
@@ -148,6 +151,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: chauffeur } = await supabase.from("users").select("id, full_name").eq("id", body.driver_id).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!chauffeur) return NextResponse.json({ error: "Chauffeur introuvable." }, { status: 404 });
     if (!(await peutDesignerChauffeur(supabase, appUser, chauffeur.id))) return NextResponse.json({ error: "Ce chauffeur n'appartient pas à vos services." }, { status: 403 });
+    // Hiérarchie : on ne se désigne pas, et on ne désigne pas un pair ou un supérieur, comme responsable (lib/hierarchie).
+    const garde = await garderDecision(supabase, appUser, chauffeur.id);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "customer_disputes", id, decision: "responsable_valide" });
     const fiche = { ...c, ...(body.champs ?? {}) };
 
     // Arrêt choisi parmi les candidats : il doit appartenir à une tournée du chauffeur désigné.
@@ -206,6 +213,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true });
   }
 
+  if (c.driver_id) {
+    // Hiérarchie : une contestation dont on est le responsable est clôturée par le niveau au-dessus.
+    const garde = await garderDecision(supabase, appUser, c.driver_id);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "customer_disputes", id, decision: body.statut });
+  }
   const { error } = await supabase
     .from("customer_disputes")
     .update({ status: body.statut, resolution_note: body.note, resolved_at: now, updated_at: now })

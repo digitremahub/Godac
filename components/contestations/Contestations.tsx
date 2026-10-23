@@ -10,6 +10,7 @@ import { resumeCodeQr } from "@/lib/colis/livraison";
 import { BadgeConfiance, Commentaires, type CommentaireVue } from "@/components/rattachement/Commentaires";
 import type { PreuveLivraison } from "@/lib/rattachement/contestation";
 import { dateParis, heureParis } from "@/lib/rattachement/format";
+import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 export interface CandidatArret {
   stopId: string;
@@ -39,6 +40,8 @@ export interface Contestation {
   suggested_driver_id: string | null;
   suggestion_reason: string | null;
   driver_id: string | null;
+  /** Rôle du responsable désigné (hiérarchie des demandes). */
+  driver_role?: string | null;
   driver_name: string | null;
   driver_response: string | null;
   responded_at: string | null;
@@ -220,8 +223,14 @@ function Details({ c }: { c: Contestation }) {
   );
 }
 
-function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chauffeurs: { id: string; name: string }[]; moi: string; focus: boolean }) {
+type Hierarchie = { moiRole: string; directionCount: number };
+type ChauffeurChoix = { id: string; name: string; role?: string };
+
+function CarteEncadrement({ c, chauffeurs, moi, hierarchie, focus }: { c: Contestation; chauffeurs: ChauffeurChoix[]; moi: string; hierarchie: Hierarchie; focus: boolean }) {
   const router = useRouter();
+  // Hiérarchie : le responsable désigné est le « demandeur » ; on ne se désigne ni ne clôture sa propre contestation.
+  const droitsSur = (id: string, role?: string | null) =>
+    droitsDecision({ moi: { id: moi, role: hierarchie.moiRole }, demandeur: { id, role: role ?? "chauffeur" }, directionCount: hierarchie.directionCount });
   const [f, setF] = useState(() => Object.fromEntries(CHAMPS.map(({ key }) => [key, c[key] === null ? "" : String(c[key])])) as Record<string, string>);
   const [reason, setReason] = useState(c.reason ?? "");
   const [driver, setDriver] = useState(c.driver_id ?? c.suggested_driver_id ?? "");
@@ -280,8 +289,9 @@ function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chau
               <select className="input" value={driver} onChange={(e) => setDriver(e.target.value)}>
                 <option value="">— Choisir —</option>
                 {chauffeurs.map((d) => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.id} value={d.id} disabled={!droitsSur(d.id, d.role).peutDecider}>
                     {d.name}
+                    {!droitsSur(d.id, d.role).peutDecider ? (d.id === moi ? " (vous : à décider par un autre niveau)" : " (à décider par un niveau supérieur)") : ""}
                     {d.id === c.suggested_driver_id ? " (suggéré)" : ""}
                   </option>
                 ))}
@@ -317,12 +327,17 @@ function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chau
             )}
           </div>
           {c.preuveDetaillee ? <PreuveDetaillee p={c.preuveDetaillee} /> : null}
+          {driver && !droitsSur(driver, chauffeurs.find((d) => d.id === driver)?.role).peutDecider && (
+            <p className="text-xs text-navy/70" data-testid="mention-hierarchie">
+              {droitsSur(driver, chauffeurs.find((d) => d.id === driver)?.role).mention} : vous ne pouvez pas valider ce responsable.
+            </p>
+          )}
           {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className="btn-primary"
-              disabled={busy || !driver}
+              disabled={busy || !driver || !droitsSur(driver, chauffeurs.find((d) => d.id === driver)?.role).peutDecider}
               onClick={() => run({ action: "valider", driver_id: driver, stop_id: c.candidats.find((k) => k.stopId === stop)?.driverId === driver ? stop : null, champs: champs() })}
             >
               Valider le responsable et notifier
@@ -358,7 +373,12 @@ function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chau
           )}
           <SuiteChauffeur c={c} />
           {c.resolution_note && <p className="text-sm text-navy/70">Clôture : {c.resolution_note}</p>}
-          {(c.status === "assigned" || c.status === "answered") && (
+          {(c.status === "assigned" || c.status === "answered") && c.driver_id && !droitsSur(c.driver_id, c.driver_role).peutDecider && (
+            <p className="rounded-lg bg-navy/[0.04] px-3 py-2 text-sm text-navy/70" data-testid="mention-hierarchie">
+              {droitsSur(c.driver_id, c.driver_role).mention} : lecture seule pour vous (le responsable désigné est vous, ou d&apos;un rang égal ou supérieur).
+            </p>
+          )}
+          {(c.status === "assigned" || c.status === "answered") && !(c.driver_id && !droitsSur(c.driver_id, c.driver_role).peutDecider) && (
             <div className="flex flex-col gap-2">
               <input className="input !py-1.5" placeholder="Note de clôture (geste commercial, remboursement…)" value={note} onChange={(e) => setNote(e.target.value)} />
               {error && <p role="alert" className="text-sm text-orange-ink">{error}</p>}
@@ -397,7 +417,7 @@ function CarteEncadrement({ c, chauffeurs, moi, focus }: { c: Contestation; chau
   );
 }
 
-function CarteChauffeur({ c, moi, focus }: { c: Contestation; moi: string; focus: boolean }) {
+function CarteChauffeur({ c, moi, focus, libelleAttente }: { c: Contestation; moi: string; focus: boolean; libelleAttente?: string }) {
   const router = useRouter();
   const [reponse, setReponse] = useState(c.driver_response ?? "");
   const [busy, setBusy] = useState(false);
@@ -411,6 +431,7 @@ function CarteChauffeur({ c, moi, focus }: { c: Contestation; moi: string; focus
         <p className="font-display text-lg font-bold">{c.client_name ?? "Contestation client"}</p>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${s.cls}`}>{c.status === "assigned" ? "À régler" : s.label}</span>
       </div>
+      {c.status === "answered" && libelleAttente && <p className="text-xs text-navy/60">{libelleAttente} pour la clôture.</p>}
       <Details c={c} />
       {c.reason && <p className="rounded-lg bg-orange/[0.07] px-3 py-2 text-sm">{c.reason}</p>}
       <div className="flex flex-wrap gap-2">
@@ -571,14 +592,20 @@ export function Contestations({
   organizationId,
   lectureAuto,
   moi = "",
+  moiRole = "chauffeur",
+  directionCount = 2,
+  effectifs,
   focusId = null,
 }: {
   contestations: Contestation[];
   encadrement: boolean;
-  chauffeurs: { id: string; name: string }[];
+  chauffeurs: ChauffeurChoix[];
   organizationId: string;
   lectureAuto: boolean;
   moi?: string;
+  moiRole?: string;
+  directionCount?: number;
+  effectifs?: { manager?: number; exploitation?: number; direction?: number };
   focusId?: string | null;
 }) {
   const ongletFocus = focusId ? ONGLETS.find((o) => (o.statuts as readonly string[]).includes(contestations.find((c) => c.id === focusId)?.status ?? ""))?.key : undefined;
@@ -594,11 +621,11 @@ export function Contestations({
       <div className="flex flex-col gap-4">
         {ouvertes.length === 0 && <p className="text-sm text-navy/60">Aucune contestation en cours. 👍</p>}
         {ouvertes.map((c) => (
-          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} />
+          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} libelleAttente={libelleEnAttente(moiRole, effectifs)} />
         ))}
         {closes.length > 0 && <h2 className="mt-2 text-lg">Clôturées</h2>}
         {closes.map((c) => (
-          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} />
+          <CarteChauffeur key={c.id} c={c} moi={moi} focus={c.id === focusId} libelleAttente={libelleEnAttente(moiRole, effectifs)} />
         ))}
       </div>
     );
@@ -631,7 +658,7 @@ export function Contestations({
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {visibles.map((c) => (
-            <CarteEncadrement key={`${c.id}-${c.status}-${c.suggested_driver_id}-${c.delivery_stop_id}`} c={c} chauffeurs={chauffeurs} moi={moi} focus={c.id === focusId} />
+            <CarteEncadrement key={`${c.id}-${c.status}-${c.suggested_driver_id}-${c.delivery_stop_id}`} c={c} chauffeurs={chauffeurs} moi={moi} hierarchie={{ moiRole, directionCount }} focus={c.id === focusId} />
           ))}
         </div>
       )}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({
   type: z.string().min(1).optional(),
@@ -38,6 +39,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  // Hiérarchie : planifier, démarrer, clore ou annuler une demande d'entretien, c'est la décider — pas la sienne,
+  // et par un rang supérieur à celui du demandeur (le chauffeur ou le manager qui l'a ouverte).
+  const decide = parsed.data.status !== undefined || parsed.data.scheduled_at !== undefined || parsed.data.completed_at !== undefined;
+  if (decide) {
+    const { data: demande } = await supabase.from("vehicle_interventions").select("requested_by").eq("id", id).maybeSingle();
+    if (demande?.requested_by) {
+      const garde = await garderDecision(supabase, appUser, demande.requested_by);
+      if (!garde.ok) return garde.reponse;
+      if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "vehicle_interventions", id, decision: parsed.data.status ?? "planification" });
+    }
+  }
   const { data, error } = await supabase
     .from("vehicle_interventions")
     .update(parsed.data)

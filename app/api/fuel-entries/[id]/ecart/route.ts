@@ -4,6 +4,8 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { journaliser } from "@/lib/audit/journal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
+import { alerterNiveauSuperieur, compterDirection, lirePersonne, tracerAutoValidation } from "@/lib/hierarchie/serveur";
+import { libelleDecideurs } from "@/lib/hierarchie/demandes";
 import {
   ACTIONS_ECART,
   COMMENTAIRE_MAX,
@@ -36,9 +38,11 @@ const MIGRATION_ABSENTE = "Le traitement des écarts n'est pas encore activé (m
  * - « explication_demandee » : alerte personnelle au chauffeur du plein ;
  * - « reponse_chauffeur » : le chauffeur répond, l'encadrement est alerté.
  *
- * Encadrement (manager du service, direction) pour les deux premières ;
- * un manager qui conduit ne traite pas son propre plein. Mêmes règles en
- * base (RLS de fuel_gap_reviews, migration 20261022000001).
+ * Encadrement (manager du service, exploitation, direction) pour les deux
+ * premières, selon la hiérarchie des demandes (lib/hierarchie) : jamais
+ * son propre plein (sauf direction seule, tracée), rang strictement
+ * supérieur à celui du conducteur du plein. Mêmes règles en base (RLS de
+ * fuel_gap_reviews, migration 20261022000001 ; migration 20261101000001).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -70,16 +74,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Cet écart a déjà été traité." }, { status: 409 });
   }
 
-  const droits = droitsEcart({ role: appUser.role, userId: appUser.id, driverId: plein.driver_id, statut });
+  const conducteur = plein.driver_id ? await lirePersonne(supabase, appUser.organization_id, plein.driver_id) : null;
+  const directionCount = await compterDirection(supabase, appUser.organization_id);
+  const droits = droitsEcart({ role: appUser.role, userId: appUser.id, driverId: plein.driver_id, statut, roleChauffeur: conducteur?.role, directionCount });
   if (!actionAutorisee(action, droits)) {
     const message =
       action === "reponse_chauffeur"
         ? "Seul le chauffeur du plein répond à une demande d'explication en cours."
-        : plein.driver_id === appUser.id && appUser.role !== "direction"
-          ? "Vous ne pouvez pas traiter l'écart de votre propre plein : la direction ou un autre manager s'en charge."
-          : "Action réservée à l'encadrement (manager, exploitation, direction).";
+        : plein.driver_id === appUser.id
+          ? `Vous ne pouvez pas traiter l'écart de votre propre plein : il doit être traité par ${libelleDecideurs(appUser.role)}.`
+          : conducteur && ["manager", "exploitation", "direction"].includes(conducteur.role) && ["manager", "exploitation", "direction", "chauffeur"].includes(appUser.role)
+            ? `L'écart de ce plein doit être traité par ${libelleDecideurs(conducteur.role)}.`
+            : "Action réservée à l'encadrement (manager, exploitation, direction).";
     return NextResponse.json({ error: message, code: "ROLE_REFUSE" }, { status: 403 });
   }
+
+  if (action !== "reponse_chauffeur" && plein.driver_id === appUser.id) await tracerAutoValidation(appUser, { table: "fuel_entries", id, decision: action });
 
   const { data: ligne, error: insertError } = await supabase
     .from("fuel_gap_reviews")
@@ -137,17 +147,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       details: { commentaire, ecarts: ecarts.map((x) => x.code) },
     });
   } else {
-    const { error: alertError } = await admin.from("alerts").insert({
-      organization_id: appUser.organization_id,
+    // La réponse monte d'un niveau au-dessus du conducteur (jamais vers lui ni un pair).
+    const alertError = await alerterNiveauSuperieur(admin, {
+      organizationId: appUser.organization_id,
+      demandeurId: appUser.id,
       type: "fuel_gap_explanation",
       severity: "info",
       message: `${appUser.full_name} a répondu sur l'écart de son plein du ${quand}${vehicule?.registration ? ` (${vehicule.registration})` : ""} : ${extrait}`,
-      related_table: "fuel_entries",
-      related_id: id,
-      recipient_roles: ["manager", "exploitation", "direction"],
-      service_id: vehicule?.service_id ?? null,
+      relatedTable: "fuel_entries",
+      relatedId: id,
     });
-    if (alertError) console.error("alerte réponse écart carburant", alertError.message);
+    if (alertError) console.error("alerte réponse écart carburant", alertError);
   }
 
   return NextResponse.json({ traitement: ligne });

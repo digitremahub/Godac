@@ -11,6 +11,8 @@ import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { ConvocationButton } from "@/components/intranet/ConvocationButton";
+import { contexteHierarchie } from "@/lib/hierarchie/serveur";
+import { peutDecider } from "@/lib/hierarchie/demandes";
 import { DriverServicesPanel } from "@/components/admin/DriverServicesPanel";
 import { DriverContactForm } from "@/components/admin/DriverContactForm";
 import { EmployeeFileForm } from "@/components/admin/EmployeeFileForm";
@@ -238,7 +240,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const { data: conduite } = await supabase.from("users").select("can_drive").eq("id", id).maybeSingle();
   const canDrive = Boolean((conduite as { can_drive?: boolean } | null)?.can_drive);
   const isFieldRole = estConducteur(u.role, canDrive);
-  const canConvene = hasRole(appUser.role, ["manager", "exploitation", "direction"]) && !isSelf;
+  // Hiérarchie des demandes : on convoque un salarié de rang inférieur (la direction : une autre personne de la direction).
+  const { directionCount } = await contexteHierarchie(supabase, appUser.organization_id);
+  const canConvene =
+    hasRole(appUser.role, ["manager", "exploitation", "direction"]) &&
+    !isSelf &&
+    peutDecider({ decideur: { id: appUser.id, role: appUser.role }, demandeur: { id: u.id, role: u.role }, directionCount }).ok;
   /** Gestion du compte (conduite, services, coordonnées complètes) : direction, ou exploitation sur un chauffeur / manager. */
   const gereLeCompte = !isSelf && (isDirection || (estExploitation && peutGererCompte(appUser.role, u.role)));
 

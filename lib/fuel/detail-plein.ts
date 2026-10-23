@@ -93,7 +93,8 @@ export interface DetailPlein {
   alertes: AlerteAffichee[];
   /** null : non visible pour ce rôle (journal d'audit réservé à l'encadrement). */
   corrections: CorrectionAffichee[] | null;
-  droits: DroitsEcart;
+  /** mention : lecture seule hiérarchique (« À décider par … »), null sinon. */
+  droits: DroitsEcart & { mention?: string | null };
   ticpe?: TicpeDuPlein | null;
 }
 

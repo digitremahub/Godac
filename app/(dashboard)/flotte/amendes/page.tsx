@@ -6,6 +6,7 @@ import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 import { lireCommentaires } from "@/lib/rattachement/commentaires-serveur";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
 
 const COLONNES =
   "id, infraction_at, amount, reference, status, notified_at, photo_path, driver_id, vehicles(registration), driver:users!fines_driver_id_fkey(full_name), matched:planning_entries!fines_matched_planning_entry_id_fkey(tour_number, driver_id, users!planning_entries_driver_id_fkey(full_name))";
@@ -28,7 +29,7 @@ export default async function FinesPage({ searchParams }: { searchParams: Promis
   const [{ data: vehicles }, premier, { data: users }] = await Promise.all([
     supabase.from("vehicles").select("id, registration").order("registration"),
     listeAmendes(COLONNES + COLONNES_NOUVELLES),
-    lectureSeule ? Promise.resolve({ data: [] as { id: string; full_name: string }[] }) : supabase.from("users").select("id, full_name").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
+    lectureSeule ? Promise.resolve({ data: [] as { id: string; full_name: string; role: string }[] }) : supabase.from("users").select("id, full_name, role").eq("active", true).or(FILTRE_CONDUCTEURS).order("full_name"),
   ]);
   // Migration 20261026000003 non appliquée : colonnes historiques.
   const lecture = premier.error && estSchemaManquant(premier.error) ? await listeAmendes(COLONNES) : premier;
@@ -40,6 +41,9 @@ export default async function FinesPage({ searchParams }: { searchParams: Promis
     const { data } = await supabase.from("users").select("id, full_name").in("id", valideurs);
     for (const u of data ?? []) noms.set(u.id, u.full_name);
   }
+  // Hiérarchie des demandes : le chauffeur désigné est le « demandeur » ; on ne règle pas sa propre amende.
+  const { directionCount } = await contexteHierarchie(supabase, appUser.organization_id);
+  const rolesDesignes = await rolesParId(supabase, appUser.organization_id, brutes.map((f) => f.driver_id).filter(Boolean));
   const commentaires = await lireCommentaires(supabase, "fine", brutes.map((f) => f.id));
 
   const fines: FineRow[] = brutes.map((f) => {
@@ -59,6 +63,7 @@ export default async function FinesPage({ searchParams }: { searchParams: Promis
       notified_at: f.notified_at,
       vehicles: f.vehicles,
       driver_id: f.driver_id,
+      driver_role: f.driver_id ? (rolesDesignes.get(f.driver_id) ?? "chauffeur") : null,
       driver: f.driver,
       suggested_driver_id: suggestedId,
       suggested_driver_name: candidats.find((c) => c.driverId === suggestedId)?.driverName ?? f.matched?.users?.full_name ?? (suggestedId ? (noms.get(suggestedId) ?? null) : null),
@@ -91,8 +96,10 @@ export default async function FinesPage({ searchParams }: { searchParams: Promis
         <FinesTable
           fines={fines}
           lectureSeule={lectureSeule}
-          chauffeurs={(users ?? []).map((u) => ({ id: u.id, name: u.full_name }))}
+          chauffeurs={(users ?? []).map((u) => ({ id: u.id, name: u.full_name, role: u.role }))}
           moi={appUser.id}
+          moiRole={appUser.role}
+          directionCount={directionCount}
           focusId={focusId ?? null}
         />
       )}

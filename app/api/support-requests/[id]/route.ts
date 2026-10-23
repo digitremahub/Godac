@@ -4,6 +4,7 @@ import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({
   status: z.enum(["open", "in_progress", "resolved"]).optional(),
@@ -31,6 +32,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  // Hiérarchie : on ne répond pas à sa propre demande d'assistance ; rang supérieur à celui du demandeur.
+  const { data: demande } = await supabase.from("support_requests").select("requested_by").eq("id", id).maybeSingle();
+  if (demande?.requested_by) {
+    const garde = await garderDecision(supabase, appUser, demande.requested_by);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "support_requests", id, decision: parsed.data.status ?? "reponse" });
+  }
   const updateFields: Record<string, unknown> = { ...parsed.data };
   if (parsed.data.response !== undefined) {
     updateFields.responded_at = new Date().toISOString();

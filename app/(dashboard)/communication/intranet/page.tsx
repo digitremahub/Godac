@@ -7,6 +7,8 @@ import { AnnouncementsList } from "@/components/intranet/AnnouncementsList";
 import { MeetingRequestForm } from "@/components/intranet/MeetingRequestForm";
 import { MeetingRequestsList } from "@/components/intranet/MeetingRequestsList";
 import { ConvocationsList } from "@/components/intranet/ConvocationsList";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 export default async function IntranetPage() {
   const g = await garderPage("communication.intranet");
@@ -61,6 +63,14 @@ export default async function IntranetPage() {
     }
   }
 
+  // Hiérarchie des demandes : on ne traite pas sa propre demande de rendez-vous, ni celle d'un pair ou d'un supérieur.
+  const { effectifs, directionCount } = await contexteHierarchie(supabase, appUser.organization_id);
+  const roles = await rolesParId(supabase, appUser.organization_id, [
+    ...((meetingRequests ?? []) as any[]).map((r) => r.requested_by as string),
+    ...((convocations ?? []) as any[]).map((c) => c.employee_id as string),
+  ]);
+  const droitsSur = (id: string) => droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id, role: roles.get(id) ?? "chauffeur" }, directionCount });
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Intranet & Convocations" description="Notes de service et convocations, avec accusé de lecture." />
@@ -94,6 +104,9 @@ export default async function IntranetPage() {
             status: r.status,
             createdAt: r.created_at,
             isOwn: r.requested_by === appUser.id,
+            peutDecider: droitsSur(r.requested_by).peutDecider,
+            mention: droitsSur(r.requested_by).mention,
+            libelleAttente: libelleEnAttente(roles.get(r.requested_by) ?? "chauffeur", effectifs),
           }))}
         />
       </div>
@@ -110,6 +123,8 @@ export default async function IntranetPage() {
             location: c.location,
             status: c.status,
             isOwn: c.employee_id === appUser.id,
+            peutDecider: droitsSur(c.employee_id).peutDecider,
+            mention: droitsSur(c.employee_id).mention,
           }))}
         />
       </div>

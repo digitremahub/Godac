@@ -2,6 +2,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({
   status: z.enum(["scheduled", "declined", "done"]),
@@ -20,6 +21,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  // Hiérarchie : on ne traite pas sa propre demande de réunion ; rang supérieur à celui du demandeur.
+  const { data: demande } = await supabase.from("meeting_requests").select("requested_by").eq("id", id).maybeSingle();
+  if (demande?.requested_by) {
+    const garde = await garderDecision(supabase, appUser, demande.requested_by);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "meeting_requests", id, decision: parsed.data.status });
+  }
   const { data, error } = await supabase
     .from("meeting_requests")
     .update({
@@ -31,6 +39,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: error.code === "42501" ? 403 : 500 });
   return NextResponse.json({ request: data });
 }

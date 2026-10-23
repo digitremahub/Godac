@@ -269,6 +269,11 @@ function SectionEcarts({ plein, onTraite }: { plein: DetailPlein; onTraite: () =
       {!plein.traitementDisponible && (
         <p className="text-xs text-navy/55">Le traitement des écarts sera disponible après la prochaine mise à jour de la base.</p>
       )}
+      {plein.droits.mention && (
+        <p className="mb-2 rounded-lg bg-navy/5 px-3 py-2 text-xs text-navy/70" data-testid="mention-hierarchie">
+          {plein.droits.mention} : vous ne pouvez pas traiter cet écart.
+        </p>
+      )}
       {(plein.droits.traiter || plein.droits.repondre) && <TraitementEcartForm entryId={plein.id} droits={plein.droits} onTraite={onTraite} />}
     </Section>
   );

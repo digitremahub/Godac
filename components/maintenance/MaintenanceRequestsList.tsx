@@ -16,6 +16,11 @@ interface RequestRow {
   photoUrls: string[];
   requesterName: string;
   createdAt: string;
+  /** Hiérarchie des demandes : faux si la demande est celle de la personne connectée, ou d'un rang égal ou supérieur. */
+  peutDecider?: boolean;
+  mention?: string | null;
+  /** « En attente de … » : niveau qui doit traiter la demande. */
+  libelleAttente?: string;
 }
 
 const URGENCY_LABELS: Record<RequestRow["urgency"], string> = {
@@ -87,12 +92,18 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
     const next = STATUS_FLOW[r.status];
     if (!next) return;
     setBusyId(r.id);
+    setError(null);
     try {
-      await fetch(`/api/vehicle-interventions/${r.id}`, {
+      const res = await fetch(`/api/vehicle-interventions/${r.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: next, ...(next === "done" ? { completed_at: new Date().toISOString() } : {}) }),
       });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setError(typeof json.error === "string" ? json.error : "Action impossible");
+        return;
+      }
       router.refresh();
     } finally {
       setBusyId(null);
@@ -169,7 +180,7 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
                 </td>
                 <td className="py-2">{r.requesterName}</td>
                 <td className="py-2">
-                  <span className="badge-neutral">{STATUS_LABELS[r.status]}</span>
+                  <span className="badge-neutral">{r.status === "scheduled" && r.libelleAttente ? r.libelleAttente : STATUS_LABELS[r.status]}</span>
                 </td>
                 {canManage && (
                   <td className="py-2">
@@ -188,10 +199,15 @@ export function MaintenanceRequestsList({ requests, canManage }: { requests: Req
                           <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busyId === r.id} onClick={() => startEdit(r)}>
                             Modifier
                           </button>
-                          {STATUS_FLOW[r.status] && (
+                          {STATUS_FLOW[r.status] && r.peutDecider !== false && (
                             <button className="btn-primary !px-2 !py-1 text-xs" disabled={busyId === r.id} onClick={() => advance(r)}>
                               → {STATUS_LABELS[STATUS_FLOW[r.status]!]}
                             </button>
+                          )}
+                          {STATUS_FLOW[r.status] && r.peutDecider === false && r.mention && (
+                            <span className="max-w-[12rem] text-xs text-navy/60" data-testid="mention-hierarchie">
+                              {r.mention}
+                            </span>
                           )}
                         </>
                       )}

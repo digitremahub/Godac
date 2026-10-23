@@ -7,6 +7,7 @@ import { BadgeConfiance, Commentaires, type CommentaireVue } from "@/components/
 import { libelleSuggestionAmende } from "@/lib/rattachement/amende";
 import { dateParis, heureParis, montantEuros } from "@/lib/rattachement/format";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { droitsDecision } from "@/lib/hierarchie/demandes";
 
 export interface CandidatVue {
   driverId: string;
@@ -34,6 +35,8 @@ export interface FineRow {
   notified_at: string | null;
   vehicles: { registration: string } | null;
   driver_id: string | null;
+  /** Rôle du responsable désigné (hiérarchie des demandes). */
+  driver_role?: string | null;
   driver: { full_name: string } | null;
   suggested_driver_id: string | null;
   suggested_driver_name: string | null;
@@ -68,7 +71,9 @@ async function patch(id: string, body: Record<string, unknown>) {
   return json;
 }
 
-function FicheAmende({ f, chauffeurs, lectureSeule, moi, focus }: { f: FineRow; chauffeurs: { id: string; name: string }[]; lectureSeule: boolean; moi: string; focus: boolean }) {
+type ChauffeurChoix = { id: string; name: string; role?: string };
+
+function FicheAmende({ f, chauffeurs, lectureSeule, moi, moiRole, directionCount, focus }: { f: FineRow; chauffeurs: ChauffeurChoix[]; lectureSeule: boolean; moi: string; moiRole: string; directionCount: number; focus: boolean }) {
   const router = useRouter();
   const [driver, setDriver] = useState(f.driver_id ?? f.suggested_driver_id ?? "");
   const [corriger, setCorriger] = useState(false);
@@ -78,6 +83,11 @@ function FicheAmende({ f, chauffeurs, lectureSeule, moi, focus }: { f: FineRow; 
   const immat = f.vehicles?.registration ?? null;
   const suggestion = f.candidats.find((c) => c.driverId === f.suggested_driver_id) ?? null;
   const ouverte = f.status === "pending_identification" || f.status === "identified" || f.status === "contested";
+  // Hiérarchie : personne ne se désigne ni ne règle sa propre amende ; rang strictement supérieur au responsable.
+  const droitsSur = (id: string, role?: string | null) => droitsDecision({ moi: { id: moi, role: moiRole }, demandeur: { id, role: role ?? "chauffeur" }, directionCount });
+  const choisi = chauffeurs.find((c) => c.id === driver);
+  const droitsChoix = driver ? droitsSur(driver, choisi?.role) : null;
+  const droitsDesigne = f.driver_id ? droitsSur(f.driver_id, f.driver_role) : null;
 
   async function run(body: Record<string, unknown>, ok?: (json: Record<string, unknown>) => string | null) {
     setBusy(true);
@@ -134,18 +144,24 @@ function FicheAmende({ f, chauffeurs, lectureSeule, moi, focus }: { f: FineRow; 
             <select className="input" value={driver} onChange={(e) => setDriver(e.target.value)}>
               <option value="">— Choisir —</option>
               {chauffeurs.map((d) => (
-                <option key={d.id} value={d.id}>
+                <option key={d.id} value={d.id} disabled={!droitsSur(d.id, d.role).peutDecider}>
                   {d.name}
+                  {!droitsSur(d.id, d.role).peutDecider ? (d.id === moi ? " (vous : à décider par un autre niveau)" : " (à décider par un niveau supérieur)") : ""}
                   {d.id === f.suggested_driver_id ? " (suggéré)" : f.candidats.some((c) => c.driverId === d.id) ? " (candidat)" : ""}
                 </option>
               ))}
             </select>
           </label>
+          {droitsChoix && !droitsChoix.peutDecider && (
+            <p className="text-xs text-navy/70" data-testid="mention-hierarchie">
+              {droitsChoix.mention} : vous ne pouvez pas valider ce responsable.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className="btn-primary !py-2 text-sm"
-              disabled={busy || !driver}
+              disabled={busy || !driver || (droitsChoix !== null && !droitsChoix.peutDecider)}
               onClick={() => run({ action: "valider", driver_id: driver, planning_entry_id: candidatChoisi?.planningEntryId ?? null }, () => "Responsable validé : notification envoyée.")}
             >
               Valider le responsable et notifier
@@ -204,7 +220,12 @@ function FicheAmende({ f, chauffeurs, lectureSeule, moi, focus }: { f: FineRow; 
             {f.notified_at ? " · notifié" : ""}
           </p>
           {corriger && choix}
-          {!lectureSeule && ouverte && (
+          {!lectureSeule && ouverte && droitsDesigne && !droitsDesigne.peutDecider && (
+            <p className="rounded-lg bg-navy/[0.04] px-3 py-2 text-sm text-navy/70" data-testid="mention-hierarchie">
+              {droitsDesigne.mention} : lecture seule pour vous (le responsable désigné est vous, ou d&apos;un rang égal ou supérieur).
+            </p>
+          )}
+          {!lectureSeule && ouverte && !(droitsDesigne && !droitsDesigne.peutDecider) && (
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn-primary !py-2 text-sm" disabled={busy} onClick={() => run({ status: "paid" })}>
                 Marquer réglée
@@ -246,12 +267,16 @@ export function FinesTable({
   lectureSeule = false,
   chauffeurs = [],
   moi = "",
+  moiRole = "manager",
+  directionCount = 2,
   focusId = null,
 }: {
   fines: FineRow[];
   lectureSeule?: boolean;
-  chauffeurs?: { id: string; name: string }[];
+  chauffeurs?: ChauffeurChoix[];
   moi?: string;
+  moiRole?: string;
+  directionCount?: number;
   focusId?: string | null;
 }) {
   const ongletFocus = focusId ? ONGLETS.find((o) => (o.statuts as readonly string[]).includes(fines.find((f) => f.id === focusId)?.status ?? ""))?.key : undefined;
@@ -286,7 +311,7 @@ export function FinesTable({
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {visibles.map((f) => (
-            <FicheAmende key={`${f.id}-${f.status}-${f.suggested_driver_id}`} f={f} chauffeurs={chauffeurs} lectureSeule={lectureSeule} moi={moi} focus={f.id === focusId} />
+            <FicheAmende key={`${f.id}-${f.status}-${f.suggested_driver_id}`} f={f} chauffeurs={chauffeurs} lectureSeule={lectureSeule} moi={moi} moiRole={moiRole} directionCount={directionCount} focus={f.id === focusId} />
           ))}
         </div>
       )}
