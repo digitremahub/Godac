@@ -953,9 +953,9 @@ export function GoNavigation(p: GoNavigationProps) {
           aria-label={`Vitesse ${vitesseKmh} kilomètres par heure${limiteKmh !== null ? `, limitation ${limiteKmh}` : ""}`}
         >
           {limiteKmh !== null && (
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border-[5px] border-red-600 bg-white text-base font-extrabold text-black shadow-pop">{limiteKmh}</span>
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border-[5px] bg-white text-base font-extrabold text-black shadow-pop" style={{ borderColor: "#d62718" }}>{limiteKmh}</span>
           )}
-          <span className={`flex h-14 min-w-[3.5rem] flex-col items-center justify-center rounded-2xl px-2 shadow-pop ${enDepassement(vitesseKmh, limiteKmh) ? "bg-red-600 text-white" : "bg-marine text-white"}`}>
+          <span className={`flex h-14 min-w-[3.5rem] flex-col items-center justify-center rounded-2xl px-2 shadow-pop ${enDepassement(vitesseKmh, limiteKmh) ? "bg-orange text-on-orange" : "bg-marine text-white"}`}>
             <span className="text-xl font-extrabold leading-none tabular-nums">{vitesseKmh}</span>
             <span className="text-[10px] font-semibold leading-none opacity-80">km/h</span>
           </span>
