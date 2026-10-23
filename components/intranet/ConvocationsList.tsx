@@ -12,6 +12,9 @@ interface ConvocationRow {
   location: string | null;
   status: "scheduled" | "done" | "cancelled";
   isOwn: boolean;
+  /** Hiérarchie des demandes : faux si l'on ne peut pas agir sur la convocation de cette personne. */
+  peutDecider?: boolean;
+  mention?: string | null;
 }
 
 const STATUS_LABELS: Record<ConvocationRow["status"], string> = { scheduled: "Prévue", done: "Terminée", cancelled: "Annulée" };
@@ -55,7 +58,12 @@ export function ConvocationsList({ convocations, canManage }: { convocations: Co
             <span className={STATUS_BADGES[c.status]}>{STATUS_LABELS[c.status]}</span>
           </div>
           <p className="whitespace-pre-wrap text-sm text-navy/70">{c.reason}</p>
-          {canManage && c.status === "scheduled" && (
+          {canManage && c.status === "scheduled" && c.peutDecider === false && (
+            <p className="text-xs text-navy/60" data-testid="mention-hierarchie">
+              {c.mention ?? "À gérer par un niveau supérieur"} : en lecture seule pour vous.
+            </p>
+          )}
+          {canManage && c.peutDecider !== false && c.status === "scheduled" && (
             <div className="flex gap-2">
               <button className="btn-secondary !px-3 !py-1.5 text-xs" disabled={busyId === c.id} onClick={() => setStatus(c.id, "done")}>
                 Marquer terminée

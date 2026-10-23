@@ -13,6 +13,9 @@ interface SupportRequestRow {
   response: string | null;
   createdAt: string;
   requesterName: string;
+  /** Hiérarchie des demandes : faux si la demande est celle de la personne connectée, ou d'un rang égal ou supérieur. */
+  peutDecider?: boolean;
+  mention?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = { open: "Ouverte", in_progress: "Prise en charge", resolved: "Résolue" };
@@ -107,6 +110,10 @@ export function SupportRequestsList({ requests, canAddToNotes }: { requests: Sup
                 </button>
               )}
             </div>
+          ) : r.peutDecider === false ? (
+            <p className="rounded-lg bg-navy/[0.04] px-3 py-2 text-xs text-navy/70" data-testid="mention-hierarchie">
+              {r.mention ?? "À traiter par un niveau supérieur"} : en lecture seule pour vous.
+            </p>
           ) : (
             <div className="flex flex-col gap-2">
               {r.status === "open" && (
