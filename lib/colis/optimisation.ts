@@ -36,6 +36,48 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
 }
 
 /**
+ * « Prochaine adresse la plus proche » : depuis le départ, on enchaîne
+ * toujours l'arrêt non visité le plus proche du point courant. Sans départ,
+ * le premier arrêt de la liste ouvre le chemin.
+ */
+export function plusProcheVoisin(depart: Point | null, arrets: Point[], distance: (a: Point, b: Point) => number = distanceKm): number[] {
+  const restant = arrets.map((_, i) => i);
+  const ordre: number[] = [];
+  let courant: Point | null = depart;
+  while (restant.length) {
+    let meilleur = 0;
+    if (courant) {
+      let dMin = Infinity;
+      restant.forEach((i, k) => {
+        const d = distance(courant!, arrets[i]!);
+        if (d < dMin - 1e-12) [dMin, meilleur] = [d, k];
+      });
+    }
+    const [i] = restant.splice(meilleur, 1);
+    ordre.push(i!);
+    courant = arrets[i!]!;
+  }
+  return ordre;
+}
+
+/** Longueur d'un chemin départ → arrêts → point d'arrivée (null : pas de trajet final). */
+export function longueurChemin(depart: Point | null, arrets: Point[], fin: Point | null, distance: (a: Point, b: Point) => number = distanceEstimee): number {
+  let total = 0;
+  let prev = depart;
+  for (const p of arrets) {
+    if (prev) total += distance(prev, p);
+    prev = p;
+  }
+  if (fin && prev) total += distance(prev, fin);
+  return total;
+}
+
+/** Deux points au même endroit (≈ 1 m) : un retour « au départ » referme la boucle. */
+export function memePoint(a: Point | null, b: Point | null): boolean {
+  return Boolean(a && b && Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lng - b.lng) < 1e-5);
+}
+
+/**
  * Renvoie les indices des arrêts dans l'ordre optimisé. `depart` est le
  * dépôt (ou la position du chauffeur) ; `retour` ferme la boucle vers lui.
  * `arrivee` (facultatif) : point d'arrivée imposé, différent du départ —
@@ -43,7 +85,9 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
  */
 export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = true, arrivee: Point | null = null, distance: (a: Point, b: Point) => number = distanceKm): number[] {
   const n = arrets.length;
-  if (n <= 1 || (n <= 2 && !arrivee)) return arrets.map((_, i) => i);
+  // Deux arrêts sans point de départ ni d'arrivée : rien à ordonner. Avec un départ
+  // (dépôt, position du chauffeur), l'arrêt le plus proche doit passer en premier.
+  if (n <= 1 || (n <= 2 && !arrivee && !depart)) return arrets.map((_, i) => i);
 
   // Nœud 0 = départ (ou premier arrêt s'il n'y a pas de départ).
   const pts: Point[] = depart ? [depart, ...arrets] : arrets;

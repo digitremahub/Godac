@@ -36,6 +36,8 @@ import { CRENEAU_AUCUN, choixDepuisCreneau, validerChoix, type ChoixCreneau, typ
 import { dateParis } from "@/lib/colis/heure-paris";
 import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 import { confirmer } from "@/lib/ui/confirmation";
+import { BadgeEpingle, LigneExtremite, OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memoriserChoix } from "@/components/colis/OptimiserSheet";
+import { epingler, epingleDe, pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 
 interface Draft {
   adresse: string;
@@ -172,6 +174,8 @@ export function TourneeColis({
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
   const [rechercheAdresse, setRechercheAdresse] = useState("");
+  /** Feuille « Optimiser l'ordre » : départ et arrivée. */
+  const [feuilleOptim, setFeuilleOptim] = useState(false);
   const horaires = useHoraires(run, stops);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -491,32 +495,54 @@ export function TourneeColis({
     }
   }
 
-  async function optimiser(depuisMaPosition = false) {
+  /**
+   * Calcule l'ordre. `depuisMaPosition` : recalcul en cours de route, prochaine
+   * adresse la plus proche depuis le GPS. `choix` : départ et arrivée de la
+   * feuille « Optimiser l'ordre » (mémorisés sur la tournée). Renvoie un
+   * message d'erreur, ou null.
+   */
+  async function optimiser(depuisMaPosition = false, choix?: { depart: Depart | null; arrivee: Arrivee }): Promise<string | null> {
     setBusy("optim");
     try {
-      let depuis: { lat: number; lng: number } | null = null;
-      if (depuisMaPosition) {
-        depuis = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }), () => reject(new Error("Position indisponible.")), {
-            enableHighAccuracy: true,
-            timeout: 10000,
-          }),
-        );
-      }
-      const r = await api<ResumeOptimisation>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run?.id, depuis }) });
+      const depuis = depuisMaPosition || choix?.depart?.mode === "position" ? await lirePositionGps() : null;
+      if (run && choix) setRun(await memoriserChoix(run, choix.depart, choix.arrivee));
+      const r = await api<ResumeOptimisation>("/api/colis/optimiser", {
+        method: "POST",
+        body: JSON.stringify({ run_id: run?.id, depuis, ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : {}), ...(depuisMaPosition ? { strategie: "proche" } : {}) }),
+      });
       const gain = r.kmAvant - r.kmApres;
       await recharger(run?.id);
       setResume(r);
       const signales = r.horsHoraires.length + r.fermes.length + r.impossibles.length;
       setToast({
         ok: !signales,
-        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
+        text: `Ordre optimisé : ≈ ${r.kmApres} km${gain > 0.5 ? ` (−${Math.round(gain)} km)` : ""}${r.extremites ? ` · départ ${r.extremites.depart}, arrivée ${r.extremites.arrivee}` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${r.sansGps ? ` · ${r.sansGps} adresse(s) à vérifier en fin de liste` : ""}${signales ? ` · ${signales} adresse(s) hors horaires ou fermée(s)` : ""}.`,
       });
+      return null;
     } catch (e) {
-      setToast({ ok: false, text: networkErrorMessage(e) });
+      const message = networkErrorMessage(e);
+      setToast({ ok: false, text: message });
+      return message;
     } finally {
       setBusy(null);
     }
+  }
+
+  /** 📌 Mettre un arrêt en premier / en dernier (ou retirer l'épingle) pour les prochaines optimisations. */
+  async function epingleArret(s: Stop, role: "premier" | "dernier" | null) {
+    if (!run) return;
+    const { depart, arrivee } = choixDeRun(run);
+    const depotConnu = run.start_lat !== null && run.start_lng !== null;
+    const nouveau = epingler(depart, arrivee, s.id, role, depotConnu);
+    // Même résultat que l'optimisation : le départ « arrêt » remplace le dépôt, l'arrivée « arrêt » le retour.
+    const maj = await memoriserChoix(run, nouveau.depart, nouveau.arrivee);
+    setRun(maj);
+    if (!role) return void setToast({ ok: true, text: "Épingle retirée : réoptimisez pour recalculer l'ordre." });
+    // Placé tout de suite en tête / en fin de sa liste ; l'optimisation le garde à cette place.
+    const groupe = grouperParListe(stops, lists).find((g) => g.arrets.some((x) => x.id === s.id));
+    const tete = groupe?.arrets.find((x) => x.id !== s.id && x.status === "pending");
+    if (groupe && (role === "dernier" || tete)) await deposer(s.id, { list_id: s.list_id ?? null, avant_id: role === "premier" ? tete!.id : null });
+    setToast({ ok: true, text: role === "premier" ? "📌 Cet arrêt sera toujours le premier : réoptimisez pour recalculer le reste." : "📌 Cet arrêt sera toujours le dernier : réoptimisez pour recalculer le reste." });
   }
 
   /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
@@ -779,13 +805,17 @@ export function TourneeColis({
   const poidsTotal = formatPoids(sommePoids(stops));
   const sansTelephone = arretsSansTelephone(stops).length;
   const enLivraison = run.status === "in_progress";
+  const choix = choixDeRun(run);
   const avancement = estimerAvancement(
     stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
     {
       depot: run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
       retourDepot: run.return_to_start,
+      // Retour au dépôt, à l'adresse choisie ou au départ : le trajet compte dans l'heure de fin.
+      arrivee: choix.arrivee ? pointFinTournee(choix.arrivee, choix.depart, run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null, stops, run.return_to_start) : undefined,
     },
   );
+  const extremites = libellesExtremites(run, stops, choix);
 
   const explicites = groupesComplets.filter((g) => g.liste);
   /** En-tête d'une liste : nom (renommable), compteurs, ordre, suppression. */
@@ -904,6 +934,16 @@ export function TourneeColis({
             setStops((all) => all.map((x) => (x.id === maj.id ? maj : x)));
             setLivraison(null);
           }}
+        />
+      )}
+      {feuilleOptim && (
+        <OptimiserSheet
+          run={run}
+          stops={stops}
+          enLivraison={enLivraison}
+          initial={choix}
+          onFermer={() => setFeuilleOptim(false)}
+          onValider={(depart, arrivee) => optimiser(enLivraison, { depart: enLivraison && depart?.mode === "position" ? null : depart, arrivee })}
         />
       )}
       {horairesStop && (
@@ -1061,11 +1101,12 @@ export function TourneeColis({
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {run.start_label ? (
-              <p className="text-xs text-navy/60">Départ : {run.start_label}{run.return_to_start ? " (retour au dépôt)" : ""}</p>
-            ) : (
-              <p className="text-xs text-navy/60">Pas d&apos;adresse de dépôt : l&apos;ordre partira du premier arrêt. Renseignez le dépôt dans Organisation → Services.</p>
-            )}
+            <div className="min-w-0 text-xs text-navy/70">
+              <p className="font-semibold">🏁 Départ : {extremites.depart}</p>
+              <p className="font-semibold">🏁 Arrivée : {extremites.arrivee}</p>
+              {!run.start_label && <p className="text-navy/60">Pas d&apos;adresse de dépôt : renseignez-la dans Organisation → Services.</p>}
+              {extremites.erreur && <p className="text-orange-ink">{extremites.erreur}</p>}
+            </div>
             <HeureDepartChamp run={run} onChange={() => recharger(run.id)} />
           </div>
           <ImportTournee
@@ -1219,7 +1260,7 @@ export function TourneeColis({
               )}
             </div>
             {run.status !== "done" && pending.length > 1 && (
-              <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => optimiser(enLivraison)}>
+              <button type="button" className="btn-secondary !py-1.5 text-sm" disabled={busy !== null} onClick={() => setFeuilleOptim(true)}>
                 {busy === "optim" ? "Calcul…" : run.optimized_at ? "Réoptimiser" : "Optimiser l'ordre"}
               </button>
             )}
@@ -1231,6 +1272,7 @@ export function TourneeColis({
           )}
           <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
           <ol className="mt-2 divide-y divide-navy/[0.07]">
+            {!rechercheAdresse && stops.length > 0 && <LigneExtremite type="depart" libelle={extremites.depart} onModifier={run.status !== "done" ? () => setFeuilleOptim(true) : undefined} />}
             {rechercheAdresse && groupes.length === 0 && <li className="px-4 py-6 text-center text-sm text-navy/60">Aucune adresse ne correspond à « {rechercheAdresse} ».</li>}
             {groupes.map((g, k) => (
               <Fragment key={g.liste?.id ?? "principale"}>
@@ -1251,8 +1293,9 @@ export function TourneeColis({
                           {s.status === "delivered" ? "✓" : s.status === "failed" ? "!" : i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          {(estMarque(s) || (s.status === "pending" && !s.phone)) && (
+                          {(estMarque(s) || (s.status === "pending" && !s.phone) || (s.status === "pending" && epingleDe(choix.depart, choix.arrivee, s.id))) && (
                             <div className="mb-1 flex flex-wrap gap-1">
+                              {s.status === "pending" && epingleDe(choix.depart, choix.arrivee, s.id) && <BadgeEpingle role={epingleDe(choix.depart, choix.arrivee, s.id)!} />}
                               <BadgeArret stop={s} />
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
@@ -1307,6 +1350,22 @@ export function TourneeColis({
                             >
                               Clôturer
                             </button>
+                          )}
+                          {s.lat !== null && (
+                            epingleDe(choix.depart, choix.arrivee, s.id) ? (
+                              <button type="button" className="btn-ghost min-h-[44px] !px-3 sm:min-h-0 sm:!px-2 sm:!py-1" onClick={() => epingleArret(s, null)} aria-label={`Retirer l'épingle de ${s.address}`}>
+                                Retirer 📌
+                              </button>
+                            ) : (
+                              <>
+                                <button type="button" className="btn-ghost min-h-[44px] !px-3 sm:min-h-0 sm:!px-2 sm:!py-1" onClick={() => epingleArret(s, "premier")} aria-label={`Mettre ${s.address} en premier`}>
+                                  📌 En premier
+                                </button>
+                                <button type="button" className="btn-ghost min-h-[44px] !px-3 sm:min-h-0 sm:!px-2 sm:!py-1" onClick={() => epingleArret(s, "dernier")} aria-label={`Mettre ${s.address} en dernier`}>
+                                  📌 En dernier
+                                </button>
+                              </>
+                            )
                           )}
                           <button type="button" className="btn-ghost !px-2 !py-1" aria-label={`Monter ${s.address}`} onClick={() => deplacer(s, "haut")}>
                             ↑
@@ -1438,6 +1497,7 @@ export function TourneeColis({
                 {triActif && multi && <ZoneFinListe listId={g.liste?.id ?? null} className="h-2" />}
               </Fragment>
             ))}
+            {!rechercheAdresse && stops.length > 0 && <LigneExtremite type="arrivee" libelle={extremites.arrivee} onModifier={run.status !== "done" ? () => setFeuilleOptim(true) : undefined} />}
           </ol>
           </ZoneTri>
         </Card>

@@ -1044,7 +1044,7 @@ export function GoNavigation(p: GoNavigationProps) {
                   </label>
                   {!fige && (
                     <button type="button" className="btn-secondary shrink-0 !px-3 text-xs" disabled={p.busy} onClick={() => void p.onReoptimiser()}>
-                      {p.busy ? "Calcul…" : "Recalculer l'ordre"}
+                      {p.busy ? "Calcul…" : "Recalculer depuis ma position"}
                     </button>
                   )}
                 </div>

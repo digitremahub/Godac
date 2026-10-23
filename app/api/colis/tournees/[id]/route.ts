@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/audit/journal";
-import { avecHoraires, avecProfessionnel, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { avecHoraires, avecProfessionnel, ecrireExtremitesRun, lireExtremitesRun, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
 
@@ -26,12 +27,13 @@ async function contexte(id: string) {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await contexte((await params).id);
   if ("erreur" in ctx) return ctx.erreur;
-  const [{ data: stops }, lists] = await Promise.all([
+  const [{ data: stops }, lists, extremites] = await Promise.all([
     ctx.supabase.from("delivery_stops").select(STOP_FIELDS).eq("run_id", ctx.run.id).order("position").order("created_at"),
     listesDeTournee(ctx.supabase, ctx.run.id),
+    lireExtremitesRun(ctx.supabase, ctx.run.id),
   ]);
   const ordonnes = ordonnerParListe((stops ?? []) as { id: string; list_id: string | null; position: number; address: string }[], lists);
-  return NextResponse.json({ run: ctx.run, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
+  return NextResponse.json({ run: { ...ctx.run, optim_depart: extremites.depart, optim_arrivee: extremites.arrivee, optim_persiste: extremites.persiste }, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
 }
 
 const patchSchema = z.object({
@@ -44,6 +46,9 @@ const patchSchema = z.object({
     .refine((v) => lireHeure(v) !== null, "Heure invalide")
     .nullable()
     .optional(),
+  /** Départ / arrivée de l'optimisation (épingles 📌 comprises) ; null = choix par défaut. */
+  optim_depart: schemaDepart.nullable().optional(),
+  optim_arrivee: schemaArrivee.nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -51,16 +56,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ("erreur" in ctx) return ctx.erreur;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { heure_depart, ...champs } = parsed.data;
+  const { heure_depart, optim_depart, optim_arrivee, ...champs } = parsed.data;
   const update: Record<string, unknown> = { ...champs };
   if (heure_depart !== undefined) update.planned_start = heure_depart === null ? null : ecrireHeure(lireHeure(heure_depart)!);
   // Début réel de la livraison (estimation de fin) ; à la clôture, la
   // dernière position partagée est effacée (aucune conservation).
   if (parsed.data.status === "in_progress" && !(ctx.run as { started_at?: string | null }).started_at) update.started_at = new Date().toISOString();
   if (parsed.data.status && parsed.data.status !== "in_progress") Object.assign(update, { last_lat: null, last_lng: null, last_position_at: null });
-  const { error } = await ctx.supabase.from("delivery_runs").update(update).eq("id", ctx.run.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (Object.keys(update).length) {
+    const { error } = await ctx.supabase.from("delivery_runs").update(update).eq("id", ctx.run.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  // Départ / arrivée : `persiste` faux tant que la migration n'est pas appliquée (l'appareil garde le choix).
+  let persiste = true;
+  if (optim_depart !== undefined || optim_arrivee !== undefined) {
+    try {
+      persiste = await ecrireExtremitesRun(ctx.supabase, ctx.run.id, { depart: optim_depart, arrivee: optim_arrivee });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Enregistrement impossible." }, { status: 500 });
+    }
+  }
+  return NextResponse.json({ ok: true, persiste });
 }
 
 /**
