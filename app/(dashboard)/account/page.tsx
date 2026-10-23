@@ -114,22 +114,7 @@ export default async function AccountPage() {
         </Card>
       )}
 
-      {isFieldRole && (
-        <>
-          <div className="flex max-w-md flex-col gap-2">
-            <p className="label">Mon badge chauffeur</p>
-            <QrCodeBadge
-              type="driver"
-              id={appUser.id}
-              title={appUser.full_name}
-              subtitle={pinAlreadySet ? "Scannez pour vous connecter" : "À présenter à la pompe"}
-              code={driverCode ?? undefined}
-            />
-            {driverCode && /^\d+$/.test(driverCode) && <CodeSecoursNaissance />}
-          </div>
-          <DriverPinForm pinAlreadySet={pinAlreadySet} />
-        </>
-      )}
+      {isFieldRole && <DriverPinForm pinAlreadySet={pinAlreadySet} />}
 
       <NameForm
         currentName={appUser.full_name}
@@ -142,6 +127,21 @@ export default async function AccountPage() {
       {authMethod !== "pin" && <EmailForm currentEmail={appUser.email} />}
       <PasswordForm />
       <PasskeyManager />
+
+      {isFieldRole && (
+        // Badge QR en bas de page : l'espace du haut reste pour les réglages.
+        <div className="flex max-w-md flex-col gap-2">
+          <p className="label">Mon badge chauffeur</p>
+          <QrCodeBadge
+            type="driver"
+            id={appUser.id}
+            title={appUser.full_name}
+            subtitle={pinAlreadySet ? "Scannez pour vous connecter" : "À présenter à la pompe"}
+            code={driverCode ?? undefined}
+          />
+          {driverCode && /^\d+$/.test(driverCode) && <CodeSecoursNaissance />}
+        </div>
+      )}
     </div>
   );
 }
