@@ -140,3 +140,21 @@ export async function alerterNiveauSuperieur(admin: Db, a: AlerteHierarchique): 
   );
   return error?.message ?? null;
 }
+
+/** Rôle de chaque personne demandée (lecture sous la RLS « users : lecture dans l'organisation »). */
+export async function rolesParId(db: Db, organizationId: string, ids: readonly string[]): Promise<Map<string, string>> {
+  const uniques = [...new Set(ids.filter(Boolean))];
+  if (uniques.length === 0) return new Map();
+  const { data } = await db.from("users").select("id, role").eq("organization_id", organizationId).in("id", uniques);
+  return new Map(((data ?? []) as { id: string; role: string }[]).map((u) => [u.id, u.role]));
+}
+
+/**
+ * Contexte des écrans : effectifs par rôle (libellés « En attente de … »
+ * avec escalade) et nombre de directions (auto-validation d'une direction
+ * seule).
+ */
+export async function contexteHierarchie(db: Db, organizationId: string): Promise<{ effectifs: EffectifsRoles; directionCount: number }> {
+  const effectifs = await effectifsRoles(db, organizationId);
+  return { effectifs, directionCount: effectifs.direction ?? 1 };
+}

@@ -25,12 +25,12 @@ const STYLE: Record<StatutAcompte, string> = {
   annulee: "bg-navy/10 text-navy/60",
 };
 
-export function BadgeAcompte({ statut }: { statut: StatutAcompte }) {
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STYLE[statut]}`}>{LIBELLES_ACOMPTE[statut]}</span>;
+export function BadgeAcompte({ statut, libelleAttente }: { statut: StatutAcompte; libelleAttente?: string }) {
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STYLE[statut]}`}>{statut === "en_attente" && libelleAttente ? libelleAttente : LIBELLES_ACOMPTE[statut]}</span>;
 }
 
 /** Mon espace › Demander un acompte : formulaire et historique. */
-export function MesAcomptes({ demandes, plafond, mois }: { demandes: DemandeAcompte[]; plafond: number | null; mois: string }) {
+export function MesAcomptes({ demandes, plafond, mois, libelleAttente }: { demandes: DemandeAcompte[]; plafond: number | null; mois: string; libelleAttente?: string }) {
   const router = useRouter();
   const [montant, setMontant] = useState("");
   const [motif, setMotif] = useState("");
@@ -120,7 +120,7 @@ export function MesAcomptes({ demandes, plafond, mois }: { demandes: DemandeAcom
                   <div className="flex flex-col gap-0.5 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold tabular-nums">{eur(d.status === "acceptee" || d.status === "versee" ? montantAcompte(d) : d.amount_requested)} €</span>
-                      <BadgeAcompte statut={d.status} />
+                      <BadgeAcompte statut={d.status} libelleAttente={libelleAttente} />
                       <span className="text-navy/60">demandé le {date(d.created_at)}</span>
                     </span>
                     {(d.status === "acceptee" || d.status === "versee") && d.amount_granted !== null && d.amount_granted !== d.amount_requested && (
@@ -148,7 +148,8 @@ export function MesAcomptes({ demandes, plafond, mois }: { demandes: DemandeAcom
   );
 }
 
-export type DemandeAvecNom = DemandeAcompte & { nom: string };
+/** hierarchie : droits de la personne connectée sur cette demande (lib/hierarchie/demandes.ts). */
+export type DemandeAvecNom = DemandeAcompte & { nom: string; hierarchie?: { peutDecider: boolean; autoValidee: boolean; mention: string | null } };
 
 function LigneGestion({ d, direction, plafond }: { d: DemandeAvecNom; direction: boolean; plafond: number | null }) {
   const router = useRouter();
@@ -159,6 +160,8 @@ function LigneGestion({ d, direction, plafond }: { d: DemandeAvecNom; direction:
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const valeur = Number(montant.replace(",", "."));
+  // Hiérarchie : sa propre demande, ou celle d'un niveau égal ou supérieur, se lit sans pouvoir la décider.
+  const lectureSeule = d.hierarchie ? !d.hierarchie.peutDecider : false;
 
   async function agir(action: "preparer" | "accepter" | "refuser" | "verser" | "annuler", texteOk: string) {
     setBusy(true);
@@ -204,7 +207,15 @@ function LigneGestion({ d, direction, plafond }: { d: DemandeAvecNom; direction:
       )}
       {d.status === "refusee" && d.decision_comment && <p className="text-sm text-orange-ink">Motif du refus : {d.decision_comment}</p>}
 
-      {d.status === "en_attente" && (
+      {lectureSeule && (d.status === "en_attente" || d.status === "acceptee") && (
+        <p className="rounded-lg bg-navy/[0.04] px-3 py-2 text-sm text-navy/70" data-testid="mention-hierarchie">
+          {d.hierarchie?.mention} : en lecture seule pour vous.
+        </p>
+      )}
+      {!lectureSeule && d.hierarchie?.autoValidee && d.status === "en_attente" && (
+        <p className="text-xs text-navy/60">Votre propre demande : auto-validation (direction unique), tracée au journal.</p>
+      )}
+      {!lectureSeule && d.status === "en_attente" && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-end gap-2">
             <label className="block w-36">
@@ -245,7 +256,7 @@ function LigneGestion({ d, direction, plafond }: { d: DemandeAvecNom; direction:
         </div>
       )}
 
-      {d.status === "acceptee" && (
+      {!lectureSeule && d.status === "acceptee" && (
         <div className="flex flex-wrap items-end gap-2">
           <label className="block">
             <span className="label">Versé le</span>

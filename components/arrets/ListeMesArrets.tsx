@@ -5,7 +5,7 @@ import type { LigneArret } from "@/lib/arrets/serveur";
 const BADGE: Record<LigneArret["statut"], string> = { recu: "badge-gold", valide: "badge-teal", refuse: "badge-orange" };
 
 /** Mes arrêts : période, statut, motif d'un refus, photos jointes. */
-export function ListeMesArrets({ arrets, liens }: { arrets: LigneArret[]; liens: Map<string, string> }) {
+export function ListeMesArrets({ arrets, liens, libelleAttente }: { arrets: LigneArret[]; liens: Map<string, string>; libelleAttente?: string }) {
   if (arrets.length === 0) return <EmptyState title="Aucun arrêt de travail enregistré" />;
   return (
     <div className="flex flex-col gap-2">
@@ -15,7 +15,7 @@ export function ListeMesArrets({ arrets, liens }: { arrets: LigneArret[]; liens:
             <span className="font-semibold">
               Du {dateCourte(a.du)} au {dateCourte(a.au)} <span className="font-normal text-navy/60">· {nbJours(a.du, a.au)} j</span>
             </span>
-            <span className={BADGE[a.statut]}>{LIBELLE_STATUT_ARRET[a.statut]}</span>
+            <span className={BADGE[a.statut]}>{a.statut === "recu" && libelleAttente ? libelleAttente : LIBELLE_STATUT_ARRET[a.statut]}</span>
           </div>
           <span className="text-navy/70">
             {libelleTypeArret(a.type)}

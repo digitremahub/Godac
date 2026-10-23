@@ -17,6 +17,14 @@ interface LeaveRow {
   overlapWith: string[];
   /** Solde de congés du demandeur et effet de cette demande. */
   solde?: { disponible: number; jours: number; insuffisant: boolean } | null;
+  /** Hiérarchie des demandes : cette personne peut-elle décider cette demande ? */
+  peutDecider?: boolean;
+  /** Direction seule qui décide de sa propre demande (tracée « auto-validée »). */
+  autoValidee?: boolean;
+  /** Lecture seule : « À décider par … » (demande à soi ou d'un pair). */
+  mention?: string | null;
+  /** « En attente de … » : niveau qui doit décider. */
+  libelleAttente?: string | null;
 }
 
 const STATUS_LABELS: Record<LeaveRow["status"], string> = {
@@ -101,7 +109,8 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
         </thead>
         <tbody>
           {leaves.map((leave) => {
-            const canEdit = leave.status === "pending" && (leave.isOwn || canDecide);
+            const decidable = canDecide && leave.peutDecider !== false;
+            const canEdit = leave.status === "pending" && (leave.isOwn || decidable);
             const isEditing = editingId === leave.id;
             return (
               <tr key={leave.id} className="border-t border-navy/5 align-top">
@@ -135,7 +144,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                       leave.status === "approved" ? "badge-teal" : leave.status === "rejected" ? "badge-orange" : "badge-gold"
                     }
                   >
-                    {STATUS_LABELS[leave.status]}
+                    {leave.status === "pending" && leave.libelleAttente ? leave.libelleAttente : STATUS_LABELS[leave.status]}
                   </span>
                   {leave.solde && (
                     <p className={`mt-1 text-xs ${leave.solde.insuffisant ? "font-semibold text-orange-ink" : "text-navy/60"}`}>
@@ -166,8 +175,14 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                             Modifier
                           </button>
                         )}
-                        {canDecide && leave.status === "pending" && (
+                        {canDecide && leave.status === "pending" && !decidable && leave.mention && (
+                          <p className="max-w-[16rem] text-xs text-navy/60" data-testid="mention-hierarchie">
+                            {leave.mention}. Vous ne pouvez pas la décider.
+                          </p>
+                        )}
+                        {decidable && leave.status === "pending" && (
                           <>
+                            {leave.autoValidee && <p className="max-w-[12rem] text-xs text-navy/60">Auto-validation (direction unique), tracée au journal.</p>}
                             <button
                               className="btn-primary !px-2 !py-1 text-xs"
                               disabled={busyId === leave.id}

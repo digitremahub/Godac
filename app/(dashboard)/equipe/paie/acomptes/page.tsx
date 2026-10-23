@@ -3,6 +3,8 @@ import { EmptyState, PageHeader } from "@/components/ui";
 import { GestionAcomptes, ReglagePlafondAcompte, type DemandeAvecNom } from "@/components/paie/Acomptes";
 import { plafondAcompte } from "@/lib/paie/acomptes";
 import { CHAMPS_DEMANDE, MESSAGE_TABLE_ABSENTE, reglagePlafond, tableAcomptesAbsente, versDemande } from "@/lib/paie/acomptes-serveur";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision } from "@/lib/hierarchie/demandes";
 
 /**
  * Équipe › Paie › Acomptes : les demandes d'acompte des salariés. Le
@@ -43,10 +45,21 @@ export default async function AcomptesPage() {
     );
   }
 
-  const demandes: DemandeAvecNom[] = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
-    ...versDemande(row),
-    nom: ((row.users as { full_name?: string } | null)?.full_name ?? "Salarié") as string,
-  }));
+  const lignes = (data ?? []) as Record<string, unknown>[];
+  const [{ directionCount }, roles] = await Promise.all([contexteHierarchie(supabase, appUser.organization_id), rolesParId(supabase, appUser.organization_id, lignes.map((r) => String(r.user_id)))]);
+  const demandes: DemandeAvecNom[] = lignes.map((row) => {
+    const droits = droitsDecision({
+      moi: { id: appUser.id, role: appUser.role },
+      demandeur: { id: String(row.user_id), role: roles.get(String(row.user_id)) ?? "chauffeur" },
+      directionCount,
+      paie: true,
+    });
+    return {
+      ...versDemande(row),
+      nom: ((row.users as { full_name?: string } | null)?.full_name ?? "Salarié") as string,
+      hierarchie: { peutDecider: droits.peutDecider, autoValidee: droits.autoValidee, mention: droits.mention },
+    };
+  });
 
   // Plafond indicatif de chaque demandeur : son dernier bulletin validé.
   const plafonds: Record<string, number | null> = {};

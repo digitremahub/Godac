@@ -5,6 +5,8 @@ import { ListeMesArrets } from "@/components/arrets/ListeMesArrets";
 import { arretsProlongeables } from "@/lib/arrets/declaration";
 import { liensDocuments, lireArrets } from "@/lib/arrets/serveur";
 import { parisDay } from "@/lib/utils/paris-time";
+import { contexteHierarchie } from "@/lib/hierarchie/serveur";
+import { libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 /** Mon espace › Mes demandes › Arrêts : déclarer un arrêt de travail, suivre son statut. */
 export default async function MesArretsPage({ searchParams }: { searchParams: Promise<{ nouveau?: string }> }) {
@@ -14,6 +16,7 @@ export default async function MesArretsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const { lignes, declarationActive } = await lireArrets(supabase, { userId: appUser.id, limite: 50 });
   const liens = await liensDocuments(supabase, lignes.flatMap((a) => a.documents));
+  const { effectifs } = await contexteHierarchie(supabase, appUser.organization_id);
   const prolongeables = arretsProlongeables(lignes, parisDay()).map((a) => ({ id: a.id, userId: a.userId, type: a.type, du: a.du, au: a.au }));
 
   return (
@@ -26,7 +29,7 @@ export default async function MesArretsPage({ searchParams }: { searchParams: Pr
       )}
       <section>
         <h2 className="mb-2 text-base">Mes arrêts</h2>
-        <ListeMesArrets arrets={lignes} liens={liens} />
+        <ListeMesArrets arrets={lignes} liens={liens} libelleAttente={libelleEnAttente(appUser.role, effectifs)} />
       </section>
     </div>
   );

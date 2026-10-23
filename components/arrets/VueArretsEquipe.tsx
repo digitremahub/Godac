@@ -10,6 +10,8 @@ import { estEncadrement, servicesDuPerimetre } from "@/lib/roles/perimetre";
 import { parisDay } from "@/lib/utils/paris-time";
 import { LIBELLE_STATUT_ARRET, affectationsALiberer, arretsProlongeables, dateCourte, libelleTypeArret, nbJours } from "@/lib/arrets/declaration";
 import { affectationsPendantArret, liensDocuments, lireArrets, type AffectationTouchee, type LigneArret } from "@/lib/arrets/serveur";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision } from "@/lib/hierarchie/demandes";
 
 const BADGE: Record<LigneArret["statut"], string> = { recu: "badge-gold", valide: "badge-teal", refuse: "badge-orange" };
 const heure = (iso: string) => new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -45,7 +47,11 @@ export async function VueArretsEquipe({ appUser, supabase, modules, arretId }: {
     .filter((u) => u.active && u.id !== appUser.id && (!dansPerimetre || dansPerimetre.has(u.id)))
     .map((u) => ({ id: u.id, nom: u.full_name }));
 
-  const visibles = lignes.filter((a) => a.userId !== appUser.id || appUser.role === "direction");
+  // Hiérarchie des demandes : tous les arrêts visibles, mais décidés seulement par le niveau au-dessus (le sien et ceux des pairs : lecture seule).
+  const [{ directionCount }, rolesSalaries] = await Promise.all([contexteHierarchie(supabase, appUser.organization_id), rolesParId(supabase, appUser.organization_id, lignes.map((a) => a.userId))]);
+  const droitsDe = (a: LigneArret) =>
+    droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: a.userId, role: rolesSalaries.get(a.userId) ?? "chauffeur" }, directionCount, paie: appUser.role === "comptable" });
+  const visibles = lignes;
   const aVerifier = visibles.filter((a) => a.statut === "recu");
   const enCours = visibles.filter((a) => a.statut === "valide" && a.au >= aujourdhui);
   const passes = visibles.filter((a) => a.statut === "refuse" || (a.statut === "valide" && a.au < aujourdhui)).slice(0, 40);
@@ -60,8 +66,9 @@ export async function VueArretsEquipe({ appUser, supabase, modules, arretId }: {
 
   const carte = (a: LigneArret) => {
     const tournees = touchees.get(a.id) ?? [];
-    const aLiberer = affectationsALiberer(tournees, a).length;
-    const peutDecider = declarationActive && (a.userId !== appUser.id || appUser.role === "direction");
+    const droits = droitsDe(a);
+    const aLiberer = droits.peutDecider ? affectationsALiberer(tournees, a).length : 0;
+    const peutDecider = declarationActive && droits.peutDecider;
     return (
       <Card key={a.id} className={`flex flex-col gap-2 !p-4 text-sm ${arretId === a.id ? "ring-2 ring-teal" : ""}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -112,6 +119,12 @@ export async function VueArretsEquipe({ appUser, supabase, modules, arretId }: {
             )}
           </div>
         )}
+        {declarationActive && !droits.peutDecider && a.statut === "recu" && droits.mention && (
+          <span className="rounded-lg bg-navy/[0.04] px-3 py-2 text-navy/70" data-testid="mention-hierarchie">
+            {droits.mention} : en lecture seule pour vous.
+          </span>
+        )}
+        {peutDecider && droits.autoValidee && a.statut === "recu" && <span className="text-navy/60">Votre propre arrêt : auto-validation (direction unique), tracée au journal.</span>}
         {(peutDecider || aLiberer > 0) && a.statut !== "refuse" && <ActionsArret id={a.id} statut={a.statut} peutDecider={peutDecider} aLiberer={planningActif ? aLiberer : 0} />}
         {peutDecider && a.statut === "refuse" && <ActionsArret id={a.id} statut={a.statut} peutDecider aLiberer={0} />}
       </Card>
