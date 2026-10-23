@@ -10,7 +10,7 @@ import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
+import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -299,6 +299,18 @@ export function TourneeColis({
     // Pas pendant le chargement d'une autre tournée (évite un « aucune tournée » transitoire).
     if (runs && (run || !activeId)) onEtat?.(run, stops);
   }, [runs, run, stops, activeId, onEtat]);
+  // Adresses ajoutées sans réseau : dès que la file se vide (réseau revenu), la tournée se recharge.
+  const fileAvant = useRef(0);
+  useEffect(() => {
+    async function surveiller() {
+      const n = await listOfflineMutations().then((l) => l.length).catch(() => 0);
+      if (fileAvant.current > 0 && n === 0) void recharger(activeId);
+      fileAvant.current = n;
+    }
+    void surveiller();
+    window.addEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+    return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+  }, [recharger, activeId]);
   useEffect(() => {
     if (!scanner && !draft && brouillons.length) {
       setDraft(brouillons[0]!);
@@ -316,9 +328,7 @@ export function TourneeColis({
     if (!creneau.ok) return setToast({ ok: false, text: creneau.erreur });
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null }>("/api/colis/arrets", {
-        method: "POST",
-        body: JSON.stringify({
+      const corps = JSON.stringify({
           run_id: run?.id,
           list_id: listeCible === AUTO ? null : listeCible,
           code: d.code,
@@ -331,8 +341,17 @@ export function TourneeColis({
           creneau: creneau.creneau,
           etablissement: d.etablissement ?? null,
           ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
-        }),
-      });
+        });
+      let r: { duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null };
+      try {
+        r = await api<typeof r>("/api/colis/arrets", { method: "POST", body: corps });
+      } catch (e) {
+        if (!isNetworkFailure(e)) throw e;
+        // Pas de réseau : l'adresse est gardée sur le téléphone et ajoutée dès le retour du réseau.
+        await enqueueOfflineMutation("/api/colis/arrets", { method: "POST", body: corps });
+        setDraft(null);
+        return setToast({ ok: true, text: "Pas de réseau : l'adresse est conservée et sera ajoutée dès que le réseau revient." });
+      }
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
       const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) ? ` ${ALERTE_SANS_TELEPHONE}` : "";
       setToast(

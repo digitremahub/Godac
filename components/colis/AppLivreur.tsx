@@ -12,7 +12,7 @@ import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
+import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
@@ -560,6 +560,18 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   }
   if (siege) destinationsRetour.push({ cle: "siege", titre: "Retour au siège", detail: siege.adresse, lien: lienExterne({ lat: siege.lat, lng: siege.lng, address: siege.adresse } as Stop), point: siege.lat !== null && siege.lng !== null ? { lat: siege.lat, lng: siege.lng } : null });
   const rechargerRun = useCallback(() => charger(run?.id), [charger, run?.id]);
+  // Adresses ajoutées sans réseau : dès que la file se vide (réseau revenu), la tournée se recharge.
+  const fileAvant = useRef(0);
+  useEffect(() => {
+    async function surveiller() {
+      const n = await listOfflineMutations().then((l) => l.length).catch(() => 0);
+      if (fileAvant.current > 0 && n === 0) void rechargerRun();
+      fileAvant.current = n;
+    }
+    void surveiller();
+    window.addEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+    return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+  }, [rechargerRun]);
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
