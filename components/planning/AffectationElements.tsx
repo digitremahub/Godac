@@ -78,6 +78,8 @@ export interface ContexteAffectations {
   basculerDimanche: () => void;
   /** Ouvre la vue Jour de ce jour (garde le service choisi). */
   allerJour: (date: string) => void;
+  /** Ouvre « Heure de la tournée » (date : jour précis d'où l'on vient, sinon la période affichée). */
+  ouvrirHeure: (cle: string, date: string | null) => void;
 }
 
 export const Contexte = createContext<ContexteAffectations | null>(null);
@@ -137,4 +139,29 @@ export function Depot({ id, actif, children }: { id: string; actif: boolean; chi
 export function Vehicule({ immat }: { immat: string | null | undefined }) {
   if (!immat) return <span className="text-[11px] opacity-70">sans véhicule</span>;
   return <span className="whitespace-nowrap text-[11px] tabular-nums opacity-80">{immat}</span>;
+}
+
+/**
+ * Heure de départ d'une tournée : un bouton « 07:00 ✎ » qui ouvre
+ * « Heure de la tournée » pour qui peut modifier le planning, sinon du texte.
+ */
+export function BoutonHeure({ ligne, date = null, heure, className = "" }: { ligne: LigneTournee; date?: string | null; heure?: string; className?: string }) {
+  const ctx = useAffectations();
+  const h = heure ?? ligne.heure;
+  if (!ctx.donnees.peutModifier) return <span className={`tabular-nums ${className}`}>{h}</span>;
+  return (
+    <button
+      type="button"
+      disabled={ctx.occupe}
+      onClick={() => ctx.ouvrirHeure(ligne.cle, date)}
+      aria-label={`Heure de départ de ${ligne.tourNumber} : ${h}. Modifier`}
+      title="Modifier l'heure de départ"
+      className={`inline-flex min-h-[32px] items-center gap-1 rounded-md px-1 tabular-nums underline decoration-dotted underline-offset-2 hover:bg-teal/15 hover:text-teal-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal max-md:min-h-[44px] max-md:px-2 ${className}`}
+    >
+      {h}
+      <span aria-hidden="true" className="text-[0.9em] opacity-70">
+        ✎
+      </span>
+    </button>
+  );
 }

@@ -17,8 +17,10 @@ const bodySchema = z.object({
   driver_id: z.string().uuid(),
   /** Jours de Paris : une case (vue Jour, case de la semaine), une semaine, des jours étirés. */
   dates: z.array(z.string().date()).min(1).max(62),
-  /** Heure de départ des affectations créées (celles qui existent gardent la leur). */
+  /** Heure de départ de Paris des affectations créées (celles qui existent gardent la leur, sauf `imposer_heure`). */
   heure: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+  /** Heure choisie à la main dans la feuille « Affecter à… » : les affectations existantes d'une autre heure la prennent aussi. */
+  imposer_heure: z.boolean().optional(),
   /** Véhicule des affectations créées ou sans véhicule ; défaut : véhicule attribué au chauffeur. */
   vehicle_id: z.string().uuid().nullable().optional(),
   /** Réponse à la question « séparées ou reliées » (409 choix_requis). */
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
   }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const { service_id, tour_number, driver_id, heure, regroupement } = parsed.data;
+  const { service_id, tour_number, driver_id, heure, regroupement, imposer_heure } = parsed.data;
   const dates = [...new Set(parsed.data.dates)].sort();
   const premier = dates[0]!;
   const dernier = dates[dates.length - 1]!;
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
     dates,
     driverId: driver_id,
     heure,
+    imposerHeure: imposer_heure,
     existantes: (existantes ?? []) as AffectationPlanning[],
     absent: absentSelon(absences),
     versUtc: parisWallTimeToUtcISOString,
@@ -165,7 +168,7 @@ export async function POST(req: Request) {
       const existante = ((existantes ?? []) as AffectationPlanning[]).find((e) => e.id === d.entreeId);
       const { data, error } = await supabase
         .from("planning_entries")
-        .update({ driver_id, ...(existante && !existante.vehicle_id && vehicule ? { vehicle_id: vehicule } : {}) })
+        .update({ driver_id, ...(existante && !existante.vehicle_id && vehicule ? { vehicle_id: vehicule } : {}), ...(d.startAt ? { start_at: d.startAt } : {}) })
         .eq("id", d.entreeId)
         .eq("status", "planned")
         .select(CHAMPS)
