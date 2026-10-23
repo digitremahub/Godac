@@ -8,12 +8,15 @@ import {
   connaitTournee,
   estAbsent,
   etatChauffeurDuJour,
-  joursDeLaLigne,
+  joursChoisis,
+  joursDuMois,
   libelleIndisponibilite,
   nomCourt,
+  RANGS_LUNDI_SAMEDI,
+  rangsDesJoursPrevus,
   type LigneTournee,
 } from "@/lib/planning/affectation";
-import { chauffeursAffiches, heureDe, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
+import { basculerRang, chauffeursAffiches, heureDe, joursDeLaSemaine, JOURS_COURTS, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
 
 export type CibleFeuille = { type: "case"; cle: string; date: string } | { type: "ligne"; cle: string };
 
@@ -30,8 +33,10 @@ export interface ActionsFeuille {
  * - une case : chauffeurs disponibles d'abord, déjà pris (2ᵉ tournée)
  *   ensuite, absents grisés ; retirer, prolonger les jours suivants,
  *   modifier l'heure ou le véhicule, supprimer ce jour ;
- * - une ligne (⇥ semaine / mois) : un chauffeur pour tous les jours où la
- *   tournée roule (ses jours d'absence restent « à remplacer »).
+ * - une ligne (⇥ semaine / mois) : un chauffeur pour les jours choisis
+ *   (pastilles L M M J V S D, pré-cochées selon les jours habituels de la
+ *   tournée ; le samedi et le dimanche restent cliquables). Ses jours
+ *   d'absence restent « à remplacer ».
  */
 export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeuille; actions: ActionsFeuille; onFermer: () => void }) {
   const ctx = useAffectations();
@@ -39,7 +44,16 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
   const ligne = ctx.lignes.find((l) => l.cle === cible.cle);
   const [recherche, setRecherche] = useState("");
 
-  const datesCible = useMemo(() => (!ligne ? [] : cible.type === "case" ? [cible.date] : joursDeLaLigne(ligne, ctx.jours.filter((d) => d >= ctx.aujourdhui || donnees.vue === "jour"))), [cible, ligne, ctx.jours, ctx.aujourdhui, donnees.vue]);
+  // « Toute la semaine / tout le mois » : tous les jours de la période, dimanche compris,
+  // même s'il n'est pas affiché ; les jours déjà passés ne se proposent pas.
+  const periode = useMemo(() => (donnees.vue === "mois" ? joursDuMois(donnees.mois, true) : donnees.vue === "semaine" ? joursDeLaSemaine(donnees.lundi) : [...ctx.jours]), [donnees.vue, donnees.mois, donnees.lundi, ctx.jours]);
+  const depuis = donnees.vue === "jour" ? undefined : ctx.aujourdhui;
+  const [rangs, setRangs] = useState<number[]>(() => {
+    const habituels = ligne ? rangsDesJoursPrevus(ligne.joursPrevus) : [];
+    const possibles = habituels.filter((r) => joursChoisis(periode, [r], depuis).length > 0);
+    return possibles.length ? possibles : joursChoisis(periode, [0, 1, 2, 3, 4], depuis).length ? [0, 1, 2, 3, 4] : [];
+  });
+  const datesCible = useMemo(() => (!ligne ? [] : cible.type === "case" ? [cible.date] : joursChoisis(periode, rangs, depuis)), [cible, ligne, periode, rangs, depuis]);
   const entrees: EntreeAffectation[] = cible.type === "case" && ligne ? (ctx.parCase.get(cleCaseTournee(ligne.cle, cible.date)) ?? []) : [];
   const tenue = entrees.find((e) => e.driver_id);
 
@@ -69,7 +83,7 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
       ? `${JOURS_LONGS[rangJour(cible.date)]} ${Number(cible.date.slice(8, 10))}/${cible.date.slice(5, 7)} · ${entrees[0] ? heureDe(entrees[0].start_at) : ligne.heure}${ligne.villages.length ? ` · ${ligne.villages.slice(0, 2).join(", ")}` : ""}`
       : datesCible.length
         ? `${datesCible.length} jour${datesCible.length > 1 ? "s" : ""} : ${libelleJour(datesCible[0]!)} → ${libelleJour(datesCible.at(-1)!)} · ${ligne.heure}`
-        : "Aucun jour à venir où cette tournée roule.";
+        : "Cochez au moins un jour.";
 
   // Prolonger (équivalent de la poignée) : jours suivants de la même semaine.
   const suivants = cible.type === "case" && tenue && donnees.vue !== "jour" ? ctx.jours.filter((d) => d > cible.date && d <= finDeSemaine(cible.date)) : [];
@@ -131,6 +145,44 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {cible.type === "ligne" && donnees.peutModifier && (
+        <div className="mb-3">
+          <p className="label">Jours à remplir</p>
+          <div className="grid grid-cols-7 gap-1" role="group" aria-label="Jours à remplir">
+            {JOURS_COURTS.map((lettre, r) => {
+              const dispo = joursChoisis(periode, [r], depuis).length > 0;
+              const coche = rangs.includes(r);
+              const habituel = rangsDesJoursPrevus(ligne.joursPrevus).includes(r);
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  disabled={!dispo}
+                  aria-pressed={coche}
+                  aria-label={`${JOURS_LONGS[r]}${habituel ? " (jour habituel)" : ""}`}
+                  onClick={() => setRangs((v) => basculerRang(v, r))}
+                  className={`flex min-h-[48px] flex-col items-center justify-center rounded-xl border-2 text-base font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal disabled:cursor-not-allowed disabled:opacity-35 ${
+                    coche ? "border-orange bg-orange/15 text-orange-ink" : "border-navy/15 bg-surface text-navy/70 hover:border-orange/50"
+                  }`}
+                >
+                  {lettre}
+                  <span className={`h-1.5 w-1.5 rounded-full ${habituel ? "bg-current opacity-60" : "opacity-0"}`} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => setRangs(RANGS_LUNDI_SAMEDI.filter((r) => joursChoisis(periode, [r], depuis).length > 0))}>
+              Lun → Sam
+            </button>
+            <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => setRangs(rangsDesJoursPrevus(ligne.joursPrevus).filter((r) => joursChoisis(periode, [r], depuis).length > 0))}>
+              Jours habituels
+            </button>
+          </div>
+          <p className="mt-1 text-sm text-navy/60">Le point marque les jours où la tournée roule d&apos;habitude.</p>
         </div>
       )}
 

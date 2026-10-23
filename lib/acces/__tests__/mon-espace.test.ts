@@ -29,7 +29,7 @@ describe("Mon espace en 3 onglets", () => {
     expect(g[0]!.prefixes).toEqual(expect.arrayContaining(["/moi/tournee/retour", "/moi/tournee/collegue"]));
   });
 
-  it("manager qui ne conduit pas : ni écrans de conduite ni « Pour un collègue » en tête (il passe par le Planning)", () => {
+  it("manager qui ne conduit pas : ni écrans de conduite ni « Pour un collègue » en tête (il passe par le Suivi en direct)", () => {
     expect(ids("manager", false)).toEqual({ journee: ["moi.pointage"], documents: ["moi.fiches_paie"], demandes: ["moi.conges", "moi.arrets", "moi.acomptes"] });
     // L'écran reste ouvert (droits inchangés).
     expect(deciderAcces(ecran("moi.tournee_collegue"), "manager", tout, false).ok).toBe(true);

@@ -273,8 +273,8 @@ export const ECRANS: readonly Ecran[] = [
     roles: ["chauffeur", "manager", "exploitation", "direction"],
     rolesMenu: ["chauffeur", "manager", "exploitation"],
     // Sous-onglet de Départ / Retour pour qui conduit ; l'encadrement qui
-    // ne conduit pas l'ouvre depuis le Planning (« Saisir pour un
-    // chauffeur »), plus en tête de son Mon espace (audit, lot 3).
+    // ne conduit pas l'ouvre depuis le Suivi en direct (« Saisir un départ
+    // ou un retour »), plus du Planning ni en tête de son Mon espace.
     menuConducteur: true,
     modules: ["planning"],
     icone: "users",
