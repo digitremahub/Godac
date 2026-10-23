@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
@@ -74,6 +75,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   const [recherche, setRecherche] = useState("");
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
+  /** Fiche en cours de modification (erreur de saisie à la base). */
+  const [ficheEdition, setFicheEdition] = useState(false);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [vue, setVue] = useState<Vue>(vueInitiale ?? "liste");
@@ -639,6 +642,22 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
         <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee })} />
       )}
 
+      {/* Bouton flottant : retour dans GO Navigation depuis la liste, la carte ou une fiche. */}
+      {run?.status === "in_progress" && !enNavigation && !enPreparation && pending.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setDetailsStop(null);
+            setFicheEdition(false);
+            changerVue("navigation");
+          }}
+          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-4 z-[60] flex min-h-[56px] items-center gap-2 rounded-full bg-teal px-5 text-base font-bold text-on-teal shadow-pop"
+          aria-label="Retourner dans GO Navigation"
+        >
+          <IconNavigation className="h-5 w-5" /> GO
+        </button>
+      )}
+
       {toast && (
         <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
           {toast.text}
@@ -758,21 +777,38 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                 <h2 id="fiche-arret-title" className="font-display text-xl font-bold">Fiche de livraison</h2>
                 <p className="mt-1 text-sm text-navy/60">{estRamasse(detailsStop) ? "Ramasse" : estPointRelais(detailsStop) ? `Point relais${detailsStop.relay_name ? ` · ${detailsStop.relay_name}` : ""}` : "Livraison"}</p>
               </div>
-              <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDetailsStop(null)} aria-label="Fermer la fiche">✕</button>
+              <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => { setDetailsStop(null); setFicheEdition(false); }} aria-label="Fermer la fiche">✕</button>
             </div>
+            {ficheEdition ? (
+              <FicheEdition
+                stop={detailsStop}
+                biais={maPosition ?? (run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null)}
+                onFermer={() => setFicheEdition(false)}
+                onEnregistre={async (texte) => {
+                  setFicheEdition(false);
+                  setDetailsStop(null);
+                  await rechargerRun();
+                  setToast({ ok: true, text: texte });
+                }}
+              />
+            ) : (
+              <>
             <p className="mt-4 break-words text-lg font-semibold">{detailsStop.address}</p>
-            {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
-            {detailsStop.phone && <p className="mt-1 text-sm">{detailsStop.phone}</p>}
-            {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
-            <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
-              <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Google Maps</a>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
-              <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>Traiter cet arrêt</button>
-            </div>
+              {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
+              {detailsStop.phone && <p className="mt-1 text-sm">{detailsStop.phone}</p>}
+              {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
+              <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
+                <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Google Maps</a>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
+                <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>Traiter cet arrêt</button>
+              </div>
+                <button type="button" className="btn-ghost mt-2 min-h-[44px] w-full justify-center text-sm" onClick={() => setFicheEdition(true)}>✏️ Modifier la fiche</button>
+              </>
+            )}
           </section>
         </div>
       )}
