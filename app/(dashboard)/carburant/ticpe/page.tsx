@@ -106,7 +106,7 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
         </Link>
       </div>
       <p className="-mt-3 mb-6 text-xs text-navy/55">
-        Date limite : celle du dépôt de votre déclaration de TVA ({regime === "annuel_ca12" ? "CA12" : "CA3"}), réglable dans les réglages TICPE — à confirmer par
+        Date limite : celle du dépôt de votre déclaration de TVA ({regime === "annuel_ca12" ? "CA12" : "CA3"}), réglable dans les réglages TICPE (par défaut le 20 du mois suivant pour la CA3 : à confirmer selon votre date de dépôt de TVA) — à confirmer par
         l&apos;expert-comptable. {avertissements > 0 ? `${avertissements} avertissement(s) à regarder sur la période affichée.` : ""}
       </p>
 

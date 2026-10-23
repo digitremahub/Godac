@@ -22,7 +22,7 @@ export interface ReglagesTicpe {
   activite_taxi: boolean;
   categorie_par_defaut: CategorieTicpe;
   regime_tva: RegimeTva;
-  /** Jour du mois de la date limite de dépôt de la TVA ; null = fin du mois suivant. */
+  /** Jour du mois suivant de la date limite de dépôt de la TVA (CA3) ; null = le 20 (valeur prudente, à confirmer selon votre date de dépôt de TVA). */
   jour_limite_depot: number | null;
   /** MM-JJ ; null = valeur par défaut (début mai, à confirmer). */
   date_limite_ca12: string | null;

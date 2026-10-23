@@ -68,9 +68,16 @@ export function dateLimiteCa12ParDefaut(annee: number): string {
 }
 
 /**
+ * Jour du mois suivant retenu par défaut pour le dépôt de la CA3 quand l'entreprise n'a rien réglé.
+ * Valeur PRUDENTE (avant la fin du mois), pas une règle : la date réelle dépend de l'entreprise
+ * (à confirmer selon votre date de dépôt de TVA) et se règle dans les réglages TICPE.
+ */
+export const JOUR_LIMITE_CA3_PAR_DEFAUT = 20;
+
+/**
  * Date limite de dépôt de la déclaration qui porte la demande de la
  * période : CA3 → le jour réglé du mois qui suit la période (par défaut
- * le dernier jour de ce mois) ; CA12 → l'année suivante (MM-JJ réglé,
+ * le 20, à confirmer selon la date de dépôt de TVA) ; CA12 → l'année suivante (MM-JJ réglé,
  * sinon début mai).
  */
 export function dateLimite(p: PeriodeDeclaration, regime: RegimeTva, reglages: Pick<ReglagesTicpe, "jour_limite_depot" | "date_limite_ca12">): string {
@@ -86,7 +93,7 @@ export function dateLimite(p: PeriodeDeclaration, regime: RegimeTva, reglages: P
   const y = Number(lendemain.slice(0, 4));
   const m = Number(lendemain.slice(5, 7));
   const dernier = finDuMois(y, m);
-  const jour = reglages.jour_limite_depot ? Math.min(reglages.jour_limite_depot, dernier) : dernier;
+  const jour = Math.min(reglages.jour_limite_depot ?? JOUR_LIMITE_CA3_PAR_DEFAUT, dernier);
   return `${y}-${pad(m)}-${pad(jour)}`;
 }
 

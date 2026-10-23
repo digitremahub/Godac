@@ -95,7 +95,7 @@ export function ReglagesTicpeForm({ initial, lectureSeule = false }: { initial: 
                   type="number"
                   min={1}
                   max={31}
-                  placeholder="par défaut : fin du mois suivant"
+                  placeholder="par défaut : le 20 du mois suivant"
                   value={r.jour_limite_depot ?? ""}
                   onChange={(e) => maj("jour_limite_depot", e.target.value ? Number(e.target.value) : null)}
                 />
@@ -108,7 +108,8 @@ export function ReglagesTicpeForm({ initial, lectureSeule = false }: { initial: 
           </div>
           <p className="mt-1 text-xs text-navy/55">
             Depuis les consommations 2025, la demande se fait auprès des impôts (DGFiP) avec la déclaration de TVA. La date limite dépend de votre entreprise :
-            reprenez celle de votre espace professionnel ({MENTION_A_CONFIRMER}).
+            reprenez celle de votre espace professionnel ({MENTION_A_CONFIRMER}). Sans date saisie, GODAC prend le 20 du mois suivant, par prudence : à confirmer selon
+            votre date de dépôt de TVA.
           </p>
         </section>
 
