@@ -169,9 +169,9 @@ export function congeDuJour(driverId: string, date: string, conges: readonly Con
 const STATUTS_OCCUPES = new Set(["planned", "in_progress"]);
 
 /**
- * Avertissements pour une affectation (nouvelle ou modifiée) : même
- * chauffeur déjà pris à la même heure, véhicule déjà pris à la même
- * heure, congé validé ou demandé. Ne bloque rien : l'encadrement décide.
+ * Avertissements pour une affectation (nouvelle ou modifiée) : véhicule
+ * déjà pris à la même heure par un autre chauffeur, congé validé ou
+ * demandé. (Un chauffeur peut avoir deux tournées à la même heure : combiné.) Ne bloque rien : l'encadrement décide.
  */
 export function conflitsAffectation(
   cible: { driverId: string | null; vehicleId?: string | null; date: string; heure: string; ignorerId?: string | null },
@@ -183,8 +183,8 @@ export function conflitsAffectation(
   const instant = Date.parse(parisWallTimeToUtcISOString(cible.date, cible.heure));
   const memeInstant = affectations.filter((a) => a.id !== cible.ignorerId && STATUTS_OCCUPES.has(a.status) && Date.parse(a.start_at) === instant);
   if (cible.driverId) {
-    const pris = memeInstant.filter((a) => a.driver_id === cible.driverId);
-    if (pris.length) out.push(`Chauffeur déjà affecté à ${cible.heure} : ${pris.map((a) => `n°${a.tour_number}`).join(", ")}.`);
+    // Deux tournées à la même heure pour un même chauffeur : c'est un
+    // combiné (certains jours), pas un conflit — aucun avertissement.
     const conge = congeDuJour(cible.driverId, cible.date, conges);
     if (conge === "approved") out.push("Chauffeur en congé ce jour-là.");
     else if (conge === "pending") out.push("Congé demandé ce jour-là (en attente de réponse).");
@@ -297,7 +297,7 @@ export interface PlanDeCopie {
   aCreer: NouvelleAffectation[];
   /** Créneau (service, tournée, départ) déjà occupé : rien n'est créé. */
   ignorees: CopieDemandee[];
-  /** Créées quand même, mais chauffeur déjà pris à la même heure. */
+  /** Hérité : toujours vide (un chauffeur peut cumuler deux tournées à la même heure, en combiné). */
   conflits: NouvelleAffectation[];
   /**
    * Créées SANS chauffeur : le chauffeur recopié est absent ce jour-là
@@ -362,7 +362,7 @@ export function planifierCopies(
     if (absent) plan.aRemplacer.push(ligne);
     if (driverId) {
       const cleChauffeur = `${driverId}|${Date.parse(startAt)}`;
-      if (chauffeurs.has(cleChauffeur)) plan.conflits.push(ligne);
+      // Même chauffeur, même heure : combiné autorisé, pas un conflit.
       chauffeurs.add(cleChauffeur);
     }
   }

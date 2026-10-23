@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { cleCaseTournee, cleLigne, estJourPrevu, etatCase, nomCourt, type LigneTournee } from "@/lib/planning/affectation";
 import { heureDe, jourDe, statutAffectation } from "@/lib/planning/semaine";
-import { Avatar, Depot, Glissable, useAffectations, Vehicule, type EntreeAffectation } from "@/components/planning/AffectationElements";
+import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, Vehicule, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
 type Tri = "heure" | "numero" | "trous";
 
@@ -107,7 +107,7 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
             </div>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65 max-md:text-sm">
-              <span className="tabular-nums">{heure}</span>
+              <BoutonHeure ligne={ligne} date={date} heure={heure} />
               {secteur && <span>· {secteur}</span>}
               {ligne.villages.length > 0 && (
                 <span>

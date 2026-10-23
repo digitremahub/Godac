@@ -95,10 +95,10 @@ describe("congés et conflits", () => {
     expect(congeDuJour("d2", LUNDI, conges)).toBe("pending");
     expect(congeDuJour("d3", LUNDI, conges)).toBeNull();
   });
-  it("même chauffeur à la même heure, véhicule pris, congé", () => {
+  it("même chauffeur à la même heure = combiné (pas d'avertissement) ; véhicule pris, congé", () => {
     const existantes = [aff({ id: "x" }), aff({ id: "y", driver_id: "d9", vehicle_id: "v2", tour_number: "40" })];
     const w = conflitsAffectation({ driverId: "d1", vehicleId: "v2", date: LUNDI, heure: "07:00" }, existantes, conges);
-    expect(w).toEqual(["Chauffeur déjà affecté à 07:00 : n°12.", "Véhicule déjà utilisé à 07:00 : n°40."]);
+    expect(w).toEqual(["Véhicule déjà utilisé à 07:00 : n°40."]);
     expect(conflitsAffectation({ driverId: "d1", date: LUNDI, heure: "07:00", ignorerId: "x" }, existantes)).toEqual([]);
     expect(conflitsAffectation({ driverId: "d1", date: "2026-10-21", heure: "08:00" }, existantes, conges)).toEqual(["Chauffeur en congé ce jour-là."]);
   });
@@ -147,7 +147,7 @@ describe("duplications", () => {
     expect(jourDe(plan.aCreer[0]!.start_at)).toBe("2026-10-26");
   });
 
-  it("ignore les créneaux déjà occupés et les doublons du plan, compte les conflits", () => {
+  it("ignore les créneaux déjà occupés et les doublons du plan ; deux tournées à la même heure pour un chauffeur = combiné, pas un conflit", () => {
     const a = aff({ id: "a" });
     const mardiOccupe = aff({ id: "m", start_at: at("2026-10-20", "07:00"), driver_id: "d2" }); // même tournée 12 à 07:00
     const mercrediAutre = aff({ id: "w", start_at: at("2026-10-21", "07:00"), tour_number: "30" }); // d1 pris à 07:00
@@ -155,7 +155,7 @@ describe("duplications", () => {
     const plan = planifierCopies(demandes, [a, mardiOccupe, mercrediAutre]);
     expect(plan.aCreer.map((r) => jourDe(r.start_at))).toEqual(["2026-10-21", "2026-10-22"]);
     expect(plan.ignorees).toHaveLength(2);
-    expect(plan.conflits.map((r) => jourDe(r.start_at))).toEqual(["2026-10-21"]);
+    expect(plan.conflits).toEqual([]);
   });
 
   it("copier / coller vers un autre chauffeur et un autre véhicule", () => {

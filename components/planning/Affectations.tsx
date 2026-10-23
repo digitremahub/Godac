@@ -23,7 +23,7 @@ import {
   trousParJour,
   type LigneTournee,
 } from "@/lib/planning/affectation";
-import { chauffeursAffiches, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
+import { chauffeursAffiches, heureDe, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
 import { textePublication } from "@/lib/planning/publication";
 import { confirmer } from "@/lib/ui/confirmation";
 import { Avatar, Contexte, type ContexteAffectations, type DonneesAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
@@ -32,6 +32,8 @@ import { AffectationsGrille } from "@/components/planning/AffectationsGrille";
 import { CalendrierMois, SemaineMobile } from "@/components/planning/AffectationsMobile";
 import { ColonneChauffeurs } from "@/components/planning/ColonneChauffeurs";
 import { FeuilleAffecter, type CibleFeuille } from "@/components/planning/FeuilleAffecter";
+import { FeuilleHeure, type CibleHeure, type PorteeHeure } from "@/components/planning/FeuilleHeure";
+import { texteChangementHeure } from "@/lib/planning/heure";
 import { RecopieSemaines } from "@/components/planning/RecopieSemaines";
 import { DupliquerSemaine, EditionAffectation, type DonneesPlanning, type Ton } from "@/components/planning/FenetresPlanning";
 import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
@@ -42,7 +44,7 @@ import { IconAlertTriangle } from "@/components/layout/icons";
 
 /** Une étape envoyée au serveur (un geste peut en enchaîner plusieurs : échange). */
 type Etape =
-  | { type: "placer"; ligne: LigneTournee; dates: string[]; driverId: string }
+  | { type: "placer"; ligne: LigneTournee; dates: string[]; driverId: string; /** Heure de Paris (« HH:MM ») ; défaut : celle de la tournée. */ heure?: string; /** Heure choisie à la main : les affectations existantes la prennent aussi. */ imposerHeure?: boolean }
   | { type: "retirer"; entree: EntreeAffectation }
   | { type: "supprimer"; entree: EntreeAffectation };
 
@@ -51,6 +53,7 @@ type Resultat = { ok: true; texte: string | null; warning: string | null; absent
 
 type Fenetre =
   | { type: "feuille"; cible: CibleFeuille }
+  | { type: "heure"; cible: CibleHeure }
   | { type: "edition"; entree: EntreeAffectation }
   | { type: "choix"; question: ChoixRegroupementData; reprendre: (r: Regroupement) => void; annuler: () => void }
   | { type: "dupliquer" }
@@ -144,11 +147,11 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     if (e.type === "supprimer") return liste.filter((a) => a.id !== e.entree.id);
     const { ligne, driverId } = e;
     const existantes = liste.filter((a) => cleLigne(a.service_id, a.tour_number) === ligne.cle);
-    const decisions = decisionsAffectation({ dates: e.dates, driverId, heure: ligne.heure, existantes, absent, versUtc: parisWallTimeToUtcISOString });
+    const decisions = decisionsAffectation({ dates: e.dates, driverId, heure: e.heure ?? ligne.heure, imposerHeure: e.imposerHeure, existantes, absent, versUtc: parisWallTimeToUtcISOString });
     let out = liste;
     const users = { full_name: nomChauffeur(driverId), phone: null, email: null };
     for (const d of decisions) {
-      if (d.type === "changer") out = out.map((a) => (a.id === d.entreeId ? { ...a, driver_id: driverId, users } : a));
+      if (d.type === "changer") out = out.map((a) => (a.id === d.entreeId ? { ...a, driver_id: driverId, users, ...(d.startAt ? { start_at: d.startAt } : {}) } : a));
       if (d.type === "creer") {
         out = [
           ...out,
@@ -168,7 +171,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         res = await fetch("/api/planning/affecter", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ service_id: e.ligne.serviceId, tour_number: e.ligne.tourNumber, driver_id: e.driverId, dates: e.dates, heure: e.ligne.heure, ...(p.vehiculeId ? { vehicle_id: p.vehiculeId } : {}), regroupement }),
+          body: JSON.stringify({ service_id: e.ligne.serviceId, tour_number: e.ligne.tourNumber, driver_id: e.driverId, dates: e.dates, heure: e.heure ?? e.ligne.heure, ...(e.imposerHeure ? { imposer_heure: true } : {}), ...(p.vehiculeId ? { vehicle_id: p.vehiculeId } : {}), regroupement }),
         });
       } catch {
         return { ok: false, erreur: "Connexion impossible. Vérifiez le réseau puis réessayez." };
@@ -240,12 +243,12 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   // --- Gestes -------------------------------------------------------------
   const ligneDe = (cle: string) => lignes.find((l) => l.cle === cle);
 
-  function placer(ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }) {
+  function placer(ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }, heure?: { valeur: string; imposee?: boolean }) {
     if (!dates.length) return setMessage({ texte: "Aucun jour à remplir.", ton: "attention" });
     // Un dimanche rempli doit se voir tout de suite.
     if (dates.some((d) => rangJour(d) === 6)) setDimancheDemande(true);
     const libelle = dates.length === 1 ? `${ligne.tourNumber} du ${libelleJour(dates[0]!)} → ${nomCourt(chauffeur.full_name)}` : `${ligne.tourNumber} → ${nomCourt(chauffeur.full_name)} (${dates.length} jours)`;
-    void executer([{ type: "placer", ligne, dates, driverId: chauffeur.id }], libelle);
+    void executer([{ type: "placer", ligne, dates, driverId: chauffeur.id, ...(heure ? { heure: heure.valeur, imposerHeure: heure.imposee } : {}) }], libelle);
   }
 
   function retirer(entree: EntreeAffectation) {
@@ -317,12 +320,13 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         return void executer(
           [
             { type: "retirer", entree },
-            { type: "placer", ligne, dates: [date], driverId: entree.driver_id },
+            { type: "placer", ligne, dates: [date], driverId: entree.driver_id, heure: heureDe(entree.start_at) },
           ],
           `${nom} déplacé : ${entree.tour_number} ${libelleJour(source.date)} → ${ligne.tourNumber} ${libelleJour(date)}`,
         );
       }
-      placer(ligne, [date], { id: entree.driver_id, full_name: nomChauffeur(entree.driver_id) });
+      // Copie : même heure que la case copiée.
+      placer(ligne, [date], { id: entree.driver_id, full_name: nomChauffeur(entree.driver_id) }, { valeur: heureDe(entree.start_at) });
     }
   }
 
@@ -362,7 +366,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
       const ligne = fin && ligneDe(fin.cle);
       if (!fin || !ligne) return;
       const dates = joursEtires(fin.source, fin.jusqua, jours);
-      if (dates.length) placer(ligne, dates, { id: fin.driverId, full_name: nomChauffeur(fin.driverId) });
+      const source = localRef.current.find((a) => a.driver_id === fin.driverId && cleLigne(a.service_id, a.tour_number) === fin.cle && jourDe(a.start_at) === fin.source && a.status !== "cancelled");
+      if (dates.length) placer(ligne, dates, { id: fin.driverId, full_name: nomChauffeur(fin.driverId) }, source ? { valeur: heureDe(source.start_at) } : undefined);
     };
     window.addEventListener("pointermove", bouger);
     window.addEventListener("pointerup", lacher);
@@ -382,6 +387,27 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     const ligne = ligneDe(cle);
     if (arme && ligne) return placer(ligne, joursLigne(ligne), arme);
     setFenetre({ type: "feuille", cible: { type: "ligne", cle } });
+  }
+
+  // --- Heure de la tournée ------------------------------------------------
+  function ouvrirHeure(cle: string, date: string | null) {
+    if (!donnees.peutModifier) return;
+    setFenetre({ type: "heure", cible: { cle, date } });
+  }
+  async function changerHeure(cle: string, heure: string, portee: PorteeHeure) {
+    const ligne = ligneDe(cle);
+    if (!ligne) return;
+    setFenetre(null);
+    setOccupe(true);
+    const r = await fetchGodac<{ modifiees: number; prevenus: number; conflits: number; modeles: number }>("/api/planning/heure", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ service_id: ligne.serviceId, tour_number: ligne.tourNumber, heure, ...(portee.type === "modele" ? { portee: "modele" } : { portee: "periode", debut: portee.debut, fin: portee.fin }) }),
+    });
+    setOccupe(false);
+    if (!r.ok) return setMessage({ texte: `Heure de ${ligne.tourNumber} : impossible. ${r.refus.message}`, ton: "erreur" });
+    setMessage({ texte: `${ligne.tourNumber} : ${texteChangementHeure({ modifiees: r.data.modifiees, prevenus: r.data.prevenus, conflits: r.data.conflits, heure, modele: portee.type === "modele" })}.`, ton: r.data.conflits ? "attention" : "ok" });
+    router.refresh();
   }
 
   // --- Publier ------------------------------------------------------------
@@ -458,6 +484,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     dimancheUtilise,
     basculerDimanche: () => setDimancheDemande((v) => !v),
     allerJour,
+    ouvrirHeure,
     commencerEtirement,
     nomChauffeur,
   };
@@ -637,6 +664,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
           }}
         />
       )}
+      {fenetre?.type === "heure" && <FeuilleHeure cible={fenetre.cible} onValider={(c, h, p) => void changerHeure(c, h, p)} onFermer={() => setFenetre(null)} />}
       {fenetre?.type === "edition" && <EditionAffectation entree={fenetre.entree} peutModifier={donnees.peutModifier} donnees={donneesFenetres} onFermer={() => setFenetre(null)} onResultat={resultat} />}
       {fenetre?.type === "choix" && (
         <Fenetre titre="2ᵉ tournée ce jour-là" onFermer={fenetre.annuler}>
