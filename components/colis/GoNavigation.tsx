@@ -114,7 +114,9 @@ export interface GoNavigationProps {
   onDeposer: (id: string, cible: CibleDepot) => Promise<void>;
   onReoptimiser: () => Promise<void>;
   /** Fin de tournée : retour guidé dans GO vers le dépôt ou le siège (arrêts tous traités). */
-  retour?: { label: string; lat: number; lng: number } | null;
+  retour?: { label: string; lat: number; lng: number; etape?: "gasoil" } | null;
+  /** Après le passage au gasoil : repartir vers le dépôt / le siège. */
+  onRetourSuivant?: () => void;
   /** Suite complète de la tournée (heure de fin estimée de l'app chauffeur). */
   onItineraire: (it: Itineraire | null) => void;
   onPosition: (p: Point) => void;
@@ -1008,11 +1010,16 @@ export function GoNavigation(p: GoNavigationProps) {
                 {estRamasse(cible) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(cible) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(cible)}
               </button>
             ) : (
-              (!cible || enRetour) && (
+              (!cible || enRetour) &&
+              (p.retour?.etape === "gasoil" ? (
+                <button type="button" className="btn-primary min-h-[52px] shrink-0 !px-3 text-sm" onClick={p.onRetourSuivant}>
+                  Plein fait ⛽
+                </button>
+              ) : (
                 <button type="button" className="btn-primary min-h-[52px] shrink-0 !px-3 text-sm" onClick={p.onFermer}>
                   {fige ? "Retour" : "Clôturer"}
                 </button>
-              )
+              ))
             )}
             <button
               type="button"
