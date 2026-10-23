@@ -40,3 +40,27 @@ export function avantApres(avant: Record<string, unknown> | null | undefined, ap
 
 /** Aucun champ n'a changé. */
 export const aucunChangement = (d: AvantApres) => Object.keys(d.apres).length === 0;
+
+/** Détails d'une entrée du journal au format avant / après ? */
+export function estAvantApres(details: unknown): details is AvantApres {
+  if (!details || typeof details !== "object") return false;
+  const d = details as Record<string, unknown>;
+  return typeof d.avant === "object" && d.avant !== null && typeof d.apres === "object" && d.apres !== null;
+}
+
+/**
+ * Phrase lisible d'une entrée du journal : « Litres : 300 → 250 » pour le
+ * format avant / après, « Litres : 250 » pour l'ancien format (nouvelles
+ * valeurs seules).
+ */
+export function decrireModification(details: Record<string, unknown>, libelle: (champ: string) => string, valeur: (champ: string, v: unknown) => string): string {
+  if (estAvantApres(details)) {
+    return Object.keys(details.apres)
+      .map((k) => `${libelle(k)} : ${valeur(k, details.avant[k])} → ${valeur(k, details.apres[k])}`)
+      .join(" · ");
+  }
+  return Object.entries(details)
+    .filter(([k]) => k !== "periode_declaree")
+    .map(([k, v]) => `${libelle(k)} : ${valeur(k, v)}`)
+    .join(" · ");
+}

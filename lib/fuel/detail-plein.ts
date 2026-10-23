@@ -58,6 +58,8 @@ export interface TicpeDuPlein {
   doublon?: boolean;
   /** L'encadrement peut confirmer « deux pleins distincts ». */
   doublonLevable?: boolean;
+  /** Période TICPE déjà déclarée qui couvre ce plein (nom), sinon absent. */
+  periodeDeclaree?: string | null;
   /** Zone saisie sur le plein (null = non renseignée : zone de la cuve ou par défaut). */
   zoneSaisie?: "metropole" | "corse" | null;
   /** Zone proposée d'après le nom de la station (jamais appliquée seule). */

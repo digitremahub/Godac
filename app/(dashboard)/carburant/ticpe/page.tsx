@@ -12,6 +12,7 @@ import { argentNonReclame, estDeclaree, libelleMois, moisDeLaPeriode, periodeCon
 import { lignesDeLaPeriode, totaliser } from "@/lib/ticpe/montant";
 import { parMois, parVehicule } from "@/lib/ticpe/synthese";
 import { formatJour } from "@/lib/ticpe/bareme";
+import { ecartsDeclarations } from "@/lib/ticpe/regularisation";
 import { LIBELLES_REGIME } from "@/lib/ticpe/reglages";
 import { parisDay } from "@/lib/utils/paris-time";
 
@@ -62,6 +63,11 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
     .sort((a, b) => b.montant - a.montant);
   const mois = parMois(lignesPeriode);
   const declaree = estDeclaree(periode, declarations);
+  // Pleins ou véhicules modifiés après la déclaration : le montant calculé aujourd'hui n'est plus celui déclaré.
+  const ecarts = ecartsDeclarations(declarations, (d) => (d.periode_debut.slice(0, 4) < String(calcul.annees.debut) ? null : montantDe({ debut: d.periode_debut, fin: d.periode_fin })));
+  const aRegulariser = [...ecarts.values()].filter((e) => e.aRegulariser).length;
+  const declarationDeLaPeriode = declarations.find((d) => !d.annulee_le && d.periode_debut <= periode.debut && d.periode_fin >= periode.fin);
+  const ecartPeriode = declarationDeLaPeriode ? ecarts.get(declarationDeLaPeriode.id) : undefined;
   const peutDeclarer = declarationsDisponibles && ["direction", "comptable"].includes(appUser.role);
   const periodeTerminee = periode.fin < aujourdhui;
 
@@ -78,6 +84,12 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
       />
       <AvertissementTicpe migrationManquante={migrationManquante} />
       {calcul.tronque && <p className="mb-3 text-sm text-orange-ink">Trop de pleins : montants incomplets.</p>}
+      {aRegulariser > 0 && (
+        <p className="mb-3 rounded-lg border border-orange-ink/30 bg-surface p-3 text-sm text-orange-ink" role="alert">
+          {aRegulariser} période{aRegulariser > 1 ? "s" : ""} déclarée{aRegulariser > 1 ? "s" : ""} dont le montant calculé ne correspond plus au montant déclaré (plein ou véhicule modifié
+          depuis) : voir « Déclarations » ci-dessous.
+        </p>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label={`Période en cours (${enCours.libelle})`} value={euros(totEnCours.montant)} />
@@ -111,7 +123,10 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
             </p>
           </div>
           {declaree ? (
-            <span className="badge-teal">Déclarée</span>
+            <span className="flex flex-col items-end gap-1">
+              <span className="badge-teal">Déclarée</span>
+              {ecartPeriode?.message && <span className="text-xs text-orange-ink">{ecartPeriode.message}</span>}
+            </span>
           ) : (
             peutDeclarer &&
             periodeTerminee && <MarquerDeclaree periode={periode} regime={regime} montantCalcule={totPeriode.montant} litres={totPeriode.litresRetenus} aujourdhui={aujourdhui} />
@@ -229,7 +244,8 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
                 <li key={d.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 ${d.annulee_le ? "text-navy/45 line-through" : ""}`}>
                   <span className="first-letter:uppercase">
                     {d.periode_libelle ?? d.periode_cle} · déclarée le {formatJour(d.declaree_le)}
-                    {d.montant_calcule !== null && Math.abs(d.montant_calcule - d.montant) >= 0.01 ? ` (calculé : ${euros(d.montant_calcule)})` : ""}
+                    {d.montant_calcule !== null && Math.abs(d.montant_calcule - d.montant) >= 0.01 ? ` (calculé à l'époque : ${euros(d.montant_calcule)})` : ""}
+                    {ecarts.get(d.id)?.message && <span className="block text-xs text-orange-ink no-underline">{ecarts.get(d.id)!.message}</span>}
                   </span>
                   <span className="flex items-center gap-2 tabular-nums">
                     {euros(d.montant)}

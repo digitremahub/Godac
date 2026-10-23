@@ -3,6 +3,7 @@ import { z } from "zod";
 import { garderApi } from "@/lib/acces/garde-api";
 import { ENCADREMENT } from "@/lib/acces/catalogue";
 import { journaliser } from "@/lib/audit/journal";
+import { avantApres, aucunChangement } from "@/lib/audit/avant-apres";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 const jour = z.string().date().nullable();
@@ -33,12 +34,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Saisie invalide." }, { status: 400 });
 
+  // État d'avant (pour le journal avant / après) : lecture sous la RLS de la personne connectée.
+  const { data: avant } = await supabase.from("vehicles").select(Object.keys(parsed.data).join(", ")).eq("id", id).maybeSingle();
   const { data, error } = await supabase.from("vehicles").update(parsed.data).eq("id", id).select("id").maybeSingle();
   if (error) {
     if (estSchemaManquant(error)) return NextResponse.json({ error: "Indisponible : la migration 20261031000002 n'est pas encore appliquée." }, { status: 503 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Véhicule introuvable ou hors de votre périmètre." }, { status: 404 });
-  await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "ticpe_vehicule_modifie", targetTable: "vehicles", targetId: id, details: parsed.data });
+  const diff = avantApres(avant as unknown as Record<string, unknown> | null, parsed.data);
+  if (!aucunChangement(diff)) {
+    await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "ticpe_vehicule_modifie", targetTable: "vehicles", targetId: id, details: diff });
+  }
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
 import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
+import { confirmer } from "@/lib/ui/confirmation";
 import type { TicpeDuPlein } from "@/lib/fuel/detail-plein";
 import { MENTION_A_CONFIRMER } from "@/lib/ticpe/reglages";
 
@@ -11,6 +12,15 @@ const litres = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigi
 const ORIGINE_ZONE: Record<string, string> = { plein: "zone saisie sur ce plein", cuve: "zone de la cuve", defaut: "zone par défaut de l'entreprise" };
 
 /** Bloc « Remboursement TICPE » de la fiche d'un plein. */
+/** PATCH d'un plein ; si sa période TICPE est déjà déclarée, demande une confirmation puis renvoie la demande confirmée. */
+async function modifierPlein(url: string, corps: Record<string, unknown>) {
+  const envoyer = (c: Record<string, unknown>) => fetchGodac(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c) });
+  const r = await envoyer(corps);
+  if (r.ok || r.refus.statut !== 409 || !r.refus.periodeDeclaree) return r;
+  const ok = await confirmer({ titre: "Période déjà déclarée", message: r.refus.message, action: "Modifier quand même" });
+  return ok ? envoyer({ ...corps, confirmer_periode_declaree: true }) : r;
+}
+
 export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: string; ticpe: TicpeDuPlein; onModifie: () => Promise<void> }) {
   const [edition, setEdition] = useState(false);
   const [type, setType] = useState<"releve_carte" | "facture" | "">(ticpe.justificatif.type === "releve_carte" || ticpe.justificatif.type === "facture" ? ticpe.justificatif.type : "");
@@ -40,11 +50,7 @@ export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: stri
     ev.preventDefault();
     setBusy(true);
     setRefus(null);
-    const r = await fetchGodac(`/api/fuel-entries/${entryId}/zone`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticpe_zone: zone || null, pays_achat: pays.trim() ? pays.trim().toUpperCase() : null }),
-    });
+    const r = await modifierPlein(`/api/fuel-entries/${entryId}/zone`, { ticpe_zone: zone || null, pays_achat: pays.trim() ? pays.trim().toUpperCase() : null });
     setBusy(false);
     if (!r.ok) return setRefus(r.refus);
     setEditionZone(false);
@@ -54,11 +60,7 @@ export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: stri
   async function doublon(lever: boolean) {
     setBusy(true);
     setRefus(null);
-    const r = await fetchGodac(`/api/fuel-entries/${entryId}/doublon`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lever }),
-    });
+    const r = await modifierPlein(`/api/fuel-entries/${entryId}/doublon`, { lever });
     setBusy(false);
     if (!r.ok) return setRefus(r.refus);
     await onModifie();
@@ -67,6 +69,12 @@ export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: stri
   return (
     <div className="text-sm">
       <BandeauRefus refus={refus} onFermer={() => setRefus(null)} />
+      {ticpe.periodeDeclaree && (
+        <p className="mb-2 rounded-lg border border-orange-ink/30 bg-surface p-2 text-xs text-orange-ink">
+          Ce plein appartient à une période déjà déclarée ({ticpe.periodeDeclaree}). Toute modification change le montant calculé et devra être régularisée ; elle est
+          enregistrée au journal avec l&apos;ancienne et la nouvelle valeur.
+        </p>
+      )}
       {ticpe.statut === "exclu" ? (
         <p className="text-navy/70">Non compté : {ticpe.raison}</p>
       ) : (

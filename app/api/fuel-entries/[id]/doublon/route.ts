@@ -4,8 +4,9 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { ENCADREMENT } from "@/lib/acces/catalogue";
 import { journaliser } from "@/lib/audit/journal";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { verifierPeriodeDeclaree } from "@/lib/ticpe/garde-periode-declaree";
 
-const schema = z.object({ lever: z.boolean() });
+const schema = z.object({ lever: z.boolean(), confirmer_periode_declaree: z.boolean().optional() });
 
 /**
  * Lève (ou rétablit) un doublon probable : une personne de l'encadrement
@@ -20,6 +21,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { appUser, supabase } = g;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Demande invalide." }, { status: 400 });
+  const { data: plein } = await supabase.from("fuel_entries").select("id, occurred_at").eq("id", id).maybeSingle();
+  if (!plein) return NextResponse.json({ error: "Plein introuvable ou hors de votre périmètre." }, { status: 404 });
+  const garde = await verifierPeriodeDeclaree(supabase, appUser.organization_id, plein.occurred_at as string, parsed.data.confirmer_periode_declaree);
+  if (garde.reponse) return garde.reponse;
   const maintenant = new Date().toISOString();
   const { data, error } = await supabase
     .from("fuel_entries")
@@ -38,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     action: "plein_doublon_leve",
     targetTable: "fuel_entries",
     targetId: id,
-    details: { doublon_leve: parsed.data.lever },
+    details: { avant: { doublon_leve: !parsed.data.lever }, apres: { doublon_leve: parsed.data.lever }, ...(garde.periodeDeclaree ? { periode_declaree: garde.periodeDeclaree } : {}) },
   });
   return NextResponse.json({ ok: true });
 }
