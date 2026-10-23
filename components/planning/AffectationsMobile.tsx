@@ -78,10 +78,10 @@ export function CalendrierMois() {
                       aria-label={`${texteJour(c.date)}${auj ? ", aujourd'hui" : ""} : ${etatJour(c)}. Ouvrir la journée`}
                       aria-current={auj ? "date" : undefined}
                       className={`flex min-h-[60px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border px-0 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
-                        auj ? "border-orange bg-orange/10" : c.couverture === "trous" ? "border-orange/30 bg-orange/[0.04]" : "border-navy/10 bg-surface"
+                        auj ? "border-teal bg-teal/10" : c.couverture === "trous" ? "border-orange/30 bg-orange/[0.04]" : "border-navy/10 bg-surface"
                       } ${c.dansMois ? "" : "opacity-45"}`}
                     >
-                      <span className={`text-base leading-none tabular-nums ${auj ? "font-extrabold text-orange-ink" : "font-semibold"}`}>{Number(c.date.slice(8, 10))}</span>
+                      <span className={`text-base leading-none tabular-nums ${auj ? "font-extrabold text-teal-ink" : "font-semibold"}`}>{Number(c.date.slice(8, 10))}</span>
                       <Indicateur cellule={c} />
                     </button>
                   </li>
@@ -133,11 +133,11 @@ export function SemaineMobile({ trous }: { trous: Record<string, number> }) {
                 aria-label={`${texteJour(d)}${auj ? ", aujourd'hui" : ""}${n ? `, ${n} à pourvoir` : ""}`}
                 onClick={() => setChoisi(d)}
                 className={`flex min-h-[72px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-0 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
-                  actif ? "border-orange bg-orange/15" : auj ? "border-orange/50 bg-surface" : "border-navy/10 bg-surface"
+                  actif ? "border-teal bg-teal/15" : auj ? "border-teal/50 bg-surface" : "border-navy/10 bg-surface"
                 }`}
               >
                 <span className="text-sm font-semibold text-navy/65">{JOURS_COURTS[r]}</span>
-                <span className={`text-base font-extrabold leading-none tabular-nums ${auj ? "text-orange-ink" : ""}`}>{Number(d.slice(8, 10))}</span>
+                <span className={`text-base font-extrabold leading-none tabular-nums ${auj ? "text-teal-ink" : ""}`}>{Number(d.slice(8, 10))}</span>
                 {n > 0 ? (
                   <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-orange px-1.5 text-sm font-bold leading-none text-on-orange tabular-nums" aria-hidden="true">
                     {n}

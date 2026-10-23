@@ -142,7 +142,7 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
                   key={d}
                   scope="col"
                   aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`}
-                  className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${mois ? `px-0 ${r === 0 ? "border-l border-navy/10" : ""}` : "px-2"} ${auj ? "text-orange-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}
+                  className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${mois ? `px-0 ${r === 0 ? "border-l border-navy/10" : ""}` : "px-2"} ${auj ? "text-teal-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}
                 >
                   {mois ? (
                     <span className="flex flex-col items-center leading-tight">
@@ -236,7 +236,7 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
           data-case=""
           data-cle={ligne.cle}
           data-date={date}
-          className={`border-b border-navy/10 align-middle ${mois ? `p-0.5 ${r === 0 ? "border-l" : ""}` : "p-1"} ${r >= 5 ? "bg-navy/[0.025]" : ""} ${date === ctx.aujourdhui ? "bg-orange/[0.05]" : ""}`}
+          className={`border-b border-navy/10 align-middle ${mois ? `p-0.5 ${r === 0 ? "border-l" : ""}` : "p-1"} ${r >= 5 ? "bg-navy/[0.025]" : ""} ${date === ctx.aujourdhui ? "bg-teal/[0.06]" : ""}`}
           style={{ minWidth: mois ? 38 : 112 }}
         >
           {etiree ? (
@@ -374,7 +374,7 @@ function GrilleChauffeurs() {
             {ctx.jours.map((d) => {
               const r = rangJour(d);
               return (
-                <th key={d} scope="col" aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`} className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${r === 0 ? "border-l" : ""} ${d === ctx.aujourdhui ? "text-orange-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}>
+                <th key={d} scope="col" aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`} className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${r === 0 ? "border-l" : ""} ${d === ctx.aujourdhui ? "text-teal-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}>
                   <span className="flex flex-col items-center leading-tight">
                     <span className="text-[10px] font-normal">{LETTRES[r]}</span>
                     {Number(d.slice(8, 10))}
