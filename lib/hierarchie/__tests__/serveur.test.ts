@@ -6,6 +6,7 @@ vi.mock("@/lib/auth/session", () => ({ getCurrentAppUser: async () => null }));
 vi.mock("@/lib/supabase/server", () => ({ createServerSupabaseClient: async () => ({}) }));
 vi.mock("@/lib/organization/modules", () => ({ getEnabledModuleKeys: async () => new Set<string>() }));
 
+import type { UserRole } from "@/lib/types/domain";
 import { alerterNiveauSuperieur, compterDirection, destinatairesDe, garderDecision, lirePersonne } from "@/lib/hierarchie/serveur";
 
 type Ligne = Record<string, unknown>;
@@ -57,7 +58,7 @@ const services: Ligne[] = [
   { user_id: "m1", service_id: "s1" },
   { user_id: "m2", service_id: "s2" },
 ];
-const moi = (id: string, role: string) => ({ id, role, organization_id: org });
+const moi = (id: string, role: string) => ({ id, role: role as UserRole, organization_id: org });
 
 describe("compterDirection", () => {
   it("compte les directions actives de l'organisation seulement", async () => {
