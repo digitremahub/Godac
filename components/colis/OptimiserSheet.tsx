@@ -144,6 +144,7 @@ export function OptimiserSheet({
     return !a0 && depotConnu && run.return_to_start ? "depot" : "libre";
   });
   const [aArret, setAArret] = useState(a0?.mode === "arret" && idsValides.has(a0.arret_id) ? a0.arret_id : "");
+  const [sansRetour, setSansRetour] = useState(a0?.mode === "arret" && a0.sans_retour === true);
   const [aLieu, setALieu] = useState<Lieu | null>(a0?.mode === "adresse" ? { label: a0.label, lat: a0.lat, lng: a0.lng } : null);
   const [aTexte, setATexte] = useState(a0?.mode === "adresse" ? a0.label : "");
   const [busy, setBusy] = useState(false);
@@ -152,7 +153,7 @@ export function OptimiserSheet({
   const depart: Depart | null =
     dKind === "depot" ? { mode: "depot" } : dKind === "position" ? { mode: "position" } : dKind === "arret" && dArret ? { mode: "arret", arret_id: dArret } : dKind === "adresse" && dLieu ? { mode: "adresse", ...dLieu } : null;
   const arrivee: Arrivee | null =
-    aKind === "depot" ? { mode: "depot" } : aKind === "meme" ? { mode: "meme" } : aKind === "libre" ? { mode: "libre" } : aKind === "arret" && aArret ? { mode: "arret", arret_id: aArret } : aKind === "adresse" && aLieu ? { mode: "adresse", ...aLieu } : null;
+    aKind === "depot" ? { mode: "depot" } : aKind === "meme" ? { mode: "meme" } : aKind === "libre" ? { mode: "libre" } : aKind === "arret" && aArret ? { mode: "arret", arret_id: aArret, ...(sansRetour ? { sans_retour: true } : {}) } : aKind === "adresse" && aLieu ? { mode: "adresse", ...aLieu } : null;
   const departIncomplet = (dKind === "arret" && !dArret) || (dKind === "adresse" && !dLieu);
   const arriveeIncomplete = !arrivee;
   const conflit = dKind === "arret" && aKind === "arret" && dArret !== "" && dArret === aArret && choisissables.length > 1;
@@ -266,8 +267,12 @@ export function OptimiserSheet({
           <h3 className="text-sm font-semibold">🏁 Arrivée</h3>
           <Option actif={aKind === "depot"} onChoisir={() => setAKind("depot")} titre="Retour au dépôt" detail={depotConnu ? "Le trajet retour compte dans le calcul." : "Aucune adresse de dépôt connue."} desactive={!depotConnu} />
           <Option actif={aKind === "meme"} onChoisir={() => setAKind("meme")} titre="Même point que le départ" detail="Vous finissez là où vous avez commencé." />
-          <Option actif={aKind === "arret"} onChoisir={() => setAKind("arret")} titre="Une adresse de la tournée" detail="Cet arrêt devient le dernier." desactive={!choisissables.length}>
+          <Option actif={aKind === "arret"} onChoisir={() => setAKind("arret")} titre="Une adresse de la tournée" detail={sansRetour ? "Cet arrêt devient le dernier livré, sans retour." : "Cet arrêt devient le dernier livré, puis retour au dépôt."} desactive={!choisissables.length}>
             {selectArret(aArret, setAArret, "Arrêt à faire en dernier", dKind === "arret" ? dArret : undefined)}
+            <label className="mt-2 flex min-h-[44px] items-center gap-2 text-sm">
+              <input type="checkbox" checked={!sansRetour} onChange={(e) => setSansRetour(!e.target.checked)} className="h-5 w-5" />
+              Inclure le retour au dépôt après cet arrêt
+            </label>
           </Option>
           <Option actif={aKind === "adresse"} onChoisir={() => setAKind("adresse")} titre="Une autre adresse">
             {champAdresse(aTexte, setATexte, aLieu, setALieu)}

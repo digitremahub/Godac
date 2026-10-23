@@ -186,7 +186,9 @@ describe("resoudreExtremites", () => {
 
   it("départ arrêt, arrivée arrêt", () => {
     const r = resoudreExtremites({ ...base, depart: { mode: "arret", arret_id: "a" }, arrivee: { mode: "arret", arret_id: "b" } });
-    expect(r).toMatchObject({ premierId: "a", dernierId: "b", depart: { lat: 45.76, lng: 4.86 }, fin: { lat: 45.77, lng: 4.87 } });
+    expect(r).toMatchObject({ premierId: "a", dernierId: "b", depart: { lat: 45.76, lng: 4.86 }, fin: depot });
+    const sans = resoudreExtremites({ ...base, depart: { mode: "arret", arret_id: "a" }, arrivee: { mode: "arret", arret_id: "b", sans_retour: true } });
+    expect(sans).toMatchObject({ dernierId: "b", fin: null });
   });
 
   it("même point que le départ, adresse libre, pas de retour", () => {
@@ -290,5 +292,19 @@ describe("recalcul depuis la position : prochaine adresse la plus proche", () =>
     const r = sequenceParListes(arrets, [], depot, false, { debut: 8 * 60, fenetres: f, distance: km, strategie: "proche" }, undefined, { fin: null });
     expect(ids(r)[0]).toBe("c");
     expect(r.horsHoraires).toEqual([]);
+  });
+});
+
+describe("dernier arrêt livré puis retour au dépôt", () => {
+  const depot = { lat: 42.7, lng: 2.9 };
+  const arrets = [
+    { id: "a", address: "1 rue A", lat: 42.71, lng: 2.91, status: "pending" },
+    { id: "b", address: "2 rue B", lat: 42.72, lng: 2.92, status: "pending" },
+  ] as never[];
+  it("le retour au dépôt suit le dernier arrêt par défaut", () => {
+    expect(pointFinTournee({ mode: "arret", arret_id: "b" }, null, depot, arrets, false)).toEqual(depot);
+  });
+  it("sans retour : aucun trajet après le dernier arrêt", () => {
+    expect(pointFinTournee({ mode: "arret", arret_id: "b", sans_retour: true }, null, depot, arrets, false)).toBeNull();
   });
 });
