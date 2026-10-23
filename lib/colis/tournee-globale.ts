@@ -21,7 +21,7 @@
  * l'appelant ; repli géographique sinon. Purement fonctionnel (testé dans
  * lib/colis/__tests__/tournee-globale.test.ts).
  */
-import { distanceEstimee, memePoint, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { distanceEstimee, memePoint, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { sequenceParListes, type ArretOptimisable, type ExtremitesSequence, type Liste } from "@/lib/colis/listes";
 
 /** Garde-fou (ms) de la recherche locale sur l'ordre des villages. */
@@ -106,8 +106,9 @@ export function ordonnerListesGlobalement(
   const debutTsp = premiere ? medoide(parListe.get(premiere.id)!, distance) : depart;
   const finTsp = derniere ? medoide(parListe.get(derniere.id)!, distance) : fin;
   const boucle = !premiere && !derniere && memePoint(fin, depart);
-  const tsp = optimiserOrdre(debutTsp, representants, boucle, boucle ? null : finTsp, distance).map((k) => milieu[k]!);
-  const candidats = [tsp, [...tsp].reverse(), milieu];
+  const proche = extremites?.strategie === "proche";
+  const tsp = (proche ? plusProcheVoisin(debutTsp, representants, distance) : optimiserOrdre(debutTsp, representants, boucle, boucle ? null : finTsp, distance)).map((k) => milieu[k]!);
+  const candidats = proche ? [tsp] : [tsp, [...tsp].reverse(), milieu];
   let meilleur = candidats[0]!;
   let meilleurKm = Infinity;
   for (const c of candidats) {
@@ -121,7 +122,7 @@ export function ordonnerListesGlobalement(
   // Or-opt sur l'ordre des villages : déplacer un village ailleurs s'il raccourcit la tournée.
   const t0 = Date.now();
   let ameliore = true;
-  while (ameliore && Date.now() - t0 < BUDGET_MS) {
+  while (!proche && ameliore && Date.now() - t0 < BUDGET_MS) {
     ameliore = false;
     for (let i = 0; i < meilleur.length && !ameliore; i++) {
       const sans = [...meilleur.slice(0, i), ...meilleur.slice(i + 1)];

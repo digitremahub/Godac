@@ -5,7 +5,7 @@
  * « Liste principale », toujours en tête : une tournée sans liste se
  * comporte exactement comme avant.
  */
-import { FACTEUR_ROUTIER, distanceEstimee, longueurChemin, memePoint, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { FACTEUR_ROUTIER, distanceEstimee, longueurChemin, memePoint, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { minutesTrajet } from "@/lib/colis/estimation";
 import { ordonnerAvecHoraires, simulerPassages, type Fenetres, type Passage } from "@/lib/colis/horaires";
 
@@ -78,6 +78,8 @@ export interface OptionsHoraires {
   minutesParArret?: number;
   /** Distance routière fournie par un moteur de routage ; repli géographique si indisponible. */
   distance?: (a: Point, b: Point) => number;
+  /** « proche » : prochaine adresse la plus proche depuis le départ (recalcul en cours de route) ; défaut « optimal ». */
+  strategie?: "optimal" | "proche";
 }
 
 export interface ResultatSequence {
@@ -109,6 +111,8 @@ export interface ExtremitesSequence {
   premierId?: string | null;
   dernierId?: string | null;
   fin?: Point | null;
+  /** « proche » : enchaîner la prochaine adresse la plus proche (sans horaires). */
+  strategie?: "optimal" | "proche";
 }
 
 /**
@@ -155,6 +159,7 @@ export function sequenceParListes(
   }));
   const derniere = groupes.reduce((k, g, i) => (g.avecGps.length || g.dernier ? i : k), -1);
   // Point où la tournée se termine après le dernier arrêt.
+  const strategie = horaires?.strategie ?? extremites?.strategie ?? "optimal";
   const cibleFin = extremites?.fin !== undefined ? extremites.fin : retour ? depart : null;
 
   const sequence = faits.map((s) => s.id);
@@ -209,7 +214,7 @@ export function sequenceParListes(
       const r = ordonnerAvecHoraires(
         courant,
         pts.map((p, k) => ({ point: p, fenetres: fen[k]! })),
-        { debut: heure, retour: ferme, arrivee, minutesParArret: horaires.minutesParArret, distance: distanceTemps },
+        { debut: heure, retour: ferme, arrivee, minutesParArret: horaires.minutesParArret, distance: distanceTemps, strategie: horaires.strategie },
       );
       ordre = r.ordre;
       fermes.push(...r.fermes.map((k) => g.avecGps[k]!.id));
@@ -223,7 +228,7 @@ export function sequenceParListes(
       ordre.forEach((k, j) => (passages[g.avecGps[k]!.id] = sim.passages[j]!));
       heure = sim.fin;
     } else {
-      ordre = optimiserOrdre(courant, pts, ferme, arrivee, distance);
+      ordre = strategie === "proche" ? plusProcheVoisin(courant, pts, distance) : optimiserOrdre(courant, pts, ferme, arrivee, distance);
     }
     for (const k of ordre) {
       sequence.push(g.avecGps[k]!.id);

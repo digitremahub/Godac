@@ -20,7 +20,7 @@
  * Les adresses fermées ce jour-là, ou qu'on ne peut plus atteindre avant
  * la fermeture, passent en fin de liste et sont signalées.
  */
-import { distanceKm, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { distanceKm, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { MINUTES_PAR_ARRET, minutesTrajet } from "@/lib/colis/estimation";
 import { dateParis, jourIso, minutesParis } from "@/lib/colis/heure-paris";
 
@@ -378,9 +378,17 @@ function evaluer(p: Probleme, ordre: number[]) {
 export function ordonnerAvecHoraires(
   depart: Point | null,
   arrets: { point: Point; fenetres: Fenetres }[],
-  options: { debut: number; retour?: boolean; arrivee?: Point | null; minutesParArret?: number; distance?: (a: Point, b: Point) => number },
+  options: {
+    debut: number;
+    retour?: boolean;
+    arrivee?: Point | null;
+    minutesParArret?: number;
+    distance?: (a: Point, b: Point) => number;
+    /** « proche » : prochaine adresse la plus proche ; seuls les horaires déplacent un arrêt. Défaut : « optimal » (plus court trajet). */
+    strategie?: "optimal" | "proche";
+  },
 ): { ordre: number[]; fermes: number[]; impossibles: number[] } {
-  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET, distance = distanceKm } = options;
+  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET, distance = distanceKm, strategie = "optimal" } = options;
   const n = arrets.length;
   const trajet = (a: Point | null, b: Point | null) => (a && b ? minutesTrajet(distance(a, b)) : 0);
   const fermes: number[] = [];
@@ -396,13 +404,8 @@ export function ordonnerAvecHoraires(
     else reste.push(i);
   }
 
-  const initial = optimiserOrdre(
-    depart,
-    reste.map((i) => arrets[i]!.point),
-    retour,
-    arrivee,
-    distance,
-  ).map((k) => reste[k]!);
+  const points = reste.map((i) => arrets[i]!.point);
+  const initial = (strategie === "proche" ? plusProcheVoisin(depart, points, distance) : optimiserOrdre(depart, points, retour, arrivee, distance)).map((k) => reste[k]!);
 
   let ordre = initial;
   if (reste.some((i) => arrets[i]!.fenetres)) {
@@ -415,7 +418,7 @@ export function ordonnerAvecHoraires(
       versFin: arrets.map((a) => trajet(a.point, fin)),
       fen: arrets.map((a) => a.fenetres),
     };
-    ordre = ameliorer(p, initial, (i) => arrets[i]!.fenetres !== null);
+    ordre = ameliorer(p, initial, (i) => arrets[i]!.fenetres !== null, strategie !== "proche");
 
   }
   return { ordre: [...ordre, ...impossibles, ...fermes], fermes, impossibles };
@@ -429,7 +432,7 @@ export function ordonnerAvecHoraires(
  *    acceptés seulement s'ils réduisent le coût sans ajouter de
  *    hors-horaires.
  */
-function ameliorer(p: Probleme, initial: number[], aHoraires: (i: number) => boolean): number[] {
+function ameliorer(p: Probleme, initial: number[], aHoraires: (i: number) => boolean, generale = true): number[] {
   const t0 = Date.now();
   let ordre = [...initial];
   let actuel = evaluer(p, ordre);
@@ -471,7 +474,8 @@ function ameliorer(p: Probleme, initial: number[], aHoraires: (i: number) => boo
   // 1. Réparation : arrêts à horaires d'abord.
   for (let passe = 0; passe < 5 && deplacer(aHoraires); passe++) if (Date.now() - t0 > BUDGET_MS) return ordre;
 
-  // 2. Amélioration générale.
+  // 2. Amélioration générale (pas en « prochaine adresse la plus proche » : seuls les horaires déplacent un arrêt).
+  if (!generale) return ordre;
   for (let passe = 0; passe < 20; passe++) {
     let mieux = deplacer(() => true);
     for (let i = 0; i < ordre.length - 1; i++) {

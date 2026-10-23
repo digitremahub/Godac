@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { longueurChemin, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { longueurChemin, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { sequenceParListes, type ArretOptimisable, type Liste } from "@/lib/colis/listes";
 import { ordonnerListesGlobalement } from "@/lib/colis/tournee-globale";
 import { contraintesListes, epingler, epingleDe, lireArrivee, lireDepart, pointFinTournee, resoudreExtremites, type ArretExtremite } from "@/lib/colis/extremites";
@@ -253,5 +253,42 @@ describe("épingles et lecture", () => {
     expect(pointFinTournee(null, null, depot, arrets, false)).toBeNull();
     expect(pointFinTournee({ mode: "libre" }, null, depot, arrets, true)).toBeNull();
     expect(pointFinTournee({ mode: "meme" }, { mode: "arret", arret_id: "a" }, depot, arrets, true)).toEqual({ lat: 45.7, lng: 4.8 });
+  });
+});
+
+describe("recalcul depuis la position : prochaine adresse la plus proche", () => {
+  const arrets = [arret("a", 3), arret("b", 1), arret("c", 5), arret("d", 2), arret("e", 4)];
+  const moi = ligne([2.6])[0]!; // entre d (2) et a (3), plus près de a
+
+  it("plusProcheVoisin enchaîne toujours l'arrêt le plus proche", () => {
+    const pts = ligne([3, 1, 5, 2, 4]);
+    const ordre = plusProcheVoisin(moi, pts, km).map((i) => pts[i]!.lng);
+    // Depuis 2,6 : 3, puis 2, puis 1, puis 4, puis 5 (jamais le plus lointain d'abord).
+    expect(ordre.map((l) => Math.round((l - 4.85) * 100))).toEqual([3, 2, 1, 4, 5]);
+  });
+
+  it("deux arrêts restants : le plus proche de la position passe en premier", () => {
+    const deux = ligne([1, 6]);
+    const loin = ligne([8])[0]!;
+    expect(optimiserOrdre(loin, deux, false, null, km)).toEqual([1, 0]);
+    expect(optimiserOrdre(depot, deux, false, null, km)).toEqual([0, 1]);
+  });
+
+  it("recalcul depuis la position : arrêts livrés intacts, premier = le plus proche, dernier imposé respecté", () => {
+    const avecFaits = [arret("f1", 9, { status: "delivered", position: 0 }), ...arrets.map((s) => ({ ...s, position: s.position + 1 }))];
+    const r = sequenceParListes(avecFaits, [], moi, false, undefined, km, { strategie: "proche", fin: null });
+    expect(ids(r)[0]).toBe("f1");
+    expect(ids(r).slice(1)).toEqual(["a", "d", "b", "e", "c"]);
+    expect(ids(r)[1]).toBe("a");
+    const avecDernier = sequenceParListes(avecFaits, [], moi, false, undefined, km, { strategie: "proche", dernierId: "a", fin: ligne([3])[0]! });
+    expect(ids(avecDernier).at(-1)).toBe("a");
+    expect(ids(avecDernier)[1]).toBe("d");
+  });
+
+  it("recalcul avec horaires : un créneau serré passe d'abord, le reste suit le plus proche", () => {
+    const f = (id: string) => (id === "c" ? ([[8 * 60, 8 * 60 + 8]] as [number, number][]) : null);
+    const r = sequenceParListes(arrets, [], depot, false, { debut: 8 * 60, fenetres: f, distance: km, strategie: "proche" }, undefined, { fin: null });
+    expect(ids(r)[0]).toBe("c");
+    expect(r.horsHoraires).toEqual([]);
   });
 });

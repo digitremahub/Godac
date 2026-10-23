@@ -28,6 +28,8 @@ const bodySchema = z.object({
   /** Départ / arrivée choisis dans « Optimiser l'ordre » ; absents : choix mémorisé sur la tournée. */
   depart: schemaDepart.nullable().optional(),
   arrivee: schemaArrivee.nullable().optional(),
+  /** « proche » : recalcul en cours de route, prochaine adresse la plus proche depuis la position (défaut : plus court trajet). */
+  strategie: z.enum(["optimal", "proche"]).optional(),
 });
 
 /**
@@ -107,7 +109,8 @@ export async function POST(req: Request) {
   const matrice = await matriceRoutiere(pointsRoutage);
   const distance = matrice.distance;
   const retour = Boolean(ext.fin && depart && memePoint(ext.fin, depart));
-  const extremites = { premierId: ext.premierId, dernierId: ext.dernierId, fin: ext.fin };
+  const strategie = parsed.data.strategie ?? "optimal";
+  const extremites = { premierId: ext.premierId, dernierId: ext.dernierId, fin: ext.fin, strategie };
 
   // Ordre global des villages : toutes les listes s'enchaînent dans un seul
   // sens de tournée (lib/colis/tournee-globale.ts).
@@ -144,10 +147,13 @@ export async function POST(req: Request) {
     debut: minute,
     fenetres: (id) => fenetres.get(id) ?? null,
     distance,
+    strategie,
   }, undefined, extremites);
 
   // Positions globales et contiguës (0, 1, 2…) dans l'ordre calculé.
-  await Promise.all(r.sequence.map((id, position) => supabase.from("delivery_stops").update({ position }).eq("id", id)));
+  const ecritures = await Promise.all(r.sequence.map((id, position) => supabase.from("delivery_stops").update({ position }).eq("id", id)));
+  const echec = ecritures.find((w) => w.error)?.error;
+  if (echec) return NextResponse.json({ error: "Le nouvel ordre n'a pas pu être enregistré : réessayez." }, { status: 500 });
   await supabase.from("delivery_runs").update({ optimized_at: new Date().toISOString() }).eq("id", run.id);
 
   const iso = (m: number) => instantParis(jour, m).toISOString();
