@@ -32,6 +32,23 @@ export async function depotDuChauffeur(supabase: SupabaseClient, appUser: Pick<A
 }
 
 /**
+ * Dépôt de départ ET de retour d'une tournée : celui de son service
+ * (services.depot_*), sinon celui du chauffeur puis de l'entreprise.
+ * Toutes les tournées partent du dépôt du service et y reviennent.
+ */
+export async function depotDuService(
+  supabase: SupabaseClient,
+  appUser: Pick<AppUser, "id" | "organization_id">,
+  serviceId: string | null | undefined,
+) {
+  if (serviceId) {
+    const { data: service } = await supabase.from("services").select("name, depot_address, depot_lat, depot_lng").eq("id", serviceId).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (service?.depot_lat && service?.depot_lng) return { label: service.depot_address ?? `Dépôt ${service.name}`, lat: service.depot_lat, lng: service.depot_lng };
+  }
+  return depotDuChauffeur(supabase, appUser);
+}
+
+/**
  * Tournées colis du chauffeur à afficher : celles du jour, plus celles
  * des 7 derniers jours qui ne sont pas clôturées.
  */
@@ -88,8 +105,7 @@ export async function creerTournee(
    */
   affectation: { planningEntryId: string; vehicleId: string | null; serviceId: string | null } | null = null,
 ) {
-  const [start, jour, { data: liens }] = await Promise.all([
-    depotDuChauffeur(supabase, appUser),
+  const [jour, { data: liens }] = await Promise.all([
     affectation
       ? Promise.resolve({ vehicleId: affectation.vehicleId, serviceId: affectation.serviceId })
       : planningDuJour(supabase, appUser.id, date).catch(() => ({ vehicleId: null, serviceId: null })),
@@ -97,6 +113,8 @@ export async function creerTournee(
   ]);
   const vehicule = jour.vehicleId;
   const service = jour.serviceId ?? ((liens ?? []) as { service_id: string }[])[0]?.service_id ?? null;
+  // Départ et retour : dépôt du service de la tournée.
+  const start = await depotDuService(supabase, appUser, service);
   const { count } = await supabase.from("delivery_runs").select("id", { count: "exact", head: true }).eq("driver_id", appUser.id).eq("run_date", date);
   const { data, error } = await supabase
     .from("delivery_runs")

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer } from "@/lib/usage/consommer";
-import { cleAdresse, depotDuChauffeur, ecrireExtremitesRun, horairesDesAdresses, lireExtremitesRun, listesDeTournee, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { cleAdresse, depotDuService, ecrireExtremitesRun, horairesDesAdresses, lireExtremitesRun, listesDeTournee, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { contraintesListes, resoudreExtremites, schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
 import { sequenceParListes } from "@/lib/colis/listes";
 import { fenetresArret, heureDepart, instantParis, lireHeure, type Fenetres } from "@/lib/colis/horaires";
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
   // Dépôt de la tournée, sinon dépôt du service du chauffeur / de l'organisation.
   let depot: Point | null = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
   if (!depot) {
-    const trouve = (await depotDuChauffeur(supabase, appUser).catch(() => null)) as { label: string; lat: number | string; lng: number | string } | null;
+    const trouve = (await depotDuService(supabase, appUser, run.service_id).catch(() => null)) as { label: string; lat: number | string; lng: number | string } | null;
     if (trouve) depot = { lat: Number(trouve.lat), lng: Number(trouve.lng) };
   }
   const choixDepart = parsed.data.depart !== undefined ? parsed.data.depart : memorise.depart;
