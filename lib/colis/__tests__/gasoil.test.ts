@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { litresEstimes, meilleureStation } from "@/lib/colis/gasoil";
+import { evaluerPlein, litresEstimes, meilleureStation } from "@/lib/colis/gasoil";
 
 describe("passage au gasoil", () => {
   const depuis = { lat: 42.7, lng: 2.9 };
@@ -17,5 +17,20 @@ describe("passage au gasoil", () => {
   it("consommation estimée du retour", () => {
     expect(litresEstimes(50, 10)).toBe(5);
     expect(litresEstimes(50, null)).toBeNull();
+  });
+});
+
+describe("plein nécessaire", () => {
+  it("réservoir presque vide : plein nécessaire", () => {
+    const r = evaluerPlein({ capaciteL: 80, kmDepuisPlein: 700, lPer100: 10, retourKm: 20 });
+    expect(r).toMatchObject({ restantL: 10, necessaire: true });
+  });
+  it("réservoir bien rempli : pas nécessaire", () => {
+    const r = evaluerPlein({ capaciteL: 80, kmDepuisPlein: 100, lPer100: 10, retourKm: 20 });
+    expect(r).toMatchObject({ restantL: 70, autonomieKm: 700, necessaire: false });
+  });
+  it("donnée manquante : pas d'estimation", () => {
+    expect(evaluerPlein({ capaciteL: null, kmDepuisPlein: 100, lPer100: 10, retourKm: 20 })).toBeNull();
+    expect(evaluerPlein({ capaciteL: 80, kmDepuisPlein: null, lPer100: 10, retourKm: 20 })).toBeNull();
   });
 });

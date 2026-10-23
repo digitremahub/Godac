@@ -60,3 +60,33 @@ export function litresEstimes(km: number, lPer100: number | null): number | null
   if (lPer100 === null || !(lPer100 > 0) || !(km >= 0)) return null;
   return Math.round(((km * lPer100) / 100) * 10) / 10;
 }
+
+export interface EtatPlein {
+  /** Km parcourus depuis le dernier plein (relevés kilométriques). */
+  kmDepuisPlein: number;
+  /** Carburant estimé restant (L), borné à [0 ; capacité]. */
+  restantL: number;
+  /** Autonomie estimée (km) avec le carburant restant. */
+  autonomieKm: number;
+  /** Faut-il refaire le plein avant le retour ? */
+  necessaire: boolean;
+}
+
+/** Réserve de sécurité : 15 % du réservoir, et 15 % de marge sur les km du retour. */
+const RESERVE = 0.15;
+
+/**
+ * Niveau estimé d'après les km parcourus depuis le dernier plein, la
+ * consommation du véhicule (L/100 km) et la capacité du réservoir. Le
+ * dernier plein est supposé complet (hypothèse : le niveau n'est pas mesuré).
+ * null si une donnée manque.
+ */
+export function evaluerPlein(p: { capaciteL: number | null; kmDepuisPlein: number | null; lPer100: number | null; retourKm: number }): EtatPlein | null {
+  const { capaciteL, kmDepuisPlein, lPer100, retourKm } = p;
+  if (!capaciteL || capaciteL <= 0 || kmDepuisPlein === null || kmDepuisPlein < 0 || !lPer100 || lPer100 <= 0) return null;
+  const utilises = (kmDepuisPlein * lPer100) / 100;
+  const restantL = Math.max(0, Math.min(capaciteL, capaciteL - utilises));
+  const autonomieKm = Math.round((restantL / lPer100) * 100);
+  const necessaire = restantL - capaciteL * RESERVE <= 0 || ((restantL - capaciteL * RESERVE) / lPer100) * 100 < retourKm * (1 + RESERVE);
+  return { kmDepuisPlein: Math.round(kmDepuisPlein), restantL: Math.round(restantL * 10) / 10, autonomieKm, necessaire };
+}

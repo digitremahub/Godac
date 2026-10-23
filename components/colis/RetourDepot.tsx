@@ -15,6 +15,9 @@ export interface DestinationRetour {
 export interface InfoGasoil {
   station: { nom: string; lat: number; lng: number; detourKm: number; distanceKm: number } | null;
   retour: { km: number; lPer100: number | null; litres: number | null };
+  /** Niveau estimé du réservoir (null : capacité, consommation ou relevés manquants). */
+  plein: { kmDepuisPlein: number; restantL: number; autonomieKm: number; necessaire: boolean } | null;
+  capaciteL: number | null;
 }
 
 /**
@@ -87,6 +90,14 @@ export function RetourDepot({
                   )}
                   .
                 </p>
+                {gasoil.info.plein ? (
+                  <p className={`rounded-xl px-3 py-2 font-semibold ${gasoil.info.plein.necessaire ? "bg-orange text-on-orange" : "bg-teal/15 text-teal-ink"}`}>
+                    {gasoil.info.plein.necessaire ? "Plein conseillé" : "Plein pas nécessaire"} — ≈ {gasoil.info.plein.restantL.toLocaleString("fr-FR")} L restants
+                    ({gasoil.info.plein.kmDepuisPlein.toLocaleString("fr-FR")} km depuis le dernier plein, autonomie ≈ {gasoil.info.plein.autonomieKm.toLocaleString("fr-FR")} km).
+                  </p>
+                ) : (
+                  <p className="text-xs text-navy/60">Niveau du réservoir non estimable (capacité du véhicule, consommation ou relevé kilométrique manquants).</p>
+                )}
                 {gasoil.info.station ? (
                   <button type="button" className="btn-primary min-h-[52px] flex-col justify-center !gap-0" onClick={() => gasoil.info?.station && gasoil.onLancer(gasoil.info.station)}>
                     <span>⛽ {gasoil.info.station.nom} avec GO</span>

@@ -543,6 +543,12 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
     }
   }
   const destinationsRetour: DestinationRetour[] = [];
+  // Le niveau estimé du réservoir s'affiche dès l'ouverture de la fenêtre de fin de tournée.
+  const retourOuvert = Boolean(finDeTournee && run && !retourVu.has(run.id));
+  useEffect(() => {
+    if (retourOuvert && maPosition && !gasoil.info && !gasoil.chargement && !gasoil.erreur && !gasoil.fait) void demanderGasoil();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retourOuvert, maPosition]);
   if (run && run.start_lat !== null && run.start_lng !== null) {
     destinationsRetour.push({
       cle: "depot",
