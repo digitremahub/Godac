@@ -113,6 +113,8 @@ export interface GoNavigationProps {
   onPasser: (s: Stop) => void;
   onDeposer: (id: string, cible: CibleDepot) => Promise<void>;
   onReoptimiser: () => Promise<void>;
+  /** Fin de tournée : retour guidé dans GO vers le dépôt ou le siège (arrêts tous traités). */
+  retour?: { label: string; lat: number; lng: number } | null;
   /** Suite complète de la tournée (heure de fin estimée de l'app chauffeur). */
   onItineraire: (it: Itineraire | null) => void;
   onPosition: (p: Point) => void;
@@ -153,7 +155,10 @@ export function GoNavigation(p: GoNavigationProps) {
   const [recherche, setRecherche] = useState("");
 
   const restants = useMemo(() => stops.filter((s) => s.status === "pending"), [stops]);
-  const cible = arretSuivi(stops, selection);
+  const cibleArret = arretSuivi(stops, selection);
+  // Tous les arrêts sont traités et le chauffeur a lancé le retour : destination guidée comme un arrêt (sans bouton « Terminé »).
+  const enRetour = !cibleArret && Boolean(p.retour);
+  const cible: Stop | null = cibleArret ?? (p.retour ? ({ id: ID_RETOUR, position: 0, parcel_code: null, parcel_count: 0, address: p.retour.label, lat: p.retour.lat, lng: p.retour.lng, recipient: null, phone: null, notes: null, status: "pending", delivered_place: null, proof_photo_path: null } as Stop) : null);
   // Arrêt suivi clôturé (livré, échec) : on passe tout seul au suivant dans l'ordre.
   useEffect(() => {
     if (!selection) return;
@@ -475,7 +480,7 @@ export function GoNavigation(p: GoNavigationProps) {
       cibleTracee.current = versId;
       traceDepuisGps.current = Boolean(depuis);
       try {
-        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify({ run_id: run.id, depuis, cible: versId }) });
+        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify(versId === ID_RETOUR && p.retour ? { run_id: run.id, depuis, cible: ID_RETOUR, point: { lat: p.retour.lat, lng: p.retour.lng } } : { run_id: run.id, depuis, cible: versId }) });
         if (cibleTracee.current !== versId) return;
         setTrajet(it);
         (carte.current?.getSource("trajet") as GeoJSONSource | undefined)?.setData(ligneGeo(it.ligne));
@@ -486,7 +491,8 @@ export function GoNavigation(p: GoNavigationProps) {
         enCalcul.current = false;
       }
     },
-    [run.id],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [run.id, p.retour?.lat, p.retour?.lng],
   );
 
   useEffect(() => {
@@ -820,7 +826,7 @@ export function GoNavigation(p: GoNavigationProps) {
                   )
                 )}
                 <p className={`truncate text-white/85 ${eta && !arrive ? "text-sm font-semibold" : "text-xs"}`}>
-                  Arrêt {numero(cible)} · {cible.address}
+                  {enRetour ? cible.address : `Arrêt ${numero(cible)} · ${cible.address}`}
                 </p>
               </>
             ) : (
@@ -988,7 +994,7 @@ export function GoNavigation(p: GoNavigationProps) {
               {cible ? (
                 <>
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-teal-ink">
-                    Arrêt {numero(cible)} / {stops.length}
+                    {enRetour ? "Retour" : `Arrêt ${numero(cible)} / ${stops.length}`}
                     {cible.parcel_count > 1 && ` · ${cible.parcel_count} colis`}
                   </span>
                   <span className="truncate text-sm font-bold leading-snug text-navy">{adresseCourte(cible.address)}</span>
@@ -997,12 +1003,12 @@ export function GoNavigation(p: GoNavigationProps) {
                 <span className="text-sm font-bold text-navy">Tournée terminée 🎉</span>
               )}
             </button>
-            {cible && !fige ? (
+            {cible && !enRetour && !fige ? (
               <button type="button" className="btn-primary min-h-[52px] shrink-0 justify-center !px-4 text-base" onClick={() => p.onTerminer(cible)}>
                 {estRamasse(cible) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(cible) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(cible)}
               </button>
             ) : (
-              !cible && (
+              (!cible || enRetour) && (
                 <button type="button" className="btn-primary min-h-[52px] shrink-0 !px-3 text-sm" onClick={p.onFermer}>
                   {fige ? "Retour" : "Clôturer"}
                 </button>
@@ -1174,6 +1180,9 @@ export function GoNavigation(p: GoNavigationProps) {
     </div>
   );
 }
+
+/** Identifiant de la destination « retour » (dépôt ou siège) suivie comme un arrêt. */
+const ID_RETOUR = "retour";
 
 const ANGLES: Partial<Record<Pictogramme, number>> = {
   "tout-droit": 0,

@@ -518,12 +518,14 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
   const enNavigation = !enPreparation && vue === "navigation" && run !== null && run.status === "in_progress";
   // Retour de fin de tournée : dépôt de la tournée et/ou siège de l'entreprise.
-  const [siege, setSiege] = useState<string | null>(null);
+  const [siege, setSiege] = useState<{ adresse: string; lat: number | null; lng: number | null } | null>(null);
+  /** Retour de fin de tournée lancé dans GO (dépôt ou siège). */
+  const [retourGo, setRetourGo] = useState<{ label: string; lat: number; lng: number } | null>(null);
   const finDeTournee = run?.status === "in_progress" && stops.length > 0 && pending.length === 0;
   useEffect(() => {
     if (!finDeTournee) return;
-    api<{ adresse: string | null }>("/api/colis/siege")
-      .then((r) => setSiege(r.adresse))
+    api<{ adresse: string | null; lat: number | null; lng: number | null }>("/api/colis/siege")
+      .then((r) => setSiege(r.adresse ? { adresse: r.adresse, lat: r.lat, lng: r.lng } : null))
       .catch(() => setSiege(null));
   }, [finDeTournee]);
   const destinationsRetour: DestinationRetour[] = [];
@@ -533,9 +535,10 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
       titre: "Retour au dépôt",
       detail: run.start_label,
       lien: lienExterne({ lat: Number(run.start_lat), lng: Number(run.start_lng), address: run.start_label ?? "dépôt" } as Stop),
+      point: { lat: Number(run.start_lat), lng: Number(run.start_lng) },
     });
   }
-  if (siege) destinationsRetour.push({ cle: "siege", titre: "Retour au siège", detail: siege, lien: lienExterne({ lat: null, lng: null, address: siege } as unknown as Stop) });
+  if (siege) destinationsRetour.push({ cle: "siege", titre: "Retour au siège", detail: siege.adresse, lien: lienExterne({ lat: siege.lat, lng: siege.lng, address: siege.adresse } as Stop), point: siege.lat !== null && siege.lng !== null ? { lat: siege.lat, lng: siege.lng } : null });
   const rechargerRun = useCallback(() => charger(run?.id), [charger, run?.id]);
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
@@ -637,6 +640,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
 
       {enNavigation && run && (
         <GoNavigation
+          retour={pending.length === 0 ? retourGo : null}
           run={run}
           stops={stops}
           lists={lists}
@@ -668,6 +672,12 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
         <RetourDepot
           destinations={destinationsRetour}
           nomNavigation={libelleNavigation(navPreferee === "go" ? "waze" : navPreferee)}
+          onLancerGo={(d) => {
+            if (!d.point) return;
+            setRetourGo({ label: d.detail ? `${d.titre} — ${d.detail}` : d.titre, ...d.point });
+            setRetourVu((v) => new Set(v).add(run.id));
+            changerVue("navigation");
+          }}
           onPlusTard={() => setRetourVu((v) => new Set(v).add(run.id))}
         />
       )}
