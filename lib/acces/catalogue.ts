@@ -257,6 +257,18 @@ export const ECRANS: readonly Ecran[] = [
     icone: "megaphone",
     note: "direction par défaut ; ouvert par la direction à des personnes désignées ou à toute l'équipe",
   }),
+  E({
+    id: "dashboard.a_traiter",
+    section: "dashboard",
+    libelle: "À traiter aujourd'hui",
+    libelleOnglet: "À traiter",
+    href: "/dashboard/a-traiter",
+    roles: ["exploitation", "direction"],
+    icone: "flag",
+    // Onglet du Tableau de bord (et aperçu sur l'accueil) : pas d'entrée de plus dans le menu latéral.
+    menu: "onglet",
+    note: "toute l'entreprise, triée par urgence ; actions groupées ; jamais ses propres demandes (hiérarchie)",
+  }),
   E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation", "comptable"], modules: ["bi_reporting"], icone: "chart", note: "exploitation et comptable : carburant et tournées, sans paie" }),
 
   // ── Mon espace ───────────────────────────────────────────────────

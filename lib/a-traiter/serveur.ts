@@ -1,0 +1,504 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/session";
+import { urlDe } from "@/lib/acces/catalogue";
+import { ecranOuvrable } from "@/lib/acces/tuiles-accueil";
+import { chargerEcartsATraiter } from "@/lib/fuel/ecarts-serveur";
+import { compterDirection } from "@/lib/hierarchie/serveur";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { LIBELLES_CONTROLE, type CodeControle, type PointARegler } from "@/lib/ticpe/controles";
+import { prochaineEcheance } from "@/lib/ticpe/echeances";
+import { controlesDeLaPeriode } from "@/lib/ticpe/periode-serveur";
+import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
+import { nextDay, parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
+import { PLAFOND_PAR_SOURCE, construireListe, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
+
+/**
+ * Chargement de « À traiter aujourd'hui » : UNE requête plafonnée par
+ * source (pas de N+1), sous la RLS de la personne connectée (exploitation
+ * et direction : toute l'entreprise). Une source dont l'écran ne s'ouvre
+ * pas (rôle, module) n'est pas lue ; une table ou une colonne absente
+ * (migration pas encore appliquée) est ignorée en silence ; une autre
+ * erreur ou un délai dépassé n'empêche jamais le reste de s'afficher :
+ * la source est seulement signalée, discrètement.
+ */
+
+type Db = SupabaseClient;
+
+export interface OptionsChargement {
+  /** Écarts carburant déjà comptés par le tableau de bord (évite de relire les pleins). */
+  ecartsIds?: readonly string[];
+  /** Délai maximal par source, en millisecondes. */
+  delaiMs?: number;
+  maintenant?: Date;
+}
+
+export interface ResultatATraiter extends ResultatListe {
+  /** Sources qui n'ont pas pu être lues (libellés courts). */
+  erreurs: string[];
+  /** Types dont la lecture a atteint le plafond : le compteur est « N+ ». */
+  plafonnes: TypeATraiter[];
+}
+
+const DELAI_PAR_DEFAUT_MS = 8000;
+const LOT_REQUETE = 80;
+
+interface Lecture {
+  brutes: ElementBrut[];
+  plafonne?: boolean;
+}
+
+interface Source {
+  type: TypeATraiter;
+  nom: string;
+  /** Écran du catalogue : la source n'est lue que s'il s'ouvre pour cette personne. */
+  ecran: string;
+  lire: () => Promise<Lecture>;
+}
+
+// ── Aides ───────────────────────────────────────────────────────────
+
+class DelaiDepasse extends Error {}
+
+function avecDelai<T>(p: Promise<T>, ms: number): Promise<T> {
+  let minuteur: ReturnType<typeof setTimeout>;
+  const limite = new Promise<never>((_, rejeter) => {
+    minuteur = setTimeout(() => rejeter(new DelaiDepasse("délai dépassé")), ms);
+  });
+  return Promise.race([p, limite]).finally(() => clearTimeout(minuteur));
+}
+
+/** Lignes d'une requête ; schéma absent = aucune ligne, autre erreur = exception. */
+async function lire<T = any>(requete: PromiseLike<{ data: T[] | null; error: { code?: string | null; message: string } | null }>): Promise<T[]> {
+  const { data, error } = await requete;
+  if (error) {
+    if (estSchemaManquant(error)) return [];
+    throw new Error(error.message);
+  }
+  return data ?? [];
+}
+
+function lots<T>(liste: readonly T[], taille: number): T[][] {
+  const r: T[][] = [];
+  for (let i = 0; i < liste.length; i += taille) r.push(liste.slice(i, i + taille));
+  return r;
+}
+
+/** Immatriculation d'une jointure `vehicles(registration)` (objet ou tableau selon le typage). */
+function immat(v: unknown): string | null {
+  const x = Array.isArray(v) ? v[0] : v;
+  return (x as { registration?: string } | null | undefined)?.registration ?? null;
+}
+
+const court = (texte: string | null | undefined, n = 90) => {
+  const t = (texte ?? "").replace(/\s+/g, " ").trim();
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+};
+const jourCourt = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit" });
+const jourDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+const euros = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+
+// ── Chargement ──────────────────────────────────────────────────────
+
+export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: ReadonlySet<string>, options: OptionsChargement = {}): Promise<ResultatATraiter> {
+  const maintenant = options.maintenant ?? new Date();
+  const delai = options.delaiMs ?? DELAI_PAR_DEFAUT_MS;
+  const ctx = { role: appUser.role, modules, conduit: appUser.conduit };
+  const org = appUser.organization_id;
+  const aujourdhui = parisDay(maintenant);
+  const debutJour = parisMidnightIso(aujourdhui);
+  const debutDemain = parisMidnightIso(nextDay(aujourdhui));
+  // Une tournée « non démarrée » : l'heure prévue est passée depuis au moins 15 minutes.
+  const limiteRetard = new Date(maintenant.getTime() - 15 * 60000).toISOString();
+  const lienPlanning = (id: string) => `${urlDe("exploitation.planning")}?entry=${id}`;
+
+  const toutes: Source[] = [
+    {
+      // Écarts carburant : le compteur global existant, puis le détail des plus anciens.
+      type: "ecart_carburant",
+      nom: "écarts carburant",
+      ecran: "carburant.pleins",
+      lire: async () => {
+        const tous = options.ecartsIds ? [...options.ecartsIds] : (await chargerEcartsATraiter(supabase)).ids;
+        // Les ids sont du plus récent au plus ancien : on garde les plus anciens, les plus urgents.
+        const gardes = tous.slice(-PLAFOND_PAR_SOURCE);
+        const pages = await Promise.all(
+          lots(gardes, LOT_REQUETE).map((ids) => lire(supabase.from("fuel_entries").select("id, occurred_at, driver_id, liters, vehicles(registration)").in("id", ids))),
+        );
+        return {
+          plafonne: tous.length > PLAFOND_PAR_SOURCE,
+          brutes: pages.flat().map((p) => ({
+            type: "ecart_carburant" as const,
+            id: p.id,
+            libelle: `Écart carburant${immat(p.vehicles) ? ` · ${immat(p.vehicles)}` : ""}`,
+            detail: `{nom} · plein du ${jourCourt(p.occurred_at)}${p.liters !== null ? ` · ${Number(p.liters).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} L` : ""}`,
+            depuis: p.occurred_at,
+            ecran: "carburant.pleins",
+            href: `${urlDe("carburant.pleins")}?plein=${p.id}`,
+            auteurId: p.driver_id,
+            personneId: p.driver_id,
+            groupable: true,
+          })),
+        };
+      },
+    },
+    {
+      // Amendes à attribuer : le responsable suggéré se confirme en un clic, sinon il se choisit sur l'écran.
+      type: "amende",
+      nom: "amendes",
+      ecran: "flotte.amendes",
+      lire: async () => {
+        const base = "id, infraction_at, amount, reference, created_at, vehicles(registration)";
+        const requete = (colonnes: string) => supabase.from("fines").select(colonnes).eq("status", "pending_identification").order("created_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE);
+        let essai = await requete(`${base}, suggested_driver_id, payment_deadline`);
+        // Colonnes de la migration 20261026000003 absentes : repli sur les colonnes historiques.
+        if (essai.error && estSchemaManquant(essai.error)) essai = await requete(base);
+        if (essai.error) {
+          if (estSchemaManquant(essai.error)) return { brutes: [] };
+          throw new Error(essai.error.message);
+        }
+        const rows = (essai.data ?? []) as any[];
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((f) => ({
+            type: "amende" as const,
+            id: f.id,
+            libelle: `Amende à attribuer${immat(f.vehicles) ? ` · ${immat(f.vehicles)}` : ""}`,
+            detail: `${euros(Number(f.amount))} · infraction du ${jourCourt(f.infraction_at)}${f.suggested_driver_id ? " · responsable suggéré : {nom}" : " · responsable à choisir"}`,
+            depuis: f.created_at,
+            echeance: f.payment_deadline ?? null,
+            ecran: "flotte.amendes",
+            href: urlDe("flotte.amendes"),
+            auteurId: f.suggested_driver_id ?? null,
+            personneId: f.suggested_driver_id ?? null,
+            choixLibre: true,
+            groupable: Boolean(f.suggested_driver_id),
+          })),
+        };
+      },
+    },
+    {
+      // Demandes d'entretien en attente de prise en charge (statut « planifiée »).
+      type: "entretien",
+      nom: "demandes d'entretien",
+      ecran: "flotte.entretien",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("vehicle_interventions")
+            .select("id, type, urgency, created_at, requested_by, vehicles(registration)")
+            .eq("status", "scheduled")
+            .order("created_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((r) => ({
+            type: "entretien" as const,
+            id: r.id,
+            libelle: `Entretien${immat(r.vehicles) ? ` · ${immat(r.vehicles)}` : ""}`,
+            detail: court(r.type),
+            depuis: r.created_at,
+            critique: r.urgency === "critical" || r.urgency === "high",
+            ecran: "flotte.entretien",
+            href: urlDe("flotte.entretien"),
+            auteurId: r.requested_by ?? null,
+            groupable: true,
+          })),
+        };
+      },
+    },
+    {
+      // Demandes de rendez-vous (intranet) : décidées par l'encadrement, hiérarchie comprise.
+      type: "demande",
+      nom: "demandes de rendez-vous",
+      ecran: "communication.intranet",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase.from("meeting_requests").select("id, reason, requested_by, preferred_date, created_at").eq("status", "pending").order("created_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((r) => ({
+            type: "demande" as const,
+            id: r.id,
+            libelle: "Demande de rendez-vous · {nom}",
+            detail: court(r.reason),
+            depuis: r.created_at,
+            echeance: r.preferred_date ?? null,
+            ecran: "communication.intranet",
+            href: urlDe("communication.intranet"),
+            auteurId: r.requested_by,
+            personneId: r.requested_by,
+          })),
+        };
+      },
+    },
+    {
+      // Demandes d'assistance adressées au gestionnaire (celles pour le support GODAC ne sont pas les siennes).
+      type: "demande",
+      nom: "demandes d'assistance",
+      ecran: "communication.assistance",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("support_requests")
+            .select("id, question, requested_by, created_at")
+            .eq("status", "open")
+            .eq("recipient", "gestionnaire")
+            .order("created_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((r) => ({
+            type: "demande" as const,
+            id: r.id,
+            libelle: "Demande d'assistance · {nom}",
+            detail: court(r.question),
+            depuis: r.created_at,
+            ecran: "communication.assistance",
+            href: urlDe("communication.assistance"),
+            auteurId: r.requested_by,
+            personneId: r.requested_by,
+          })),
+        };
+      },
+    },
+    {
+      // Contrôles TICPE bloquants de la prochaine échéance, regroupés par nature de point.
+      type: "ticpe",
+      nom: "contrôles TICPE",
+      ecran: "carburant.ticpe_controles",
+      lire: async () => {
+        const p = await chargerParametresTicpe(supabase, org);
+        if (p.migrationManquante) return { brutes: [] };
+        const echeance = prochaineEcheance(aujourdhui, p.reglages);
+        const { points } = await controlesDeLaPeriode(supabase, org, echeance.periode);
+        const parCode = new Map<CodeControle, PointARegler[]>();
+        for (const pt of points.filter((x) => x.gravite === "bloquant")) parCode.set(pt.code, [...(parCode.get(pt.code) ?? []), pt]);
+        return {
+          brutes: [...parCode.entries()].map(([code, pts]) => ({
+            type: "ticpe" as const,
+            id: `${echeance.periode.cle}:${code}`,
+            libelle: pts.length === 1 ? `TICPE : ${pts[0]!.titre}` : `TICPE : ${pts.length} × ${LIBELLES_CONTROLE[code].toLowerCase()}`,
+            detail: pts.length === 1 ? pts[0]!.detail : `Bloquant avant la déclaration · ${echeance.periode.libelle}`,
+            echeance: echeance.dateLimite,
+            ecran: "carburant.ticpe_controles",
+            href: pts.length === 1 ? pts[0]!.lien : urlDe("carburant.ticpe_controles"),
+          })),
+        };
+      },
+    },
+    {
+      // Tournées du jour sans chauffeur.
+      type: "tournee_sans_chauffeur",
+      nom: "tournées sans chauffeur",
+      ecran: "exploitation.planning",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("planning_entries")
+            .select("id, tour_number, start_at, vehicles(registration)")
+            .eq("status", "planned")
+            .is("driver_id", null)
+            .gte("start_at", debutJour)
+            .lt("start_at", debutDemain)
+            .order("start_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((t) => ({
+            type: "tournee_sans_chauffeur" as const,
+            id: t.id,
+            libelle: `Tournée ${t.tour_number} sans chauffeur`,
+            detail: `Départ prévu à ${heure(t.start_at)}${immat(t.vehicles) ? ` · ${immat(t.vehicles)}` : ""}`,
+            echeance: t.start_at,
+            ecran: "exploitation.planning",
+            href: lienPlanning(t.id),
+          })),
+        };
+      },
+    },
+    {
+      // Tournées planifiées du jour, avec chauffeur, pas démarrées alors que l'heure prévue est passée.
+      type: "tournee_en_retard",
+      nom: "tournées non démarrées",
+      ecran: "exploitation.planning",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("planning_entries")
+            .select("id, tour_number, start_at, driver_id, vehicles(registration)")
+            .eq("status", "planned")
+            .not("driver_id", "is", null)
+            .gte("start_at", debutJour)
+            .lt("start_at", limiteRetard)
+            .order("start_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((t) => ({
+            type: "tournee_en_retard" as const,
+            id: t.id,
+            libelle: `Tournée ${t.tour_number} non démarrée`,
+            detail: `{nom} · prévue à ${heure(t.start_at)}${immat(t.vehicles) ? ` · ${immat(t.vehicles)}` : ""}`,
+            echeance: t.start_at,
+            // Plus d'une demi-heure de retard : urgent.
+            critique: maintenant.getTime() - Date.parse(t.start_at) >= 30 * 60000,
+            ecran: "exploitation.planning",
+            href: lienPlanning(t.id),
+            personneId: t.driver_id,
+          })),
+        };
+      },
+    },
+    {
+      // Congés à valider.
+      type: "conge",
+      nom: "congés",
+      ecran: "equipe.conges",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase.from("leave_requests").select("id, driver_id, start_date, end_date, created_at").eq("status", "pending").order("created_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((c) => ({
+            type: "conge" as const,
+            id: c.id,
+            libelle: "Congé · {nom}",
+            detail: `du ${jourDate(c.start_date)} au ${jourDate(c.end_date)}`,
+            depuis: c.created_at,
+            echeance: c.start_date,
+            ecran: "equipe.conges",
+            href: urlDe("equipe.conges"),
+            auteurId: c.driver_id,
+            personneId: c.driver_id,
+            groupable: true,
+          })),
+        };
+      },
+    },
+    {
+      // Arrêts de travail déclarés (reçus), à valider ou refuser. Le motif médical n'est jamais affiché.
+      type: "arret",
+      nom: "arrêts de travail",
+      ecran: "equipe.arrets",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase.from("work_stoppages").select("id, user_id, start_date, end_date, created_at").eq("status", "recu").order("created_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((a) => ({
+            type: "arret" as const,
+            id: a.id,
+            libelle: "Arrêt de travail · {nom}",
+            detail: `du ${jourDate(a.start_date)} au ${jourDate(a.end_date)}`,
+            depuis: a.created_at,
+            ecran: "equipe.arrets",
+            href: urlDe("equipe.arrets"),
+            auteurId: a.user_id,
+            personneId: a.user_id,
+            paie: true,
+            groupable: true,
+          })),
+        };
+      },
+    },
+    {
+      // Contestations clients : responsable à valider, ou réponse du chauffeur à clôturer.
+      type: "contestation",
+      nom: "contestations",
+      ecran: "exploitation.contestations",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("customer_disputes")
+            .select("id, status, client_name, reference, created_at, driver_id, suggested_driver_id")
+            .in("status", ["to_validate", "answered"])
+            .order("created_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((c) => {
+            const avalider = c.status === "to_validate";
+            return {
+              type: "contestation" as const,
+              id: c.id,
+              libelle: avalider ? "Contestation : responsable à valider" : "Contestation : réponse du chauffeur à clôturer",
+              detail: court([c.client_name, c.reference].filter(Boolean).join(" · ")) || null,
+              depuis: c.created_at,
+              ecran: "exploitation.contestations",
+              href: urlDe("exploitation.contestations"),
+              auteurId: (avalider ? (c.suggested_driver_id ?? c.driver_id) : c.driver_id) ?? null,
+              choixLibre: avalider,
+            };
+          }),
+        };
+      },
+    },
+    {
+      // Chauffeurs inscrits par le lien d'invitation, en attente d'approbation.
+      type: "inscription",
+      nom: "inscriptions",
+      ecran: "equipe.inscriptions",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase.from("users").select("id, full_name, created_at").eq("organization_id", org).eq("pending_approval", true).order("created_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((u) => ({
+            type: "inscription" as const,
+            id: u.id,
+            libelle: `Inscription à valider · ${u.full_name}`,
+            depuis: u.created_at,
+            ecran: "equipe.inscriptions",
+            href: urlDe("equipe.inscriptions"),
+          })),
+        };
+      },
+    },
+  ];
+  const sources = toutes.filter((s) => ecranOuvrable(s.ecran, ctx));
+
+  const erreurs: string[] = [];
+  const plafonnes = new Set<TypeATraiter>();
+  const lectures = await Promise.all(
+    sources.map(async (s): Promise<ElementBrut[]> => {
+      try {
+        const l = await avecDelai(s.lire(), delai);
+        if (l.plafonne) plafonnes.add(s.type);
+        return l.brutes;
+      } catch (e) {
+        if (!(e instanceof DelaiDepasse)) console.error("à traiter :", s.nom, e instanceof Error ? e.message : e);
+        erreurs.push(s.nom);
+        return [];
+      }
+    }),
+  );
+  const brutes = lectures.flat();
+
+  // Une seule lecture des personnes citées : rôle (hiérarchie) et nom.
+  const ids = [...new Set(brutes.flatMap((b) => [b.auteurId, b.personneId]).filter((x): x is string => Boolean(x)))];
+  const personnes = new Map<string, PersonneConnue>();
+  if (ids.length > 0) {
+    try {
+      const pages = await Promise.all(lots(ids, LOT_REQUETE).map((l) => lire<any>(supabase.from("users").select("id, role, full_name").eq("organization_id", org).in("id", l))));
+      for (const u of pages.flat()) personnes.set(u.id, { role: u.role, nom: u.full_name ?? null });
+    } catch (e) {
+      console.error("à traiter : personnes", e instanceof Error ? e.message : e);
+    }
+  }
+  const direction = appUser.role === "direction" || [...personnes.values()].some((p) => p.role === "direction");
+  const directionCount = direction ? await compterDirection(supabase, org) : 2;
+
+  const liste = construireListe({ brutes, moi: { id: appUser.id, role: appUser.role }, personnes, directionCount, maintenant });
+  return { ...liste, erreurs: [...new Set(erreurs)], plafonnes: [...plafonnes] };
+}
