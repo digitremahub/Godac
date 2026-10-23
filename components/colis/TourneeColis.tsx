@@ -1178,7 +1178,9 @@ export function TourneeColis({
       )}
 
       {draft && (
-        <Card className="flex flex-col gap-3 border-2 border-teal/40">
+        // Fenêtre au-dessus de la page : le formulaire s'ouvre là où l'on est, sans descendre chercher la ligne ouverte.
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-label="Nouvelle adresse">
+        <Card className="flex max-h-[92dvh] w-full max-w-lg flex-col gap-3 overflow-y-auto overscroll-contain !rounded-b-none border-2 border-teal/40 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:!rounded-b-3xl">
           <div className="flex items-center justify-between">
             <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : draft.type === "point_relais" ? "Dépôt en point relais" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
@@ -1278,6 +1280,7 @@ export function TourneeColis({
             )}
           </div>
         </Card>
+        </div>
       )}
 
       {(stops.length > 0 || multi) && (
@@ -1470,7 +1473,9 @@ export function TourneeColis({
                       )}
                       <HistoriqueArret stop={s} />
                       {edition?.id === s.id && (
-                        <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
+                        // Fenêtre au-dessus de la page : plus besoin de chercher la ligne ouverte dans la liste.
+                        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-label="Modifier l'adresse">
+                        <div className="flex max-h-[92dvh] w-full max-w-lg flex-col gap-2 overflow-y-auto overscroll-contain rounded-t-3xl bg-surface p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
                           {edition.type === "point_relais" && <NomRelaisInput value={edition.relais} onChange={(relais) => setEdition({ ...edition, relais })} />}
                           <AdresseInput biais={depot} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
@@ -1520,6 +1525,7 @@ export function TourneeColis({
                               Annuler
                             </button>
                           </div>
+                        </div>
                         </div>
                       )}
                     </li>
