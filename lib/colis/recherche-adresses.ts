@@ -8,7 +8,9 @@
 //     business_name des arrêts passés) : déjà vérifié par l'équipe ;
 //  2. OpenStreetMap (Photon : établissements et adresses, biaisé autour du
 //     dépôt ou du chauffeur) et la Base Adresse Nationale (France) ;
-//  3. Google Places Autocomplete, seulement si GOOGLE_PLACES_API_KEY existe.
+//  3. Google Places Autocomplete : source PRINCIPALE si une clé existe
+//     (lib/colis/places-google.ts) ; sinon la BAN répond seule et vite, et
+//     OpenStreetMap complète ensuite (deuxième requête, jamais bloquante).
 
 import { normaliserTexte } from "@/lib/colis/professionnel";
 
@@ -26,6 +28,8 @@ export interface SuggestionAdresse {
   source: SourceSuggestion;
   /** Précision affichée (catégorie, ville…). */
   detail?: string | null;
+  /** Identifiant Google Places : les coordonnées sont résolues au choix (Place Details). */
+  placeId?: string;
 }
 
 /** Texte de la suggestion tel qu'affiché et cherché. */
@@ -146,4 +150,40 @@ export function lireBiais(lat: string | null, lng: string | null): { lat: number
   const b = Number(lng);
   if (lat === null || lng === null || !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) return null;
   return { lat: a, lng: b };
+}
+
+/**
+ * Réponse rapide : annuaire interne d'abord, puis la source principale
+ * (Google ou BAN) dans SON ordre de pertinence, sans doublon.
+ */
+export function ordonnerRapide(annuaire: readonly SuggestionAdresse[], principal: readonly SuggestionAdresse[], limite = 8): SuggestionAdresse[] {
+  return ajouterSansDoublon([], [...annuaire, ...principal], limite);
+}
+
+/**
+ * Enrichissement : les suggestions déjà affichées gardent leur place (rien
+ * ne saute sous le doigt), les nouvelles s'ajoutent à la suite, établissements
+ * et adresses alternés.
+ */
+export function completerSuggestions(existantes: readonly SuggestionAdresse[], complement: readonly SuggestionAdresse[], limite = 8): SuggestionAdresse[] {
+  const etab = complement.filter((s) => s.type === "etablissement");
+  const adr = complement.filter((s) => s.type === "adresse");
+  const alternes: SuggestionAdresse[] = [];
+  for (let i = 0; i < Math.max(etab.length, adr.length); i++) {
+    if (etab[i]) alternes.push(etab[i]!);
+    if (adr[i]) alternes.push(adr[i]!);
+  }
+  return ajouterSansDoublon(existantes, alternes, limite);
+}
+
+function ajouterSansDoublon(base: readonly SuggestionAdresse[], ajouts: readonly SuggestionAdresse[], limite: number): SuggestionAdresse[] {
+  const vus = new Set(base.map(cle));
+  const sortie = [...base];
+  for (const s of ajouts) {
+    const k = cle(s);
+    if (!s.adresse || vus.has(k) || sortie.length >= limite) continue;
+    vus.add(k);
+    sortie.push(s);
+  }
+  return sortie;
 }

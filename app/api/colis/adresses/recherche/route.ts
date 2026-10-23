@@ -4,24 +4,31 @@ import { codePays } from "@/lib/pays/serveur";
 import {
   depuisPhoton,
   filtrerAnnuaire,
-  fusionnerSuggestions,
   lireBiais,
+  ordonnerRapide,
   type EntreeAnnuaire,
   type ProprietesPhoton,
   type SuggestionAdresse,
 } from "@/lib/colis/recherche-adresses";
+import { cleGoogle, corpsAutocomplete, lireAutocomplete, MASQUE_AUTOCOMPLETE, sessionValide, URL_AUTOCOMPLETE } from "@/lib/colis/places-google";
 
 export const dynamic = "force-dynamic";
 
 const UA = "GODAC/1.0 (recherche d'adresses et d'établissements ; https://godac-v2.vercel.app)";
+/** Au-delà, une source facultative est abandonnée : elle ne doit jamais retarder la saisie. */
+const DELAI_RAPIDE_MS = 1200;
+const DELAI_ANNUAIRE_MS = 700;
+const DELAI_COMPLEMENT_MS = 1500;
 
 /**
- * Champ adresse de la tournée colis : adresses postales ET établissements
- * par leur nom (« Pharmacie du Centre Saint-X »). Annuaire interne de
- * l'entreprise, puis OpenStreetMap (Photon, biaisé autour de `lat`/`lng` :
- * dépôt ou chauffeur), Base Adresse Nationale en France, et Google Places
- * seulement si GOOGLE_PLACES_API_KEY est configurée. Une source en panne
- * n'empêche jamais les autres de répondre.
+ * Champ adresse de la tournée colis, en deux temps.
+ *  - `phase=rapide` (défaut) : Google Places Autocomplete si une clé existe
+ *    (GOOGLE_PLACES_API_KEY ou GOOGLE_MAPS_API_KEY), sinon la Base Adresse
+ *    Nationale (France), plus l'annuaire interne si il répond en < 0,7 s.
+ *    Les coordonnées Google sont résolues au choix (/api/colis/adresses/detail).
+ *  - `phase=complement` (sans clé Google seulement) : OpenStreetMap (Photon,
+ *    plus lent), timeout 1,5 s, que le client ajoute à la liste affichée.
+ * Une source en panne ou lente ne bloque jamais la réponse.
  */
 export async function GET(req: Request) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -29,17 +36,29 @@ export async function GET(req: Request) {
   const { appUser, supabase } = g;
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
-  if (q.length < 3 || q.length > 160) return NextResponse.json({ resultats: [] });
+  if (q.length < 3 || q.length > 160) return NextResponse.json({ resultats: [], complement: false });
   const biais = lireBiais(url.searchParams.get("lat"), url.searchParams.get("lng"));
+  const session = url.searchParams.get("session");
+  const phase = url.searchParams.get("phase") === "complement" ? "complement" : "rapide";
+  const cle = cleGoogle(process.env);
   const pays = await codePays(appUser.organization_id).catch(() => "FR");
 
-  const [annuaire, osm, ban, google] = await Promise.all([
-    annuaireInterne(supabase, appUser.organization_id, q),
-    photon(q, biais, pays),
-    pays === "FR" ? baseAdresseNationale(q, biais) : Promise.resolve([]),
-    googlePlaces(q, biais, pays),
+  if (phase === "complement") {
+    if (cle) return NextResponse.json({ resultats: [], complement: false });
+    return NextResponse.json({ resultats: await photon(q, biais, pays), complement: false });
+  }
+
+  const [annuaire, principal] = await Promise.all([
+    delai(annuaireInterne(supabase, appUser.organization_id, q), DELAI_ANNUAIRE_MS),
+    cle ? googlePlaces(cle, q, biais, pays, sessionValide(session) ? session : null) : pays === "FR" ? baseAdresseNationale(q, biais) : Promise.resolve([]),
   ]);
-  return NextResponse.json({ resultats: fusionnerSuggestions(annuaire, [osm, ban, google]) });
+  // Sans clé Google : le client enchaîne sur la phase « complement » (établissements OSM).
+  return NextResponse.json({ resultats: ordonnerRapide(annuaire, principal), complement: !cle });
+}
+
+/** Résultat de repli si la source dépasse le délai (sans l'annuler : elle se termine seule). */
+function delai(p: Promise<SuggestionAdresse[]>, ms: number): Promise<SuggestionAdresse[]> {
+  return Promise.race([p, new Promise<SuggestionAdresse[]>((r) => setTimeout(() => r([]), ms))]);
 }
 
 type Client = Awaited<ReturnType<typeof garderApi>> extends infer R ? (R extends { ok: true; supabase: infer S } ? S : never) : never;
@@ -80,7 +99,7 @@ async function photon(q: string, biais: { lat: number; lng: number } | null, pay
       p.set("lat", "46.6");
       p.set("lon", "2.5");
     }
-    const res = await fetch(`https://photon.komoot.io/api/?${p.toString()}`, { headers: { Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(4000), next: { revalidate: 60 } });
+    const res = await fetch(`https://photon.komoot.io/api/?${p.toString()}`, { headers: { Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(DELAI_COMPLEMENT_MS), next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = (await res.json()) as { features?: { properties?: ProprietesPhoton & { countrycode?: string }; geometry?: { coordinates?: [number, number] } }[] };
     return (data.features ?? [])
@@ -94,12 +113,12 @@ async function photon(q: string, biais: { lat: number; lng: number } | null, pay
 
 async function baseAdresseNationale(q: string, biais: { lat: number; lng: number } | null): Promise<SuggestionAdresse[]> {
   try {
-    const p = new URLSearchParams({ q, limit: "5", autocomplete: "1" });
+    const p = new URLSearchParams({ q, limit: "6", autocomplete: "1" });
     if (biais) {
       p.set("lat", String(biais.lat));
       p.set("lon", String(biais.lng));
     }
-    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?${p.toString()}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(4000), next: { revalidate: 60 } });
+    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?${p.toString()}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(DELAI_RAPIDE_MS), next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = (await res.json()) as { features?: { properties?: { label?: string }; geometry?: { coordinates?: [number, number] } }[] };
     return (data.features ?? [])
@@ -110,36 +129,19 @@ async function baseAdresseNationale(q: string, biais: { lat: number; lng: number
   }
 }
 
-/** Google Places Autocomplete (API « Places (New) »), seulement avec une clé. Coordonnées : géocodées à l'ajout. */
-async function googlePlaces(q: string, biais: { lat: number; lng: number } | null, pays: string): Promise<SuggestionAdresse[]> {
-  const cle = process.env.GOOGLE_PLACES_API_KEY;
-  if (!cle) return [];
+/** Google Places Autocomplete (API « Places (New) »), biaisé autour du dépôt. Pas de coordonnées ici. */
+async function googlePlaces(cle: string, q: string, biais: { lat: number; lng: number } | null, pays: string, session: string | null): Promise<SuggestionAdresse[]> {
   try {
-    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+    const res = await fetch(URL_AUTOCOMPLETE, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": cle },
-      body: JSON.stringify({
-        input: q,
-        languageCode: "fr",
-        includedRegionCodes: [pays.toLowerCase()],
-        ...(biais ? { locationBias: { circle: { center: { latitude: biais.lat, longitude: biais.lng }, radius: 30000 } } } : {}),
-      }),
-      signal: AbortSignal.timeout(4000),
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": cle, "X-Goog-FieldMask": MASQUE_AUTOCOMPLETE },
+      body: JSON.stringify(corpsAutocomplete(q, pays, biais, session)),
+      signal: AbortSignal.timeout(DELAI_RAPIDE_MS),
     });
-    if (!res.ok) return [];
-    const data = (await res.json()) as { suggestions?: { placePrediction?: { types?: string[]; structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } } } }[] };
-    return (data.suggestions ?? [])
-      .map((s) => s.placePrediction)
-      .filter((p): p is NonNullable<typeof p> => Boolean(p?.structuredFormat?.mainText?.text && p.structuredFormat.secondaryText?.text))
-      .map((p) => {
-        const etablissement = (p.types ?? []).includes("establishment");
-        const principal = p.structuredFormat!.mainText!.text!;
-        const secondaire = p.structuredFormat!.secondaryText!.text!;
-        return etablissement
-          ? { type: "etablissement" as const, nom: principal, adresse: secondaire, lat: null, lng: null, source: "google" as const }
-          : { type: "adresse" as const, nom: null, adresse: `${principal}, ${secondaire}`, lat: null, lng: null, source: "google" as const };
-      });
+    if (!res.ok) return pays === "FR" ? baseAdresseNationale(q, biais) : [];
+    return lireAutocomplete(await res.json());
   } catch {
-    return [];
+    // Google injoignable ou lent : repli BAN pour ne jamais laisser le champ vide.
+    return pays === "FR" ? baseAdresseNationale(q, biais) : [];
   }
 }
