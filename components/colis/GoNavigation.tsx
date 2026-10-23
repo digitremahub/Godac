@@ -143,6 +143,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const [voix, setVoix] = useState(false);
   const [trajet, setTrajet] = useState<Itineraire | null>(null);
   const [ajout, setAjout] = useState(false);
+  /** Arrêt dont l'adresse est en cours de correction (erreur de saisie à la base). */
+  const [correction, setCorrection] = useState<Stop | null>(null);
   const [recherche, setRecherche] = useState("");
 
   const restants = useMemo(() => stops.filter((s) => s.status === "pending"), [stops]);
@@ -1024,6 +1026,7 @@ export function GoNavigation(p: GoNavigationProps) {
                       onHoraires={p.onHoraires}
                       onFiche={p.onFiche}
                       onPasser={p.onPasser}
+                      onCorriger={setCorrection}
                     />
                   ))}
                 </div>
@@ -1100,6 +1103,20 @@ export function GoNavigation(p: GoNavigationProps) {
           </>
         )}
       </div>
+
+      {correction && (
+        <CorrectionAdresse
+          stop={correction}
+          position={position}
+          depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null}
+          onFermer={() => setCorrection(null)}
+          onCorrigee={async (texte, ok) => {
+            setCorrection(null);
+            await p.onRecharger();
+            p.onToast({ ok, text: texte });
+          }}
+        />
+      )}
 
       {ajout && (
         <AjoutAdresse
@@ -1231,6 +1248,7 @@ function CarteArret({
   onHoraires,
   onFiche,
   onPasser,
+  onCorriger,
 }: {
   stop: Stop;
   numero: number;
@@ -1242,7 +1260,7 @@ function CarteArret({
   fige: boolean;
   plusieurs: boolean;
   busy: boolean;
-} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser">) {
+} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser"> & { onCorriger: (s: Stop) => void }) {
   const secondaire = [s.business_name, s.recipient].filter((v): v is string => Boolean(v) && !repeteAdresse(v, s.address)).join(" · ");
   const [plus, setPlus] = useState(false);
   const pastilleBase = "inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-xs font-semibold";
@@ -1298,6 +1316,11 @@ function CarteArret({
         <button type="button" className={pastilleAction} onClick={() => onFiche(s)}>
           Fiche
         </button>
+        {!fige && (
+          <button type="button" className={pastilleAction} onClick={() => onCorriger(s)}>
+            ✏️ Adresse
+          </button>
+        )}
         <button type="button" className={pastilleAction} onClick={() => setPlus((v) => !v)} aria-expanded={plus} aria-controls={`go-plus-${s.id}`}>
           ⋯ Plus
         </button>
@@ -1323,6 +1346,71 @@ function CarteArret({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Correction de l'adresse d'un arrêt sans quitter GO (erreur de saisie à la
+ * base) : PATCH /api/colis/arrets/[id] { adresse } la re-géolocalise ; l'écran
+ * est rechargé, le trajet vers l'arrêt se recalcule avec les nouvelles
+ * coordonnées. L'ordre des arrêts n'est pas modifié (« Réoptimiser » reste
+ * au choix du chauffeur).
+ */
+function CorrectionAdresse({
+  stop,
+  position,
+  depot,
+  onFermer,
+  onCorrigee,
+}: {
+  stop: Stop;
+  position: Point | null;
+  depot: Point | null;
+  onFermer: () => void;
+  onCorrigee: (texte: string, ok: boolean) => Promise<void>;
+}) {
+  const [adresse, setAdresse] = useState(stop.address);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const inchangee = adresse.trim() === stop.address.trim();
+
+  async function enregistrer() {
+    if (adresse.trim().length < 5) return setErreur("Saisissez une adresse (5 caractères au moins).");
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      await api(`/api/colis/arrets/${stop.id}`, { method: "PATCH", body: JSON.stringify({ adresse: adresse.trim() }) });
+      await onCorrigee("Adresse corrigée : le trajet est recalculé.", true);
+    } catch (e) {
+      setErreur(networkErrorMessage(e));
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="correction-adresse-titre">
+      <section className="flex max-h-[92dvh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="correction-adresse-titre" className="font-display text-xl font-bold">Corriger l&apos;adresse</h2>
+            <p className="text-sm text-navy/60">Erreur de saisie à la base : l&apos;adresse est remplacée et localisée de nouveau, sans quitter GO.</p>
+          </div>
+          <button type="button" className="btn-ghost !px-2 !py-1" onClick={onFermer} aria-label="Fermer">
+            ✕
+          </button>
+        </div>
+        <AdresseInput value={adresse} autoFocus biais={position ?? depot} onChange={setAdresse} onChoisir={(sug) => setAdresse(sug.adresse)} />
+        {erreur && (
+          <p role="alert" className="text-sm font-semibold text-orange-ink">
+            {erreur}
+          </p>
+        )}
+        <button type="button" className="btn-primary min-h-[48px] justify-center !py-3 text-base" disabled={envoi || inchangee || adresse.trim().length < 5} onClick={enregistrer}>
+          {envoi ? "Enregistrement…" : "Enregistrer l'adresse"}
+        </button>
+      </section>
+    </div>
   );
 }
 
