@@ -23,6 +23,7 @@ import { nomGroupe, grouperParListe } from "@/lib/colis/listes";
 import type { Itineraire, Point } from "@/lib/colis/itineraire";
 import type { CibleDepot } from "@/lib/colis/reordonner";
 import type { SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { COULEURS_CARTE, styliserGodac, type StyleCarte } from "@/lib/colis/style-carte";
 import {
@@ -1513,9 +1514,7 @@ function AjoutAdresse({
     setEnvoi(true);
     setErreur(null);
     try {
-      const r = await api<{ stop?: Stop; grouped?: boolean; duplicate?: boolean; message?: string; village?: { nom: string; horsTournee: boolean } | null }>("/api/colis/arrets", {
-        method: "POST",
-        body: JSON.stringify({
+      const corps = JSON.stringify({
           run_id: run.id,
           adresse: adresse.trim(),
           type,
@@ -1524,8 +1523,16 @@ function AjoutAdresse({
           creneau: choix.creneau,
           ...(type === "point_relais" ? { relais: relais.trim() || etablissement?.nom || null, colis: Math.max(0, Math.min(500, Number(colis) || 0)) } : {}),
           etablissement: etablissement && etablissement.adresse === adresse ? { nom: etablissement.nom ?? etablissement.adresse, lat: etablissement.lat, lng: etablissement.lng } : null,
-        }),
       });
+      let r: { stop?: Stop; grouped?: boolean; duplicate?: boolean; message?: string; village?: { nom: string; horsTournee: boolean } | null };
+      try {
+        r = await api<typeof r>("/api/colis/arrets", { method: "POST", body: corps });
+      } catch (e) {
+        if (!isNetworkFailure(e)) throw e;
+        // Pas de réseau : l'adresse est gardée sur le téléphone et ajoutée dès le retour du réseau.
+        await enqueueOfflineMutation("/api/colis/arrets", { method: "POST", body: corps });
+        return void (await onAjoute("Pas de réseau : l'adresse est conservée et sera ajoutée dès que le réseau revient.", true));
+      }
       if (r.duplicate) return void (await onAjoute(r.message ?? "Déjà dans la tournée.", false));
       const village = r.village ? ` (${r.village.horsTournee ? "hors tournée" : r.village.nom})` : "";
       if (r.grouped || !r.stop) return void (await onAjoute(`Ajouté à l'arrêt déjà prévu à cette adresse${village}.`, true));

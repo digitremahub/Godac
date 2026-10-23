@@ -10,7 +10,7 @@ import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
-import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
+import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
 import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -299,6 +299,18 @@ export function TourneeColis({
     // Pas pendant le chargement d'une autre tournée (évite un « aucune tournée » transitoire).
     if (runs && (run || !activeId)) onEtat?.(run, stops);
   }, [runs, run, stops, activeId, onEtat]);
+  // Adresses ajoutées sans réseau : dès que la file se vide (réseau revenu), la tournée se recharge.
+  const fileAvant = useRef(0);
+  useEffect(() => {
+    async function surveiller() {
+      const n = await listOfflineMutations().then((l) => l.length).catch(() => 0);
+      if (fileAvant.current > 0 && n === 0) void recharger(activeId);
+      fileAvant.current = n;
+    }
+    void surveiller();
+    window.addEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+    return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, surveiller);
+  }, [recharger, activeId]);
   useEffect(() => {
     if (!scanner && !draft && brouillons.length) {
       setDraft(brouillons[0]!);
@@ -316,9 +328,7 @@ export function TourneeColis({
     if (!creneau.ok) return setToast({ ok: false, text: creneau.erreur });
     setBusy("ajout");
     try {
-      const r = await api<{ duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null }>("/api/colis/arrets", {
-        method: "POST",
-        body: JSON.stringify({
+      const corps = JSON.stringify({
           run_id: run?.id,
           list_id: listeCible === AUTO ? null : listeCible,
           code: d.code,
@@ -331,8 +341,17 @@ export function TourneeColis({
           creneau: creneau.creneau,
           etablissement: d.etablissement ?? null,
           ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
-        }),
-      });
+        });
+      let r: { duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null };
+      try {
+        r = await api<typeof r>("/api/colis/arrets", { method: "POST", body: corps });
+      } catch (e) {
+        if (!isNetworkFailure(e)) throw e;
+        // Pas de réseau : l'adresse est gardée sur le téléphone et ajoutée dès le retour du réseau.
+        await enqueueOfflineMutation("/api/colis/arrets", { method: "POST", body: corps });
+        setDraft(null);
+        return setToast({ ok: true, text: "Pas de réseau : l'adresse est conservée et sera ajoutée dès que le réseau revient." });
+      }
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
       const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) ? ` ${ALERTE_SANS_TELEPHONE}` : "";
       setToast(
@@ -1159,7 +1178,9 @@ export function TourneeColis({
       )}
 
       {draft && (
-        <Card className="flex flex-col gap-3 border-2 border-teal/40">
+        // Fenêtre au-dessus de la page : le formulaire s'ouvre là où l'on est, sans descendre chercher la ligne ouverte.
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-label="Nouvelle adresse">
+        <Card className="flex max-h-[92dvh] w-full max-w-lg flex-col gap-3 overflow-y-auto overscroll-contain !rounded-b-none border-2 border-teal/40 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:!rounded-b-3xl">
           <div className="flex items-center justify-between">
             <h2 className="text-lg">{draft.type === "ramasse" ? "Nouvelle ramasse" : draft.type === "point_relais" ? "Dépôt en point relais" : "Nouveau colis"}</h2>
             <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setDraft(null)} aria-label="Annuler">
@@ -1259,6 +1280,7 @@ export function TourneeColis({
             )}
           </div>
         </Card>
+        </div>
       )}
 
       {(stops.length > 0 || multi) && (
@@ -1451,7 +1473,9 @@ export function TourneeColis({
                       )}
                       <HistoriqueArret stop={s} />
                       {edition?.id === s.id && (
-                        <div className="mt-2 flex flex-col gap-2 rounded-xl border border-teal/40 p-3">
+                        // Fenêtre au-dessus de la page : plus besoin de chercher la ligne ouverte dans la liste.
+                        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-label="Modifier l'adresse">
+                        <div className="flex max-h-[92dvh] w-full max-w-lg flex-col gap-2 overflow-y-auto overscroll-contain rounded-t-3xl bg-surface p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl">
                           <ChoixTypeArret value={edition.type} onChange={(type) => setEdition({ ...edition, type })} />
                           {edition.type === "point_relais" && <NomRelaisInput value={edition.relais} onChange={(relais) => setEdition({ ...edition, relais })} />}
                           <AdresseInput biais={depot} value={edition.adresse} onChange={(adresse) => setEdition({ ...edition, adresse })} autoFocus />
@@ -1501,6 +1525,7 @@ export function TourneeColis({
                               Annuler
                             </button>
                           </div>
+                        </div>
                         </div>
                       )}
                     </li>
