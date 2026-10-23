@@ -5,6 +5,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { InvitationsGoNavigation, type LigneInvitationStaff } from "@/components/godac-staff/InvitationsGoNavigation";
+import { ResumeApporteursStaff } from "@/components/godac-staff/ResumeApporteursStaff";
+import { apporteurStaff, nomsApporteurs, resumerParApporteurStaff } from "@/lib/partage-go/staff";
 
 /**
  * Backoffice GODAC › Invitations GO Navigation : génération des liens
@@ -19,23 +21,44 @@ export default async function InvitationsGoNavigationPage() {
   if (!isGodacStaffEmail(user?.email)) redirect("/dashboard");
 
   const admin = createAdminSupabaseClient();
-  const { data, error } = await admin
-    .from("go_navigation_invitations")
-    .select("id, note, expires_at, created_at, created_by_email, used_at, revoked_at, organization_id, organizations(name)")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const colonnes = "id, note, expires_at, created_at, created_by_email, used_at, revoked_at, organization_id, organizations(name)";
+  const lire = (cols: string) => admin.from("go_navigation_invitations").select(cols).order("created_at", { ascending: false }).limit(200);
+  // Colonnes du suivi d'apporteur absentes (migration 20261103000003 non appliquée) : liste sans apporteur.
+  let { data, error } = await lire(`${colonnes}, created_by_user_id, created_by_org_id, referral_link_id`);
+  const suiviApporteur = !error;
+  if (error?.code === "42703") ({ data, error } = await lire(colonnes));
 
-  const lignes: LigneInvitationStaff[] = ((data ?? []) as any[]).map((r) => ({
-    id: r.id,
-    note: r.note,
-    expiresAt: r.expires_at,
-    createdAt: r.created_at,
-    createdBy: r.created_by_email,
-    usedAt: r.used_at,
-    revokedAt: r.revoked_at,
-    organizationId: r.organization_id,
-    organizationName: r.organizations?.name ?? null,
-  }));
+  const brut = (data ?? []) as any[];
+  const comptesRes = suiviApporteur
+    ? await admin
+        .from("organizations")
+        .select("id, offre, subscription_status, trial_ends_at, referred_by_user_id, referred_by_org_id")
+        .not("referred_by_user_id", "is", null)
+    : { data: [] as any[] };
+  const comptes = (comptesRes.data ?? []) as any[];
+  const noms = await nomsApporteurs(
+    admin,
+    [...brut.map((r) => r.created_by_user_id).filter(Boolean), ...comptes.map((c) => c.referred_by_user_id)],
+    [...brut.map((r) => r.created_by_org_id).filter(Boolean), ...comptes.map((c) => c.referred_by_org_id).filter(Boolean)],
+  );
+
+  const lignes: LigneInvitationStaff[] = brut.map((r) => {
+    const a = r.created_by_user_id ? apporteurStaff(r.created_by_user_id, r.created_by_org_id ?? null, noms) : null;
+    return {
+      id: r.id,
+      note: r.note,
+      expiresAt: r.expires_at,
+      createdAt: r.created_at,
+      createdBy: r.created_by_email,
+      usedAt: r.used_at,
+      revokedAt: r.revoked_at,
+      organizationId: r.organization_id,
+      organizationName: r.organizations?.name ?? null,
+      apporteur: a ? (a.organisation ? `${a.nom} (${a.organisation})` : a.nom) : null,
+      viaLien: Boolean(r.referral_link_id),
+    };
+  });
+  const resume = resumerParApporteurStaff(comptes, noms);
 
   return (
     <main className="min-h-screen p-6">
@@ -53,7 +76,10 @@ export default async function InvitationsGoNavigationPage() {
           <p className="text-sm text-navy/70">Invitations indisponibles : appliquez la migration 20261023000003_inscription_go_navigation.sql.</p>
         </Card>
       ) : (
-        <InvitationsGoNavigation invitations={lignes} />
+        <>
+          <InvitationsGoNavigation invitations={lignes} />
+          {suiviApporteur && <ResumeApporteursStaff lignes={resume} />}
+        </>
       )}
     </main>
   );

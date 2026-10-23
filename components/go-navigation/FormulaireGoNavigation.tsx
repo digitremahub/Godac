@@ -11,7 +11,7 @@ import { DUREE_ESSAI_JOURS } from "@/lib/go-navigation/offre";
  * de passe, CGU. Le compte est créé et connecté côté serveur, puis la
  * personne arrive sur Tournée colis (accueil GO Navigation).
  */
-export function FormulaireGoNavigation({ jeton }: { jeton: string }) {
+export function FormulaireGoNavigation({ jeton, invitePar = null }: { jeton: string; invitePar?: string | null }) {
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
@@ -41,6 +41,7 @@ export function FormulaireGoNavigation({ jeton }: { jeton: string }) {
     <Card className="flex w-full max-w-sm flex-col gap-4">
       <div>
         <h1 className="text-xl">Essayer GO Navigation</h1>
+        {invitePar && <p className="mt-0.5 text-xs text-navy/55">Invité par {invitePar}</p>}
         <p className="mt-1 text-sm text-navy/65">
           La navigation chauffeur avec votre tournée colis intégrée. Essai gratuit de {DUREE_ESSAI_JOURS} jours, sans carte bancaire.
         </p>
