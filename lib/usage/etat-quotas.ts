@@ -1,7 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { bornesMoisParis, debutJourParis, resoudreFormule, type UsageFeature } from "@/lib/usage/quotas";
+import { lecturesInclusesOrganisation } from "@/lib/usage/inclus-livreur";
+import { bornesMoisParis, debutJourParis, inclusEffectif, resoudreFormule, type UsageFeature } from "@/lib/usage/quotas";
 
 export interface EtatQuotaFonction {
   fonction: UsageFeature;
@@ -55,6 +56,11 @@ export async function etatQuotas(organizationId: string, fonctions: readonly Usa
     ]);
     const inclusPar = new Map((quotas ?? []).map((q: { feature: string; included_per_month: number | null }) => [q.feature, q.included_per_month]));
     for (const q of (propres.error ? [] : (propres.data ?? [])) as { feature: string; included_per_month: number | null }[]) inclusPar.set(q.feature, q.included_per_month);
+    // Lectures IA : volume par chauffeur de l'app Livreur (le plus favorable), sauf plafond d'essai.
+    if (fonctions.includes("ocr_label") && !(propres.data ?? []).some((q: { feature: string }) => q.feature === "ocr_label")) {
+      const parChauffeur = await lecturesInclusesOrganisation(admin, organizationId);
+      inclusPar.set("ocr_label", inclusEffectif(Number(inclusPar.get("ocr_label") ?? 0), parChauffeur));
+    }
     return fonctions.map((f, i) => {
       const t = totaux[i]?.data;
       const ligne = (Array.isArray(t) ? t[0] : t) as { month_units?: number } | null;

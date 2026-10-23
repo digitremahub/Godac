@@ -10,7 +10,7 @@
  * lib/usage/__tests__/facturation.test.ts. Câblage réel :
  * lib/usage/facturation-serveur.ts.
  */
-import { bornesMoisParis, descriptionLigneFacture, lignesDepassement, resoudreFormule } from "@/lib/usage/quotas";
+import { bornesMoisParis, descriptionLigneFacture, inclusEffectif, lignesDepassement, resoudreFormule } from "@/lib/usage/quotas";
 
 export interface OrgFacturable {
   id: string;
@@ -22,6 +22,8 @@ export interface OrgFacturable {
 export interface DepotFacturation {
   organisations(): Promise<OrgFacturable[]>;
   quotas(): Promise<{ plan_id: string; feature: string; included_per_month: number }[]>;
+  /** Lectures IA incluses grâce à l'app Livreur (chauffeurs × volume par chauffeur), 0 si non applicable. */
+  lecturesLivreur?(organizationId: string): Promise<number>;
   prix(): Promise<{ feature: string; unit_price_eur: number; label: string }[]>;
   totaux(organizationId: string, debut: string, fin: string): Promise<{ feature: string; units: number }[]>;
   /** Réserve la ligne ; false si elle existe déjà (déjà facturée ou en cours). */
@@ -58,6 +60,7 @@ export async function facturerDepassements(depot: DepotFacturation, creerLigne: 
   for (const org of orgs) {
     const formule = resoudreFormule(org.plan);
     const inclus = Object.fromEntries(quotas.filter((q) => q.plan_id === formule).map((q) => [q.feature, Number(q.included_per_month)]));
+    if (depot.lecturesLivreur) inclus.ocr_label = inclusEffectif(inclus.ocr_label ?? 0, await depot.lecturesLivreur(org.id));
     const totaux = await depot.totaux(org.id, debut, fin);
     for (const ligne of lignesDepassement(totaux, inclus, prixParFonction)) {
       const reservee = await depot.reserver({

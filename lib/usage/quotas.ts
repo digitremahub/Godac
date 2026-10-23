@@ -57,6 +57,34 @@ export function plafondJournalierParDefaut(inclusParMois: number): number {
   return Math.max(20, Math.ceil((inclusParMois * 10) / 30));
 }
 
+/**
+ * Lectures IA (étiquettes, photos, pages de bordereau) incluses par
+ * chauffeur et par mois pour l'application Livreur, dégressives avec la
+ * taille de l'équipe (le coût IA reste ≈ 25 à 33 % du prix par chauffeur) :
+ * 300 jusqu'à 5 chauffeurs, 250 jusqu'à 15, 200 jusqu'à 30, 150 jusqu'à 60,
+ * 120 au-delà. Au-delà du volume, la saisie manuelle reste complète.
+ */
+export const LECTURES_PAR_CHAUFFEUR: readonly { jusqua: number | null; parChauffeur: number }[] = [
+  { jusqua: 5, parChauffeur: 300 },
+  { jusqua: 15, parChauffeur: 250 },
+  { jusqua: 30, parChauffeur: 200 },
+  { jusqua: 60, parChauffeur: 150 },
+  { jusqua: null, parChauffeur: 120 },
+];
+
+/** Lectures IA par mois incluses pour `chauffeurs` chauffeurs actifs (0 sans chauffeur). */
+export function lecturesInclusesLivreur(chauffeurs: number): number {
+  const n = Math.max(0, Math.floor(chauffeurs));
+  if (n === 0) return 0;
+  const palier = LECTURES_PAR_CHAUFFEUR.find((p) => p.jusqua === null || n <= p.jusqua)!;
+  return n * palier.parChauffeur;
+}
+
+/** Volume inclus effectif : le plus favorable du volume de la formule et du volume par chauffeur. */
+export function inclusEffectif(inclusFormule: number, inclusLivreur: number): number {
+  return Math.max(inclusFormule, inclusLivreur);
+}
+
 export interface QuotaLigne {
   included_per_month: number | null;
   daily_cap: number | null;
@@ -142,7 +170,8 @@ export function messageRefus(
     return `Plafond mensuel atteint pour ${libelle} : ${info.inclusParMois} par mois pendant votre essai. Contactez GODAC pour l'augmenter.`;
   }
   const prix = info.prixUnitaire !== null ? ` (${formatEuro(info.prixUnitaire)} HT l'unité)` : "";
-  return `Quota mensuel atteint pour ${libelle} : ${info.inclusParMois} inclus dans votre formule ce mois-ci. La direction peut autoriser le dépassement facturé${prix} dans Abonnement › Consommation.`;
+  const manuel = fonction === "ocr_label" ? " La saisie manuelle reste disponible (scan des codes-barres, recherche et saisie des adresses)." : "";
+  return `Quota mensuel atteint pour ${libelle} : ${info.inclusParMois} inclus dans votre formule ce mois-ci.${manuel} La direction peut autoriser le dépassement facturé${prix} dans Abonnement › Consommation.`;
 }
 
 // ── Bornes de mois et de jour, heure de Paris ────────────────────────

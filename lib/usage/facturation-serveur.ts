@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DepotFacturation, OrgFacturable } from "@/lib/usage/facturation";
+import { lecturesInclusesOrganisation } from "@/lib/usage/inclus-livreur";
 
 /** Accès base de la facturation du dépassement (client service). */
 export function depotFacturationSupabase(admin: SupabaseClient): DepotFacturation {
@@ -18,6 +19,7 @@ export function depotFacturationSupabase(admin: SupabaseClient): DepotFacturatio
       if (error) throw new Error(`Quotas illisibles : ${error.message}`);
       return data ?? [];
     },
+    lecturesLivreur: (organizationId) => lecturesInclusesOrganisation(admin, organizationId),
     async prix() {
       const { data, error } = await admin.from("usage_prices").select("feature, unit_price_eur, label");
       if (error) throw new Error(`Prix illisibles : ${error.message}`);

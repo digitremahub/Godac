@@ -1,10 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { lecturesInclusesOrganisation } from "@/lib/usage/inclus-livreur";
 import {
   bornesMoisParis,
   debutJourParis,
   deciderConsommation,
   messageRefus,
+  plafondJournalierParDefaut,
+  inclusEffectif,
   quotaEffectif,
   resoudreFormule,
   seuilsFranchis,
@@ -71,7 +74,17 @@ export async function consommer(
     admin.from("usage_quota_overrides").select("included_per_month, daily_cap").eq("organization_id", organizationId).eq("feature", feature).maybeSingle(),
   ]);
 
-  const { inclusParMois, plafondJour, depassementAutorise } = quotaEffectif(quota, propre.error ? null : propre.data, orgRes.data?.usage_overage_enabled ?? true);
+  const effectif = quotaEffectif(quota, propre.error ? null : propre.data, orgRes.data?.usage_overage_enabled ?? true);
+  let { inclusParMois, plafondJour } = effectif;
+  const { depassementAutorise } = effectif;
+  // Lectures IA : le volume par chauffeur de l'app Livreur s'ajoute à la formule (le plus favorable l'emporte), sauf plafond d'essai.
+  if (feature === "ocr_label" && (propre.error || !propre.data)) {
+    const parChauffeur = await lecturesInclusesOrganisation(admin, organizationId);
+    if (parChauffeur > inclusParMois) {
+      inclusParMois = inclusEffectif(inclusParMois, parChauffeur);
+      plafondJour = Math.max(plafondJour, plafondJournalierParDefaut(inclusParMois));
+    }
+  }
   const totaux = (Array.isArray(totauxRes.data) ? totauxRes.data[0] : totauxRes.data) as { month_units: number; day_units: number } | null;
   const utiliseMois = Number(totaux?.month_units ?? 0);
   const utiliseJour = Number(totaux?.day_units ?? 0);
