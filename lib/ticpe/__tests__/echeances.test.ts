@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  JOUR_LIMITE_CA3_PAR_DEFAUT,
   argentNonReclame,
   dateLimite,
   dateLimiteCa12ParDefaut,
@@ -41,10 +42,11 @@ describe("périodes de déclaration", () => {
 });
 
 describe("dates limites", () => {
-  it("CA3 : fin du mois suivant par défaut", () => {
-    expect(dateLimite(periodeContenant("2026-01-15", "mensuel"), "mensuel", R)).toBe("2026-02-28");
-    expect(dateLimite(periodeContenant("2026-12-15", "mensuel"), "mensuel", R)).toBe("2027-01-31");
-    expect(dateLimite(periodeContenant("2026-02-15", "trimestriel"), "trimestriel", R)).toBe("2026-04-30");
+  it("CA3 : le 20 du mois suivant par défaut (valeur prudente, réglable)", () => {
+    expect(JOUR_LIMITE_CA3_PAR_DEFAUT).toBe(20);
+    expect(dateLimite(periodeContenant("2026-01-15", "mensuel"), "mensuel", R)).toBe("2026-02-20");
+    expect(dateLimite(periodeContenant("2026-12-15", "mensuel"), "mensuel", R)).toBe("2027-01-20");
+    expect(dateLimite(periodeContenant("2026-02-15", "trimestriel"), "trimestriel", R)).toBe("2026-04-20");
   });
   it("CA3 : jour réglé, borné à la fin du mois", () => {
     expect(dateLimite(periodeContenant("2026-03-15", "mensuel"), "mensuel", { ...R, jour_limite_depot: 19 })).toBe("2026-04-19");
@@ -57,9 +59,12 @@ describe("dates limites", () => {
     expect(dateLimite(periodeContenant("2026-06-01", "annuel_ca12"), "annuel_ca12", { ...R, date_limite_ca12: "05-15" })).toBe("2027-05-15");
   });
   it("prochaine échéance : période précédente tant que sa date limite n'est pas passée", () => {
-    expect(prochaineEcheance("2026-10-22", R)).toMatchObject({ periode: { cle: "2026-09" }, dateLimite: "2026-10-31", joursRestants: 9 });
+    expect(prochaineEcheance("2026-10-15", R)).toMatchObject({ periode: { cle: "2026-09" }, dateLimite: "2026-10-20", joursRestants: 5 });
+    // Le 22/10, la date du 20/10 est passée : on bascule sur la période en cours (la date par défaut n'est plus « fin du mois »).
+    expect(prochaineEcheance("2026-10-22", R)).toMatchObject({ periode: { cle: "2026-10" }, dateLimite: "2026-11-20" });
+    expect(prochaineEcheance("2026-10-22", { ...R, jour_limite_depot: 31 })).toMatchObject({ periode: { cle: "2026-09" }, dateLimite: "2026-10-31", joursRestants: 9 });
     expect(prochaineEcheance("2026-10-22", { ...R, jour_limite_depot: 19 })).toMatchObject({ periode: { cle: "2026-10" }, dateLimite: "2026-11-19" });
-    expect(prochaineEcheance("2026-10-22", { ...R, regime_tva: "trimestriel" })).toMatchObject({ periode: { cle: "2026-T3" }, dateLimite: "2026-10-31" });
+    expect(prochaineEcheance("2026-10-15", { ...R, regime_tva: "trimestriel" })).toMatchObject({ periode: { cle: "2026-T3" }, dateLimite: "2026-10-20" });
     expect(prochaineEcheance("2026-10-22", { ...R, regime_tva: "annuel_ca12" })).toMatchObject({ periode: { cle: "2026" }, dateLimite: "2027-05-04" });
     expect(prochaineEcheance("2026-03-01", { ...R, regime_tva: "annuel_ca12" })).toMatchObject({ periode: { cle: "2025" }, dateLimite: "2026-05-05" });
   });

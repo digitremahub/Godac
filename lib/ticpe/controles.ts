@@ -7,6 +7,7 @@
 
 import { LIBELLES_CATEGORIE_COURTS, LIBELLES_ZONE } from "@/lib/ticpe/bareme";
 import type { ResultatEligibilite } from "@/lib/ticpe/eligibilite";
+import { DOUBLON_MINUTES, departager, doublonsProbables, litresProches } from "@/lib/ticpe/doublons";
 import { jourParis, type Depassement, type LigneTicpe } from "@/lib/ticpe/montant";
 
 export type Gravite = "bloquant" | "avertissement";
@@ -24,7 +25,9 @@ export type CodeControle =
   | "taux_manquant"
   | "location_loueur"
   | "vehicule_a_verifier"
-  | "vehicule_a_regulariser";
+  | "vehicule_a_regulariser"
+  | "zone_a_verifier"
+  | "hors_france";
 
 export interface PointARegler {
   cle: string;
@@ -50,6 +53,8 @@ export const LIBELLES_CONTROLE: Record<CodeControle, string> = {
   location_loueur: "Véhicule loué : remboursement demandé par le loueur",
   vehicule_a_verifier: "Véhicule à vérifier",
   vehicule_a_regulariser: "Véhicule à régulariser",
+  zone_a_verifier: "Zone du plein à vérifier",
+  hors_france: "Plein acheté hors de France",
 };
 
 export interface PleinControle {
@@ -60,6 +65,9 @@ export interface PleinControle {
   status: string;
   tank_id?: string | null;
   station_name?: string | null;
+  ticket_photo_path?: string | null;
+  ticpe_justificatif?: string | null;
+  ticpe_doublon_leve_le?: string | null;
 }
 
 export interface VehiculeControle {
@@ -77,41 +85,7 @@ function nombre(v: number | string | null | undefined): number | null {
 const L = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} L`;
 const dateHeure = (iso: string) => new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" });
 
-/** Écart maximal pour un doublon : 30 minutes, litres à 1 L ou 2 % près. */
-export const DOUBLON_MINUTES = 30;
-
-export function litresProches(a: number, b: number): boolean {
-  return Math.abs(a - b) <= Math.max(1, 0.02 * Math.max(a, b));
-}
-
-/**
- * Paires de pleins probablement saisis deux fois (ex. ticket photographié
- * et ligne du relevé de carte) : même véhicule, à 30 minutes au plus,
- * litres proches.
- */
-export function doublonsProbables<P extends Pick<PleinControle, "id" | "vehicle_id" | "occurred_at" | "liters">>(pleins: readonly P[]): [P, P][] {
-  const parVehicule = new Map<string, P[]>();
-  for (const p of pleins) {
-    if (nombre(p.liters) === null) continue;
-    const l = parVehicule.get(p.vehicle_id) ?? [];
-    l.push(p);
-    parVehicule.set(p.vehicle_id, l);
-  }
-  const paires: [P, P][] = [];
-  for (const liste of parVehicule.values()) {
-    liste.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
-    for (let i = 0; i < liste.length; i++) {
-      const a = liste[i]!;
-      const ta = new Date(a.occurred_at).getTime();
-      for (let j = i + 1; j < liste.length; j++) {
-        const b = liste[j]!;
-        if (new Date(b.occurred_at).getTime() - ta > DOUBLON_MINUTES * 60000) break;
-        if (litresProches(nombre(a.liters)!, nombre(b.liters)!)) paires.push([a, b]);
-      }
-    }
-  }
-  return paires;
-}
+export { DOUBLON_MINUTES, doublonsProbables, litresProches };
 
 export interface EntreeControles {
   periode: { debut: string; fin: string };
@@ -154,10 +128,23 @@ export function controlesPeriode(e: EntreeControles): PointARegler[] {
       ajouter({ cle: `non_valide:${l.id}`, code: "plein_non_valide", gravite: "bloquant", detail: `${qui} : pas encore validé, il n'est pas compté.`, lien: lienPlein(l.id), objet: { type: "plein", id: l.id } });
     }
     if (l.statut === "exclu") {
+      if (l.paysHorsFrance) {
+        ajouter({ cle: `hors_france:${l.id}`, code: "hors_france", gravite: "avertissement", detail: `${qui} : acheté en ${l.paysHorsFrance}, non compté (seule l'accise française est remboursée, à confirmer par l'expert-comptable). Corrigez le pays d'achat s'il s'agit d'une erreur.`, lien: lienPlein(l.id), objet: { type: "plein", id: l.id } });
+      }
       if (l.raison?.includes("hors de la période")) {
         ajouter({ cle: `hors_periode:${l.id}`, code: "hors_periode", gravite: "avertissement", detail: `${qui} : plein en dehors de la période d'éligibilité du véhicule, non compté.`, lien: lienVehicule(l.vehicle_id), objet: { type: "vehicule", id: l.vehicle_id } });
       }
       continue;
+    }
+    if (l.zoneIncertaine) {
+      ajouter({
+        cle: `zone:${l.id}`,
+        code: "zone_a_verifier",
+        gravite: "avertissement",
+        detail: `${qui} : la station évoque la Corse mais la zone du plein n'est pas renseignée ; compté en ${LIBELLES_ZONE[l.zone ?? "metropole"]}. Indiquez la zone (Corse ou métropole) et le pays d'achat dans la fiche du plein.`,
+        lien: lienPlein(l.id),
+        objet: { type: "plein", id: l.id },
+      });
     }
     if (!l.justificatif.present) {
       if (l.justificatif.type === "livraison_cuve") {
@@ -177,14 +164,15 @@ export function controlesPeriode(e: EntreeControles): PointARegler[] {
 
   // Doublons probables parmi les pleins fiables de la période.
   const fiables = [...e.pleins.values()].filter((p) => STATUTS_FIABLES.includes(p.status) && dans(jourParis(p.occurred_at)));
-  for (const [a, b] of doublonsProbables(fiables)) {
+  for (const [x, y] of doublonsProbables(fiables)) {
+    const { garde, ecarte } = departager(x, y);
     ajouter({
-      cle: `doublon:${a.id}:${b.id}`,
+      cle: `doublon:${x.id}:${y.id}`,
       code: "doublon",
       gravite: "bloquant",
-      detail: `${immat(a.vehicle_id)} : ${L(nombre(a.liters)!)} le ${dateHeure(a.occurred_at)} et ${L(nombre(b.liters)!)} le ${dateHeure(b.occurred_at)} (ticket et relevé de carte ?).`,
-      lien: lienPlein(b.id),
-      objet: { type: "plein", id: b.id },
+      detail: `${immat(x.vehicle_id)} : ${L(nombre(x.liters)!)} le ${dateHeure(x.occurred_at)} et ${L(nombre(y.liters)!)} le ${dateHeure(y.occurred_at)} (ticket et relevé de carte ?). Le plein du ${dateHeure(ecarte.occurred_at)} n'est pas compté (celui du ${dateHeure(garde.occurred_at)} l'est) tant que vous n'avez pas confirmé deux pleins distincts.`,
+      lien: lienPlein(ecarte.id),
+      objet: { type: "plein", id: ecarte.id },
     });
   }
 
@@ -215,7 +203,7 @@ export function controlesPeriode(e: EntreeControles): PointARegler[] {
       cle: `plafond:${d.vehicle_id}:${d.periode}`,
       code: "plafond",
       gravite: "avertissement",
-      detail: `${immat(d.vehicle_id)} : ${L(d.litres)} sur ${d.periode.replace("-S", " semestre ")} pour un plafond de ${L(d.plafond)} ; ${L(d.litresHorsPlafond)} exclus du montant (plafond à confirmer par l'expert-comptable).`,
+      detail: `${immat(d.vehicle_id)} : ${L(d.litres)} sur ${d.periode.replace("-S", " semestre ")} pour le plafond que vous avez activé de ${L(d.plafond)} ; ${L(d.litresHorsPlafond)} exclus du montant. Ce plafond vient de vos réglages : base légale non confirmée, à confirmer par l'expert-comptable.`,
       lien: lienVehicule(d.vehicle_id),
       objet: { type: "vehicule", id: d.vehicle_id },
     });

@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { avantApres, aucunChangement } from "@/lib/audit/avant-apres";
+import { declarationCouvrant } from "@/lib/ticpe/declarations-serveur";
+import { jourParis } from "@/lib/ticpe/montant";
+import { messagePeriodeDeclaree, modifieLeMontantTicpe } from "@/lib/ticpe/regularisation";
 
 const patchSchema = z.object({
   totalizer_before: z.coerce.number().nonnegative().nullable().optional(),
@@ -23,6 +27,8 @@ const patchSchema = z.object({
   validate: z.boolean().optional(),
   /** Set when an ocr_failed row is completed by hand — the degraded-mode fallback never silently drops the ticket photo already attached. */
   markManual: z.boolean().optional(),
+  /** Confirmation explicite : le plein appartient à une période TICPE déjà déclarée. */
+  confirmer_periode_declaree: z.boolean().optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -63,10 +69,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { validate, markManual, ...fields } = parsed.data;
+  const { validate, markManual, confirmer_periode_declaree, ...fields } = parsed.data;
   const supabase = await createServerSupabaseClient();
 
-  const { data: current } = await supabase.from("fuel_entries").select("status, tank_id").eq("id", id).maybeSingle();
+  // État d'avant : statut, cuve, date et les colonnes que cette demande va modifier (pour le journal avant / après).
+  const colonnesAvant = [...new Set(["status", "tank_id", "occurred_at", ...Object.keys(fields)])];
+  const { data: currentBrut } = await supabase.from("fuel_entries").select(colonnesAvant.join(", ")).eq("id", id).maybeSingle();
+  const current = currentBrut as unknown as (Record<string, unknown> & { status: string; tank_id: string | null; occurred_at: string }) | null;
   if (!current) return NextResponse.json({ error: "Plein introuvable." }, { status: 404 });
   const dejaEnregistre = current.status === "manual" || current.status === "validated";
   // Revalider un plein déjà enregistré ne doit rien rejouer (stock, alertes).
@@ -75,6 +84,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (fields.occurred_at && new Date(fields.occurred_at).getTime() > Date.now() + 10 * 60_000) {
     return NextResponse.json({ error: "La date du plein est dans le futur." }, { status: 422 });
+  }
+  // Plein d'une période TICPE déjà déclarée : la modification change le montant calculé, donc demande une confirmation.
+  let periodeDeclaree: string | null = null;
+  if (dejaEnregistre && modifieLeMontantTicpe(fields)) {
+    const jours = [jourParis(current.occurred_at), ...(fields.occurred_at ? [jourParis(fields.occurred_at)] : [])];
+    const decl = await declarationCouvrant(supabase, appUser.organization_id, jours);
+    if (decl) {
+      if (!confirmer_periode_declaree) {
+        return NextResponse.json({ error: messagePeriodeDeclaree(decl), code: "PERIODE_DECLAREE", periodeDeclaree: decl.periode_libelle ?? decl.periode_cle }, { status: 409 });
+      }
+      periodeDeclaree = decl.periode_libelle ?? decl.periode_cle;
+    }
   }
   const tankFinal = fields.tank_id !== undefined ? fields.tank_id : current.tank_id;
   if (tankFinal === null) {
@@ -107,14 +128,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (dejaEnregistre) {
-    await journaliser({
-      organizationId: appUser.organization_id,
-      userId: appUser.id,
-      action: "plein_modification",
-      targetTable: "fuel_entries",
-      targetId: id,
-      details: fields,
-    });
+    // Journal : ancienne et nouvelle valeur de chaque champ réellement changé.
+    const diff = avantApres(current, fields);
+    if (!aucunChangement(diff)) {
+      await journaliser({
+        organizationId: appUser.organization_id,
+        userId: appUser.id,
+        action: "plein_modification",
+        targetTable: "fuel_entries",
+        targetId: id,
+        details: { ...diff, ...(periodeDeclaree ? { periode_declaree: periodeDeclaree } : {}) },
+      });
+    }
   }
   return NextResponse.json({ fuelEntry: data });
 }

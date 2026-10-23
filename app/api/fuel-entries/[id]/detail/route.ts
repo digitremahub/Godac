@@ -8,6 +8,7 @@ import { libelleADecider } from "@/lib/hierarchie/demandes";
 import { ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
 import type { DetailPlein, PhotoPlein, TicpeDuPlein } from "@/lib/fuel/detail-plein";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { declarationCouvrant } from "@/lib/ticpe/declarations-serveur";
 import { jourParis } from "@/lib/ticpe/montant";
 import { LIBELLES_CATEGORIE_COURTS, LIBELLES_ZONE } from "@/lib/ticpe/bareme";
 
@@ -117,6 +118,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const annee = Number(jourParis(e.occurred_at).slice(0, 4));
       const calcul = await calculerTicpe(supabase, appUser.organization_id, { anneeDebut: annee, anneeFin: annee, vehicleIds: [e.vehicle_id] });
       const l = calcul.lignes.find((x) => x.id === id);
+      const declaree = l ? await declarationCouvrant(supabase, appUser.organization_id, [jourParis(e.occurred_at)]) : null;
       if (l) {
         ticpe = {
           statut: l.statut,
@@ -133,6 +135,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           montant: l.montant,
           justificatif: l.justificatif,
           justificatifModifiable: ["manager", "exploitation", "direction"].includes(appUser.role) && !e.ticket_photo_path,
+          zoneSaisie: calcul.pleins.get(id)?.ticpe_zone === "corse" || calcul.pleins.get(id)?.ticpe_zone === "metropole" ? (calcul.pleins.get(id)!.ticpe_zone as "corse" | "metropole") : null,
+          zonePropose: l.zonePropose ? LIBELLES_ZONE[l.zonePropose] : null,
+          zoneIncertaine: l.zoneIncertaine === true,
+          paysAchat: calcul.pleins.get(id)?.pays_achat ?? null,
+          zoneModifiable: ["manager", "exploitation", "direction"].includes(appUser.role),
+          periodeDeclaree: declaree ? (declaree.periode_libelle ?? declaree.periode_cle) : null,
+          doublon: l.doublon === true,
+          doublonLeveLe: calcul.pleins.get(id)?.ticpe_doublon_leve_le ?? null,
+          doublonLevable: ["manager", "exploitation", "direction"].includes(appUser.role) && (l.doublon === true || Boolean(calcul.pleins.get(id)?.ticpe_doublon_leve_le)),
         };
       }
     } catch (err) {

@@ -95,7 +95,7 @@ export function ReglagesTicpeForm({ initial, lectureSeule = false }: { initial: 
                   type="number"
                   min={1}
                   max={31}
-                  placeholder="par défaut : fin du mois suivant"
+                  placeholder="par défaut : le 20 du mois suivant"
                   value={r.jour_limite_depot ?? ""}
                   onChange={(e) => maj("jour_limite_depot", e.target.value ? Number(e.target.value) : null)}
                 />
@@ -108,28 +108,40 @@ export function ReglagesTicpeForm({ initial, lectureSeule = false }: { initial: 
           </div>
           <p className="mt-1 text-xs text-navy/55">
             Depuis les consommations 2025, la demande se fait auprès des impôts (DGFiP) avec la déclaration de TVA. La date limite dépend de votre entreprise :
-            reprenez celle de votre espace professionnel ({MENTION_A_CONFIRMER}).
+            reprenez celle de votre espace professionnel ({MENTION_A_CONFIRMER}). Sans date saisie, GODAC prend le 20 du mois suivant, par prudence : à confirmer selon
+            votre date de dépôt de TVA.
           </p>
         </section>
 
         <section>
-          <h3 className="mb-2 text-base">Plafond par véhicule</h3>
+          <h3 className="mb-2 text-base">Plafond de volume par véhicule (facultatif)</h3>
+          <label className="mb-2 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={r.plafond_actif} onChange={(e) => maj("plafond_actif", e.target.checked)} />
+            Appliquer un plafond de litres par véhicule <span className="text-xs text-navy/55">({MENTION_A_CONFIRMER} : base légale non confirmée)</span>
+          </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="label">Litres au maximum</span>
-              <input className="input" type="number" min={1} value={r.plafond_litres} onChange={(e) => maj("plafond_litres", Number(e.target.value || 0))} />
+              <input
+                className="input"
+                type="number"
+                min={1}
+                disabled={!r.plafond_actif}
+                value={r.plafond_litres ?? ""}
+                onChange={(e) => maj("plafond_litres", e.target.value ? Number(e.target.value) : null)}
+              />
             </label>
             <label className="block">
               <span className="label">Par</span>
-              <select className="input" value={r.plafond_periode} onChange={(e) => maj("plafond_periode", e.target.value as "annuel" | "semestriel")}>
+              <select className="input" disabled={!r.plafond_actif} value={r.plafond_periode} onChange={(e) => maj("plafond_periode", e.target.value as "annuel" | "semestriel")}>
                 <option value="annuel">an (année civile)</option>
                 <option value="semestriel">semestre</option>
               </select>
             </label>
           </div>
           <p className="mt-1 text-xs text-navy/55">
-            Les sources se contredisent (40 000 L par an ou 20 000 L par semestre) : {MENTION_A_CONFIRMER}. Les litres au-delà restent visibles mais ne comptent
-            pas dans le montant.
+            Par défaut, GODAC n&apos;applique aucun plafond : nous n&apos;avons pas trouvé de texte qui en fixe un. N&apos;en activez un que si votre expert-comptable
+            vous le demande. Les litres au-delà d&apos;un plafond activé restent visibles dans les contrôles et les documents, mais ne comptent pas dans le montant.
           </p>
         </section>
 

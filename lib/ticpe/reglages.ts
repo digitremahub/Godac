@@ -22,11 +22,14 @@ export interface ReglagesTicpe {
   activite_taxi: boolean;
   categorie_par_defaut: CategorieTicpe;
   regime_tva: RegimeTva;
-  /** Jour du mois de la date limite de dépôt de la TVA ; null = fin du mois suivant. */
+  /** Jour du mois suivant de la date limite de dépôt de la TVA (CA3) ; null = le 20 (valeur prudente, à confirmer selon votre date de dépôt de TVA). */
   jour_limite_depot: number | null;
   /** MM-JJ ; null = valeur par défaut (début mai, à confirmer). */
   date_limite_ca12: string | null;
-  plafond_litres: number;
+  /** Plafond de volume appliqué seulement si l'organisation l'a activé ET saisi (base légale non confirmée). */
+  plafond_actif: boolean;
+  /** Litres par véhicule et par période ; null = aucune valeur saisie. Sans effet tant que plafond_actif est faux. */
+  plafond_litres: number | null;
   plafond_periode: "annuel" | "semestriel";
   accepte_hvo_b100: boolean;
   location_demandeur: "nous" | "loueur";
@@ -35,7 +38,7 @@ export interface ReglagesTicpe {
   rappel_jours: number;
 }
 
-/** Modèle standard : TRM seul, CA3 mensuelle, 40 000 L/an/véhicule (à confirmer), gazole seul, location demandée par nous. */
+/** Modèle standard : TRM seul, CA3 mensuelle, aucun plafond de volume, gazole seul, location demandée par nous. */
 export const REGLAGES_PAR_DEFAUT: ReglagesTicpe = {
   activite_trm: true,
   activite_trv: false,
@@ -44,7 +47,8 @@ export const REGLAGES_PAR_DEFAUT: ReglagesTicpe = {
   regime_tva: "mensuel",
   jour_limite_depot: null,
   date_limite_ca12: null,
-  plafond_litres: 40000,
+  plafond_actif: false,
+  plafond_litres: null,
   plafond_periode: "annuel",
   accepte_hvo_b100: false,
   location_demandeur: "nous",
@@ -65,7 +69,8 @@ export const schemaReglages = z
       .string()
       .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/, "Format MM-JJ attendu (ex. 05-05).")
       .nullable(),
-    plafond_litres: z.number().int().positive().max(1_000_000),
+    plafond_actif: z.boolean(),
+    plafond_litres: z.number().int().positive().max(1_000_000).nullable(),
     plafond_periode: z.enum(["annuel", "semestriel"]),
     accepte_hvo_b100: z.boolean(),
     location_demandeur: z.enum(["nous", "loueur"]),
@@ -73,6 +78,7 @@ export const schemaReglages = z
     forfait_pondere_2025: z.boolean(),
     rappel_jours: z.number().int().min(0).max(60),
   })
+  .refine((r) => !r.plafond_actif || r.plafond_litres !== null, { message: "Saisissez le plafond en litres pour l'activer.", path: ["plafond_litres"] })
   .refine((r) => r.activite_trm || r.activite_trv || r.activite_taxi, { message: "Cochez au moins une activité.", path: ["activite_trm"] })
   .refine((r) => (r.categorie_par_defaut === "trm" ? r.activite_trm : r.categorie_par_defaut === "trv" ? r.activite_trv : r.activite_taxi), {
     message: "La catégorie par défaut doit être une activité cochée.",
@@ -101,7 +107,8 @@ export function normaliserReglages(ligne: Record<string, unknown> | null | undef
     regime_tva: un(ligne.regime_tva, REGIMES_TVA, d.regime_tva),
     jour_limite_depot: entier(ligne.jour_limite_depot, null, 1, 31),
     date_limite_ca12: typeof ligne.date_limite_ca12 === "string" && /^\d{2}-\d{2}$/.test(ligne.date_limite_ca12) ? ligne.date_limite_ca12 : null,
-    plafond_litres: entier(ligne.plafond_litres, d.plafond_litres, 1, 1_000_000) ?? d.plafond_litres,
+    plafond_actif: false,
+    plafond_litres: entier(ligne.plafond_litres, null, 1, 1_000_000),
     plafond_periode: un(ligne.plafond_periode, ["annuel", "semestriel"] as const, d.plafond_periode),
     accepte_hvo_b100: bool(ligne.accepte_hvo_b100, d.accepte_hvo_b100),
     location_demandeur: un(ligne.location_demandeur, ["nous", "loueur"] as const, d.location_demandeur),
@@ -109,9 +116,19 @@ export function normaliserReglages(ligne: Record<string, unknown> | null | undef
     forfait_pondere_2025: bool(ligne.forfait_pondere_2025, d.forfait_pondere_2025),
     rappel_jours: entier(ligne.rappel_jours, d.rappel_jours, 0, 60) ?? d.rappel_jours,
   };
+  // Colonne absente (migration non appliquée) ou non cochée : aucun plafond.
+  r.plafond_actif = bool(ligne.plafond_actif, false) && r.plafond_litres !== null;
   if (!r.activite_trm && !r.activite_trv && !r.activite_taxi) r.activite_trm = true;
   return r;
 }
+
+/** Plafond réellement appliqué : null (aucun) tant que l'organisation ne l'a pas activé et saisi. */
+export function plafondEffectif(reglages: Pick<ReglagesTicpe, "plafond_actif" | "plafond_litres">): number | null {
+  return reglages.plafond_actif && reglages.plafond_litres !== null && reglages.plafond_litres > 0 ? reglages.plafond_litres : null;
+}
+
+/** Mention obligatoire autour de tout plafond de volume. */
+export const MENTION_PLAFOND = `Plafond de volume : ${"à confirmer par l'expert-comptable"} — base légale non confirmée.`;
 
 /** Activité cochée dans les réglages ? */
 export function activiteActive(reglages: ReglagesTicpe, categorie: CategorieTicpe): boolean {

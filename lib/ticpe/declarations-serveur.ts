@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { declarationDuJour } from "@/lib/ticpe/regularisation";
 
 export interface LigneDeclaration {
   id: string;
@@ -39,4 +40,18 @@ export async function chargerDeclarations(supabase: SupabaseClient, organization
     })),
     disponible: true,
   };
+}
+
+/**
+ * Déclaration non annulée qui couvre l'un de ces jours (AAAA-MM-JJ de Paris), sinon null.
+ * Tolère la migration 20261031000003 non appliquée (null).
+ */
+export async function declarationCouvrant(supabase: SupabaseClient, organizationId: string, jours: readonly string[]): Promise<LigneDeclaration | null> {
+  const { declarations, disponible } = await chargerDeclarations(supabase, organizationId);
+  if (!disponible) return null;
+  for (const j of jours) {
+    const d = declarationDuJour(j, declarations);
+    if (d) return d;
+  }
+  return null;
 }
