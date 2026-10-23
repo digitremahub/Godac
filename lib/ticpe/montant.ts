@@ -2,7 +2,9 @@
  * Montant TICPE par plein, plafond par véhicule — pur, testé.
  *
  * Pour chaque plein de gazole validé d'un véhicule éligible à sa date :
- * zone (Corse si la station ou la cuve est en Corse, sinon métropole),
+ * zone (champ explicite du plein, sinon zone de la cuve, sinon zone par
+ * défaut de l'organisation ; le nom de la station ne fait que PROPOSER
+ * la Corse, jamais la décider), pays d'achat (hors France : non compté),
  * taux du barème à la date du plein (heure de Paris), montant =
  * litres / 100 × taux. Pleins à la cuve : seuls les litres distribués au
  * véhicule (le plein lui-même) comptent, jamais la livraison de la cuve.
@@ -35,6 +37,10 @@ export interface PleinTicpe {
   ticket_photo_path?: string | null;
   ticpe_justificatif?: string | null;
   ticpe_justificatif_ref?: string | null;
+  /** Zone TICPE saisie sur le plein (null = non renseignée). Migration 20261101000004. */
+  ticpe_zone?: string | null;
+  /** Pays d'achat, code ISO (null = non renseigné, donc France). Migration 20261101000004. */
+  pays_achat?: string | null;
   /** Une personne a confirmé « deux pleins distincts » (migration 20261101000003). */
   ticpe_doublon_leve_le?: string | null;
 }
@@ -46,28 +52,47 @@ export function jourParis(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
 
-/** Corse : nom ou adresse de station (villes principales, « Corse », codes postaux 20xxx, 2A / 2B). */
+/**
+ * Indices de Corse dans un nom ou une adresse de station (villes principales,
+ * « Corse », codes postaux 200xx-206xx). Sert UNIQUEMENT à proposer une zone :
+ * un code postal peut être celui d'une ville étrangère (20095 Hambourg) et un
+ * nom de station peut contenir « Corte » sans être en Corse (Corte-Real, Lisbonne).
+ */
 const RE_CORSE =
-  /\bcorse\b|\bcorsica\b|ajaccio|bastia|porto[- ]?vecchio|\bcalvi\b|\bcorte\b|propriano|bonifacio|[iî]le[- ]rousse|sart[eè]ne|ghisonaccia|biguglia|furiani|borgo\b|lucciana|\b20[0-6]\d{2}\b|\b2[ab]\b/i;
+  /\bcorse\b|\bcorsica\b|ajaccio|bastia|porto[- ]?vecchio|\bcalvi\b|\bcorte\b|propriano|bonifacio|[iî]le[- ]rousse|sart[eè]ne|ghisonaccia|biguglia|furiani|borgo\b|lucciana|\b20[0-6]\d{2}\b/i;
 
-export function stationEnCorse(texte: string | null | undefined): boolean {
+/** Le texte évoque la Corse : une PROPOSITION de zone, jamais une décision. */
+export function stationEvoqueCorse(texte: string | null | undefined): boolean {
   return Boolean(texte && RE_CORSE.test(texte));
 }
 
-export type OrigineZone = "cuve" | "station" | "defaut";
+export type OrigineZone = "plein" | "cuve" | "defaut";
+
+/** Pays d'achat d'un plein : code ISO en majuscules ; non renseigné = France. */
+export function paysDuPlein(plein: Pick<PleinTicpe, "pays_achat">): string {
+  const p = typeof plein.pays_achat === "string" ? plein.pays_achat.trim().toUpperCase() : "";
+  return /^[A-Z]{2}$/.test(p) ? p : "FR";
+}
+
+const zoneValide = (z: unknown): z is "metropole" | "corse" => z === "metropole" || z === "corse";
 
 /**
- * Zone d'un plein : cuve → zone de la cuve ; station dont le nom ou
- * l'adresse indique la Corse → Corse ; sinon zone par défaut de
- * l'organisation.
+ * Zone d'un plein, dans cet ordre : zone saisie sur le plein ; pour un plein
+ * à la cuve, zone de la cuve ; sinon zone par défaut de l'organisation. Si
+ * rien n'a été saisi et que la station évoque la Corse alors que la zone
+ * retenue est la métropole, la zone est « incertaine » : on garde la zone
+ * par défaut, on propose la Corse, et le plein devient un point à vérifier.
  */
 export function zoneDuPlein(
-  plein: Pick<PleinTicpe, "tank_id" | "station_name">,
+  plein: Pick<PleinTicpe, "tank_id" | "station_name" | "ticpe_zone">,
   ctx: { zoneCuve?: "metropole" | "corse" | null; zoneParDefaut: "metropole" | "corse" },
-): { zone: ZoneTicpe; origine: OrigineZone } {
-  if (plein.tank_id) return { zone: ctx.zoneCuve ?? ctx.zoneParDefaut, origine: ctx.zoneCuve ? "cuve" : "defaut" };
-  if (stationEnCorse(plein.station_name)) return { zone: "corse", origine: "station" };
-  return { zone: ctx.zoneParDefaut, origine: "defaut" };
+): { zone: ZoneTicpe; origine: OrigineZone; incertaine: boolean; zonePropose: ZoneTicpe | null } {
+  if (zoneValide(plein.ticpe_zone)) return { zone: plein.ticpe_zone, origine: "plein", incertaine: false, zonePropose: null };
+  if (plein.tank_id) return { zone: ctx.zoneCuve ?? ctx.zoneParDefaut, origine: ctx.zoneCuve ? "cuve" : "defaut", incertaine: false, zonePropose: null };
+  if (ctx.zoneParDefaut !== "corse" && stationEvoqueCorse(plein.station_name)) {
+    return { zone: ctx.zoneParDefaut, origine: "defaut", incertaine: true, zonePropose: "corse" };
+  }
+  return { zone: ctx.zoneParDefaut, origine: "defaut", incertaine: false, zonePropose: null };
 }
 
 export type TypeJustificatif = "ticket" | "facture" | "releve_carte" | "livraison_cuve";
@@ -118,6 +143,12 @@ export interface LigneTicpe {
   categorie: CategorieTicpe | null;
   zone: ZoneTicpe | null;
   origineZone: OrigineZone | null;
+  /** Zone non saisie et station qui évoque la Corse : à vérifier par une personne. */
+  zoneIncertaine?: boolean;
+  /** Zone proposée d'après le nom de la station (jamais appliquée seule). */
+  zonePropose?: ZoneTicpe | null;
+  /** Pays d'achat si hors France (plein non compté). */
+  paysHorsFrance?: string | null;
   taux: number | null;
   tauxAConfirmer: boolean;
   origineTaux: "bareme" | "surcharge" | null;
@@ -183,14 +214,22 @@ export function calculerPlein(plein: PleinTicpe, ctx: ContextePlein): LigneTicpe
   if (!compteLe(ctx.eligibilite, jour)) return exclu("Plein hors de la période d'éligibilité du véhicule.");
   const categorie = ctx.eligibilite.categorie!;
 
-  const { zone, origine } = zoneDuPlein(plein, { zoneCuve: ctx.zoneCuve ?? null, zoneParDefaut: ctx.reglages.zone_par_defaut });
+  // Règle prudente : seule l'accise française est remboursée ; un plein acheté ailleurs n'est pas compté.
+  const pays = paysDuPlein(plein);
+  if (pays !== "FR") {
+    return { ...exclu(`Plein acheté hors de France (${pays}) : non compté tant que le pays d'achat n'est pas la France (seule l'accise française est remboursée, à confirmer par l'expert-comptable).`), paysHorsFrance: pays };
+  }
+
+  const { zone, origine, incertaine, zonePropose } = zoneDuPlein(plein, { zoneCuve: ctx.zoneCuve ?? null, zoneParDefaut: ctx.reglages.zone_par_defaut });
   const t = tauxApplicable(jour, categorie, zone, ctx.bareme, ctx.surcharges, { forfaitPondere: ctx.reglages.forfait_pondere_2025 });
-  if (t.statut === "manquant") return { ...base, categorie, zone, origineZone: origine, statut: "taux_manquant", raison: t.raison, litresRetenus: litres };
+  if (t.statut === "manquant") return { ...base, categorie, zone, origineZone: origine, zoneIncertaine: incertaine, zonePropose, statut: "taux_manquant", raison: t.raison, litresRetenus: litres };
   return {
     ...base,
     categorie,
     zone: t.zoneRetenue,
     origineZone: origine,
+    zoneIncertaine: incertaine,
+    zonePropose,
     statut: "compte",
     taux: t.taux,
     tauxAConfirmer: t.aConfirmer,

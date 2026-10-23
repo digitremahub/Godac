@@ -73,6 +73,16 @@ describe("contrôles avant déclaration", () => {
     const leve = scenario(base.map((x) => (x.id === "releve" ? { ...x, ticpe_doublon_leve_le: "2026-03-11T09:00:00Z" } : x)));
     expect(leve).toEqual([]);
   });
+  it("zone incertaine (station qui évoque la Corse, zone non saisie) : point à vérifier, puis plus rien une fois la zone saisie", () => {
+    const p = scenario([{ id: "a", station_name: "Relais Corte-Real Lisboa" }]);
+    expect(p).toMatchObject([{ code: "zone_a_verifier", gravite: "avertissement", lien: "/carburant/pleins?plein=a" }]);
+    expect(scenario([{ id: "a", station_name: "Relais Corte-Real Lisboa", ticpe_zone: "metropole" }])).toEqual([]);
+  });
+  it("plein hors de France : signalé, non compté", () => {
+    const p = scenario([{ id: "a", pays_achat: "PT", station_name: "Relais Corte-Real Lisboa" }]);
+    expect(codes(p)).toEqual(["hors_france"]);
+    expect(p[0]!.detail).toContain("PT");
+  });
   it("PTAC inconnu : bloquant sur le véhicule", () => {
     const p = scenario([{ id: "a" }, { id: "b", occurred_at: "2026-03-12T08:00:00Z" }], { v1: { ...camion, ptac_kg: null } });
     expect(p).toMatchObject([{ code: "ptac_inconnu", gravite: "bloquant", lien: "/flotte/vehicules/v1" }]);

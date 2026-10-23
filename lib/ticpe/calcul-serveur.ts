@@ -6,6 +6,7 @@ import { bornesPeriode } from "@/lib/ticpe/export";
 import { exclureDoublons } from "@/lib/ticpe/doublons";
 import { appliquerPlafond, calculerPlein, type Depassement, type LigneTicpe, type PleinTicpe } from "@/lib/ticpe/montant";
 import { plafondEffectif } from "@/lib/ticpe/reglages";
+import { colonneManquante, groupesSansColonne, selection } from "@/lib/ticpe/colonnes";
 import { chargerParametresTicpe, type ParametresTicpe } from "@/lib/ticpe/serveur";
 import { evaluerFlotte, type VehiculeEvalue } from "@/lib/ticpe/vehicules-serveur";
 
@@ -38,7 +39,8 @@ export interface CalculTicpe {
 }
 
 const COLONNES_PLEIN = "id, vehicle_id, driver_id, occurred_at, liters, unit_price, status, product, station_name, tank_id, ticket_photo_path, vehicle_km";
-const COLONNES_DOUBLON = "ticpe_doublon_leve_le";
+/** Colonnes ajoutées après coup : justificatif (20261031000002), doublon levé (20261101000003), zone et pays (20261101000004). */
+const GROUPES_OPTIONNELS = ["ticpe_justificatif, ticpe_justificatif_ref", "ticpe_doublon_leve_le", "ticpe_zone, pays_achat"];
 
 /**
  * Calcule la TICPE de l'organisation sur des années civiles entières
@@ -109,12 +111,19 @@ async function chargerPleins(supabase: SupabaseClient, organizationId: string, o
       { maxRows: 100000 },
     );
   if (opts.vehicleIds && opts.vehicleIds.length === 0) return { rows: [] as PleinCharge[], truncated: false };
-  // Colonnes ajoutées par des migrations : on essaie la lecture complète, puis sans les colonnes les plus récentes.
-  const JUSTIF = "ticpe_justificatif, ticpe_justificatif_ref";
-  for (const colonnes of [`${COLONNES_PLEIN}, ${JUSTIF}, ${COLONNES_DOUBLON}`, `${COLONNES_PLEIN}, ${JUSTIF}`]) {
-    const res = await lire(colonnes);
+  // Colonnes de migrations pas toujours appliquées : on retire, une à une, celles que la base ne connaît pas.
+  let groupes = GROUPES_OPTIONNELS;
+  while (groupes.length > 0) {
+    const res = await lire(selection(COLONNES_PLEIN, groupes));
     if (!res.error) return res;
-    if (!estSchemaManquant({ message: res.error })) console.error("pleins TICPE", res.error);
+    const manquante = colonneManquante(res.error);
+    const restants = manquante ? groupesSansColonne(groupes, manquante) : groupes;
+    if (restants.length === groupes.length) {
+      // Ce n'est pas une colonne de nos migrations : on lit le socle seul.
+      if (!estSchemaManquant({ message: res.error })) console.error("pleins TICPE", res.error);
+      break;
+    }
+    groupes = restants;
   }
   return lire(COLONNES_PLEIN);
 }

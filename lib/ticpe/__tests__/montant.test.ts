@@ -9,7 +9,8 @@ import {
   justificatifDuPlein,
   libelleLigne,
   lignesDeLaPeriode,
-  stationEnCorse,
+  stationEvoqueCorse,
+  paysDuPlein,
   totaliser,
   zoneDuPlein,
   type ContextePlein,
@@ -39,8 +40,47 @@ describe("montant par plein", () => {
   it("saisie manuelle comptée aussi", () => {
     expect(calculerPlein(plein({ status: "manual" }), ctx).statut).toBe("compte");
   });
-  it("station en Corse : 14,21 €/hl", () => {
-    expect(calculerPlein(plein({ station_name: "Relais Ajaccio" }), ctx)).toMatchObject({ zone: "corse", taux: 14.21, montant: 56.84, origineZone: "station" });
+  it("zone Corse saisie sur le plein : 14,21 €/hl", () => {
+    expect(calculerPlein(plein({ ticpe_zone: "corse" }), ctx)).toMatchObject({ zone: "corse", taux: 14.21, montant: 56.84, origineZone: "plein", zoneIncertaine: false });
+  });
+  it("le nom de la station ne décide plus : « Relais Ajaccio » sans zone saisie = zone par défaut, à vérifier", () => {
+    expect(calculerPlein(plein({ station_name: "Relais Ajaccio" }), ctx)).toMatchObject({
+      zone: "metropole",
+      taux: 15.56,
+      origineZone: "defaut",
+      zoneIncertaine: true,
+      zonePropose: "corse",
+    });
+  });
+  it("zone saisie « métropole » : plus de doute, même pour « Corte-Real Lisboa » et « 20095 Hambourg »", () => {
+    for (const station of ["Relais Corte-Real Lisboa", "Hamburg 20095"]) {
+      expect(calculerPlein(plein({ station_name: station, ticpe_zone: "metropole" }), ctx)).toMatchObject({ zone: "metropole", zoneIncertaine: false, origineZone: "plein" });
+    }
+  });
+  it("« Corte-Real Lisboa » et « 20095 Hambourg » sans zone saisie : jamais Corse d'office, à vérifier", () => {
+    for (const station of ["Relais Corte-Real Lisboa", "Hamburg 20095"]) {
+      expect(calculerPlein(plein({ station_name: station }), ctx)).toMatchObject({ zone: "metropole", taux: 15.56, zoneIncertaine: true, zonePropose: "corse" });
+    }
+  });
+  it("organisation en Corse par défaut : station quelconque sans doute", () => {
+    const corse = { ...ctx, reglages: { ...REGLAGES_PAR_DEFAUT, zone_par_defaut: "corse" as const } };
+    expect(calculerPlein(plein({ station_name: "Lyon 69200" }), corse)).toMatchObject({ zone: "corse", zoneIncertaine: false });
+    expect(calculerPlein(plein({ station_name: "Bastia" }), corse)).toMatchObject({ zone: "corse", zoneIncertaine: false });
+  });
+  it("station corse sans mot-clé : zone par défaut tant qu'une personne n'a pas saisi la zone", () => {
+    expect(calculerPlein(plein({ station_name: "Station du port" }), ctx)).toMatchObject({ zone: "metropole", zoneIncertaine: false });
+    expect(calculerPlein(plein({ station_name: "Station du port", ticpe_zone: "corse" }), ctx)).toMatchObject({ zone: "corse", taux: 14.21 });
+  });
+  it("plein acheté hors de France : non compté, avec explication", () => {
+    const l = calculerPlein(plein({ pays_achat: "pt", station_name: "Relais Corte-Real Lisboa" }), ctx);
+    expect(l).toMatchObject({ statut: "exclu", montant: 0, litresRetenus: 0, paysHorsFrance: "PT" });
+    expect(l.raison).toContain("hors de France (PT)");
+    expect(calculerPlein(plein({ pays_achat: "DE" }), ctx).statut).toBe("exclu");
+  });
+  it("pays FR, vide ou absent : compté", () => {
+    for (const pays_achat of ["FR", "fr", "", null, undefined]) expect(calculerPlein(plein({ pays_achat }), ctx).statut).toBe("compte");
+    expect(paysDuPlein({ pays_achat: " es " })).toBe("ES");
+    expect(paysDuPlein({ pays_achat: "France" })).toBe("FR");
   });
   it("AdBlue, plein non validé, litres absents : exclus", () => {
     expect(calculerPlein(plein({ product: "adblue" }), ctx)).toMatchObject({ statut: "exclu", montant: 0 });
@@ -75,15 +115,17 @@ describe("montant par plein", () => {
 });
 
 describe("zone et justificatif", () => {
-  it("détection de la Corse", () => {
-    for (const s of ["Station Bastia", "AJACCIO", "Total 20090", "Relais 2A", "Porto-Vecchio", "Corse"]) expect(stationEnCorse(s), s).toBe(true);
-    for (const s of ["Lyon", "Paris 75012", "Station A20", "Calvisson", null]) expect(stationEnCorse(s), String(s)).toBe(false);
+  it("indices de Corse (proposition seulement)", () => {
+    for (const x of ["Station Bastia", "AJACCIO", "Total 20090", "Porto-Vecchio", "Corse", "Hamburg 20095"]) expect(stationEvoqueCorse(x), x).toBe(true);
+    for (const x of ["Lyon", "Paris 75012", "Station A20", "Calvisson", "Bât 2A", null]) expect(stationEvoqueCorse(x), String(x)).toBe(false);
   });
-  it("cuve : zone de la cuve, sinon zone par défaut", () => {
-    expect(zoneDuPlein({ tank_id: "t", station_name: "Bastia" }, { zoneCuve: "metropole", zoneParDefaut: "metropole" })).toEqual({ zone: "metropole", origine: "cuve" });
-    expect(zoneDuPlein({ tank_id: "t" }, { zoneCuve: "corse", zoneParDefaut: "metropole" })).toEqual({ zone: "corse", origine: "cuve" });
-    expect(zoneDuPlein({ tank_id: "t" }, { zoneParDefaut: "corse" })).toEqual({ zone: "corse", origine: "defaut" });
-    expect(zoneDuPlein({ station_name: "Lyon" }, { zoneParDefaut: "corse" })).toEqual({ zone: "corse", origine: "defaut" });
+  it("ordre : zone du plein, puis cuve, puis zone par défaut", () => {
+    expect(zoneDuPlein({ tank_id: "t", station_name: "Bastia", ticpe_zone: "corse" }, { zoneCuve: "metropole", zoneParDefaut: "metropole" })).toMatchObject({ zone: "corse", origine: "plein" });
+    expect(zoneDuPlein({ tank_id: "t", station_name: "Bastia" }, { zoneCuve: "metropole", zoneParDefaut: "metropole" })).toEqual({ zone: "metropole", origine: "cuve", incertaine: false, zonePropose: null });
+    expect(zoneDuPlein({ tank_id: "t" }, { zoneCuve: "corse", zoneParDefaut: "metropole" })).toMatchObject({ zone: "corse", origine: "cuve" });
+    expect(zoneDuPlein({ tank_id: "t" }, { zoneParDefaut: "corse" })).toMatchObject({ zone: "corse", origine: "defaut" });
+    expect(zoneDuPlein({ station_name: "Lyon" }, { zoneParDefaut: "corse" })).toMatchObject({ zone: "corse", origine: "defaut", incertaine: false });
+    expect(zoneDuPlein({ ticpe_zone: "bidon" }, { zoneParDefaut: "metropole" })).toMatchObject({ zone: "metropole", origine: "defaut" });
   });
   it("plein à la cuve : compte, justifié par les livraisons de la cuve", () => {
     const l = calculerPlein(plein({ tank_id: "t1", ticket_photo_path: null, station_name: null }), { ...ctx, zoneCuve: "corse", cuveAvecFacture: true });

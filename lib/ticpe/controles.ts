@@ -25,7 +25,9 @@ export type CodeControle =
   | "taux_manquant"
   | "location_loueur"
   | "vehicule_a_verifier"
-  | "vehicule_a_regulariser";
+  | "vehicule_a_regulariser"
+  | "zone_a_verifier"
+  | "hors_france";
 
 export interface PointARegler {
   cle: string;
@@ -51,6 +53,8 @@ export const LIBELLES_CONTROLE: Record<CodeControle, string> = {
   location_loueur: "Véhicule loué : remboursement demandé par le loueur",
   vehicule_a_verifier: "Véhicule à vérifier",
   vehicule_a_regulariser: "Véhicule à régulariser",
+  zone_a_verifier: "Zone du plein à vérifier",
+  hors_france: "Plein acheté hors de France",
 };
 
 export interface PleinControle {
@@ -124,10 +128,23 @@ export function controlesPeriode(e: EntreeControles): PointARegler[] {
       ajouter({ cle: `non_valide:${l.id}`, code: "plein_non_valide", gravite: "bloquant", detail: `${qui} : pas encore validé, il n'est pas compté.`, lien: lienPlein(l.id), objet: { type: "plein", id: l.id } });
     }
     if (l.statut === "exclu") {
+      if (l.paysHorsFrance) {
+        ajouter({ cle: `hors_france:${l.id}`, code: "hors_france", gravite: "avertissement", detail: `${qui} : acheté en ${l.paysHorsFrance}, non compté (seule l'accise française est remboursée, à confirmer par l'expert-comptable). Corrigez le pays d'achat s'il s'agit d'une erreur.`, lien: lienPlein(l.id), objet: { type: "plein", id: l.id } });
+      }
       if (l.raison?.includes("hors de la période")) {
         ajouter({ cle: `hors_periode:${l.id}`, code: "hors_periode", gravite: "avertissement", detail: `${qui} : plein en dehors de la période d'éligibilité du véhicule, non compté.`, lien: lienVehicule(l.vehicle_id), objet: { type: "vehicule", id: l.vehicle_id } });
       }
       continue;
+    }
+    if (l.zoneIncertaine) {
+      ajouter({
+        cle: `zone:${l.id}`,
+        code: "zone_a_verifier",
+        gravite: "avertissement",
+        detail: `${qui} : la station évoque la Corse mais la zone du plein n'est pas renseignée ; compté en ${LIBELLES_ZONE[l.zone ?? "metropole"]}. Indiquez la zone (Corse ou métropole) et le pays d'achat dans la fiche du plein.`,
+        lien: lienPlein(l.id),
+        objet: { type: "plein", id: l.id },
+      });
     }
     if (!l.justificatif.present) {
       if (l.justificatif.type === "livraison_cuve") {
