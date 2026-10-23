@@ -14,7 +14,9 @@ const bodySchema = z.object({
    * GO Navigation : trajet vers ce seul arrêt (depuis la position du
    * chauffeur, sinon le dépôt) au lieu de toute la suite de la tournée.
    */
-  cible: z.string().uuid().nullable().optional(),
+  cible: z.union([z.string().uuid(), z.literal("retour")]).nullable().optional(),
+  /** Destination du retour de fin de tournée (dépôt, siège) quand `cible` vaut « retour ». */
+  point: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
 });
 
 /** Service d'itinéraires compatible OSRM (serveur de démonstration public par défaut). */
@@ -67,6 +69,12 @@ export async function POST(req: Request) {
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 
   const depot = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
+  if (parsed.data.cible === "retour") {
+    const arrivee = parsed.data.point;
+    const depart = parsed.data.depuis ?? depot;
+    if (!arrivee || !depart) return NextResponse.json({ ligne: [], distanceKm: 0, dureeMin: 0, approx: false } satisfies Itineraire);
+    return NextResponse.json(await troncon([depart, arrivee], true));
+  }
   if (parsed.data.cible) {
     const { data: arret } = await supabase.from("delivery_stops").select("lat, lng").eq("run_id", run.id).eq("id", parsed.data.cible).maybeSingle();
     if (!arret) return NextResponse.json({ error: "Arrêt introuvable dans cette tournée." }, { status: 404 });
