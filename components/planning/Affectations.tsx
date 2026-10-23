@@ -13,11 +13,14 @@ import {
   decisionsAffectation,
   estAbsent,
   etapesDeplacement,
+  joursAffichesSemaine,
   joursDeLaLigne,
+  joursDuMois,
   joursEtires,
   lignesTournees,
   nomCourt,
   texteAffectation,
+  trousParJour,
   type LigneTournee,
 } from "@/lib/planning/affectation";
 import { chauffeursAffiches, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
@@ -26,6 +29,7 @@ import { confirmer } from "@/lib/ui/confirmation";
 import { Avatar, Contexte, type ContexteAffectations, type DonneesAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
 import { AffectationsJour } from "@/components/planning/AffectationsJour";
 import { AffectationsGrille } from "@/components/planning/AffectationsGrille";
+import { CalendrierMois, SemaineMobile } from "@/components/planning/AffectationsMobile";
 import { ColonneChauffeurs } from "@/components/planning/ColonneChauffeurs";
 import { FeuilleAffecter, type CibleFeuille } from "@/components/planning/FeuilleAffecter";
 import { RecopieSemaines } from "@/components/planning/RecopieSemaines";
@@ -83,11 +87,22 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   const [etirement, setEtirement] = useState<{ cle: string; source: string; jusqua: string } | null>(null);
   const [glisse, setGlisse] = useState<{ id: string; nom: string } | null>(null);
   const [modelesOuverts, setModelesOuverts] = useState(false);
+  const [chauffeursOuverts, setChauffeursOuverts] = useState(false);
   const [publication, setPublication] = useState(false);
   const maj = useRef(false);
 
+  // Jours affichés. Le dimanche : s'il sert (le serveur l'a mis dans la période),
+  // ou à la demande (« + dimanche »), ou toujours sur téléphone (calendrier à 7 colonnes).
+  const [dimancheDemande, setDimancheDemande] = useState(false);
+  const dimancheUtilise = useMemo(() => donnees.vue !== "jour" && donnees.jours.some((d) => rangJour(d) === 6), [donnees.vue, donnees.jours]);
+  const dimancheAffiche = dimancheUtilise || dimancheDemande || petitEcran;
+  const jours = useMemo(() => {
+    if (donnees.vue === "jour") return donnees.jours;
+    return donnees.vue === "semaine" ? joursAffichesSemaine(donnees.lundi, dimancheAffiche) : joursDuMois(donnees.mois, dimancheAffiche);
+  }, [donnees.vue, donnees.jours, donnees.lundi, donnees.mois, dimancheAffiche]);
+
   const services = useMemo(() => new Set(donnees.serviceIds), [donnees.serviceIds]);
-  const visibles = useMemo(() => new Set(donnees.jours), [donnees.jours]);
+  const visibles = useMemo(() => new Set(jours), [jours]);
   const affichees = useMemo(() => local.filter((a) => services.has(a.service_id) && visibles.has(jourDe(a.start_at))), [local, services, visibles]);
   const lignes = useMemo(
     () => lignesTournees({ routes: donnees.routes, modeles: donnees.modeles, affectations: affichees, serviceIds: donnees.serviceIds, serviceParDefaut: donnees.selectedService || null }),
@@ -227,6 +242,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
 
   function placer(ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }) {
     if (!dates.length) return setMessage({ texte: "Aucun jour à remplir.", ton: "attention" });
+    // Un dimanche rempli doit se voir tout de suite.
+    if (dates.some((d) => rangJour(d) === 6)) setDimancheDemande(true);
     const libelle = dates.length === 1 ? `${ligne.tourNumber} du ${libelleJour(dates[0]!)} → ${nomCourt(chauffeur.full_name)}` : `${ligne.tourNumber} → ${nomCourt(chauffeur.full_name)} (${dates.length} jours)`;
     void executer([{ type: "placer", ligne, dates, driverId: chauffeur.id }], libelle);
   }
@@ -241,7 +258,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   }
 
   /** Jours « toute la semaine / tout le mois » d'une tournée : à partir d'aujourd'hui. */
-  const joursLigne = (ligne: LigneTournee) => joursDeLaLigne(ligne, donnees.jours.filter((d) => d >= aujourdhui));
+  const joursLigne = (ligne: LigneTournee) => joursDeLaLigne(ligne, jours.filter((d) => d >= aujourdhui));
 
   function deposer(ev: DragEndEvent) {
     setGlisse(null);
@@ -344,7 +361,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
       setEtirement(null);
       const ligne = fin && ligneDe(fin.cle);
       if (!fin || !ligne) return;
-      const dates = joursEtires(fin.source, fin.jusqua, donnees.jours);
+      const dates = joursEtires(fin.source, fin.jusqua, jours);
       if (dates.length) placer(ligne, dates, { id: fin.driverId, full_name: nomChauffeur(fin.driverId) });
     };
     window.addEventListener("pointermove", bouger);
@@ -387,12 +404,17 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     if (donnees.selectedService) qs.set("service", donnees.selectedService);
     router.push(`/exploitation/planning?${qs.toString()}`);
   }
+  function allerJour(d: string) {
+    const qs = new URLSearchParams({ view: "day", day: d });
+    if (donnees.selectedService) qs.set("service", donnees.selectedService);
+    router.push(`/exploitation/planning?${qs.toString()}`);
+  }
   const premier = donnees.jours[0]!;
   const nav =
     donnees.vue === "jour"
       ? { prec: () => aller({ day: addDays(premier, -1) }), suiv: () => aller({ day: addDays(premier, 1) }), maintenant: () => aller({ day: aujourdhui }), estMaintenant: premier === aujourdhui, libelle: `${JOURS_LONGS[rangJour(premier)]} ${new Date(`${premier}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`, quoi: "Jour" }
       : donnees.vue === "semaine"
-        ? { prec: () => aller({ week: addDays(donnees.lundi, -7) }), suiv: () => aller({ week: addDays(donnees.lundi, 7) }), maintenant: () => aller({ week: aujourdhui }), estMaintenant: donnees.jours.includes(aujourdhui), libelle: `${Number(premier.slice(8, 10))} → ${new Date(`${donnees.jours.at(-1)}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`, quoi: "Semaine" }
+        ? { prec: () => aller({ week: addDays(donnees.lundi, -7) }), suiv: () => aller({ week: addDays(donnees.lundi, 7) }), maintenant: () => aller({ week: aujourdhui }), estMaintenant: donnees.jours.includes(aujourdhui), libelle: `${Number(premier.slice(8, 10))} → ${new Date(`${addDays(donnees.lundi, 6)}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`, quoi: "Semaine" }
         : { prec: () => aller({ month: addMonths(donnees.mois, -1) }), suiv: () => aller({ month: addMonths(donnees.mois, 1) }), maintenant: () => aller({ month: aujourdhui.slice(0, 7) }), estMaintenant: donnees.mois === aujourdhui.slice(0, 7), libelle: new Date(`${donnees.mois}-15T12:00:00Z`).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }), quoi: "Mois" };
 
   const nomService = donnees.selectedService ? (donnees.services.find((s) => s.id === donnees.selectedService)?.name ?? null) : null;
@@ -400,13 +422,17 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   const astuce = !donnees.peutModifier
     ? "Lecture seule."
     : petitEcran
-      ? "touchez une tournée pour choisir le chauffeur"
+      ? donnees.vue === "mois"
+        ? "touchez un jour pour l'ouvrir"
+        : "touchez une tournée pour choisir le chauffeur"
       : donnees.vue === "jour"
         ? "glissez un chauffeur sur une tournée"
         : "glissez un chauffeur sur une case, une ligne ou plusieurs jours";
 
   const compteurs = donnees.vue === "jour" ? compteursDuJour({ date: premier, lignes, parCase, chauffeurs: chauffeursAffiches(donnees.chauffeurs, donnees.rattachements, donnees.serviceIds, affichees), affectations: affichees, conges: donnees.conges, arrets: donnees.arrets }) : null;
-  const lundisDuMois = useMemo(() => [...new Set(donnees.jours.map((d) => addDays(d, -rangJour(d))))], [donnees.jours]);
+  const lundisDuMois = useMemo(() => [...new Set(jours.map((d) => addDays(d, -rangJour(d))))], [jours]);
+  const trous = useMemo(() => trousParJour(lignes, jours, parCase), [lignes, jours, parCase]);
+  const totalTrous = Object.values(trous).reduce((n, t) => n + t, 0);
 
   const capteurs = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }));
 
@@ -415,7 +441,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     affectations: affichees,
     lignes,
     parCase,
-    jours: donnees.jours,
+    jours,
     aujourdhui,
     petitEcran,
     glisser,
@@ -424,7 +450,14 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     occupe,
     ouvrirCase,
     ouvrirLigne,
-    choisirChauffeur: setArme,
+    choisirChauffeur: (c) => {
+      setArme(c);
+      if (c) setChauffeursOuverts(false);
+    },
+    dimancheAffiche,
+    dimancheUtilise,
+    basculerDimanche: () => setDimancheDemande((v) => !v),
+    allerJour,
     commencerEtirement,
     nomChauffeur,
   };
@@ -448,48 +481,48 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     <Contexte.Provider value={contexte}>
       <div className="flex flex-col gap-4 pb-16">
         {/* En-tête : titre, période, actions */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className={petitEcran ? "flex flex-col gap-3" : "flex flex-wrap items-start justify-between gap-3"}>
           <div className="min-w-0">
             <h2 className="font-display text-2xl font-extrabold leading-tight">{titre}</h2>
-            <p className="mt-0.5 text-sm text-navy/65">
+            <p className="mt-0.5 text-sm text-navy/65 max-md:text-[15px]">
               {nomService ? `Service ${nomService}` : "Tous vos services"} · {astuce}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1">
-              <button type="button" className="btn-secondary min-h-[44px] min-w-[44px] !px-3" onClick={nav.prec} aria-label={`${nav.quoi} précédent`}>
+          <div className={petitEcran ? "flex w-full flex-col gap-2" : "flex flex-wrap items-center gap-2"}>
+            <div className={petitEcran ? "flex w-full items-center gap-2" : "flex items-center gap-1"}>
+              <button type="button" className="btn-secondary min-h-[48px] min-w-[48px] !px-3 md:min-h-[44px] md:min-w-[44px]" onClick={nav.prec} aria-label={`${nav.quoi} précédent`}>
                 ‹
               </button>
-              <button type="button" className="btn-secondary min-h-[44px] min-w-[10rem] !px-3 text-sm font-semibold first-letter:uppercase" onClick={nav.maintenant} disabled={nav.estMaintenant} title={nav.estMaintenant ? undefined : "Revenir à aujourd'hui"}>
+              <button type="button" className={`btn-secondary min-h-[48px] !px-3 text-sm font-semibold first-letter:uppercase ${petitEcran ? "min-w-0 flex-1 text-base" : "min-h-[44px] min-w-[10rem]"}`} onClick={nav.maintenant} disabled={nav.estMaintenant} title={nav.estMaintenant ? undefined : "Revenir à aujourd'hui"}>
                 <span className="first-letter:uppercase">{nav.libelle}</span>
               </button>
-              <button type="button" className="btn-secondary min-h-[44px] min-w-[44px] !px-3" onClick={nav.suiv} aria-label={`${nav.quoi} suivant`}>
+              <button type="button" className="btn-secondary min-h-[48px] min-w-[48px] !px-3 md:min-h-[44px] md:min-w-[44px]" onClick={nav.suiv} aria-label={`${nav.quoi} suivant`}>
                 ›
               </button>
             </div>
             {donnees.peutModifier && (
               <>
                 {donnees.vue === "jour" && (
-                  <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => setFenetre({ type: "dupliquer" })}>
+                  <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} onClick={() => setFenetre({ type: "dupliquer" })}>
                     Dupliquer la semaine
                   </button>
                 )}
                 {donnees.vue === "semaine" && (
                   <>
-                    <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => setFenetre({ type: "recopie", mode: "precedente" })}>
+                    <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} onClick={() => setFenetre({ type: "recopie", mode: "precedente" })}>
                       Copier depuis la semaine précédente
                     </button>
-                    <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" aria-expanded={modelesOuverts} onClick={() => setModelesOuverts((v) => !v)}>
+                    <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} aria-expanded={modelesOuverts} onClick={() => setModelesOuverts((v) => !v)}>
                       Modèles
                     </button>
                   </>
                 )}
                 {donnees.vue === "mois" && (
-                  <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => setFenetre({ type: "recopie", mode: "mois" })}>
+                  <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} onClick={() => setFenetre({ type: "recopie", mode: "mois" })}>
                     Copier une semaine type…
                   </button>
                 )}
-                <button type="button" className="min-h-[44px] rounded-xl bg-orange px-4 text-sm font-semibold text-on-orange shadow-sm hover:bg-orange/90 disabled:opacity-60" disabled={publication || occupe} onClick={publier} title="Une notification par chauffeur concerné, avec ses tournées">
+                <button type="button" className={`min-h-[44px] rounded-xl bg-orange px-4 text-sm font-semibold text-on-orange shadow-sm hover:bg-orange/90 disabled:opacity-60 ${BTN_MOBILE}`} disabled={publication || occupe} onClick={publier} title="Une notification par chauffeur concerné, avec ses tournées">
                   {publication ? "Publication…" : "Publier aux chauffeurs"}
                   {donnees.aPrevenir ? <span className="ml-1.5 rounded-full bg-white/25 px-1.5 text-xs">{donnees.aPrevenir}</span> : null}
                 </button>
@@ -497,6 +530,23 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
             )}
           </div>
         </div>
+
+        {petitEcran && donnees.vue !== "jour" && (
+          <p className={`rounded-xl px-3.5 py-2.5 text-[15px] font-semibold ${totalTrous ? "bg-orange/15 text-orange-ink" : "bg-success/10 text-success-ink"}`} aria-live="polite">
+            {totalTrous === 0 ? `Tout est pourvu ${donnees.vue === "mois" ? "ce mois-ci" : "cette semaine"}.` : `${totalTrous} case${totalTrous > 1 ? "s" : ""} à pourvoir ${donnees.vue === "mois" ? "ce mois-ci" : "cette semaine"}`}
+          </p>
+        )}
+
+        {petitEcran && arme && (
+          <p className="flex items-center justify-between gap-2 rounded-xl bg-orange/10 p-3 text-[15px] text-orange-ink" role="status">
+            <span>
+              Touchez une tournée pour y placer <strong>{nomCourt(arme.full_name)}</strong>.
+            </span>
+            <button type="button" className="min-h-[44px] shrink-0 px-2 underline" onClick={() => setArme(null)}>
+              Annuler
+            </button>
+          </p>
+        )}
 
         {compteurs && (
           <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Résumé du jour">
@@ -533,8 +583,28 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
 
         <DndContext sensors={capteurs} onDragStart={debutGlisser} onDragEnd={deposer} onDragCancel={() => setGlisse(null)}>
           <div className={`grid grid-cols-1 gap-5 ${donnees.peutModifier ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : ""}`}>
-            {donnees.vue === "jour" ? <AffectationsJour /> : <AffectationsGrille />}
-            {donnees.peutModifier && <ColonneChauffeurs />}
+            {donnees.vue === "jour" ? <AffectationsJour /> : petitEcran ? donnees.vue === "mois" ? <CalendrierMois /> : <SemaineMobile key={donnees.lundi} trous={trous} /> : <AffectationsGrille />}
+            {donnees.peutModifier &&
+              (petitEcran ? (
+                <section aria-label="Chauffeurs" className="min-w-0">
+                  <button
+                    type="button"
+                    aria-expanded={chauffeursOuverts}
+                    onClick={() => setChauffeursOuverts((v) => !v)}
+                    className="btn-secondary min-h-[48px] w-full justify-between !px-4 text-base"
+                  >
+                    <span>Chauffeurs · placer depuis la liste</span>
+                    <span aria-hidden="true">{chauffeursOuverts ? "▴" : "▾"}</span>
+                  </button>
+                  {chauffeursOuverts && (
+                    <div className="mt-2">
+                      <ColonneChauffeurs />
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <ColonneChauffeurs />
+              ))}
           </div>
           <DragOverlay dropAnimation={null}>
             {glisse ? (
@@ -580,6 +650,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     </Contexte.Provider>
   );
 }
+
+/** Boutons d'action du téléphone : pleine largeur, texte lisible. */
+const BTN_MOBILE = "max-md:w-full max-md:min-h-[48px] max-md:text-base";
 
 function Compteur({ n, libelle, alerte = false }: { n: number; libelle: string; alerte?: boolean }) {
   return (

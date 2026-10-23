@@ -71,6 +71,13 @@ export interface ContexteAffectations {
   choisirChauffeur: (c: { id: string; full_name: string } | null) => void;
   commencerEtirement: (cle: string, source: string, driverId: string, e: React.PointerEvent) => void;
   nomChauffeur: (id: string | null) => string;
+  /** Le dimanche est-il affiché (il sert, ou demandé, ou téléphone) ? */
+  dimancheAffiche: boolean;
+  /** Le dimanche sert-il dans la période (affectation ou tournée qui roule ce jour-là) ? */
+  dimancheUtilise: boolean;
+  basculerDimanche: () => void;
+  /** Ouvre la vue Jour de ce jour (garde le service choisi). */
+  allerJour: (date: string) => void;
 }
 
 export const Contexte = createContext<ContexteAffectations | null>(null);

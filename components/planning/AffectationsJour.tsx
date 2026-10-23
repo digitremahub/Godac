@@ -14,9 +14,9 @@ type Tri = "heure" | "numero" | "trous";
  * carte (déplacer, échanger) ou vers la colonne Chauffeurs (retirer).
  * Toucher / cliquer une carte : feuille « Affecter à… » (même actions).
  */
-export function AffectationsJour() {
+export function AffectationsJour({ date: dateDonnee }: { date?: string } = {}) {
   const ctx = useAffectations();
-  const date = ctx.jours[0]!;
+  const date = dateDonnee ?? ctx.jours[0]!;
   const [tri, setTri] = useState<Tri>("heure");
   const [toutes, setToutes] = useState(false);
 
@@ -44,7 +44,7 @@ export function AffectationsJour() {
         </h2>
         <label className="flex items-center gap-1.5 text-sm text-navy/70">
           Trier :
-          <select className="input min-h-[40px] !w-auto !py-1 text-sm" value={tri} onChange={(e) => setTri(e.target.value as Tri)}>
+          <select className="input min-h-[44px] !w-auto !py-1 text-sm" value={tri} onChange={(e) => setTri(e.target.value as Tri)}>
             <option value="heure">heure de départ</option>
             <option value="numero">numéro</option>
             <option value="trous">sans chauffeur d&apos;abord</option>
@@ -58,7 +58,7 @@ export function AffectationsJour() {
         </p>
       )}
 
-      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" aria-label="Tournées du jour">
         {cartes.roulent.map((c) => (
           <CarteTournee key={c.ligne.cle} ligne={c.ligne} date={date} entrees={c.entrees} />
         ))}
@@ -66,7 +66,7 @@ export function AffectationsJour() {
       </ul>
 
       {cartes.autres.length > 0 && (
-        <button type="button" className="mt-3 min-h-[44px] text-sm text-navy/70 underline-offset-2 hover:text-teal-ink hover:underline" onClick={() => setToutes((v) => !v)} aria-expanded={toutes}>
+        <button type="button" className="mt-3 min-h-[48px] text-[15px] text-navy/70 underline-offset-2 hover:text-teal-ink hover:underline" onClick={() => setToutes((v) => !v)} aria-expanded={toutes}>
           {toutes ? "Masquer" : "Afficher"} les {cartes.autres.length} tournée{cartes.autres.length > 1 ? "s" : ""} qui ne roulent pas d&apos;habitude ce jour-là
         </button>
       )}
@@ -80,7 +80,7 @@ function heureCarte(c: { ligne: LigneTournee; entrees: EntreeAffectation[] }): n
   return (hh ?? 0) * 60 + (mm ?? 0);
 }
 
-function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: LigneTournee; date: string; entrees: EntreeAffectation[]; horsJour?: boolean }) {
+export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: LigneTournee; date: string; entrees: EntreeAffectation[]; horsJour?: boolean }) {
   const ctx = useAffectations();
   const etat = etatCase(entrees, !horsJour);
   const trou = etat === "a_remplacer" || etat === "vide_prevue";
@@ -104,9 +104,9 @@ function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: Ligne
           >
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-display text-xl font-extrabold leading-none">{ligne.tourNumber}</h3>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
             </div>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65">
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65 max-md:text-sm">
               <span className="tabular-nums">{heure}</span>
               {secteur && <span>· {secteur}</span>}
               {ligne.villages.length > 0 && (
@@ -115,7 +115,7 @@ function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: Ligne
                 </span>
               )}
               {ligne.renfort && <span>· renfort</span>}
-              {colis > 0 && <span className="rounded-full bg-navy/[0.06] px-2 py-0.5 text-xs font-bold text-navy/80">{colis} colis</span>}
+              {colis > 0 && <span className="rounded-full bg-navy/[0.06] px-2 py-0.5 text-xs font-bold text-navy/80 max-md:text-sm">{colis} colis</span>}
               {ctx.donnees.serviceIds.length > 1 && <span className="text-navy/50">· {ctx.donnees.services.find((s) => s.id === ligne.serviceId)?.name}</span>}
             </p>
 
@@ -126,7 +126,7 @@ function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: Ligne
                   type="button"
                   disabled={!ctx.donnees.peutModifier || ctx.occupe}
                   onClick={() => ctx.ouvrirCase(ligne.cle, date)}
-                  className={`flex min-h-[48px] items-center justify-center rounded-xl border-2 border-dashed px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
+                  className={`flex min-h-[52px] items-center justify-center rounded-xl border-2 border-dashed px-3 text-sm font-semibold max-md:text-base transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
                     survol || arme ? "border-orange bg-orange/15 text-orange-ink" : "border-orange/60 bg-orange/[0.06] text-orange-ink hover:bg-orange/10"
                   }`}
                 >
@@ -134,6 +134,16 @@ function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: Ligne
                 </button>
               )}
             </div>
+            {ctx.petitEcran && ctx.donnees.vue === "semaine" && ctx.donnees.peutModifier && (
+              <button
+                type="button"
+                disabled={ctx.occupe}
+                onClick={() => ctx.ouvrirLigne(ligne.cle)}
+                className="mt-2.5 min-h-[48px] self-start rounded-xl bg-navy/[0.06] px-4 text-[15px] font-semibold text-navy/80 hover:bg-teal/20 hover:text-teal-ink"
+              >
+                ⇥ Toute la semaine
+              </button>
+            )}
           </div>
         )}
       </Depot>
@@ -168,10 +178,10 @@ function ChauffeurPlace({ entree, date }: { entree: EntreeAffectation; date: str
         <span className="min-w-0 flex-1 leading-tight">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-bold">{nomCourt(nom)}</span>
-            {rang > 0 && <span className="rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-on-teal">2ᵉ tournée{liee ? " · liée" : ""}</span>}
-            {!modifiable && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px]">{statut.libelle}</span>}
+            {rang > 0 && <span className="rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-on-teal max-md:text-sm">2ᵉ tournée{liee ? " · liée" : ""}</span>}
+            {!modifiable && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] max-md:text-sm">{statut.libelle}</span>}
           </span>
-          <span className="block text-xs tabular-nums text-white/70">
+          <span className="block text-xs tabular-nums text-white/70 max-md:text-sm">
             {heureDe(entree.start_at)}
             {fin ? ` → ${fin}` : ""}
           </span>

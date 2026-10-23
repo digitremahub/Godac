@@ -163,7 +163,7 @@ const ENCADREMENT: SectionGuide[] = [
       {
         titre: "Construire le planning",
         texte:
-          "« Planning » affiche la semaine à l'horizontale : affectez chaque chauffeur à une tournée et un véhicule, dupliquez une case, suivez les présences (coche du haut = matin, du bas = soir). Les chauffeurs sont prévenus des changements.",
+          "« Planning » s'ouvre sur le jour, avec la semaine et le mois : glissez un chauffeur sur une tournée (sur téléphone, touchez la tournée puis choisissez le chauffeur), y compris le samedi. « Toute la semaine » permet de choisir les jours à remplir. Publiez pour prévenir les chauffeurs.",
         lien: { href: "/exploitation/planning", label: "Planning" },
         module: "planning",
       },
@@ -195,7 +195,7 @@ const ENCADREMENT: SectionGuide[] = [
       {
         titre: "Suivre les tournées en direct",
         texte:
-          "« Suivi des tournées » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 30 secondes.",
+          "« Suivi des tournées » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 30 secondes. Le bouton « Saisir un départ ou un retour » en haut de la page enregistre le départ ou le retour d'un chauffeur à sa place (badge et code).",
         lien: { href: "/exploitation/suivi", label: "Suivi des tournées" },
         module: "route_optimizer",
       },
