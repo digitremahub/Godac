@@ -257,7 +257,7 @@ export const ECRANS: readonly Ecran[] = [
     icone: "megaphone",
     note: "direction par défaut ; ouvert par la direction à des personnes désignées ou à toute l'équipe",
   }),
-  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation"], modules: ["bi_reporting"], icone: "chart", note: "exploitation : carburant et tournées, sans paie" }),
+  E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation", "comptable"], modules: ["bi_reporting"], icone: "chart", note: "exploitation et comptable : carburant et tournées, sans paie" }),
 
   // ── Mon espace ───────────────────────────────────────────────────
   E({
