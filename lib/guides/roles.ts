@@ -152,6 +152,11 @@ const AIDE: SectionGuide = {
   etapes: [
     { titre: "Questions fréquentes", texte: "Les réponses aux questions les plus posées.", lien: { href: "/aide/faq", label: "Questions fréquentes" } },
     { titre: "Assistant", texte: "La bulle d'aide en bas de l'écran répond à vos questions sur GODAC et transmet à un responsable si besoin.", module: "assistant" },
+    {
+      titre: "Qui décide de mes demandes ?",
+      texte:
+        "Personne ne décide de sa propre demande. Une demande (congé, arrêt, acompte, entretien, rendez-vous…) est traitée par le niveau juste au-dessus : le manager de votre service pour un chauffeur, l'exploitation ou la direction pour un manager, la direction pour l'exploitation, et une autre personne de la direction pour la direction (une direction seule dans l'entreprise peut valider la sienne, c'est alors inscrit au journal). Dans « Mon espace », une demande en cours indique « En attente de… » ; dans les écrans de gestion, une demande que vous ne pouvez pas décider s'affiche en lecture seule avec « À décider par… ».",
+    },
     { titre: "Mon compte", texte: "Nom, téléphone, mode sombre et taille du texte se règlent dans « Mon compte ».", lien: { href: "/account", label: "Mon compte" } },
   ],
 };
