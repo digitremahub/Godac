@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { ATraiterAttente, ATraiterBloc } from "@/components/dashboard/ATraiterBloc";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card } from "@/components/ui";
 import { AlertList } from "@/components/alerts/AlertList";
@@ -166,6 +168,11 @@ export async function DirectionDashboard({ appUser, enabledModules }: { appUser:
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Vue d'ensemble de l'organisation." />
+
+      {/* Une seule liste de tout ce qui attend une décision, triée par urgence (page dédiée : actions groupées). */}
+      <Suspense fallback={<ATraiterAttente />}>
+        <ATraiterBloc appUser={appUser} enabledModules={enabledModules} ecartsIds={ecartsRes.ids} />
+      </Suspense>
 
       {/* À traiter d'abord : écarts carburant, bulletins à valider… */}
       <h2 className="mb-3 text-lg">À traiter</h2>
