@@ -22,7 +22,7 @@ export default async function RentalRequestsPage({
   const vehicleId = sp.vehicule && uuid.test(sp.vehicule) ? sp.vehicule : undefined;
 
   const [requests, { data: providers }, { data: vehicles }, { data: counts }] = await Promise.all([
-    loadRentalRequests(supabase, { status, providerId, vehicleId }),
+    loadRentalRequests(supabase, { status, providerId, vehicleId }, 200, { id: appUser.id, role: appUser.role, organizationId: appUser.organization_id }),
     supabase.from("rental_providers").select("id, name").order("name"),
     supabase.from("vehicles").select("id, registration").neq("ownership", "propre").order("registration"),
     supabase.from("rental_maintenance_requests").select("status"),

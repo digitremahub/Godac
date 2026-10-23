@@ -25,6 +25,8 @@ import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
 import { evaluerFlotte } from "@/lib/ticpe/vehicules-serveur";
 import { estLoue } from "@/lib/ticpe/eligibilite";
 import { LIBELLES_CATEGORIE_COURTS } from "@/lib/ticpe/bareme";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 type SpecSources = Record<string, { origin: "ia" | "saisie" | "import"; confirmed: boolean } | undefined> | null;
 
@@ -68,7 +70,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       supabase
         .from("vehicle_interventions")
         .select(
-          "id, type, description, urgency, status, scheduled_at, completed_at, cost, odometer_km, appointment_needed, photo_paths, created_at",
+          "id, type, description, urgency, status, scheduled_at, completed_at, cost, odometer_km, appointment_needed, photo_paths, created_at, requested_by",
         )
         .eq("vehicle_id", id)
         .order("created_at", { ascending: false }),
@@ -130,6 +132,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   if (!vehicle) notFound();
   const v = vehicle as any;
 
+  // Hiérarchie des demandes : on ne traite pas sa propre demande d'entretien ; rang supérieur à celui du demandeur.
+  const { directionCount, effectifs } = await contexteHierarchie(supabase, appUser.organization_id);
+  const rolesDemandeurs = await rolesParId(supabase, appUser.organization_id, (interventions ?? []).map((i: any) => i.requested_by).filter(Boolean));
   const interventionsWithPhotos = await Promise.all(
     (interventions ?? []).map(async (i: any) => {
       const paths: string[] = i.photo_paths ?? [];
@@ -139,7 +144,16 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           return data?.signedUrl ?? null;
         }),
       );
-      return { ...i, photoUrls: photoUrls.filter((u): u is string => Boolean(u)) };
+      const droits = i.requested_by
+        ? droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: i.requested_by, role: rolesDemandeurs.get(i.requested_by) ?? "chauffeur" }, directionCount })
+        : null;
+      return {
+        ...i,
+        photoUrls: photoUrls.filter((u): u is string => Boolean(u)),
+        peutDecider: droits ? droits.peutDecider : true,
+        mention: droits?.mention ?? null,
+        libelleAttente: libelleEnAttente(i.requested_by ? (rolesDemandeurs.get(i.requested_by) ?? "chauffeur") : "chauffeur", effectifs),
+      };
     }),
   );
 
@@ -160,7 +174,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const [rentalProviders, rentalRequests, linkedRequests] = canManageRental
     ? await Promise.all([
         supabase.from("rental_providers").select("id, name, active").order("name").then((r) => (r.data ?? []) as { id: string; name: string; active: boolean }[]),
-        loadRentalRequests(supabase, { vehicleId: id }, 50),
+        loadRentalRequests(supabase, { vehicleId: id }, 50, { id: appUser.id, role: appUser.role, organizationId: appUser.organization_id }),
         supabase.from("rental_maintenance_requests").select("intervention_id").eq("vehicle_id", id).then((r) => (r.data ?? []) as { intervention_id: string }[]),
       ])
     : [[], [], []];

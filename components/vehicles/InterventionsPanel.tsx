@@ -17,6 +17,10 @@ interface Intervention {
   odometer_km: number | null;
   appointment_needed: boolean;
   photoUrls: string[];
+  /** Hiérarchie des demandes : faux si la demande est celle de la personne connectée, ou d'un rang égal ou supérieur. */
+  peutDecider?: boolean;
+  mention?: string | null;
+  libelleAttente?: string;
 }
 
 const STATUS_FLOW: Record<Intervention["status"], Intervention["status"] | null> = {
@@ -232,13 +236,18 @@ export function InterventionsPanel({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={URGENCY_BADGES[i.urgency]}>{URGENCY_LABELS[i.urgency]}</span>
-                      <span className="badge-neutral">{STATUS_LABELS[i.status]}</span>
+                      <span className="badge-neutral">{i.status === "scheduled" && i.libelleAttente ? i.libelleAttente : STATUS_LABELS[i.status]}</span>
+                      {canManage && i.peutDecider === false && STATUS_FLOW[i.status] && i.mention && (
+                        <span className="max-w-[14rem] text-xs text-navy/60" data-testid="mention-hierarchie">
+                          {i.mention}
+                        </span>
+                      )}
                       {canManage && (
                         <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => startEdit(i)}>
                           Modifier
                         </button>
                       )}
-                      {canManage && STATUS_FLOW[i.status] && (
+                      {canManage && i.peutDecider !== false && STATUS_FLOW[i.status] && (
                         <button className="btn-secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => advance(i)}>
                           → {STATUS_LABELS[STATUS_FLOW[i.status]!]}
                         </button>
