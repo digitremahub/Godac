@@ -65,8 +65,8 @@
 /* Orange GODAC (Mon compte → Affichage) : thème clair à dominante
    orange. L'accent (teal partout ailleurs) devient l'orange GODAC, le
    fond un papier légèrement chaud, le texte reste marine. Les erreurs et
-   alertes « orange » passent en rouge framboise pour ne pas se confondre
-   avec l'accent ; les pastilles « OK » restent vertes. Ratios de
+   alertes « orange » passent à l'ambre doré (le doré de la palette GODAC)
+   pour ne pas se confondre avec l'accent ; les pastilles « OK » restent vertes. Ratios de
    contraste vérifiés dans lib/display/__tests__/theme-orange.test.ts. */
 :root[data-theme="orange"] {
   --c-ink: 10 15 30;
@@ -75,9 +75,10 @@
   --c-teal: 255 107 53;
   --c-teal-hover: 255 133 89;
   --c-teal-ink: 194 65 12;
-  --c-orange: 225 29 72;
-  --c-orange-hover: 190 18 60;
-  --c-orange-ink: 190 18 60;
+  --c-orange: 245 200 66;
+  --c-orange-hover: 232 183 40;
+  --c-orange-ink: 133 100 4;
+  --c-on-orange: 10 15 30;
   --c-success: 22 163 74;
   --c-success-ink: 22 101 52;
   --c-halo: 194 65 12;
@@ -94,9 +95,10 @@
   --c-teal: 255 107 53;
   --c-teal-hover: 255 133 89;
   --c-teal-ink: 255 140 96;
-  --c-orange: 225 29 72;
-  --c-orange-hover: 190 18 60;
-  --c-orange-ink: 251 113 133;
+  --c-orange: 245 200 66;
+  --c-orange-hover: 250 214 102;
+  --c-orange-ink: 245 200 66;
+  --c-on-orange: 10 15 30;
   --c-gold-ink: 245 200 66;
   --c-relais-ink: 196 181 253;
   --c-success: 22 163 74;

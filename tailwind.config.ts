@@ -22,7 +22,7 @@ const config: Config = {
         // qui ne suit pas la couleur de menu de l'entreprise.
         "marine-fixe": "#0A0F1E",
         // Accent fills, as variables so the Orange GODAC theme can swap
-        // them (teal → orange GODAC, orange → rouge framboise). Defaults
+        // them (teal → orange GODAC, orange → ambre doré). Defaults
         // #1BE4C1 / #FF6B35 in app/globals.css.
         teal: "rgb(var(--c-teal) / <alpha-value>)",
         orange: "rgb(var(--c-orange) / <alpha-value>)",
