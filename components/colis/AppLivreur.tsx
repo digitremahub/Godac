@@ -32,6 +32,7 @@ import { OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memori
 import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
+import { RecommanderEmployeur } from "@/components/recommandation/RecommanderEmployeur";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
 // La carte (MapLibre) n'est chargée que si le chauffeur l'ouvre.
@@ -61,7 +62,21 @@ const MEMO = "godac-tournee-colis";
  * integre>) ; l'étape courante vient de lib/colis/parcours.ts. L'écran
  * reste allumé pendant la tournée quand le téléphone le permet.
  */
-export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette = true }: { prenom: string | null; pays?: string; vueInitiale?: Vue; lectureEtiquette?: boolean }) {
+export function AppLivreur({
+  prenom,
+  pays = "FR",
+  vueInitiale,
+  lectureEtiquette = true,
+  recommander = false,
+}: {
+  prenom: string | null;
+  pays?: string;
+  vueInitiale?: Vue;
+  lectureEtiquette?: boolean;
+  /** Compte GO Navigation : propose « Recommander GODAC à mon employeur » en bas de l'écran. */
+  recommander?: boolean;
+}) {
+  const [recoOuverte, setRecoOuverte] = useState(false);
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -1260,6 +1275,15 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
           </section>
         )}
       </main>
+
+      {recommander && !enNavigation && !enCarte && (
+        <footer className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 text-center">
+          <button type="button" onClick={() => setRecoOuverte(true)} className="min-h-[44px] px-3 text-sm text-navy/60 underline-offset-2 hover:underline">
+            Recommander GODAC à mon employeur
+          </button>
+        </footer>
+      )}
+      {recoOuverte && <RecommanderEmployeur onFermer={() => setRecoOuverte(false)} />}
     </div>
   );
 }

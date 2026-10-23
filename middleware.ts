@@ -17,6 +17,8 @@ const PUBLIC_PATHS = [
   "/confidentialite",
   "/contact",
   "/bon-de-commande",
+  // Document d'une page remis à l'employeur d'un chauffeur GO (imprimable).
+  "/recommandation",
   // « Voir la démo » signs the visitor into the demo organization.
   "/demo",
   // Référencement : lus par les moteurs de recherche sans session.
