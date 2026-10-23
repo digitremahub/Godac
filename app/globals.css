@@ -286,8 +286,9 @@
   .btn-ghost {
     @apply btn text-navy/70 hover:bg-navy/[0.05] hover:text-navy;
   }
+  /* Actions sensibles (retirer, supprimer) : marine GODAC, comme btn-dark ; la confirmation porte l'avertissement. */
   .btn-danger {
-    @apply btn bg-orange text-on-orange shadow-[inset_0_-1px_0_rgba(10,15,30,0.15)] hover:bg-[rgb(var(--c-orange-hover))];
+    @apply btn bg-marine text-white ring-1 ring-inset ring-white/10 hover:bg-marine/90;
   }
 
   /* Form fields — white, 44px tall, teal focus halo. */

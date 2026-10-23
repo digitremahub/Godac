@@ -98,7 +98,7 @@ export function DriverRecoveryCodePanel({ drivers }: { drivers: Driver[] }) {
             <p className="text-sm font-semibold text-navy">Pour confirmer, saisis exactement : <span className="font-mono">{RESET_CONFIRMATION}</span></p>
             <input aria-label="Phrase de confirmation de réinitialisation" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" className="w-full rounded-lg border border-orange/40 bg-surface px-3 py-2 text-sm" />
             <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={resettingAll || confirmation !== RESET_CONFIRMATION} onClick={resetAllAccess} className="rounded-lg bg-orange px-3 py-2 text-sm font-semibold text-on-orange disabled:cursor-not-allowed disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Confirmer la réinitialisation"}</button>
+              <button type="button" disabled={resettingAll || confirmation !== RESET_CONFIRMATION} onClick={resetAllAccess} className="btn-danger disabled:cursor-not-allowed disabled:opacity-50">{resettingAll ? "Réinitialisation…" : "Confirmer la réinitialisation"}</button>
               <button type="button" disabled={resettingAll} onClick={() => { setShowResetConfirmation(false); setConfirmation(""); }} className="rounded-lg border border-navy/20 px-3 py-2 text-sm">Annuler</button>
             </div>
           </div>
