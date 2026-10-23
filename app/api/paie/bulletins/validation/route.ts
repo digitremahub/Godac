@@ -3,6 +3,8 @@ import { z } from "zod";
 import { garderApi } from "@/lib/acces/garde-api";
 import { journaliser } from "@/lib/audit/journal";
 import { deciderValidation, ROLES_VALIDATION, statutValide } from "@/lib/paie/validation";
+import { compterDirection } from "@/lib/hierarchie/serveur";
+import { peutDecider } from "@/lib/hierarchie/demandes";
 
 const bodySchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(500),
@@ -34,7 +36,14 @@ export async function POST(req: Request) {
 
   const traites: string[] = [];
   const ignores: { id: string; raison: string }[] = [];
+  // Hiérarchie : une direction ne valide son propre bulletin que si elle est seule (sinon une autre personne de la direction).
+  const directionCount = await compterDirection(supabase, appUser.organization_id);
   for (const b of bulletins) {
+    const droit = peutDecider({ decideur: { id: appUser.id, role: appUser.role }, demandeur: { id: b.user_id, role: b.user_id === appUser.id ? appUser.role : "chauffeur" }, directionCount, paie: true });
+    if (!droit.ok) {
+      ignores.push({ id: b.id, raison: droit.raison });
+      continue;
+    }
     const d = deciderValidation({ role: appUser.role, decision, commentaire, statutActuel: statutValide(b.validation_status) });
     if (!d.ok) {
       ignores.push({ id: b.id, raison: d.message });
@@ -55,7 +64,7 @@ export async function POST(req: Request) {
       action: d.statut === "valide" ? "paie_bulletin_valide" : "paie_bulletin_refuse",
       targetTable: "payslips",
       targetId: b.id,
-      details: { salarie: b.user_id, mois: String(b.period_start).slice(0, 7), ...(d.statut === "refuse" ? { commentaire: commentaire!.trim() } : {}) },
+      details: { salarie: b.user_id, ...(droit.autoValidee ? { auto_validee: "direction unique" } : {}), mois: String(b.period_start).slice(0, 7), ...(d.statut === "refuse" ? { commentaire: commentaire!.trim() } : {}) },
     });
   }
 

@@ -9,6 +9,7 @@ import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { parisDay } from "@/lib/utils/paris-time";
 import { messageAlerteEncadrement, verifierDeclaration, dateCourte, type TypeDeclarable } from "@/lib/arrets/declaration";
 import { affectationsPendantArret, lireArrets, notifierArret, serviceDuSalarie } from "@/lib/arrets/serveur";
+import { garderDecision } from "@/lib/hierarchie/serveur";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const bodySchema = z.object({
@@ -51,6 +52,9 @@ export async function POST(req: Request) {
     if (appUser.role === "manager" && !(await canManagePendingDriver(supabase, appUser, cibleId))) {
       return NextResponse.json({ error: "Ce salarié n'est pas dans vos services." }, { status: 403 });
     }
+    // Saisir l'arrêt d'un autre (directement validé) est une décision : même hiérarchie (la paie garde ses droits).
+    const garde = await garderDecision(supabase, appUser, cibleId, { paie: true });
+    if (!garde.ok) return garde.reponse;
   } else if (d.documents.length === 0) {
     return NextResponse.json({ error: "Ajoutez la photo du volet employeur de votre avis d'arrêt." }, { status: 400 });
   }
@@ -127,6 +131,7 @@ export async function POST(req: Request) {
       accidentTravail: (d.type as TypeDeclarable) === "at_mp",
       parEncadrement: pourAutrui,
     }),
+    demandeurId: cibleId,
   });
   if (pourAutrui) {
     await notifierArret(admin, {

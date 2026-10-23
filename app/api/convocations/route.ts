@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({
   employee_id: z.string().uuid(),
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createServerSupabaseClient();
+  // Hiérarchie : on ne se convoque pas soi-même, ni un pair ou un supérieur (la direction : une autre personne de la direction).
+  const garde = await garderDecision(supabase, appUser, parsed.data.employee_id);
+  if (!garde.ok) return garde.reponse;
   const { data, error } = await supabase
     .from("convocations")
     .insert({

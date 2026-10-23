@@ -3,6 +3,8 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
 import { droitsEcart, ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
+import { compterDirection, lirePersonne } from "@/lib/hierarchie/serveur";
+import { libelleADecider } from "@/lib/hierarchie/demandes";
 import { ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
 import type { DetailPlein, PhotoPlein, TicpeDuPlein } from "@/lib/fuel/detail-plein";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
@@ -46,9 +48,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const suivi = await chargerSuiviEcarts(supabase, [id]);
   const traitements = suivi.traitements.get(id) ?? [];
+  // Hiérarchie des demandes : le conducteur du plein décide du rang requis pour traiter l'écart.
+  const conducteur = e.driver_id && appUser.role !== "chauffeur" ? await lirePersonne(supabase, appUser.organization_id, e.driver_id) : null;
+  const directionCount = appUser.role === "chauffeur" ? 2 : await compterDirection(supabase, appUser.organization_id);
   const alertes = suivi.alertes.get(id) ?? [];
   const ecarts = ecartsDuPlein(e, alertes);
   const statut = statutEcart(ecarts.length, traitements);
+
+  const droits = droitsEcart({ role: appUser.role, userId: appUser.id, driverId: e.driver_id, statut, roleChauffeur: conducteur?.role, directionCount });
+  // Lecture seule : écart à traiter, mais pas par cette personne (son plein, ou rang insuffisant).
+  const mention = !droits.traiter && ["manager", "exploitation", "direction"].includes(appUser.role) && (statut === "ouvert" || statut === "reponse_recue" || statut === "explication_demandee") ? libelleADecider(conducteur?.role ?? "chauffeur") : null;
 
   // Journal d'audit (corrections d'un plein enregistré) : lu en service
   // (RLS direction seule), montré à l'encadrement et au comptable — le
@@ -173,9 +182,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           details: a.details && typeof a.details === "object" ? (a.details as Record<string, unknown>) : null,
         }))
       : null,
-    droits: suivi.traitementDisponible
-      ? droitsEcart({ role: appUser.role, userId: appUser.id, driverId: e.driver_id, statut })
-      : { traiter: false, repondre: false },
+    droits: suivi.traitementDisponible ? { ...droits, mention } : { traiter: false, repondre: false, mention: null },
     ticpe,
   };
 

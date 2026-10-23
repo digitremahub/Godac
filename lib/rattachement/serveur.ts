@@ -6,6 +6,7 @@ import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/p
 import { rapprocherAmende, type CandidatAmende, type Confiance, type CreneauPlanning, type PointGps, type PriseVehicule, type TourneeColis } from "@/lib/rattachement/amende";
 import { evaluerPreuve, rapprocherContestation, type ArretCandidat, type CriteresContestation, type PreuveLivraison } from "@/lib/rattachement/contestation";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { destinatairesDe } from "@/lib/hierarchie/serveur";
 
 /**
  * Accès aux données du rapprochement (planning, changements de véhicule,
@@ -303,20 +304,36 @@ export async function serviceDuChauffeur(supabase: Db, driverId: string): Promis
  * Alerte (relayée en push / e-mail par le webhook des alertes). Insertion
  * par le client service : la RLS d'alerts n'autorise pas l'insertion par
  * un utilisateur (même convention que les amendes et contestations).
+ *
+ * Routage hiérarchique : avec `demandeurId` (et sans destinataire
+ * personnel), l'alerte monte d'un niveau au-dessus de cette personne
+ * (manager du service pour un chauffeur ; exploitation et direction pour
+ * un manager ; direction pour une exploitation ; les autres membres de la
+ * direction pour la direction), avec escalade si ce niveau est vide
+ * (lib/hierarchie/demandes.ts › destinatairesNotification) : une alerte
+ * personnelle par destinataire, jamais pour lui-même ni pour un pair.
+ * Personne au-dessus (direction seule) : aucune alerte. Sans `demandeurId`,
+ * diffusion par rôles comme avant.
  */
 export async function notifier(
   admin: Db,
-  a: { organizationId: string; type: "fine_notification" | "customer_dispute"; severity: "info" | "warning"; message: string; relatedTable: "fines" | "customer_disputes"; relatedId: string; recipientUserId?: string | null; recipientRoles?: string[]; serviceId?: string | null },
+  a: { organizationId: string; type: "fine_notification" | "customer_dispute"; severity: "info" | "warning"; message: string; relatedTable: "fines" | "customer_disputes"; relatedId: string; recipientUserId?: string | null; recipientRoles?: string[]; serviceId?: string | null; demandeurId?: string | null },
 ): Promise<string | null> {
-  const { error } = await admin.from("alerts").insert({
+  const base = {
     organization_id: a.organizationId,
     type: a.type,
     severity: a.severity,
     message: a.message,
     related_table: a.relatedTable,
     related_id: a.relatedId,
-    ...(a.recipientUserId ? { recipient_user_id: a.recipientUserId } : { recipient_roles: a.recipientRoles ?? ["manager", "exploitation", "direction"] }),
-    ...(a.serviceId ? { service_id: a.serviceId } : {}),
-  });
+  };
+  let lignes: Record<string, unknown>[];
+  if (a.recipientUserId) lignes = [{ ...base, recipient_user_id: a.recipientUserId, ...(a.serviceId ? { service_id: a.serviceId } : {}) }];
+  else if (a.demandeurId) {
+    const destinataires = await destinatairesDe(admin, a.organizationId, a.demandeurId);
+    lignes = destinataires.map((u) => ({ ...base, recipient_user_id: u.id }));
+  } else lignes = [{ ...base, recipient_roles: a.recipientRoles ?? ["manager", "exploitation", "direction"], ...(a.serviceId ? { service_id: a.serviceId } : {}) }];
+  if (lignes.length === 0) return null;
+  const { error } = await admin.from("alerts").insert(lignes);
   return error?.message ?? null;
 }

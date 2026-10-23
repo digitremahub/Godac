@@ -4,6 +4,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { journaliser } from "@/lib/audit/journal";
 import { actionAcompte, moisDe, moisDeDeduction, moisLisible, statutAcompte } from "@/lib/paie/acomptes";
 import { MESSAGE_TABLE_ABSENTE, tableAcomptesAbsente } from "@/lib/paie/acomptes-serveur";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const dateIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const bodySchema = z.object({
@@ -53,6 +54,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   });
   if (!verdict.ok) return NextResponse.json({ error: verdict.message }, { status: 403 });
 
+  // Hiérarchie : seule l'annulation par son auteur échappe à la règle. Pas de décision, de préparation ni de versement sur sa propre demande
+  // (sauf direction seule, tracée) ; le comptable garde ses droits sur la paie des autres.
+  let autoValidee = false;
+  if (!(action === "annuler" && d.user_id === appUser.id)) {
+    const garde = await garderDecision(supabase, appUser, d.user_id, { paie: true });
+    if (!garde.ok) return garde.reponse;
+    autoValidee = garde.autoValidee;
+  }
+
   const patch: Record<string, unknown> = {};
   let avertissement: string | null = null;
   if (action === "annuler") patch.status = "annulee";
@@ -96,6 +106,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: error.code === "42501" || error.code === "23514" ? 403 : 500 });
   }
 
+  if (autoValidee) await tracerAutoValidation(appUser, { table: "salary_advance_requests", id, decision: action });
   if (action !== "annuler" || d.user_id !== appUser.id) {
     await journaliser({
       organizationId: appUser.organization_id,

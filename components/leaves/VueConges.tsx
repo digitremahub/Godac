@@ -10,6 +10,8 @@ import { joursOuvrables } from "@/lib/paie/conges";
 import Link from "next/link";
 import { urlDe } from "@/lib/acces/catalogue";
 import { lireArrets } from "@/lib/arrets/serveur";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 /**
  * Congés : Équipe › Congés (encadrement : décisions sur son service, avec
@@ -66,8 +68,18 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
     return { disponible: s.disponible, jours, insuffisant: r.status === "pending" && sansElle - jours < 0 };
   };
 
+  // Hiérarchie des demandes : qui peut décider quoi, et « En attente de … » pour le demandeur.
+  const { effectifs, directionCount } = await contexteHierarchie(supabase, appUser.organization_id);
+  const roles = await rolesParId(supabase, appUser.organization_id, rows.map((r) => r.driver_id as string));
+  const droitsDe = (r: any) =>
+    droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: r.driver_id, role: roles.get(r.driver_id) ?? "chauffeur" }, directionCount });
+
   // Arrêts de travail reçus, à vérifier (encadrement) : rappel en tête.
-  const arretsAVerifier = decision ? (await lireArrets(supabase, { limite: 200 })).lignes.filter((a) => a.statut === "recu" && a.userId !== appUser.id).length : 0;
+  const arretsRecus = decision ? (await lireArrets(supabase, { limite: 200 })).lignes.filter((a) => a.statut === "recu") : [];
+  const rolesArrets = await rolesParId(supabase, appUser.organization_id, arretsRecus.map((a) => a.userId));
+  const arretsAVerifier = arretsRecus.filter(
+    (a) => droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: a.userId, role: rolesArrets.get(a.userId) ?? "chauffeur" }, directionCount, paie: appUser.role === "comptable" }).peutDecider,
+  ).length;
 
   return (
     <div>
@@ -116,6 +128,10 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
           isOwn: r.driver_id === appUser.id,
           overlapWith: overlapsByLeaveId.get(r.id) ?? [],
           solde: soldeLigne(r),
+          peutDecider: decision ? droitsDe(r).peutDecider : false,
+          autoValidee: decision ? droitsDe(r).autoValidee : false,
+          mention: decision ? droitsDe(r).mention : null,
+          libelleAttente: r.driver_id === appUser.id ? libelleEnAttente(appUser.role, effectifs) : libelleEnAttente(roles.get(r.driver_id) ?? "chauffeur", effectifs),
         }))}
         canDecide={isDecisionMaker}
       />

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({ replacement_driver_id: z.string().uuid().nullable() });
 
@@ -22,6 +23,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  const { data: conge } = await supabase.from("leave_requests").select("driver_id").eq("id", id).maybeSingle();
+  if (conge) {
+    // Hiérarchie : on n'organise pas le remplacement de son propre congé.
+    const garde = await garderDecision(supabase, appUser, conge.driver_id);
+    if (!garde.ok) return garde.reponse;
+  }
   const { error } = await supabase
     .from("leave_requests")
     .update({ replacement_driver_id: parsed.data.replacement_driver_id })

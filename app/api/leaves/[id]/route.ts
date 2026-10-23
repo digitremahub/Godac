@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z
   .object({
@@ -51,11 +52,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const isOwner = current.driver_id === appUser.id;
 
   const update: Record<string, unknown> = {};
+  let autoValidee = false;
 
   if (parsed.data.status) {
     if (!isDecisionMaker) {
       return NextResponse.json({ error: "Rôle non autorisé pour décider d'une demande de congé" }, { status: 403 });
     }
+    // Hiérarchie : jamais sa propre demande, rang strictement supérieur (lib/hierarchie).
+    const garde = await garderDecision(supabase, appUser, current.driver_id);
+    if (!garde.ok) return garde.reponse;
+    autoValidee = garde.autoValidee;
     update.status = parsed.data.status;
     update.decided_by = appUser.id;
     update.decided_at = new Date().toISOString();
@@ -68,6 +74,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         { error: "Vous ne pouvez modifier qu'une de vos demandes encore en attente" },
         { status: 403 },
       );
+    }
+    // Corriger la demande d'un autre est une décision : même hiérarchie. Sa propre demande en attente reste modifiable par son auteur.
+    if (isDecisionMaker && !(isOwner && current.status === "pending") && !parsed.data.status) {
+      const garde = await garderDecision(supabase, appUser, current.driver_id);
+      if (!garde.ok) return garde.reponse;
     }
     if (parsed.data.start_date !== undefined) update.start_date = parsed.data.start_date;
     if (parsed.data.end_date !== undefined) update.end_date = parsed.data.end_date;
@@ -85,6 +96,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id, status, start_date, end_date, reason")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: error.code === "42501" ? 403 : 500 });
+  if (autoValidee) await tracerAutoValidation(appUser, { table: "leave_requests", id, decision: String(parsed.data.status) });
   return NextResponse.json({ leaveRequest: data });
 }

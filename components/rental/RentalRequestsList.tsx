@@ -36,6 +36,9 @@ export interface RentalRequestItem {
   invoiceUrls: string[];
   tokenExpiresAt: string | null;
   events: { action: string; actorKind: string; actorName: string | null; comment: string | null; createdAt: string }[];
+  /** Hiérarchie des demandes : faux si la demande d'entretien d'origine est celle de la personne connectée, ou d'un rang égal ou supérieur. */
+  peutDecider?: boolean;
+  mention?: string | null;
 }
 
 const URGENCY: Record<string, { label: string; badge: string }> = {
@@ -142,7 +145,12 @@ export function RentalRequestsList({ requests, showVehicle = true }: { requests:
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {ACTION_BUTTONS.filter((b) => canManagerAct(r.status, b.action)).map((b) => (
+                {r.peutDecider === false && r.mention && ACTION_BUTTONS.some((b) => canManagerAct(r.status, b.action)) && (
+                  <span className="max-w-[14rem] self-center text-xs text-navy/60" data-testid="mention-hierarchie">
+                    {r.mention}
+                  </span>
+                )}
+                {ACTION_BUTTONS.filter((b) => r.peutDecider !== false && canManagerAct(r.status, b.action)).map((b) => (
                   <button
                     key={b.action}
                     className={`${b.primary ? "btn-primary" : "btn-secondary"} !px-2 !py-1 text-xs`}

@@ -106,9 +106,23 @@ describe("droitsEcart", () => {
     expect(droitsEcart({ ...base, role: "comptable" }).traiter).toBe(false);
   });
 
-  it("un manager qui conduit ne traite pas l'écart de son propre plein ; la direction si", () => {
+  it("un manager qui conduit ne traite pas l'écart de son propre plein ; la direction seule, si", () => {
     expect(droitsEcart({ ...base, role: "manager", driverId: "moi" }).traiter).toBe(false);
-    expect(droitsEcart({ ...base, role: "direction", driverId: "moi" }).traiter).toBe(true);
+    expect(droitsEcart({ ...base, role: "direction", driverId: "moi", directionCount: 1 }).traiter).toBe(true);
+    expect(droitsEcart({ ...base, role: "direction", driverId: "moi", directionCount: 2 }).traiter).toBe(false);
+  });
+
+  it("hiérarchie : l'écart du plein d'un manager revient à l'exploitation ou à la direction, pas à un autre manager", () => {
+    const duManager = { ...base, driverId: "manager-2", roleChauffeur: "manager" };
+    expect(droitsEcart({ ...duManager, role: "manager" }).traiter).toBe(false);
+    expect(droitsEcart({ ...duManager, role: "exploitation" }).traiter).toBe(true);
+    expect(droitsEcart({ ...duManager, role: "direction" }).traiter).toBe(true);
+  });
+
+  it("hiérarchie : l'écart du plein d'une exploitation revient à la direction", () => {
+    const duExploitation = { ...base, driverId: "expl-2", roleChauffeur: "exploitation" };
+    expect(droitsEcart({ ...duExploitation, role: "exploitation" }).traiter).toBe(false);
+    expect(droitsEcart({ ...duExploitation, role: "direction" }).traiter).toBe(true);
   });
 
   it("rien à traiter sans écart, ni après traitement", () => {

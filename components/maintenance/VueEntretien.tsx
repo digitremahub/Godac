@@ -7,6 +7,8 @@ import { isModuleEnabled } from "@/lib/organization/modules";
 import { PageHeader } from "@/components/ui";
 import { MaintenanceRequestForm } from "@/components/maintenance/MaintenanceRequestForm";
 import { MaintenanceRequestsList } from "@/components/maintenance/MaintenanceRequestsList";
+import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
+import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
 
 const URGENCY_RANK: Record<string, number> = { critical: 0, high: 1, normal: 2, low: 3 };
 
@@ -21,7 +23,7 @@ export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demand
     supabase
       .from("vehicle_interventions")
       .select(
-        "id, type, description, urgency, status, odometer_km, appointment_needed, photo_paths, created_at, vehicles(registration), users!vehicle_interventions_requested_by_fkey(full_name)",
+        "id, type, description, urgency, status, odometer_km, appointment_needed, photo_paths, created_at, requested_by, vehicles(registration), users!vehicle_interventions_requested_by_fkey(full_name)",
       )
       .order("created_at", { ascending: false }),
     supabase.from("organizations").select("emergency_phone").eq("id", appUser.organization_id).single(),
@@ -36,6 +38,10 @@ export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demand
 
   const rows = (requests ?? []) as any[];
   rows.sort((a, b) => (URGENCY_RANK[a.urgency] ?? 2) - (URGENCY_RANK[b.urgency] ?? 2));
+
+  // Hiérarchie des demandes : on ne traite pas sa propre demande ; rang supérieur à celui du demandeur.
+  const { directionCount, effectifs } = await contexteHierarchie(supabase, appUser.organization_id);
+  const rolesDemandeurs = await rolesParId(supabase, appUser.organization_id, rows.map((r) => r.requested_by).filter(Boolean));
 
   const rowsWithPhotos = await Promise.all(
     rows.map(async (r) => {
@@ -81,6 +87,11 @@ export async function VueEntretien({ appUser, supabase, vehicle, titre = "Demand
           photoUrls: r.photoUrls,
           requesterName: r.users?.full_name ?? "—",
           createdAt: r.created_at,
+          ...(() => {
+            const role = r.requested_by ? (rolesDemandeurs.get(r.requested_by) ?? "chauffeur") : "chauffeur";
+            const droits = r.requested_by ? droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: r.requested_by, role }, directionCount }) : null;
+            return { peutDecider: droits ? droits.peutDecider : true, mention: droits?.mention ?? null, libelleAttente: libelleEnAttente(role, effectifs) };
+          })(),
         }))}
         canManage={hasRole(appUser.role, ["manager", "exploitation", "direction"])}
       />
