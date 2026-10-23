@@ -35,8 +35,19 @@ export async function POST(req: Request) {
     action: "inscription_go_navigation",
     targetTable: "organizations",
     targetId: r.organizationId,
-    details: { offre: "go_navigation" },
+    details: { offre: "go_navigation", apporteur_user_id: r.apporteurUserId, lien_id: r.lienId },
   });
+  // Trace aussi chez l'apporteur (journal de son organisation) : qui a fait essayer GO.
+  if (r.apporteurUserId && r.apporteurOrgId) {
+    await journaliser({
+      organizationId: r.apporteurOrgId,
+      userId: r.apporteurUserId,
+      action: "inscription_go_navigation",
+      targetTable: "organizations",
+      targetId: r.organizationId,
+      details: { offre: "go_navigation", via: r.lienId ? "lien_personnel" : "invitation" },
+    });
+  }
 
   // Connexion directe : le compte vient d'être créé avec ce mot de passe.
   const supabase = await createServerSupabaseClient();

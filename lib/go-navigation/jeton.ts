@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 /**
  * Jeton du lien d'invitation GO Navigation (/go-navigation/[jeton]) : même
@@ -21,6 +21,18 @@ export function ressembleJetonInvitation(jeton: unknown): jeton is string {
 
 export function hacherJetonInvitation(jeton: string): string {
   return createHash("sha256").update(`godac-go-navigation:${jeton}`).digest("hex");
+}
+
+/**
+ * Jeton du lien PERSONNEL d'un apporteur (« Faire essayer GO ») : dérivé de
+ * l'id du lien par HMAC-SHA256 (32 octets → 43 caractères, même forme que les
+ * autres jetons). Seul le hash est stocké pour la recherche, mais le
+ * propriétaire doit pouvoir revoir et recopier son lien : le serveur le
+ * recalcule depuis l'id. Changer le secret invalide les liens existants
+ * (il suffit de les régénérer).
+ */
+export function deriverJetonApporteur(lienId: string, secret: string): string {
+  return createHmac("sha256", secret).update(`godac-apporteur-go:${lienId}`).digest("base64url");
 }
 
 /** Adresse IP hachée pour la limitation de débit (jamais stockée en clair). */

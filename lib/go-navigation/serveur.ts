@@ -1,7 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clientIp } from "@/lib/rental/public-access";
-import { hacherIpInscription, hacherJetonInvitation, LIMITES_INSCRIPTION, ressembleJetonInvitation } from "@/lib/go-navigation/jeton";
+import { genererJetonInvitation, hacherIpInscription, hacherJetonInvitation, LIMITES_INSCRIPTION, ressembleJetonInvitation } from "@/lib/go-navigation/jeton";
+import { apporteurAutorise } from "@/lib/partage-go/serveur";
+import { attributionDepuis, depasseMaxInscriptions, libelleApporteur, lienUtilisable, type Attribution } from "@/lib/partage-go/apporteur";
 import {
   finEssai,
   invitationUtilisable,
@@ -49,20 +51,69 @@ export async function limiteAtteinte(admin: SupabaseClient, headers: Headers, en
   return { ipHash, message: null };
 }
 
-/** Invitation encore utilisable pour ce jeton, sinon null (forme, hash, révocation, usage, expiration). */
-export async function invitationValide(admin: SupabaseClient, jeton: string): Promise<InvitationRow | null> {
+/**
+ * Jeton d'inscription résolu : soit une invitation à usage unique (staff
+ * GODAC ou apporteur), soit le lien personnel multi-usage d'un apporteur.
+ * `attribution` vient de la base (jamais du client).
+ */
+export interface JetonResolu {
+  type: "invitation" | "lien";
+  /** id de l'invitation, ou du lien personnel. */
+  id: string;
+  attribution: Attribution;
+}
+
+/** Nombre d'inscriptions retenues par un lien personnel (les tentatives abandonnées sont marquées révoquées). */
+async function inscritsDuLien(admin: SupabaseClient, lienId: string): Promise<number> {
+  const { count } = await admin.from("go_navigation_invitations").select("id", { count: "exact", head: true }).eq("referral_link_id", lienId).is("revoked_at", null);
+  return count ?? 0;
+}
+
+/**
+ * Jeton encore utilisable, sinon null (forme, hash, révocation, usage,
+ * expiration, maximum d'inscriptions, apporteur qui n'a plus le droit). Les
+ * colonnes et la table du suivi d'apporteur peuvent manquer (migration
+ * 20261103000003 pas encore appliquée) : on retombe sur le comportement
+ * historique (invitations du staff).
+ */
+export async function jetonValide(admin: SupabaseClient, jeton: string, maintenant: Date = new Date()): Promise<JetonResolu | null> {
   if (!ressembleJetonInvitation(jeton)) return null;
-  const { data, error } = await admin
-    .from("go_navigation_invitations")
-    .select("id, expires_at, used_at, revoked_at")
-    .eq("token_hash", hacherJetonInvitation(jeton))
+  const hash = hacherJetonInvitation(jeton);
+
+  const { data, error } = await admin.from("go_navigation_invitations").select("id, expires_at, used_at, revoked_at").eq("token_hash", hash).maybeSingle();
+  if (!error && data) {
+    if (!invitationUtilisable(data as InvitationRow, maintenant)) return null;
+    const inv = data as InvitationRow;
+    const { data: src } = await admin.from("go_navigation_invitations").select("created_by_user_id, created_by_org_id, referral_link_id").eq("id", inv.id).maybeSingle();
+    const attribution = attributionDepuis(src as { created_by_user_id?: string | null; created_by_org_id?: string | null; referral_link_id?: string | null } | null);
+    if (attribution.referred_by_user_id && !(await apporteurAutorise(admin, attribution.referred_by_user_id))) return null;
+    return { type: "invitation", id: inv.id, attribution };
+  }
+
+  const { data: lien, error: errLien } = await admin
+    .from("go_apporteur_liens")
+    .select("id, organization_id, user_id, expires_at, revoked_at, max_inscriptions")
+    .eq("code_hash", hash)
     .maybeSingle();
-  if (error || !data) return null;
-  return invitationUtilisable(data as InvitationRow) ? (data as InvitationRow) : null;
+  if (errLien || !lien) return null;
+  const l = lien as { id: string; organization_id: string; user_id: string; expires_at: string; revoked_at: string | null; max_inscriptions: number };
+  if (!lienUtilisable(l, await inscritsDuLien(admin, l.id), maintenant)) return null;
+  if (!(await apporteurAutorise(admin, l.user_id))) return null;
+  return { type: "lien", id: l.id, attribution: attributionDepuis({ created_by_user_id: l.user_id, created_by_org_id: l.organization_id, referral_link_id: l.id }) };
+}
+
+/** « Invité par Jean Dupont » pour la page d'inscription : nom (ou organisation), jamais d'e-mail. */
+export async function libelleInvitePar(admin: SupabaseClient, attribution: Attribution): Promise<string | null> {
+  if (!attribution.referred_by_user_id) return null;
+  const [u, o] = await Promise.all([
+    admin.from("users").select("full_name").eq("id", attribution.referred_by_user_id).maybeSingle(),
+    attribution.referred_by_org_id ? admin.from("organizations").select("name").eq("id", attribution.referred_by_org_id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  return libelleApporteur((u.data as { full_name?: string } | null)?.full_name, (o.data as { name?: string } | null)?.name);
 }
 
 export type ResultatInscription =
-  | { ok: true; organizationId: string; userId: string }
+  | { ok: true; organizationId: string; userId: string; apporteurUserId: string | null; apporteurOrgId: string | null; lienId: string | null }
   | { ok: false; statut: number; message: string; echecJeton?: boolean };
 
 /**
@@ -78,21 +129,34 @@ export type ResultatInscription =
  * Tout échec après l'étape 1 défait ce qui a été créé et libère le lien.
  */
 export async function inscrireGoNavigation(admin: SupabaseClient, form: FormulaireInscription, maintenant: Date = new Date()): Promise<ResultatInscription> {
-  const invitation = await invitationValide(admin, form.jeton);
-  if (!invitation) return { ok: false, statut: 410, message: MESSAGE_LIEN_INVALIDE, echecJeton: true };
+  const jeton = await jetonValide(admin, form.jeton, maintenant);
+  if (!jeton) return { ok: false, statut: 410, message: MESSAGE_LIEN_INVALIDE, echecJeton: true };
 
-  const { data: reservee } = await admin
-    .from("go_navigation_invitations")
-    .update({ used_at: maintenant.toISOString() })
-    .eq("id", invitation.id)
-    .is("used_at", null)
-    .is("revoked_at", null)
-    .gt("expires_at", maintenant.toISOString())
-    .select("id")
-    .maybeSingle();
-  if (!reservee) return { ok: false, statut: 410, message: MESSAGE_LIEN_INVALIDE, echecJeton: true };
-
-  const liberer = () => admin.from("go_navigation_invitations").update({ used_at: null }).eq("id", invitation.id).is("used_by_user_id", null);
+  // Identifiant de l'invitation qui portera le compte : l'invitation elle-même,
+  // ou (lien personnel) une ligne créée ici, déjà « utilisée », pour que
+  // inscrire_go_navigation() reste inchangée.
+  let invitationId: string;
+  let liberer: () => PromiseLike<unknown>;
+  if (jeton.type === "invitation") {
+    const { data: reservee } = await admin
+      .from("go_navigation_invitations")
+      .update({ used_at: maintenant.toISOString() })
+      .eq("id", jeton.id)
+      .is("used_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", maintenant.toISOString())
+      .select("id")
+      .maybeSingle();
+    if (!reservee) return { ok: false, statut: 410, message: MESSAGE_LIEN_INVALIDE, echecJeton: true };
+    invitationId = jeton.id;
+    liberer = () => admin.from("go_navigation_invitations").update({ used_at: null }).eq("id", invitationId).is("used_by_user_id", null);
+  } else {
+    const reserve = await reserverPlaceLien(admin, jeton, maintenant);
+    if (!reserve) return { ok: false, statut: 410, message: MESSAGE_LIEN_INVALIDE, echecJeton: true };
+    invitationId = reserve;
+    // Tentative abandonnée : la ligne ne compte plus dans le maximum du lien.
+    liberer = () => admin.from("go_navigation_invitations").update({ revoked_at: new Date().toISOString() }).eq("id", invitationId).is("used_by_user_id", null);
+  }
   const nomComplet = `${form.prenom} ${form.nom}`.trim();
 
   const { data: cree, error: authError } = await admin.auth.admin.createUser({
@@ -111,7 +175,7 @@ export async function inscrireGoNavigation(admin: SupabaseClient, form: Formulai
   }
 
   const { data: organizationId, error: rpcError } = await admin.rpc("inscrire_go_navigation", {
-    p_invitation_id: invitation.id,
+    p_invitation_id: invitationId,
     p_user_id: cree.user.id,
     p_email: form.email,
     p_full_name: nomComplet,
@@ -128,5 +192,54 @@ export async function inscrireGoNavigation(admin: SupabaseClient, form: Formulai
     return { ok: false, statut: 503, message: "L'inscription n'est pas disponible pour le moment. Réessayez plus tard ou contactez GODAC." };
   }
 
-  return { ok: true, organizationId: organizationId as string, userId: cree.user.id };
+  // Attribution de l'apporteur sur l'organisation d'essai, posée depuis le jeton
+  // résolu côté serveur. Un échec ne défait pas le compte : l'invitation porte
+  // déjà l'apporteur (created_by_*), on le consigne pour le rattraper.
+  if (jeton.attribution.referred_by_user_id) {
+    const { error: errAttribution } = await admin.from("organizations").update(jeton.attribution).eq("id", organizationId as string);
+    if (errAttribution) console.error("inscrireGoNavigation: attribution de l'apporteur non enregistrée", errAttribution.message);
+  }
+
+  return { ok: true, organizationId: organizationId as string, userId: cree.user.id, apporteurUserId: jeton.attribution.referred_by_user_id, apporteurOrgId: jeton.attribution.referred_by_org_id, lienId: jeton.attribution.referral_link_id };
+}
+
+/**
+ * Réserve une place sur un lien personnel : crée l'invitation « utilisée »
+ * qui portera le compte, puis recompte. Si le maximum est dépassé (deux
+ * inscriptions simultanées sur la dernière place), la ligne est annulée.
+ * Renvoie l'id de la ligne, ou null.
+ */
+async function reserverPlaceLien(admin: SupabaseClient, jeton: JetonResolu, maintenant: Date): Promise<string | null> {
+  const { referred_by_user_id: userId, referred_by_org_id: orgId, referral_link_id: lienId } = jeton.attribution;
+  if (!userId || !orgId || !lienId) return null;
+  const [{ data: apporteur }, { data: lien }] = await Promise.all([
+    admin.from("users").select("email").eq("id", userId).maybeSingle(),
+    admin.from("go_apporteur_liens").select("max_inscriptions").eq("id", lienId).maybeSingle(),
+  ]);
+  const max = (lien as { max_inscriptions?: number } | null)?.max_inscriptions;
+  if (!max) return null;
+  const { data: ligne, error } = await admin
+    .from("go_navigation_invitations")
+    .insert({
+      // Jeton jamais communiqué : la ligne n'est pas un lien utilisable, juste le support du compte.
+      token_hash: hacherJetonInvitation(genererJetonInvitation()),
+      note: "Lien personnel",
+      expires_at: maintenant.toISOString(),
+      used_at: maintenant.toISOString(),
+      created_by_email: ((apporteur as { email?: string } | null)?.email ?? "apporteur").toLowerCase(),
+      created_by_user_id: userId,
+      created_by_org_id: orgId,
+      referral_link_id: lienId,
+    })
+    .select("id")
+    .single();
+  if (error || !ligne) {
+    console.error("inscrireGoNavigation: réservation du lien personnel", error?.message);
+    return null;
+  }
+  if (depasseMaxInscriptions(await inscritsDuLien(admin, lienId), max)) {
+    await admin.from("go_navigation_invitations").update({ revoked_at: new Date().toISOString() }).eq("id", ligne.id);
+    return null;
+  }
+  return ligne.id as string;
 }

@@ -18,6 +18,10 @@ export interface LigneInvitationStaff {
   revokedAt: string | null;
   organizationId: string | null;
   organizationName: string | null;
+  /** Apporteur (nom + organisation) quand l'invitation vient d'une personne autorisée du côté client. */
+  apporteur?: string | null;
+  /** Compte créé par le lien personnel de l'apporteur. */
+  viaLien?: boolean;
 }
 
 const BADGE: Record<StatutInvitation, string> = { envoyee: "badge-teal", utilisee: "badge-teal", expiree: "badge-gold", revoquee: "badge-gold" };
@@ -134,7 +138,15 @@ export function InvitationsGoNavigation({ invitations }: { invitations: LigneInv
                       {date(i.createdAt)}
                       <span className="block text-xs text-navy/55">{i.createdBy}</span>
                     </td>
-                    <td className="py-2">{i.note ?? "—"}</td>
+                    <td className="py-2">
+                      {i.note ?? "—"}
+                      {i.apporteur && (
+                        <span className="block text-xs text-navy/55">
+                          Apporteur : {i.apporteur}
+                          {i.viaLien ? " · lien personnel" : ""}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2">
                       <span className={BADGE[statut]}>{LIBELLES_STATUT_INVITATION[statut]}</span>
                       {i.usedAt && <span className="block text-xs text-navy/55">{date(i.usedAt)}</span>}

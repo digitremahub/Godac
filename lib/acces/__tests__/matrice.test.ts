@@ -15,7 +15,7 @@ function matrice(): string {
   for (const s of SECTIONS) {
     for (const e of ECRANS.filter((x) => x.section === s.id)) {
       const cases = TOUS_LES_ROLES.map((r) => (menus[r]!.has(e.id) ? "✅" : deciderAcces(e, r, tout).ok ? "🔒" : e.alternative?.[r] ? `↪ ${e.alternative[r]}` : "—"));
-      const mods = [...(e.modules ?? []), ...(e.modulesAuMoinsUn ?? []).map((m) => `${m}?`)].join(", ");
+      const mods = [...(e.droit ? [e.droit] : []), ...(e.modules ?? []), ...(e.modulesAuMoinsUn ?? []).map((m) => `${m}?`)].join(", ");
       lignes.push(`| ${s.libelle} | ${e.libelle} | \`${e.href}\` | ${cases.join(" | ")} | ${mods || "—"} |`);
     }
   }

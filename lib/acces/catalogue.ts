@@ -217,6 +217,12 @@ export interface Ecran {
    * qui ouvre /fines depuis une alerte → ses propres amendes).
    */
   alternative?: Partial<Record<UserRole, string>>;
+  /**
+   * Droit par personne (et non par rôle) : pseudo-module à trouver parmi les
+   * modules actifs, ajouté côté serveur (lib/acces/modules-requete.ts) aux
+   * personnes autorisées. Ex. DROIT_PARTAGE_GO.
+   */
+  droit?: string;
   /** Restriction supplémentaire faite par la page (texte pour la matrice). */
   note?: string;
   /**
@@ -230,9 +236,27 @@ export interface Ecran {
 
 const E = (e: Ecran) => e;
 
+/**
+ * Pseudo-module « Faire essayer GO » : ajouté aux modules actifs de la
+ * direction (toujours), des personnes désignées par elle et, si elle l'a
+ * activé, de toute l'équipe (lib/partage-go/serveur.ts). Jamais ajouté aux
+ * comptes d'essai GO Navigation.
+ */
+export const DROIT_PARTAGE_GO = "droit:partage_go";
+
 export const ECRANS: readonly Ecran[] = [
   // ── Tableau de bord ──────────────────────────────────────────────
   E({ id: "dashboard.accueil", section: "dashboard", libelle: "Tableau de bord", libelleOnglet: "Aujourd'hui", href: "/dashboard", roles: TOUS_LES_ROLES, icone: "grid" }),
+  E({
+    id: "partage.go",
+    section: "dashboard",
+    libelle: "Faire essayer GO",
+    href: "/partage-go",
+    roles: TOUS_LES_ROLES,
+    droit: DROIT_PARTAGE_GO,
+    icone: "megaphone",
+    note: "direction par défaut ; ouvert par la direction à des personnes désignées ou à toute l'équipe",
+  }),
   E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation"], modules: ["bi_reporting"], icone: "chart", note: "exploitation : carburant et tournées, sans paie" }),
 
   // ── Mon espace ───────────────────────────────────────────────────
@@ -890,6 +914,9 @@ export function deciderAcces(e: Ecran, role: UserRole, modulesActifs: ReadonlySe
   }
   if (e.conducteur && !conduit) {
     return { ok: false, motif: "role", rolesAutorises: e.roles, redirection: e.alternative?.[role], conducteur: true };
+  }
+  if (e.droit && !modulesActifs.has(e.droit)) {
+    return { ok: false, motif: "role", rolesAutorises: ["direction"], redirection: e.alternative?.[role] };
   }
   const manquants = (e.modules ?? []).filter((m) => !modulesActifs.has(m));
   if (manquants.length > 0) return { ok: false, motif: "module", modules: manquants };
