@@ -22,7 +22,8 @@ export type Depart =
 export type Arrivee =
   | { mode: "depot" }
   | { mode: "meme" }
-  | { mode: "arret"; arret_id: string }
+  /** Dernier arrêt livré ; le retour au dépôt (ou au départ) suit, sauf `sans_retour`. */
+  | { mode: "arret"; arret_id: string; sans_retour?: boolean }
   | { mode: "adresse"; label: string; lat: number; lng: number }
   | { mode: "libre" };
 
@@ -38,7 +39,7 @@ export const schemaDepart = z.discriminatedUnion("mode", [
 export const schemaArrivee = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("depot") }),
   z.object({ mode: z.literal("meme") }),
-  z.object({ mode: z.literal("arret"), arret_id: z.string().uuid() }),
+  z.object({ mode: z.literal("arret"), arret_id: z.string().uuid(), sans_retour: z.boolean().optional() }),
   z.object({ mode: z.literal("adresse"), ...adresse }),
   z.object({ mode: z.literal("libre") }),
 ]);
@@ -156,7 +157,11 @@ export function resoudreExtremites(e: EntreeExtremites): ExtremitesResolues {
     const r = arret(a.arret_id, "arrivée");
     if (typeof r === "string") return refus(r);
     dernierId = r.a.id;
-    [fin, arriveeLibelle] = [r.p, abreger(r.a.address)];
+    // Le dernier arrêt est le dernier livré ; le trajet retour (dépôt, sinon
+    // point de départ) s'ajoute après lui, sauf demande contraire.
+    const retour = a.sans_retour ? null : (e.depot ?? depart);
+    if (retour) [fin, arriveeLibelle] = [retour, `${abreger(r.a.address)} puis retour ${retour === e.depot ? libelleDepot.toLowerCase() : departLibelle}`];
+    else arriveeLibelle = abreger(r.a.address);
   } else if (a.mode === "adresse") {
     [fin, arriveeLibelle] = [{ lat: a.lat, lng: a.lng }, abreger(a.label)];
   }
@@ -270,10 +275,10 @@ export function pointFinTournee(
     }
     case "adresse":
       return { lat: arrivee.lat, lng: arrivee.lng };
-    case "arret": {
-      const s = arrets.find((x) => x.id === arrivee.arret_id);
-      return s ? pointDe(s) : null;
-    }
+    case "arret":
+      // Après le dernier arrêt : retour au dépôt (ou au départ), sauf demande contraire.
+      if (arrivee.sans_retour) return null;
+      return depot ?? (depart?.mode === "adresse" ? { lat: depart.lat, lng: depart.lng } : null);
     default:
       return null;
   }
