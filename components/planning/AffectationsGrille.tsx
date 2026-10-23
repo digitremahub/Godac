@@ -38,8 +38,21 @@ export function AffectationsGrille() {
   const trous = useMemo(() => trousParJour(ctx.lignes, ctx.jours, ctx.parCase), [ctx.lignes, ctx.jours, ctx.parCase]);
   const totalTrous = Object.values(trous).reduce((n, t) => n + t, 0);
 
+  const boutonDimanche = !ctx.dimancheUtilise && !(mois && parChauffeur) && (
+    <button
+      type="button"
+      aria-pressed={ctx.dimancheAffiche}
+      onClick={ctx.basculerDimanche}
+      title={ctx.dimancheAffiche ? "Cacher la colonne du dimanche" : "Afficher le dimanche pour y placer quelqu'un"}
+      className="min-h-[40px] rounded-lg border border-dashed border-navy/25 px-3 text-sm font-semibold text-navy/75 hover:border-orange/50 hover:text-orange-ink"
+    >
+      {ctx.dimancheAffiche ? "− dimanche" : "+ dimanche"}
+    </button>
+  );
+
   return (
     <section aria-label={mois ? "Planning du mois" : "Planning de la semaine"} className="min-w-0">
+      {!mois && boutonDimanche && <div className="mb-2 flex justify-end">{boutonDimanche}</div>}
       {mois && (
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg bg-navy/[0.05] p-1" role="group" aria-label="Lignes du tableau">
@@ -61,6 +74,7 @@ export function AffectationsGrille() {
           <p className="text-sm text-navy/65" aria-live="polite">
             {totalTrous === 0 ? "Aucun trou ce mois-ci." : `${totalTrous} case${totalTrous > 1 ? "s" : ""} à pourvoir ce mois-ci.`}
           </p>
+          {boutonDimanche}
         </div>
       )}
       {mois && parChauffeur ? <GrilleChauffeurs /> : <GrilleTournees trous={trous} />}
@@ -128,7 +142,7 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
                   key={d}
                   scope="col"
                   aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`}
-                  className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${mois ? `px-0 ${r === 0 ? "border-l border-navy/10" : ""}` : "px-2"} ${auj ? "text-orange-ink" : r >= 5 ? "text-navy/40" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.025]" : ""}`}
+                  className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${mois ? `px-0 ${r === 0 ? "border-l border-navy/10" : ""}` : "px-2"} ${auj ? "text-orange-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}
                 >
                   {mois ? (
                     <span className="flex flex-col items-center leading-tight">
@@ -237,14 +251,16 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
               disabled={!ctx.donnees.peutModifier || ctx.occupe}
               onClick={() => ctx.ouvrirCase(ligne.cle, date)}
               aria-label={`${libelleCase} : ${etat === "a_remplacer" ? "à remplacer" : etat === "vide_prevue" ? "sans chauffeur" : "vide"}${ctx.arme ? `, placer ${ctx.arme.full_name}` : ""}`}
-              className={`flex w-full items-center justify-center rounded-lg border-2 border-dashed text-orange-ink transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${mois ? "h-9 text-xs" : "min-h-[52px] flex-col text-sm"} ${
+              className={`flex w-full items-center justify-center rounded-lg border-2 border-dashed text-orange-ink transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${mois ? "h-9 text-sm" : "min-h-[52px] flex-col text-base"} ${
                 survol
                   ? "border-orange bg-orange/20"
                   : etat === "a_remplacer"
                     ? "border-solid border-orange bg-orange/10 font-semibold"
                     : etat === "vide_prevue"
                       ? "border-orange/50 bg-orange/[0.05] hover:bg-orange/10"
-                      : `border-navy/10 text-navy/30 hover:border-orange/40 hover:text-orange-ink ${ctx.arme ? "" : "[@media(hover:hover)]:text-transparent [@media(hover:hover)]:hover:text-orange-ink"}`
+                      : // Jour où la tournée ne roule pas d'habitude (samedi…) : même case « disponible », un peu plus discrète.
+                        // Le « + » ne disparaît jamais ; il s'estompe seulement avec une souris précise.
+                        "border-orange/30 bg-orange/[0.02] font-semibold text-orange-ink/80 hover:border-orange/60 hover:bg-orange/10 hover:text-orange-ink [@media(hover:hover)_and_(pointer:fine)]:text-orange-ink/50 [@media(hover:hover)_and_(pointer:fine)]:hover:text-orange-ink"
               }`}
             >
               {etat === "a_remplacer" ? (mois ? "!" : <><span>À remplacer</span><span className="text-[11px] font-normal">absent ou retiré</span></>) : "+"}
@@ -358,7 +374,7 @@ function GrilleChauffeurs() {
             {ctx.jours.map((d) => {
               const r = rangJour(d);
               return (
-                <th key={d} scope="col" aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`} className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${r === 0 ? "border-l" : ""} ${d === ctx.aujourdhui ? "text-orange-ink" : r >= 5 ? "bg-navy/[0.025] text-navy/40" : "text-navy/60"}`}>
+                <th key={d} scope="col" aria-label={`${JOURS_LONGS[r]} ${Number(d.slice(8, 10))}`} className={`border-b border-navy/10 py-2 text-center text-xs font-semibold ${r === 0 ? "border-l" : ""} ${d === ctx.aujourdhui ? "text-orange-ink" : "text-navy/60"} ${r >= 5 ? "bg-navy/[0.02]" : ""}`}>
                   <span className="flex flex-col items-center leading-tight">
                     <span className="text-[10px] font-normal">{LETTRES[r]}</span>
                     {Number(d.slice(8, 10))}
