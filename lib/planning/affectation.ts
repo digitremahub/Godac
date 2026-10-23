@@ -9,7 +9,7 @@
  * sans chauffeur), prévue mais vide, ou simplement vide (jour où la
  * tournée ne roule pas d'habitude).
  */
-import { addDays } from "@/lib/planning/dates";
+import { addDays, monthCalendarDays } from "@/lib/planning/dates";
 import { heureDe, jourDe, rangJour, type AffectationPlanning, type CongePlanning, type ModelePlanning } from "@/lib/planning/semaine";
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,11 @@ export interface LigneTournee {
   routeId: string | null;
   /** Heure de départ habituelle (modèle, sinon affectation la plus fréquente, sinon 07:00). */
   heure: string;
-  /** Jours où elle roule d'habitude (0 = dimanche … 6 = samedi, comme les modèles). */
+  /**
+   * Jours où elle roule d'habitude (0 = dimanche … 6 = samedi, comme les
+   * modèles) : le modèle, sinon lundi → vendredi, plus tout jour (samedi,
+   * dimanche…) où elle a des affectations dans la période chargée.
+   */
   joursPrevus: number[];
   villages: string[];
   renfort: boolean;
@@ -124,6 +128,7 @@ export function lignesTournees(params: {
   const services = new Set(params.serviceIds);
   const lignes = new Map<string, LigneTournee>();
   const heures = new Map<string, Map<string, number>>();
+  const joursVus = new Map<string, Set<number>>();
 
   function ajouter(serviceId: string, tourNumber: string, route: RoutePlanning | null) {
     const cle = cleLigne(serviceId, tourNumber);
@@ -147,15 +152,24 @@ export function lignesTournees(params: {
     const h = heureDe(a.start_at);
     parHeure.set(h, (parHeure.get(h) ?? 0) + 1);
     heures.set(cleLigne(a.service_id, a.tour_number), parHeure);
+    if (a.status !== "cancelled") {
+      const vus = joursVus.get(cleLigne(a.service_id, a.tour_number)) ?? new Set<number>();
+      vus.add(new Date(`${jourDe(a.start_at)}T12:00:00Z`).getUTCDay());
+      joursVus.set(cleLigne(a.service_id, a.tour_number), vus);
+    }
   }
 
   for (const ligne of lignes.values()) {
     const modeles = params.modeles.filter((m) => m.service_id === ligne.serviceId && m.tour_number === ligne.tourNumber);
+    const vus = [...(joursVus.get(ligne.cle) ?? [])];
     if (modeles.length) {
-      ligne.joursPrevus = [...new Set(modeles.flatMap((m) => m.weekdays))].sort((a, b) => a - b);
+      // Le modèle, plus les jours où la tournée a réellement roulé (samedi compris).
+      ligne.joursPrevus = [...new Set([...modeles.flatMap((m) => m.weekdays), ...vus])].sort((a, b) => a - b);
       ligne.heure = modeles[0]!.departure_time.slice(0, 5);
       continue;
     }
+    // Sans modèle : lundi → vendredi, plus samedi et dimanche s'ils servent.
+    ligne.joursPrevus = [...new Set([...JOURS_PREVUS_PAR_DEFAUT, ...vus.filter((j) => j === 6 || j === 0)])].sort((a, b) => a - b);
     const parHeure = heures.get(ligne.cle);
     if (parHeure?.size) ligne.heure = [...parHeure.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0];
   }
@@ -245,6 +259,81 @@ export function joursAffichesSemaine(lundi: string, dimancheUtilise: boolean): s
 /** Le dimanche sert-il dans la période (une affectation ou un modèle qui roule le dimanche) ? */
 export function dimancheUtilise(affectations: readonly AffectationPlanning[], lignes: readonly LigneTournee[]): boolean {
   return lignes.some((l) => l.joursPrevus.includes(0)) || affectations.some((a) => a.status !== "cancelled" && rangJour(jourDe(a.start_at)) === 6);
+}
+
+/** Rangs (0 = lundi … 6 = dimanche) des jours habituels d'une tournée (joursPrevus : 0 = dimanche … 6 = samedi). */
+export function rangsDesJoursPrevus(joursPrevus: readonly number[]): number[] {
+  return [...new Set(joursPrevus.map((j) => (j + 6) % 7))].sort((a, b) => a - b);
+}
+
+/** Raccourci « Lun → Sam » de la feuille « Affecter à… ». */
+export const RANGS_LUNDI_SAMEDI = [0, 1, 2, 3, 4, 5];
+
+/**
+ * Jours à remplir pour « toute la semaine / tout le mois » avec des jours
+ * choisis (rangs 0 = lundi … 6 = dimanche) : les jours donnés dont le rang
+ * est coché et qui ne sont pas passés (`depuis`, inclus).
+ */
+export function joursChoisis(jours: readonly string[], rangs: readonly number[], depuis?: string): string[] {
+  const coches = new Set(rangs);
+  return jours.filter((d) => coches.has(rangJour(d)) && (!depuis || d >= depuis));
+}
+
+/** Les jours d'un mois « AAAA-MM », le dimanche seulement s'il est demandé. */
+export function joursDuMois(mois: string, avecDimanche: boolean): string[] {
+  const jours: string[] = [];
+  const premier = `${mois}-01`;
+  for (let d = premier; d.slice(0, 7) === mois; d = addDays(d, 1)) if (avecDimanche || rangJour(d) !== 6) jours.push(d);
+  return jours;
+}
+
+// ---------------------------------------------------------------------------
+// Calendrier du mois (téléphone) : 7 colonnes lundi → dimanche.
+// ---------------------------------------------------------------------------
+
+export type CouvertureJour = "hors_mois" | "aucune" | "trous" | "complet";
+
+export interface CelluleMois {
+  date: string;
+  dansMois: boolean;
+  /** Tournées qui comptent ce jour-là (prévues ou déjà placées). */
+  tournees: number;
+  /** Cases à pourvoir (à remplacer ou prévues et vides). */
+  trous: number;
+  /** Hors du mois : pas de données chargées, donc pas d'indicateur. */
+  couverture: CouvertureJour;
+}
+
+/**
+ * Calendrier d'un mois : une liste de semaines (lundi → dimanche, jours des
+ * mois voisins compris pour compléter), chaque jour avec son nombre de
+ * tournées et de trous. Les jours hors du mois n'ont pas de données
+ * (seul le mois est chargé) : couverture « hors_mois », sans compteur.
+ */
+export function calendrierMois<T extends AffectationPlanning>(mois: string, lignes: readonly LigneTournee[], parCase: Map<string, T[]>): { lundi: string; jours: CelluleMois[] }[] {
+  const semaines: { lundi: string; jours: CelluleMois[] }[] = [];
+  for (const date of monthCalendarDays(mois)) {
+    const dansMois = date.slice(0, 7) === mois;
+    let tournees = 0;
+    let trous = 0;
+    if (dansMois) {
+      for (const l of lignes) {
+        const etat = etatCase(parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date));
+        if (etat !== "vide") tournees++;
+        if (estUnTrou(etat)) trous++;
+      }
+    }
+    const couverture: CouvertureJour = !dansMois ? "hors_mois" : tournees === 0 ? "aucune" : trous > 0 ? "trous" : "complet";
+    if (rangJour(date) === 0) semaines.push({ lundi: date, jours: [] });
+    semaines.at(-1)!.jours.push({ date, dansMois, tournees, trous, couverture });
+  }
+  return semaines;
+}
+
+/** Jour ouvert par défaut en vue Semaine (téléphone) : aujourd'hui s'il est dans la semaine, sinon le premier jour avec un trou, sinon le premier. */
+export function jourParDefaut(jours: readonly string[], aujourdhui: string, trous: Record<string, number>): string {
+  if (jours.includes(aujourdhui)) return aujourdhui;
+  return jours.find((d) => (trous[d] ?? 0) > 0) ?? jours[0]!;
 }
 
 // ---------------------------------------------------------------------------

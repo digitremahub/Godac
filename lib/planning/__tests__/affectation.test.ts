@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   affectationsParTournee,
+  calendrierMois,
   cleCaseTournee,
   cleLigne,
   compteursDuJour,
@@ -15,12 +16,17 @@ import {
   indisponibilite,
   initiales,
   joursAffichesSemaine,
+  joursChoisis,
   joursDeLaLigne,
+  joursDuMois,
+  jourParDefaut,
   joursEtires,
   joursPlacesParChauffeur,
   libelleIndisponibilite,
   lignesTournees,
   nomCourt,
+  RANGS_LUNDI_SAMEDI,
+  rangsDesJoursPrevus,
   PALETTE_CHAUFFEURS,
   sortFicheAncienChauffeur,
   texteAffectation,
@@ -28,7 +34,7 @@ import {
   type ArretPlanning,
 } from "@/lib/planning/affectation";
 import { arretsRetenus } from "@/lib/planning/absences";
-import { copiesSurSemaines, copiesVersDates, libelleJour, planifierCopies, texteApercu, texteResultat, type AffectationPlanning, type CongePlanning } from "@/lib/planning/semaine";
+import { copiesSurSemaines, copiesVersDates, libelleJour, rangJour, planifierCopies, texteApercu, texteResultat, type AffectationPlanning, type CongePlanning } from "@/lib/planning/semaine";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 
 const LUNDI = "2026-10-19";
@@ -296,5 +302,108 @@ describe("fiche colis de l'ancien chauffeur", () => {
   it("fiche commencée : gardée", () => {
     expect(sortFicheAncienChauffeur({ ...base, statut: "in_progress" })).toBe("garder");
     expect(sortFicheAncienChauffeur({ ...base, arretsTraites: 2 })).toBe("garder");
+  });
+});
+
+describe("jours habituels déduits de l'historique", () => {
+  const SAMEDI = jour(5);
+  const DIMANCHE = jour(6);
+  const routes = [{ id: "r1", tourNumber: "T101", serviceId: "s1" }];
+  const lignesAvec = (modeles: Parameters<typeof lignesTournees>[0]["modeles"], affectations: AffectationPlanning[]) =>
+    lignesTournees({ routes, modeles, affectations, serviceIds: ["s1"] }).find((l) => l.tourNumber === "T101")!;
+
+  it("sans modèle ni historique : lundi → vendredi", () => {
+    expect(lignesAvec([], []).joursPrevus).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("sans modèle : le samedi (ou le dimanche) avec une affectation devient un jour habituel", () => {
+    expect(lignesAvec([], [aff({ id: "s", start_at: at(SAMEDI, "06:30") })]).joursPrevus).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(lignesAvec([], [aff({ id: "s", start_at: at(SAMEDI, "06:30") }), aff({ id: "d", start_at: at(DIMANCHE, "06:30") })]).joursPrevus).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("sans modèle : un jour de semaine ou une affectation annulée ne change rien", () => {
+    expect(lignesAvec([], [aff({ id: "m", start_at: at(jour(1), "06:30") })]).joursPrevus).toEqual([1, 2, 3, 4, 5]);
+    expect(lignesAvec([], [aff({ id: "x", start_at: at(SAMEDI, "06:30"), status: "cancelled" })]).joursPrevus).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("avec modèle : modèle + jours où elle a des affectations", () => {
+    const modele = [{ service_id: "s1", tour_number: "T101", departure_time: "06:30:00", weekdays: [1, 3], default_vehicle_id: null }];
+    expect(lignesAvec(modele, []).joursPrevus).toEqual([1, 3]);
+    expect(lignesAvec(modele, [aff({ id: "s", start_at: at(SAMEDI, "06:30") }), aff({ id: "m", start_at: at(jour(1), "06:30") })]).joursPrevus).toEqual([1, 2, 3, 6]);
+  });
+
+  it("le samedi habituel compte comme trou quand il est vide", () => {
+    const l = lignesAvec([], [aff({ id: "s", start_at: at(SAMEDI, "06:30") })]);
+    expect(trousParJour([l], [SAMEDI, DIMANCHE], affectationsParTournee([]))).toEqual({ [SAMEDI]: 1, [DIMANCHE]: 0 });
+  });
+});
+
+describe("jours choisis pour « toute la semaine »", () => {
+  const semaine = joursAffichesSemaine(LUNDI, true);
+  it("rangs des jours habituels (0 = lundi)", () => {
+    expect(rangsDesJoursPrevus([1, 2, 3, 4, 5])).toEqual([0, 1, 2, 3, 4]);
+    expect(rangsDesJoursPrevus([0, 6])).toEqual([5, 6]);
+  });
+  it("jours cochés, sans ceux déjà passés", () => {
+    expect(joursChoisis(semaine, RANGS_LUNDI_SAMEDI)).toEqual(semaine.slice(0, 6));
+    expect(joursChoisis(semaine, [5])).toEqual([jour(5)]);
+    expect(joursChoisis(semaine, RANGS_LUNDI_SAMEDI, jour(3))).toEqual([jour(3), jour(4), jour(5)]);
+    expect(joursChoisis(semaine, [])).toEqual([]);
+  });
+});
+
+describe("calendrier du mois (téléphone)", () => {
+  const routes = [
+    { id: "r1", tourNumber: "T101", serviceId: "s1" },
+    { id: "r2", tourNumber: "T102", serviceId: "s1" },
+  ];
+  // Octobre 2026 : le 1er est un jeudi, le 31 un samedi.
+  const affectations = [
+    aff({ id: "a", start_at: at("2026-10-05", "06:30") }),
+    aff({ id: "b", tour_number: "T102", start_at: at("2026-10-05", "06:30"), driver_id: "d2" }),
+    aff({ id: "c", start_at: at("2026-10-06", "06:30") }),
+    aff({ id: "d", tour_number: "T102", start_at: at("2026-10-06", "06:30"), driver_id: null }),
+    aff({ id: "e", start_at: at("2026-10-10", "06:30") }),
+  ];
+  const lignes = lignesTournees({ routes, modeles: [], affectations, serviceIds: ["s1"] });
+  const semaines = calendrierMois("2026-10", lignes, affectationsParTournee(affectations));
+  const cellule = (d: string) => semaines.flatMap((s) => s.jours).find((c) => c.date === d)!;
+
+  it("semaines lundi → dimanche, jours des mois voisins compris", () => {
+    expect(semaines).toHaveLength(5);
+    expect(semaines.every((s) => s.jours.length === 7 && rangJour(s.lundi) === 0)).toBe(true);
+    expect(semaines[0]!.lundi).toBe("2026-09-28");
+    expect(semaines[0]!.jours.map((c) => c.dansMois)).toEqual([false, false, false, true, true, true, true]);
+    expect(semaines.at(-1)!.jours.at(-1)!.date).toBe("2026-11-01");
+    expect(semaines.at(-1)!.jours.at(-1)!.dansMois).toBe(false);
+  });
+
+  it("compteurs de trous par jour", () => {
+    expect(cellule("2026-10-05")).toMatchObject({ tournees: 2, trous: 0, couverture: "complet" });
+    expect(cellule("2026-10-06")).toMatchObject({ tournees: 2, trous: 1, couverture: "trous" });
+    expect(cellule("2026-10-07")).toMatchObject({ tournees: 2, trous: 2, couverture: "trous" });
+  });
+
+  it("samedi placé : T101 roule aussi les autres samedis (trou) ; dimanche vide : aucune tournée", () => {
+    expect(cellule("2026-10-03")).toMatchObject({ tournees: 1, trous: 1, couverture: "trous" });
+    expect(cellule("2026-10-10")).toMatchObject({ tournees: 1, trous: 0, couverture: "complet" });
+    expect(cellule("2026-10-11")).toMatchObject({ tournees: 0, couverture: "aucune" });
+  });
+
+  it("jours hors du mois : pas d'indicateur", () => {
+    expect(cellule("2026-09-30")).toMatchObject({ dansMois: false, tournees: 0, trous: 0, couverture: "hors_mois" });
+  });
+
+  it("jours du mois, dimanche à la demande", () => {
+    expect(joursDuMois("2026-10", true)).toHaveLength(31);
+    expect(joursDuMois("2026-10", false)).toHaveLength(27);
+    expect(joursDuMois("2026-10", false).every((d) => rangJour(d) !== 6)).toBe(true);
+  });
+
+  it("jour ouvert par défaut en vue Semaine", () => {
+    const semaine = joursAffichesSemaine(LUNDI, true);
+    expect(jourParDefaut(semaine, jour(2), {})).toBe(jour(2));
+    expect(jourParDefaut(semaine, "2026-12-01", { [jour(3)]: 2, [jour(4)]: 1 })).toBe(jour(3));
+    expect(jourParDefaut(semaine, "2026-12-01", {})).toBe(LUNDI);
   });
 });
