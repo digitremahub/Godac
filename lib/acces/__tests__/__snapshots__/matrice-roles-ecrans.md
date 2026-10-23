@@ -2,6 +2,7 @@
 |---|---|---|---|---|---|---|---|---|
 | Tableau de bord | Tableau de bord | `/dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Tableau de bord | Faire essayer GO | `/partage-go` | — | — | — | — | — | droit:partage_go |
+| Tableau de bord | À traiter aujourd'hui | `/dashboard/a-traiter` | — | — | 🔒 | — | 🔒 | — |
 | Tableau de bord | Reporting BI | `/dashboard/reporting` | — | — | ✅ | ✅ | ✅ | bi_reporting |
 | Mon espace | Départ | `/moi/tournee/depart` | ✅ | — | — | — | — | planning |
 | Mon espace | Retour | `/moi/tournee/retour` | 🔒 | — | — | — | — | planning |
