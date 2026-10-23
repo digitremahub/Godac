@@ -26,6 +26,8 @@ import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { TourneeColis } from "@/components/colis/TourneeColis";
+import { OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memoriserChoix } from "@/components/colis/OptimiserSheet";
+import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
@@ -62,6 +64,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   const [run, setRun] = useState<Run | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [lists, setLists] = useState<Liste[]>([]);
+  /** Feuille « Départ / arrivée » du recalcul en cours de route. */
+  const [feuilleOptim, setFeuilleOptim] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [voirTermines, setVoirTermines] = useState(false);
@@ -416,24 +420,33 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
     }
   }
 
-  async function reoptimiser() {
-    if (!run) return;
+  /**
+   * Recalcul depuis la position actuelle : on relit le GPS (à défaut la dernière
+   * position connue), puis les arrêts restants s'enchaînent de la prochaine
+   * adresse la plus proche à la suivante, jusqu'à l'arrivée choisie.
+   */
+  async function reoptimiser(choix?: { depart: Depart | null; arrivee: Arrivee }): Promise<string | null> {
+    if (!run) return null;
     setBusy(true);
     try {
-      const depuis = await new Promise<{ lat: number; lng: number } | null>((resolve) =>
-        navigator.geolocation
-          ? navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }), () => resolve(null), { enableHighAccuracy: true, timeout: 10000 })
-          : resolve(null),
-      );
-      const r = await api<ResumeOptimisation>("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id, depuis }) });
+      const depuis = await lirePositionGps(maPosition);
+      setMaPosition(depuis);
+      if (choix) setRun(await memoriserChoix(run, choix.depart, choix.arrivee));
+      const r = await api<ResumeOptimisation>("/api/colis/optimiser", {
+        method: "POST",
+        body: JSON.stringify({ run_id: run.id, depuis, strategie: "proche", ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : {}) }),
+      });
       await charger(run.id);
       const hors = r.horsHoraires.length + r.impossibles.length;
       setToast({
         ok: !hors && !r.fermes.length,
-        text: `Ordre recalculé${depuis ? " depuis votre position" : ""} : ≈ ${r.kmApres} km${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
+        text: `Ordre recalculé depuis votre position : ≈ ${r.kmApres} km${r.extremites ? ` jusqu'à ${r.extremites.arrivee}` : ""}${r.finEstimee ? ` · fin vers ${heureFin(r.finEstimee)}` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
       });
+      return null;
     } catch (e) {
-      setToast({ ok: false, text: networkErrorMessage(e) });
+      const message = networkErrorMessage(e);
+      setToast({ ok: false, text: message });
+      return message;
     } finally {
       setBusy(false);
     }
@@ -481,12 +494,15 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   };
   const actives = (runs ?? []).filter((t) => t.status !== "done");
   const progression = stops.length ? Math.round((termines.length / stops.length) * 100) : 0;
+  const choix = choixDeRun(run);
+  const extremites = run ? libellesExtremites(run, stops, choix) : { depart: "", arrivee: "" };
   const avancement = estimerAvancement(
     stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
     {
       position: maPosition,
       depot: run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
       retourDepot: run?.return_to_start,
+      arrivee: choix.arrivee && run ? pointFinTournee(choix.arrivee, choix.depart, run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null, stops, run.return_to_start) : undefined,
       minutesItineraire: itineraire && !itineraire.approx ? itineraire.dureeMin : null,
     },
   );
@@ -612,11 +628,15 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
           onFiche={setDetailsStop}
           onPasser={passerAdresseSuivante}
           onDeposer={deposer}
-          onReoptimiser={reoptimiser}
+          onReoptimiser={() => reoptimiser().then(() => undefined)}
           onItineraire={setItineraire}
           onPosition={setMaPosition}
           traceActive={traceActive}
         />
+      )}
+
+      {feuilleOptim && run && (
+        <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee })} />
       )}
 
       {toast && (
@@ -678,6 +698,7 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                 Reste ≈ {itineraire.distanceKm} km
                 {itineraire.dureeMin !== null && ` · ${itineraire.dureeMin >= 60 ? `${Math.floor(itineraire.dureeMin / 60)} h ${String(itineraire.dureeMin % 60).padStart(2, "0")}` : `${itineraire.dureeMin} min`} de route`}
                 {itineraire.approx && " (estimation)"}
+                {` · 🏁 ${extremites.arrivee}`}
               </p>
             )}
             {arretCarte ? (
@@ -959,9 +980,14 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
                   </span>
                 )}
               </h2>
-              <button type="button" className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={reoptimiser}>
-                {busy ? "Calcul…" : "Recalculer depuis ici"}
-              </button>
+              <div className="flex items-center gap-1">
+                <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs" disabled={busy} onClick={() => setFeuilleOptim(true)}>
+                  Départ / arrivée
+                </button>
+                <button type="button" className="btn-secondary min-h-[44px] !px-3 !py-1 text-xs" disabled={busy} onClick={() => void reoptimiser()}>
+                  {busy ? "Calcul…" : "Recalculer depuis ma position"}
+                </button>
+              </div>
             </div>
             <ZoneTri ordre={ordreTri} onDeposer={deposer} actif={triActif}>
             <ol className="flex flex-col gap-2">
@@ -1042,6 +1068,12 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
               ))}
             </ol>
             </ZoneTri>
+            {!terme && (
+              <p className="mt-2 text-xs font-semibold text-navy/70">
+                🏁 Arrivée : <span className="font-normal">{extremites.arrivee}</span>
+                {avancement.finEstimee && <span className="font-normal"> · fin estimée vers {heureFin(avancement.finEstimee)}</span>}
+              </p>
+            )}
           </section>
         )}
 

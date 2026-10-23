@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     lireExtremitesRun(ctx.supabase, ctx.run.id),
   ]);
   const ordonnes = ordonnerParListe((stops ?? []) as { id: string; list_id: string | null; position: number; address: string }[], lists);
-  return NextResponse.json({ run: ctx.run, lists, extremites, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
+  return NextResponse.json({ run: { ...ctx.run, optim_depart: extremites.depart, optim_arrivee: extremites.arrivee, optim_persiste: extremites.persiste }, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
 }
 
 const patchSchema = z.object({

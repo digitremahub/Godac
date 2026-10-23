@@ -113,7 +113,13 @@ export interface ResumeOptimisation {
   impossibles: string[];
   /** false quand le moteur de routage est indisponible et que GODAC utilise une estimation. */
   distanceRoutiere?: boolean;
+  /** Durée estimée de la tournée (trajets, remises, attentes), retour compris. */
+  dureeMin?: number | null;
+  /** Départ et arrivée retenus (« Dépôt », « Ma position actuelle », adresse…). */
+  extremites?: { depart: string; arrivee: string };
 }
+
+const dureeTexte = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}` : `${min} min`);
 
 const heureIso = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", " h ") : "—");
 
@@ -136,8 +142,14 @@ export function ResumeOptimisationCarte({ resume, stops, onFermer }: { resume: R
           <IconX className="h-4 w-4" />
         </button>
       </div>
+      {resume.extremites && (
+        <p className="text-xs font-semibold text-navy/75">
+          🏁 Départ : {resume.extremites.depart} · 🏁 Arrivée : {resume.extremites.arrivee}
+        </p>
+      )}
       <p className="text-xs text-navy/65">
-        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)} · 3 min moyennes par livraison
+        Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)}
+        {resume.dureeMin ? ` (≈ ${dureeTexte(resume.dureeMin)} au total, trajets compris)` : ""} · 3 min moyennes par livraison
         {resume.avecHoraires > 0 && ` · ${resume.avecHoraires} adresse${resume.avecHoraires > 1 ? "s" : ""} avec horaires`}
         {resume.sansGps > 0 && ` · ${resume.sansGps} adresse(s) à vérifier en fin de liste`}
       </p>

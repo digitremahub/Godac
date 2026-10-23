@@ -6,6 +6,8 @@ import type { Map as CarteMap, Marker } from "maplibre-gl";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import type { Run, Stop } from "@/components/colis/commun";
 import { pastille } from "@/components/colis/marqueurs";
+import { choixDeRun } from "@/components/colis/OptimiserSheet";
+import { resoudreExtremites } from "@/lib/colis/extremites";
 
 /** Fond de carte vectoriel gratuit (OpenStreetMap via OpenFreeMap), remplaçable par variable d'environnement. */
 const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.org/styles/liberty";
@@ -93,6 +95,31 @@ export function CarteTournee({
       Object.assign(d.style, { width: "26px", height: "26px", borderRadius: "6px", background: "#FFFFFF", color: NAVY, border: `2px solid ${NAVY}`, font: "700 12px system-ui", display: "grid", placeItems: "center" });
       marqueurs.current.push(new maplibregl.Marker({ element: d }).setLngLat([Number(run.start_lng), Number(run.start_lat)]).addTo(m));
     }
+    // 🏁 Départ / arrivée choisis ailleurs que sur le dépôt ou un arrêt (adresse libre).
+    const choix = choixDeRun(run);
+    const ext = resoudreExtremites({
+      depart: choix.depart,
+      arrivee: choix.arrivee,
+      depot: run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
+      position: choix.depart?.mode === "position" ? { lat: 0, lng: 0 } : null,
+      arrets: stops,
+      retourParDefaut: run.return_to_start,
+    });
+    if (!ext.erreur) {
+      const drapeau = (p: { lat: number; lng: number } | null, titre: string) => {
+        if (!p || (p.lat === 0 && p.lng === 0)) return;
+        const ici = (a: { lat: number | null; lng: number | null }) => a.lat !== null && a.lng !== null && Math.abs(Number(a.lat) - p.lat) < 1e-5 && Math.abs(Number(a.lng) - p.lng) < 1e-5;
+        if (stops.some(ici) || ici({ lat: run.start_lat, lng: run.start_lng })) return;
+        const f = document.createElement("div");
+        f.textContent = "🏁";
+        f.title = titre;
+        f.setAttribute("aria-label", titre);
+        Object.assign(f.style, { fontSize: "22px", lineHeight: "1" });
+        marqueurs.current.push(new maplibregl.Marker({ element: f }).setLngLat([p.lng, p.lat]).addTo(m));
+      };
+      drapeau(ext.depart, `Départ : ${ext.departLibelle}`);
+      drapeau(ext.fin, `Arrivée : ${ext.arriveeLibelle}`);
+    }
     stops.forEach((s, i) => {
       if (s.lat === null || s.lng === null) return;
       const el = pastille(String(i + 1), s.status, s.id === selection, s.kind === "ramasse", s.kind === "point_relais");
@@ -103,7 +130,7 @@ export function CarteTournee({
       });
       marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([Number(s.lng), Number(s.lat)]).addTo(m));
     });
-  }, [prete, stops, selection, run.start_lat, run.start_lng, run.start_label, onSelection]);
+  }, [prete, stops, selection, run, onSelection]);
 
   // Cadrage initial sur toute la tournée.
   const cadre = useRef(false);

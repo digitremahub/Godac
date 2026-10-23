@@ -1,5 +1,6 @@
 /** Types et petits utilitaires partagés par la tournée colis et l'application chauffeur. */
 import type { FicheHoraires } from "@/lib/colis/horaires";
+import type { Arrivee, Depart } from "@/lib/colis/extremites";
 export type { Liste } from "@/lib/colis/listes";
 export interface Run {
   id: string;
@@ -13,6 +14,11 @@ export interface Run {
   optimized_at: string | null;
   /** Heure de départ prévue (« 08:00:00 ») ; null = 08:00. */
   planned_start?: string | null;
+  /** Départ / arrivée de l'optimisation (épingles 📌 comprises) ; absents avant la migration 20261102000001 ou si jamais choisis. */
+  optim_depart?: Depart | null;
+  optim_arrivee?: Arrivee | null;
+  /** false : colonnes absentes, le choix reste sur l'appareil. */
+  optim_persiste?: boolean;
 }
 export interface Stop {
   id: string;
