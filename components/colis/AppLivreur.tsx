@@ -6,8 +6,7 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
-import { distanceM } from "@/lib/colis/navigation";
-import { RetourDepot } from "@/components/colis/RetourDepot";
+import { RetourDepot, type DestinationRetour } from "@/components/colis/RetourDepot";
 import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -518,6 +517,25 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   const enCarte = !enPreparation && vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
   // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
   const enNavigation = !enPreparation && vue === "navigation" && run !== null && run.status === "in_progress";
+  // Retour de fin de tournée : dépôt de la tournée et/ou siège de l'entreprise.
+  const [siege, setSiege] = useState<string | null>(null);
+  const finDeTournee = run?.status === "in_progress" && stops.length > 0 && pending.length === 0;
+  useEffect(() => {
+    if (!finDeTournee) return;
+    api<{ adresse: string | null }>("/api/colis/siege")
+      .then((r) => setSiege(r.adresse))
+      .catch(() => setSiege(null));
+  }, [finDeTournee]);
+  const destinationsRetour: DestinationRetour[] = [];
+  if (run && run.start_lat !== null && run.start_lng !== null) {
+    destinationsRetour.push({
+      cle: "depot",
+      titre: "Retour au dépôt",
+      detail: run.start_label,
+      lien: lienExterne({ lat: Number(run.start_lat), lng: Number(run.start_lng), address: run.start_label ?? "dépôt" } as Stop),
+    });
+  }
+  if (siege) destinationsRetour.push({ cle: "siege", titre: "Retour au siège", detail: siege, lien: lienExterne({ lat: null, lng: null, address: siege } as unknown as Stop) });
   const rechargerRun = useCallback(() => charger(run?.id), [charger, run?.id]);
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
@@ -646,11 +664,9 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
         <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee })} />
       )}
 
-      {run?.status === "in_progress" && stops.length > 0 && pending.length === 0 && run.start_lat !== null && run.start_lng !== null && !retourVu.has(run.id) && (
+      {run?.status === "in_progress" && stops.length > 0 && pending.length === 0 && destinationsRetour.length > 0 && !retourVu.has(run.id) && (
         <RetourDepot
-          depot={run.start_label ?? "dépôt"}
-          distanceKm={maPosition ? distanceM(maPosition, { lat: Number(run.start_lat), lng: Number(run.start_lng) }) / 1000 : null}
-          lien={lienExterne({ lat: Number(run.start_lat), lng: Number(run.start_lng), address: run.start_label ?? "dépôt" } as Stop)}
+          destinations={destinationsRetour}
           nomNavigation={libelleNavigation(navPreferee === "go" ? "waze" : navPreferee)}
           onPlusTard={() => setRetourVu((v) => new Set(v).add(run.id))}
         />

@@ -2,21 +2,24 @@
 
 import { IconNavigation } from "@/components/layout/icons";
 
+export interface DestinationRetour {
+  cle: "depot" | "siege";
+  titre: string;
+  detail: string | null;
+  /** Lien de l'application de navigation choisie, vers cette destination. */
+  lien: string;
+}
+
 /**
  * Fin de tournée : dernier arrêt traité, on propose de lancer le retour au
- * dépôt (navigation externe vers le dépôt de la tournée) avant de clôturer.
+ * dépôt ou au siège de l'entreprise (navigation externe) avant de clôturer.
  */
 export function RetourDepot({
-  depot,
-  distanceKm,
-  lien,
+  destinations,
   nomNavigation,
   onPlusTard,
 }: {
-  depot: string;
-  distanceKm: number | null;
-  /** Lien de l'application de navigation choisie, vers le dépôt. */
-  lien: string;
+  destinations: DestinationRetour[];
   nomNavigation: string;
   onPlusTard: () => void;
 }) {
@@ -26,13 +29,15 @@ export function RetourDepot({
         <h2 id="retour-depot-titre" className="font-display text-xl font-bold">
           Tournée terminée 🎉
         </h2>
-        <p className="text-sm text-navy/70">
-          Tous les arrêts sont traités. Lancer le retour au dépôt{depot ? ` (${depot})` : ""}
-          {distanceKm !== null ? ` — environ ${distanceKm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km à vol d'oiseau` : ""} ?
-        </p>
-        <a href={lien} target="_blank" rel="noreferrer" onClick={onPlusTard} className="btn-primary min-h-[52px] justify-center text-base">
-          <IconNavigation className="h-5 w-5" /> Retour au dépôt avec {nomNavigation}
-        </a>
+        <p className="text-sm text-navy/70">Tous les arrêts sont traités. Où voulez-vous rentrer ? Le guidage s&apos;ouvre dans {nomNavigation}.</p>
+        {destinations.map((d, i) => (
+          <a key={d.cle} href={d.lien} target="_blank" rel="noreferrer" onClick={onPlusTard} className={`${i === 0 ? "btn-primary" : "btn-secondary"} min-h-[56px] flex-col justify-center !gap-0 text-base`}>
+            <span className="flex items-center gap-2">
+              <IconNavigation className="h-5 w-5" /> {d.titre}
+            </span>
+            {d.detail && <span className="max-w-full truncate text-xs font-normal opacity-80">{d.detail}</span>}
+          </a>
+        ))}
         <button type="button" className="btn-ghost min-h-[44px] justify-center text-sm" onClick={onPlusTard}>
           Plus tard
         </button>
