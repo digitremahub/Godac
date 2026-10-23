@@ -497,7 +497,7 @@ export type DecisionJour =
   /** Créer l'affectation avec ce chauffeur. */
   | { type: "creer"; date: string; startAt: string; driverId: string | null }
   /** Mettre ce chauffeur sur l'affectation existante. */
-  | { type: "changer"; date: string; entreeId: string; ancienChauffeur: string | null }
+  | { type: "changer"; date: string; entreeId: string; ancienChauffeur: string | null; /** Nouvelle heure (heure choisie à l'affectation, différente de l'actuelle). */ startAt?: string }
   /** Rien à faire : déjà ce chauffeur, tournée démarrée, ou chauffeur absent avec une case déjà tenue. */
   | { type: "rien"; date: string; raison: "deja" | "figee" | "absent" };
 
@@ -511,6 +511,8 @@ export function decisionsAffectation(params: {
   dates: readonly string[];
   driverId: string | null;
   heure: string;
+  /** L'heure a été choisie à la main : une affectation existante qui en a une autre la prend aussi. */
+  imposerHeure?: boolean;
   existantes: readonly AffectationPlanning[];
   absent: (driverId: string, date: string) => boolean;
   versUtc: (date: string, heure: string) => string;
@@ -537,7 +539,8 @@ export function decisionsAffectation(params: {
       out.push({ type: "rien", date, raison: "absent" });
       continue;
     }
-    out.push({ type: "changer", date, entreeId: cible.id, ancienChauffeur: cible.driver_id });
+    const nouvelleHeure = params.imposerHeure && heureDe(cible.start_at) !== params.heure;
+    out.push({ type: "changer", date, entreeId: cible.id, ancienChauffeur: cible.driver_id, ...(nouvelleHeure ? { startAt: params.versUtc(date, params.heure) } : {}) });
   }
   return out;
 }

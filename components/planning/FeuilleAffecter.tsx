@@ -16,12 +16,13 @@ import {
   rangsDesJoursPrevus,
   type LigneTournee,
 } from "@/lib/planning/affectation";
+import { HEURE_VALIDE } from "@/lib/planning/heure";
 import { basculerRang, chauffeursAffiches, heureDe, joursDeLaSemaine, JOURS_COURTS, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
 
 export type CibleFeuille = { type: "case"; cle: string; date: string } | { type: "ligne"; cle: string };
 
 export interface ActionsFeuille {
-  placer: (ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }) => void;
+  placer: (ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }, heure?: { valeur: string; imposee?: boolean }) => void;
   retirer: (entree: EntreeAffectation) => void;
   supprimer: (entree: EntreeAffectation) => void;
   modifier: (entree: EntreeAffectation) => void;
@@ -56,6 +57,10 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
   const datesCible = useMemo(() => (!ligne ? [] : cible.type === "case" ? [cible.date] : joursChoisis(periode, rangs, depuis)), [cible, ligne, periode, rangs, depuis]);
   const entrees: EntreeAffectation[] = cible.type === "case" && ligne ? (ctx.parCase.get(cleCaseTournee(ligne.cle, cible.date)) ?? []) : [];
   const tenue = entrees.find((e) => e.driver_id);
+  // Heure de départ : celle de la case (ou habituelle de la tournée), modifiable ici.
+  const heureInitiale = entrees[0] ? heureDe(entrees[0].start_at) : (ligne?.heure ?? "07:00");
+  const [heure, setHeure] = useState(heureInitiale);
+  const heureChoisie = HEURE_VALIDE.test(heure) && heure !== heureInitiale ? { valeur: heure, imposee: true } : { valeur: heureInitiale };
 
   const chauffeurs = useMemo(() => {
     const visibles = chauffeursAffiches(donnees.chauffeurs, donnees.rattachements, donnees.serviceIds, ctx.affectations);
@@ -139,7 +144,7 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
                 key={d}
                 type="button"
                 className="btn-secondary min-h-[44px] !px-3 text-sm"
-                onClick={() => actions.placer(ligne, ctx.jours.filter((x) => x > (cible as { date: string }).date && x <= d), { id: tenue.driver_id!, full_name: ctx.nomChauffeur(tenue.driver_id) })}
+                onClick={() => actions.placer(ligne, ctx.jours.filter((x) => x > (cible as { date: string }).date && x <= d), { id: tenue.driver_id!, full_name: ctx.nomChauffeur(tenue.driver_id) }, { valeur: heureDe(tenue.start_at) })}
               >
                 {libelleJour(d)}
               </button>
@@ -188,6 +193,15 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
 
       {donnees.peutModifier && (cible.type === "ligne" ? datesCible.length > 0 : true) && (
         <>
+          <div className="mb-3">
+            <label className="label" htmlFor="heure-depart">
+              Heure de départ
+            </label>
+            <input id="heure-depart" type="time" required value={heure} onChange={(e) => setHeure(e.target.value)} className="input min-h-[48px] w-40 text-base" aria-describedby="aide-heure" />
+            <p id="aide-heure" className="mt-1 text-sm text-navy/60">
+              {heure !== heureInitiale ? `Changée (habituelle : ${heureInitiale}) : appliquée à tous les jours posés.` : "Heure habituelle de la tournée ; modifiable pour ce placement."}
+            </p>
+          </div>
           <p className="label">{tenue ? "Remplacer par" : "Choisir le chauffeur"}</p>
           {chauffeurs.length > 8 && (
             <input data-autofocus className="input mb-2 min-h-[44px]" placeholder="Rechercher un chauffeur…" value={recherche} onChange={(e) => setRecherche(e.target.value)} aria-label="Rechercher un chauffeur" />
@@ -200,7 +214,7 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
                   <button
                     type="button"
                     disabled={absent}
-                    onClick={() => actions.placer(ligne, datesCible, c)}
+                    onClick={() => actions.placer(ligne, datesCible, c, heureChoisie)}
                     className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${absent ? "cursor-not-allowed border-navy/5 opacity-45" : "border-navy/10 hover:border-teal/60 hover:bg-teal/[0.06]"} ${c.etat === "pris" ? "opacity-75" : ""}`}
                   >
                     <Avatar id={c.id} nom={c.full_name} attenue={absent} />

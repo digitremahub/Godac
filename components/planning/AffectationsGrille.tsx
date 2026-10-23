@@ -15,7 +15,7 @@ import {
 } from "@/lib/planning/affectation";
 import { heureDe, jourDe, JOURS_LONGS, rangJour, statutAffectation } from "@/lib/planning/semaine";
 import { addDays } from "@/lib/planning/dates";
-import { Avatar, Depot, Glissable, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
+import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
 const JOURS_COURTS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const LETTRES = ["L", "M", "M", "J", "V", "S", "D"];
@@ -196,9 +196,9 @@ function EnteteLigne({ ligne }: { ligne: LigneTournee }) {
       {(survol, ref) => (
         <th ref={ref as any} scope="row" className={`sticky left-0 z-10 border-b border-r border-navy/10 px-3 py-1.5 text-left align-middle ${survol ? "bg-orange/15" : "bg-surface"}`}>
           <span className="block font-display text-base font-extrabold leading-tight">{ligne.tourNumber}</span>
-          <span className="block truncate text-xs text-navy/60" style={{ maxWidth: mois ? "8rem" : "10rem" }}>
-            {ligne.heure}
-            {secteur ? ` · ${secteur}` : ""}
+          <span className="flex items-center text-xs text-navy/60" style={{ maxWidth: mois ? "8rem" : "10rem" }}>
+            <BoutonHeure ligne={ligne} />
+            {secteur ? <span className="truncate">&nbsp;· {secteur}</span> : null}
           </span>
           {ctx.donnees.peutModifier && (
             <button
