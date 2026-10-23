@@ -32,6 +32,7 @@ import { OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memori
 import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
+import { SortieDepotLivreur } from "@/components/time-clock/SortieDepotLivreur";
 import { RecommanderEmployeur } from "@/components/recommandation/RecommanderEmployeur";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
@@ -591,6 +592,8 @@ export function AppLivreur({
 
   return (
     <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
+      {/* Sortie du dépôt pointée automatiquement : surveillance dès qu'aucune tournée n'est en cours (après la clôture, écran de retour au dépôt compris). */}
+      <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} />
       {!enNavigation && (
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
