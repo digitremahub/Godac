@@ -13,6 +13,7 @@ export const ACTIONS_AUDIT = {
   ticpe_periode_declaree: "Période TICPE marquée déclarée",
   ticpe_declaration_annulee: "Déclaration TICPE annulée",
   ticpe_document_genere: "Document TICPE généré (3310-TIC, ERA, dossier)",
+  ticpe_document_force: "Document TICPE généré malgré des points bloquants non résolus",
   rapport_correction: "Rapport de tournée corrigé",
   rapport_relecture: "Scans de rapport relus",
   plein_modification: "Plein modifié",

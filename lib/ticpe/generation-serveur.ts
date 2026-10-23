@@ -3,6 +3,7 @@ import type { CalculTicpe } from "@/lib/ticpe/calcul-serveur";
 import { documentPeriode, etatRecapitulatifAnnuel, type DocumentPeriode, type InfosVehiculeDoc, type LigneEra } from "@/lib/ticpe/documents";
 import { LIBELLES_CATEGORIE_COURTS, LIBELLES_ZONE, formatJour } from "@/lib/ticpe/bareme";
 import { lignesDeLaPeriode } from "@/lib/ticpe/montant";
+import { avertissementDocument } from "@/lib/ticpe/bloquants";
 import { AVERTISSEMENT_TICPE } from "@/lib/ticpe/reglages";
 import { buildTicpeWorkbook, type TicpeExportRow, type TicpePleinRow, type TicpeRecapRow } from "@/lib/utils/excel";
 import { generateEraPdf, generateTicpePdf } from "@/lib/ticpe/generate-pdf";
@@ -38,7 +39,7 @@ export interface RecapGenere {
 }
 
 /** Récapitulatif 3310-TIC d'une période : Excel (récapitulatif, véhicules, pleins) et PDF. */
-export async function genererRecapPeriode(calcul: CalculTicpe, organisation: string, debut: string, fin: string): Promise<RecapGenere> {
+export async function genererRecapPeriode(calcul: CalculTicpe, organisation: string, debut: string, fin: string, pointsNonResolus = 0): Promise<RecapGenere> {
   const vehicules = infosVehicules(calcul);
   const doc = documentPeriode(calcul.lignes, vehicules, debut, fin);
   const comptees = lignesDeLaPeriode(calcul.lignes, debut, fin).filter((l) => l.statut !== "exclu");
@@ -87,7 +88,10 @@ export async function genererRecapPeriode(calcul: CalculTicpe, organisation: str
       };
     });
 
-  const avertissement = `${AVERTISSEMENT_TICPE}${doc.tauxManquants > 0 ? ` Attention : ${doc.tauxManquants} plein(s) sans taux au barème, non chiffrés.` : ""}`;
+  const avertissement = avertissementDocument(
+    `${AVERTISSEMENT_TICPE}${doc.tauxManquants > 0 ? ` Attention : ${doc.tauxManquants} plein(s) sans taux au barème, non chiffrés.` : ""}`,
+    pointsNonResolus,
+  );
   const [xlsx, pdf] = await Promise.all([
     buildTicpeWorkbook({ organizationName: organisation, periodStart: debut, periodEnd: fin, rows, recap: recapRows, pleins, avertissement }),
     generateTicpePdf({
@@ -111,11 +115,12 @@ export interface EraGenere {
 }
 
 /** État récapitulatif annuel (ERA) : Excel et PDF. */
-export async function genererEra(calcul: CalculTicpe, organisation: string, siren: string | null, annee: number): Promise<EraGenere> {
+export async function genererEra(calcul: CalculTicpe, organisation: string, siren: string | null, annee: number, pointsNonResolus = 0): Promise<EraGenere> {
+  const avertissement = avertissementDocument(AVERTISSEMENT_TICPE, pointsNonResolus);
   const lignes = etatRecapitulatifAnnuel(calcul.lignes, infosVehicules(calcul), annee);
   const [xlsx, pdf] = await Promise.all([
-    construireClasseurEra({ organisation, siren, annee, lignes, avertissement: AVERTISSEMENT_TICPE }),
-    generateEraPdf({ organizationName: organisation, siren, annee, lignes, avertissement: AVERTISSEMENT_TICPE }),
+    construireClasseurEra({ organisation, siren, annee, lignes, avertissement }),
+    generateEraPdf({ organizationName: organisation, siren, annee, lignes, avertissement }),
   ]);
   return { lignes, xlsx, pdf, total: r2(lignes.reduce((n, l) => n + l.montant, 0)), litres: r2(lignes.reduce((n, l) => n + l.litresRetenus, 0)) };
 }

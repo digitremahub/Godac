@@ -6,11 +6,12 @@ import { journaliser } from "@/lib/audit/journal";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { garderBloquants } from "@/lib/ticpe/garde-bloquants";
 import { genererEra } from "@/lib/ticpe/generation-serveur";
 
 export const maxDuration = 120;
 
-const schema = z.object({ annee: z.number().int().min(2025).max(2100) });
+const schema = z.object({ annee: z.number().int().min(2025).max(2100), forcer_malgre_bloquants: z.number().int().min(1).optional() });
 
 /**
  * État récapitulatif annuel (ERA) TICPE d'une année : Excel + PDF, rangés
@@ -23,13 +24,15 @@ export async function POST(req: Request) {
   const { appUser, supabase } = g;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Année invalide (2025 ou après)." }, { status: 400 });
-  const { annee } = parsed.data;
+  const { annee, forcer_malgre_bloquants } = parsed.data;
 
   const { data: org } = await supabase.from("organizations").select("id, name, siren").eq("id", appUser.organization_id).single();
   if (!org) return NextResponse.json({ error: "Organisation introuvable." }, { status: 409 });
   const calcul = await calculerTicpe(supabase, org.id, { anneeDebut: annee, anneeFin: annee });
   if (calcul.tronque) return NextResponse.json({ error: "Trop de pleins sur l'année : ERA incomplet." }, { status: 413 });
-  const era = await genererEra(calcul, org.name, (org as { siren?: string | null }).siren ?? null, annee);
+  const garde = await garderBloquants(supabase, org.id, calcul, { debut: `${annee}-01-01`, fin: `${annee}-12-31` }, forcer_malgre_bloquants);
+  if (garde.reponse) return garde.reponse;
+  const era = await genererEra(calcul, org.name, (org as { siren?: string | null }).siren ?? null, annee, garde.pointsNonResolus);
 
   const id = randomUUID();
   const xlsxPath = `${org.id}/era-${annee}-${id}.xlsx`;
@@ -65,5 +68,6 @@ export async function POST(req: Request) {
     supabase.storage.from("ticpe-exports").createSignedUrl(pdfPath, 300),
   ]);
   await journaliser({ organizationId: org.id, userId: appUser.id, action: "ticpe_document_genere", targetTable: "ticpe_exports", targetId: ligne?.id ?? null, details: { document: "era", annee, vehicules: era.lignes.length, montant: era.total } });
+  if (garde.force) await journaliser({ organizationId: org.id, userId: appUser.id, action: "ticpe_document_force", targetTable: "ticpe_exports", targetId: ligne?.id ?? null, details: { document: "era", annee, points_bloquants_non_resolus: garde.pointsNonResolus } });
   return NextResponse.json({ ok: true, exportId: ligne?.id ?? null, excelUrl: s1?.signedUrl, pdfUrl: s2?.signedUrl, enregistre: !error });
 }
