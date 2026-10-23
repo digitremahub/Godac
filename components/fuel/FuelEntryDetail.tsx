@@ -1,5 +1,6 @@
 "use client";
 
+import { decrireModification } from "@/lib/audit/avant-apres";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
@@ -217,9 +218,8 @@ export function FuelEntryDetail({ entryId }: { entryId: string }) {
                 {c.details && Object.keys(c.details).length > 0 && (
                   <span className="text-navy/70">
                     {" — "}
-                    {Object.entries(c.details)
-                      .map(([k, v]) => `${LIBELLES_CHAMPS_PLEIN[k] ?? k} : ${valeurCorrection(k, v)}`)
-                      .join(" · ")}
+                    {decrireModification(c.details, (k) => LIBELLES_CHAMPS_PLEIN[k] ?? k, valeurCorrection)}
+                    {typeof c.details.periode_declaree === "string" && <span className="text-orange-ink"> · période TICPE déjà déclarée ({c.details.periode_declaree}) : à régulariser</span>}
                   </span>
                 )}
               </li>

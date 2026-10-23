@@ -15,6 +15,10 @@ export interface Refus {
   rolesAutorises?: string[];
   utilise?: number;
   inclus?: number;
+  /** Génération refusée : nombre de points bloquants à régler (ou à confirmer). */
+  bloquants?: number;
+  /** Modification refusée : le plein appartient à une période TICPE déjà déclarée (nom de la période) ; à confirmer. */
+  periodeDeclaree?: string;
 }
 
 export type ReponseGodac<T> = { ok: true; data: T; statut: number } | { ok: false; refus: Refus };
@@ -52,6 +56,8 @@ export function lireRefus(statut: number, corps: unknown): Refus {
     rolesAutorises: Array.isArray(c.rolesAutorises) ? (c.rolesAutorises as string[]) : undefined,
     utilise: nombre(c.utilise),
     inclus: nombre(c.inclus),
+    bloquants: nombre(c.bloquants),
+    periodeDeclaree: typeof c.periodeDeclaree === "string" ? c.periodeDeclaree : undefined,
   };
 }
 

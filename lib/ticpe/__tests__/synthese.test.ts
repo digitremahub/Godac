@@ -13,7 +13,7 @@ const l = (p: Partial<PleinTicpe> & { id: string }) =>
 const lignes = [
   l({ id: "a" }),
   l({ id: "b", vehicle_id: "v2", occurred_at: "2026-04-02T08:00:00Z", liters: 250 }),
-  l({ id: "c", station_name: "Bastia", liters: 50 }),
+  l({ id: "c", ticpe_zone: "corse", liters: 50 }),
   l({ id: "d", product: "adblue" }),
 ];
 

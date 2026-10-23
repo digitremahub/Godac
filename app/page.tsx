@@ -53,12 +53,12 @@ const ETAPES_TICPE = [
   },
   {
     title: "Le montant, plein par plein",
-    description: "Chaque plein éligible est chiffré au barème daté de sa période (2026 : 15,56 €/hl en métropole, 14,21 €/hl en Corse). Pas de tableur à tenir à jour.",
+    description: "Chaque plein éligible est chiffré au barème daté de sa période (2026 : 15,56 €/hl en métropole, 14,21 €/hl en Corse ; taux à vérifier sur impots.gouv.fr). Pas de tableur à tenir à jour.",
     icon: IconCoins,
   },
   {
     title: "Contrôlé avant de déclarer",
-    description: "Plein sans justificatif, doublon probable, plafond de volume dépassé, consommation anormale, PTAC inconnu : vous corrigez avant, pas pendant un contrôle.",
+    description: "Plein sans justificatif, doublon probable, taux manquant, consommation anormale, PTAC inconnu : vous corrigez avant, pas pendant un contrôle.",
     icon: IconShieldCheck,
   },
   {
@@ -94,17 +94,17 @@ const LEVIERS_CARBURANT = [
   },
   {
     title: "Cuves et prix maîtrisés",
-    description: "Niveau des cuves, prix moyen pondéré recalculé à chaque livraison, carte des prix stations pour faire le plein au bon endroit.",
+    description: "Niveau des cuves, prix moyen pondéré recalculé à chaque livraison, prix payé à chaque plein : vous suivez ce que coûte chaque litre.",
     icon: IconCylinder,
   },
   {
     title: "Consommation par véhicule",
-    description: "L/100 km sur 30 et 90 jours, comparés à la référence constructeur : vous savez quel camion ou quel chauffeur consomme trop.",
+    description: "L/100 km sur 30 et 90 jours, alerte sur une consommation anormale : vous savez quel camion consomme trop.",
     icon: IconChartBar,
   },
   {
     title: "Justificatifs rangés",
-    description: "Photo du ticket, relevé de carte ou facture de livraison de cuve : chaque plein garde sa preuve, prête pour la TICPE et pour un contrôle.",
+    description: "Photo du ticket, référence du relevé de carte ou de la facture, facture de livraison de cuve : chaque plein garde sa preuve, prête pour la TICPE et pour un contrôle.",
     icon: IconPaperclip,
   },
   {

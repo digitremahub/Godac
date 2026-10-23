@@ -16,7 +16,7 @@ const p = (x: Partial<PleinTicpe> & { id: string }) =>
 const { lignes } = appliquerPlafond(
   [
     p({ id: "a" }),
-    p({ id: "b", station_name: "Bastia", liters: 200 }),
+    p({ id: "b", ticpe_zone: "corse", liters: 200 }),
     p({ id: "c", vehicle_id: "v2", occurred_at: "2026-05-02T08:00:00Z", liters: 600 }),
     p({ id: "d", vehicle_id: "v2", occurred_at: "2026-06-02T08:00:00Z", liters: 600 }),
     p({ id: "e", occurred_at: "2025-12-31T08:00:00Z", liters: 50 }),

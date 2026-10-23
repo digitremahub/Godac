@@ -54,6 +54,23 @@ export interface TicpeDuPlein {
   justificatif: { type: string | null; present: boolean; libelle: string };
   /** L'encadrement peut déclarer un relevé de carte ou une facture. */
   justificatifModifiable: boolean;
+  /** Plein écarté du montant comme doublon probable (à lever par une personne). */
+  doublon?: boolean;
+  /** L'encadrement peut confirmer « deux pleins distincts ». */
+  doublonLevable?: boolean;
+  /** Période TICPE déjà déclarée qui couvre ce plein (nom), sinon absent. */
+  periodeDeclaree?: string | null;
+  /** Zone saisie sur le plein (null = non renseignée : zone de la cuve ou par défaut). */
+  zoneSaisie?: "metropole" | "corse" | null;
+  /** Zone proposée d'après le nom de la station (jamais appliquée seule). */
+  zonePropose?: string | null;
+  zoneIncertaine?: boolean;
+  /** Pays d'achat saisi (null = non renseigné, donc France). */
+  paysAchat?: string | null;
+  /** L'encadrement peut saisir la zone et le pays d'achat. */
+  zoneModifiable?: boolean;
+  /** Doublon déjà levé par une personne. */
+  doublonLeveLe?: string | null;
 }
 
 export interface DetailPlein {
@@ -115,6 +132,8 @@ export const LIBELLES_CHAMPS_PLEIN: Record<string, string> = {
   tank_id: "Cuve",
   ticpe_justificatif: "Justificatif TICPE",
   ticpe_justificatif_ref: "Référence du justificatif",
+  ticpe_zone: "Zone TICPE",
+  pays_achat: "Pays d'achat",
 };
 
 export const LIBELLES_STATUT_PLEIN: Record<string, string> = {

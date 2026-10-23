@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { garderBloquants } from "@/lib/ticpe/garde-bloquants";
 import { genererRecapPeriode } from "@/lib/ticpe/generation-serveur";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { isModuleEnabled } from "@/lib/organization/modules";
@@ -14,6 +15,8 @@ const bodySchema = z
   .object({
     period_start: z.string().date(),
     period_end: z.string().date(),
+    /** Nombre de points bloquants que la personne choisit de passer (voir lib/ticpe/bloquants.ts). */
+    forcer_malgre_bloquants: z.number().int().min(1).optional(),
   })
   .refine((b) => b.period_start <= b.period_end, { message: "La fin de période précède le début.", path: ["period_end"] });
 
@@ -42,7 +45,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { period_start, period_end } = parsed.data;
+  const { period_start, period_end, forcer_malgre_bloquants } = parsed.data;
 
   const supabase = await createServerSupabaseClient();
   const ticpeEnabled = await isModuleEnabled(supabase, appUser.organization_id, "ticpe_export");
@@ -63,7 +66,9 @@ export async function POST(req: Request) {
   // puis récapitulatif 3310-TIC de la période, en jours entiers de Paris.
   const calcul = await calculerTicpe(supabase, organization.id, { anneeDebut: Number(period_start.slice(0, 4)), anneeFin: Number(period_end.slice(0, 4)) });
   if (calcul.tronque) return NextResponse.json({ error: "Trop de pleins sur la période : réduisez-la." }, { status: 413 });
-  const { rows, doc, xlsx: workbookBuffer, pdf: pdfBuffer } = await genererRecapPeriode(calcul, organization.name, period_start, period_end);
+  const garde = await garderBloquants(supabase, organization.id, calcul, { debut: period_start, fin: period_end }, forcer_malgre_bloquants);
+  if (garde.reponse) return garde.reponse;
+  const { rows, doc, xlsx: workbookBuffer, pdf: pdfBuffer } = await genererRecapPeriode(calcul, organization.name, period_start, period_end, garde.pointsNonResolus);
 
   const exportId = randomUUID();
   const filePath = `${organization.id}/${exportId}.xlsx`;
@@ -97,7 +102,7 @@ export async function POST(req: Request) {
   // Colonnes du lot 6 (migration 20261031000005) ; sans elles, l'export reste au format historique.
   let { data: exportRow, error: insertError } = await supabase
     .from("ticpe_exports")
-    .insert({ ...ligneExport, document_type: "periode", total_refund: doc.totalMontant, details: { recap: doc.recap, tauxManquants: doc.tauxManquants } })
+    .insert({ ...ligneExport, document_type: "periode", total_refund: doc.totalMontant, details: { recap: doc.recap, tauxManquants: doc.tauxManquants, pointsNonResolus: garde.pointsNonResolus } })
     .select("id")
     .single();
   const colonnesDocuments = !estSchemaManquant(insertError);
@@ -147,5 +152,15 @@ export async function POST(req: Request) {
     targetId: exportId2,
     details: { period_start, period_end, vehicules: rows.length, litres: totalLiters, remboursement: doc.totalMontant },
   });
+  if (garde.force) {
+    await journaliser({
+      organizationId: organization.id,
+      userId: appUser.id,
+      action: "ticpe_document_force",
+      targetTable: "ticpe_exports",
+      targetId: exportId2,
+      details: { document: "3310-TIC", period_start, period_end, points_bloquants_non_resolus: garde.pointsNonResolus },
+    });
+  }
   return NextResponse.json({ exportId: exportId2, downloadUrl: signedUrl?.signedUrl });
 }

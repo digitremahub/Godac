@@ -2,12 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { BandeauRefus } from "@/components/acces/BandeauRefus";
 import { fetchGodac, type Refus } from "@/lib/http/fetch-godac";
 
-type Etat = { busy: boolean; refus: Refus | null; message: string | null };
-const initial: Etat = { busy: false, refus: null, message: null };
+type Etat = { busy: boolean; refus: Refus | null; message: string | null; bloquants: number | null };
+const initial: Etat = { busy: false, refus: null, message: null, bloquants: null };
 
 /**
  * Génération des documents TICPE : récapitulatif 3310-TIC d'une période
@@ -22,14 +23,43 @@ export function GenerateurDocuments({ debut, fin, libelle, anneeEra, annees }: {
   const [era, setEra] = useState<Etat>(initial);
   const [dossier, setDossier] = useState<Etat>(initial);
 
-  async function lancer<T>(set: (e: Etat) => void, url: string, corps: unknown, ouvrir: (d: T) => (string | undefined)[], message: (d: T) => string) {
-    set({ busy: true, refus: null, message: null });
+  async function lancer<T>(set: (e: Etat) => void, url: string, corps: object, ouvrir: (d: T) => (string | undefined)[], message: (d: T) => string) {
+    set({ busy: true, refus: null, message: null, bloquants: null });
     const r = await fetchGodac<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
-    if (!r.ok) return set({ busy: false, refus: r.refus, message: null });
+    if (!r.ok) {
+      // Points bloquants : on ne génère pas sans une confirmation explicite (voir ConfirmationBloquants).
+      if (r.refus.statut === 409 && r.refus.bloquants) return set({ busy: false, refus: null, message: null, bloquants: r.refus.bloquants });
+      return set({ busy: false, refus: r.refus, message: null, bloquants: null });
+    }
     for (const u of ouvrir(r.data)) if (u) window.open(u, "_blank");
-    set({ busy: false, refus: null, message: message(r.data) });
+    set({ busy: false, refus: null, message: message(r.data), bloquants: null });
     router.refresh();
   }
+
+  const genererRecap = (forcer?: number) =>
+    lancer<{ downloadUrl?: string }>(
+      setRecap,
+      "/api/ticpe/export",
+      { period_start: du, period_end: au, ...(forcer ? { forcer_malgre_bloquants: forcer } : {}) },
+      (d) => [d.downloadUrl],
+      () => (forcer ? `Récapitulatif généré avec la mention « ${forcer} point(s) non résolu(s) » : à ne pas déclarer en l'état.` : "Récapitulatif généré : à vérifier ligne par ligne (« Vérifier »)."),
+    );
+  const genererEra = (forcer?: number) =>
+    lancer<{ excelUrl?: string; pdfUrl?: string; enregistre: boolean }>(
+      setEra,
+      "/api/ticpe/era",
+      { annee, ...(forcer ? { forcer_malgre_bloquants: forcer } : {}) },
+      (d) => [d.excelUrl, d.pdfUrl],
+      (d) => (d.enregistre ? `ERA ${annee} généré et rangé ci-dessous.` : `ERA ${annee} généré (non rangé : mise à jour de la base en attente).`),
+    );
+  const genererDossier = (forcer?: number) =>
+    lancer<{ url?: string; fichiers: number; absents: number }>(
+      setDossier,
+      "/api/ticpe/dossier",
+      { periode_debut: du, periode_fin: au, ...(forcer ? { forcer_malgre_bloquants: forcer } : {}) },
+      (d) => [d.url],
+      (d) => `Archive prête : ${d.fichiers} fichier(s)${d.absents ? `, ${d.absents} non inclus (voir LISEZMOI.txt)` : ""}.`,
+    );
 
   const periodeValide = du && au && du <= au;
   return (
@@ -54,12 +84,11 @@ export function GenerateurDocuments({ debut, fin, libelle, anneeEra, annees }: {
           type="button"
           className="btn-primary"
           disabled={recap.busy || !periodeValide}
-          onClick={() =>
-            void lancer<{ downloadUrl?: string }>(setRecap, "/api/ticpe/export", { period_start: du, period_end: au }, (d) => [d.downloadUrl], () => "Récapitulatif généré : à vérifier ligne par ligne (« Vérifier »).")
-          }
+          onClick={() => void genererRecap()}
         >
           {recap.busy ? "Génération…" : "Générer le récapitulatif"}
         </button>
+        <ConfirmationBloquants n={recap.bloquants} busy={recap.busy} onConfirmer={(n) => void genererRecap(n)} />
         {recap.message && <p className="text-sm text-teal-ink">{recap.message}</p>}
       </Card>
 
@@ -86,18 +115,11 @@ export function GenerateurDocuments({ debut, fin, libelle, anneeEra, annees }: {
           type="button"
           className="btn-primary"
           disabled={era.busy}
-          onClick={() =>
-            void lancer<{ excelUrl?: string; pdfUrl?: string; enregistre: boolean }>(
-              setEra,
-              "/api/ticpe/era",
-              { annee },
-              (d) => [d.excelUrl, d.pdfUrl],
-              (d) => (d.enregistre ? `ERA ${annee} généré et rangé ci-dessous.` : `ERA ${annee} généré (non rangé : mise à jour de la base en attente).`),
-            )
-          }
+          onClick={() => void genererEra()}
         >
           {era.busy ? "Génération…" : `Générer l'ERA ${annee}`}
         </button>
+        <ConfirmationBloquants n={era.bloquants} busy={era.busy} onConfirmer={(n) => void genererEra(n)} />
         {era.message && <p className="text-sm text-teal-ink">{era.message}</p>}
       </Card>
 
@@ -114,20 +136,38 @@ export function GenerateurDocuments({ debut, fin, libelle, anneeEra, annees }: {
           type="button"
           className="btn-secondary"
           disabled={dossier.busy || !periodeValide}
-          onClick={() =>
-            void lancer<{ url?: string; fichiers: number; absents: number }>(
-              setDossier,
-              "/api/ticpe/dossier",
-              { periode_debut: du, periode_fin: au },
-              (d) => [d.url],
-              (d) => `Archive prête : ${d.fichiers} fichier(s)${d.absents ? `, ${d.absents} non inclus (voir LISEZMOI.txt)` : ""}.`,
-            )
-          }
+          onClick={() => void genererDossier()}
         >
           {dossier.busy ? "Préparation de l'archive…" : "Préparer le dossier de contrôle"}
         </button>
+        <ConfirmationBloquants n={dossier.bloquants} busy={dossier.busy} onConfirmer={(n) => void genererDossier(n)} />
         {dossier.message && <p className="text-sm text-teal-ink">{dossier.message}</p>}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Points bloquants : la génération est refusée tant qu'ils ne sont pas réglés.
+ * On peut la forcer en confirmant le nombre de points ; le document porte alors
+ * la mention « N points non résolus » et la confirmation est tracée.
+ */
+function ConfirmationBloquants({ n, busy, onConfirmer }: { n: number | null; busy: boolean; onConfirmer: (n: number) => void }) {
+  if (!n) return null;
+  return (
+    <div className="rounded-lg border border-orange-ink/30 bg-surface p-3 text-sm" role="alert">
+      <p className="text-orange-ink">
+        {n} point{n > 1 ? "s" : ""} bloquant{n > 1 ? "s" : ""} à régler avant de générer ce document.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Link href="/carburant/ticpe/controles" className="btn-secondary !px-3 !py-1.5 text-xs">
+          Voir les points à régler
+        </Link>
+        <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => onConfirmer(n)}>
+          Je génère malgré {n} point{n > 1 ? "s" : ""} bloquant{n > 1 ? "s" : ""}
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-navy/55">Le document portera la mention « {n} point{n > 1 ? "s" : ""} non résolu{n > 1 ? "s" : ""} » et votre choix sera enregistré au journal.</p>
     </div>
   );
 }

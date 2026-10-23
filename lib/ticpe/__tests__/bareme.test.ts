@@ -120,20 +120,29 @@ describe("outils du barème", () => {
 });
 
 describe("réglages TICPE", () => {
-  it("valeurs par défaut : TRM, CA3 mensuelle, 40 000 L/an, gazole seul, location demandée par nous", () => {
+  it("valeurs par défaut : TRM, CA3 mensuelle, aucun plafond, gazole seul, location demandée par nous", () => {
     expect(normaliserReglages(null)).toEqual(REGLAGES_PAR_DEFAUT);
-    expect(REGLAGES_PAR_DEFAUT).toMatchObject({ activite_trm: true, activite_taxi: false, regime_tva: "mensuel", plafond_litres: 40000, accepte_hvo_b100: false, location_demandeur: "nous" });
+    expect(REGLAGES_PAR_DEFAUT).toMatchObject({ activite_trm: true, activite_taxi: false, regime_tva: "mensuel", plafond_actif: false, plafond_litres: null, accepte_hvo_b100: false, location_demandeur: "nous" });
   });
   it("normalise une ligne lue en base", () => {
-    const r = normaliserReglages({ regime_tva: "trimestriel", plafond_litres: "20000", plafond_periode: "semestriel", jour_limite_depot: 19, inconnu: 1 });
-    expect(r).toMatchObject({ regime_tva: "trimestriel", plafond_litres: 20000, plafond_periode: "semestriel", jour_limite_depot: 19 });
+    const r = normaliserReglages({ regime_tva: "trimestriel", plafond_actif: true, plafond_litres: "20000", plafond_periode: "semestriel", jour_limite_depot: 19, inconnu: 1 });
+    expect(r).toMatchObject({ regime_tva: "trimestriel", plafond_actif: true, plafond_litres: 20000, plafond_periode: "semestriel", jour_limite_depot: 19 });
   });
   it("valeurs invalides → défaut", () => {
     const r = normaliserReglages({ regime_tva: "hebdo", plafond_litres: -5, jour_limite_depot: 40, activite_trm: false, activite_trv: false, activite_taxi: false });
     expect(r.regime_tva).toBe("mensuel");
-    expect(r.plafond_litres).toBe(40000);
+    expect(r.plafond_litres).toBeNull();
+    expect(r.plafond_actif).toBe(false);
     expect(r.jour_limite_depot).toBeNull();
     expect(r.activite_trm).toBe(true);
+  });
+  it("ligne ancienne (40000 par défaut, sans colonne plafond_actif) : aucun plafond appliqué", () => {
+    const r = normaliserReglages({ plafond_litres: 40000, plafond_periode: "annuel" });
+    expect(r).toMatchObject({ plafond_actif: false, plafond_litres: 40000 });
+  });
+  it("schéma : plafond activé sans litres refusé", () => {
+    expect(schemaReglages.safeParse({ ...REGLAGES_PAR_DEFAUT, plafond_actif: true, plafond_litres: null }).success).toBe(false);
+    expect(schemaReglages.safeParse({ ...REGLAGES_PAR_DEFAUT, plafond_actif: true, plafond_litres: 30000 }).success).toBe(true);
   });
   it("schéma : au moins une activité, catégorie par défaut cochée", () => {
     expect(schemaReglages.safeParse(REGLAGES_PAR_DEFAUT).success).toBe(true);

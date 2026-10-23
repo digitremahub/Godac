@@ -8,6 +8,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { creerZip, type FichierZip } from "@/lib/paie/zip";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
+import { garderBloquants } from "@/lib/ticpe/garde-bloquants";
+import { mentionPointsNonResolus } from "@/lib/ticpe/bloquants";
 import { genererRecapPeriode } from "@/lib/ticpe/generation-serveur";
 import { lignesDeLaPeriode } from "@/lib/ticpe/montant";
 import { nomFichierSur } from "@/lib/ticpe/documents";
@@ -22,7 +24,7 @@ const BUCKET_TICKETS = process.env.SUPABASE_STORAGE_BUCKET ?? "fuel-tickets";
 const TAILLE_MAX = 45 * 1024 * 1024;
 
 const schema = z
-  .object({ periode_debut: z.string().date(), periode_fin: z.string().date() })
+  .object({ periode_debut: z.string().date(), periode_fin: z.string().date(), forcer_malgre_bloquants: z.number().int().min(1).optional() })
   .refine((b) => b.periode_debut <= b.periode_fin, { message: "Période invalide." });
 
 function extension(chemin: string): string {
@@ -43,13 +45,15 @@ export async function POST(req: Request) {
   const { appUser, supabase } = g;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Période invalide." }, { status: 400 });
-  const { periode_debut: debut, periode_fin: fin } = parsed.data;
+  const { periode_debut: debut, periode_fin: fin, forcer_malgre_bloquants } = parsed.data;
 
   const { data: org } = await supabase.from("organizations").select("id, name").eq("id", appUser.organization_id).single();
   if (!org) return NextResponse.json({ error: "Organisation introuvable." }, { status: 409 });
   const calcul = await calculerTicpe(supabase, org.id, { anneeDebut: Number(debut.slice(0, 4)), anneeFin: Number(fin.slice(0, 4)) });
   if (calcul.tronque) return NextResponse.json({ error: "Trop de pleins sur la période : réduisez-la." }, { status: 413 });
-  const recap = await genererRecapPeriode(calcul, org.name, debut, fin);
+  const garde = await garderBloquants(supabase, org.id, calcul, { debut, fin }, forcer_malgre_bloquants);
+  if (garde.reponse) return garde.reponse;
+  const recap = await genererRecapPeriode(calcul, org.name, debut, fin, garde.pointsNonResolus);
   const comptees = lignesDeLaPeriode(calcul.lignes, debut, fin).filter((l) => l.statut !== "exclu");
 
   // Justificatifs à joindre (chemins lus sous la RLS de la personne connectée).
@@ -120,6 +124,7 @@ export async function POST(req: Request) {
       `Période du ${debut} au ${fin}. Généré le ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}.`,
       "",
       AVERTISSEMENT_TICPE,
+      ...(garde.pointsNonResolus > 0 ? ["", mentionPointsNonResolus(garde.pointsNonResolus)] : []),
       "",
       `Pleins comptés : ${comptees.length}. Montant calculé : ${recap.doc.totalMontant.toLocaleString("fr-FR")} €. Volume retenu : ${recap.doc.totalHectolitres.toLocaleString("fr-FR")} hl.`,
       `Pleins sans justificatif enregistré dans GODAC : ${sansJustif} (relevés de cartes et factures papier à joindre par l'entreprise).`,
@@ -152,5 +157,6 @@ export async function POST(req: Request) {
   if (error && !estSchemaManquant(error)) console.error("dossier TICPE", error.message);
   const { data: signe } = await supabase.storage.from("ticpe-exports").createSignedUrl(zipPath, 600);
   await journaliser({ organizationId: org.id, userId: appUser.id, action: "ticpe_document_genere", targetTable: "ticpe_exports", targetId: ligne?.id ?? null, details: { document: "dossier", debut, fin, fichiers: fichiers.length, absents: absents.length } });
+  if (garde.force) await journaliser({ organizationId: org.id, userId: appUser.id, action: "ticpe_document_force", targetTable: "ticpe_exports", targetId: ligne?.id ?? null, details: { document: "dossier", debut, fin, points_bloquants_non_resolus: garde.pointsNonResolus } });
   return NextResponse.json({ ok: true, url: signe?.signedUrl, fichiers: fichiers.length, absents: absents.length });
 }
