@@ -68,10 +68,9 @@ export async function POST(req: Request) {
   const arrets = (stops ?? []) as { id: string; list_id: string | null; lat: number | null; lng: number | null; status: string; position: number; address: string; window_start: string | null; window_end: string | null }[];
   // Dépôt de la tournée, sinon dépôt du service du chauffeur / de l'organisation.
   let depot: Point | null = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
-  let depotLibelle: string | null = (run.start_label as string | null) ?? null;
   if (!depot) {
     const trouve = (await depotDuChauffeur(supabase, appUser).catch(() => null)) as { label: string; lat: number | string; lng: number | string } | null;
-    if (trouve) [depot, depotLibelle] = [{ lat: Number(trouve.lat), lng: Number(trouve.lng) }, trouve.label];
+    if (trouve) depot = { lat: Number(trouve.lat), lng: Number(trouve.lng) };
   }
   const choixDepart = parsed.data.depart !== undefined ? parsed.data.depart : memorise.depart;
   const choixArrivee = parsed.data.arrivee !== undefined ? parsed.data.arrivee : memorise.arrivee;
@@ -79,7 +78,6 @@ export async function POST(req: Request) {
     depart: choixDepart,
     arrivee: choixArrivee,
     depot,
-    depotLibelle,
     position: parsed.data.depuis ?? null,
     arrets,
     retourParDefaut: run.return_to_start,

@@ -70,7 +70,6 @@ export interface EntreeExtremites {
   arrivee: Arrivee | null;
   /** Dépôt (service du chauffeur, sinon organisation) ; null : inconnu. */
   depot: Point | null;
-  depotLibelle?: string | null;
   /** Position actuelle du chauffeur, quand la requête la fournit (réoptimisation en cours de route). */
   position: Point | null;
   arrets: ArretExtremite[];
@@ -109,7 +108,7 @@ export function resoudreExtremites(e: EntreeExtremites): ExtremitesResolues {
     if (!p) return `L'arrêt « ${abreger(a.address)} » n'a pas de position GPS : corrigez son adresse avant de le choisir comme ${role}.`;
     return { a, p };
   };
-  const libelleDepot = e.depotLibelle?.trim() || "Dépôt";
+  const libelleDepot = "Dépôt";
 
   // ── Départ ──
   let depart: Point | null = null;
@@ -131,7 +130,8 @@ export function resoudreExtremites(e: EntreeExtremites): ExtremitesResolues {
     // Réoptimisation en cours de route : on part de la position du chauffeur, quel que soit le choix mémorisé.
     [depart, departLibelle] = [e.position, "Ma position actuelle"];
   } else if (d.mode === "position") {
-    return refus("Votre position actuelle n'est pas disponible : autorisez la localisation ou choisissez un autre départ.");
+    // Position non transmise (démarrage, GPS refusé) : on ne bloque pas la tournée, on part du dépôt.
+    if (e.depot) [depart, departLibelle] = [e.depot, libelleDepot];
   } else if (d.mode === "depot") {
     if (!e.depot) return refus("Aucune adresse de dépôt n'est connue : choisissez une autre adresse de départ.");
     [depart, departLibelle] = [e.depot, libelleDepot];

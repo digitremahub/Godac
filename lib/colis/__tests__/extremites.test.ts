@@ -170,18 +170,18 @@ describe("resoudreExtremites", () => {
     { id: "f", status: "delivered", lat: 45.78, lng: 4.88, address: "3 rue F" },
     { id: "g", status: "pending", lat: null, lng: null, address: "4 rue G" },
   ];
-  const base = { depot, depotLibelle: "Dépôt Lyon", position: null, arrets, retourParDefaut: true };
+  const base = { depot, position: null, arrets, retourParDefaut: true };
 
   it("rien de choisi : dépôt au départ et retour comme avant", () => {
     const r = resoudreExtremites({ ...base, depart: null, arrivee: null });
-    expect(r).toMatchObject({ depart: depot, fin: depot, premierId: null, dernierId: null, departLibelle: "Dépôt Lyon" });
+    expect(r).toMatchObject({ depart: depot, fin: depot, premierId: null, dernierId: null, departLibelle: "Dépôt" });
     expect(resoudreExtremites({ ...base, depart: null, arrivee: null, retourParDefaut: false }).fin).toBeNull();
     expect(resoudreExtremites({ ...base, depart: null, arrivee: null, position: { lat: 1, lng: 1 } })).toMatchObject({ depart: { lat: 1, lng: 1 }, fin: null });
   });
 
   it("départ dépôt, arrivée dépôt", () => {
     const r = resoudreExtremites({ ...base, depart: { mode: "depot" }, arrivee: { mode: "depot" } });
-    expect(r).toMatchObject({ depart: depot, fin: depot, arriveeLibelle: "Dépôt Lyon" });
+    expect(r).toMatchObject({ depart: depot, fin: depot, arriveeLibelle: "Dépôt" });
   });
 
   it("départ arrêt, arrivée arrêt", () => {
@@ -207,7 +207,11 @@ describe("resoudreExtremites", () => {
     expect(resoudreExtremites({ ...base, depart: null, arrivee: { mode: "arret", arret_id: "g" } }).erreur).toMatch(/pas de position GPS/);
     expect(resoudreExtremites({ ...base, depart: { mode: "arret", arret_id: "zz" }, arrivee: null }).erreur).toMatch(/n'existe plus/);
     expect(resoudreExtremites({ ...base, depot: null, depart: { mode: "depot" }, arrivee: null }).erreur).toMatch(/dépôt/);
-    expect(resoudreExtremites({ ...base, depart: { mode: "position" }, arrivee: null }).erreur).toMatch(/position/);
+  });
+
+  it("« Ma position » sans GPS : on part du dépôt au lieu de bloquer", () => {
+    expect(resoudreExtremites({ ...base, depart: { mode: "position" }, arrivee: null })).toMatchObject({ depart: depot });
+    expect(resoudreExtremites({ ...base, position: { lat: 1, lng: 2 }, depart: { mode: "position" }, arrivee: null }).depart).toEqual({ lat: 1, lng: 2 });
   });
 
   it("un arrêt seul peut être premier et dernier", () => {
