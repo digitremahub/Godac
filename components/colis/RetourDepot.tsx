@@ -12,6 +12,11 @@ export interface DestinationRetour {
   point: { lat: number; lng: number } | null;
 }
 
+export interface InfoGasoil {
+  station: { nom: string; lat: number; lng: number; detourKm: number; distanceKm: number } | null;
+  retour: { km: number; lPer100: number | null; litres: number | null };
+}
+
 /**
  * Fin de tournée : dernier arrêt traité, on propose de lancer le retour au
  * dépôt ou au siège de l'entreprise (navigation externe) avant de clôturer.
@@ -20,12 +25,15 @@ export function RetourDepot({
   destinations,
   nomNavigation,
   onLancerGo,
+  gasoil,
   onPlusTard,
 }: {
   destinations: DestinationRetour[];
   nomNavigation: string;
   /** Lance le retour guidé dans GO Navigation. */
   onLancerGo: (d: DestinationRetour) => void;
+  /** Option « passer au gasoil » : null = déjà fait / indisponible. */
+  gasoil: { info: InfoGasoil | null; chargement: boolean; erreur: boolean; onDemander: () => void; onLancer: (s: NonNullable<InfoGasoil["station"]>) => void } | null;
   onPlusTard: () => void;
 }) {
   return (
@@ -59,6 +67,41 @@ export function RetourDepot({
             )}
           </div>
         ))}
+        {gasoil && (
+          <div className="rounded-2xl border border-navy/15 p-3">
+            {!gasoil.info ? (
+              <button type="button" className="btn-secondary min-h-[48px] w-full justify-center" onClick={gasoil.onDemander} disabled={gasoil.chargement}>
+                ⛽ {gasoil.chargement ? "Recherche d'une station…" : "Passer au gasoil avant de rentrer"}
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2 text-sm">
+                <p className="text-navy/80">
+                  Retour estimé : <strong>{gasoil.info.retour.km.toLocaleString("fr-FR")} km</strong>
+                  {gasoil.info.retour.litres !== null ? (
+                    <>
+                      {" "}
+                      ≈ <strong>{gasoil.info.retour.litres.toLocaleString("fr-FR")} L</strong> ({gasoil.info.retour.lPer100?.toLocaleString("fr-FR")} L/100 km du véhicule)
+                    </>
+                  ) : (
+                    " — consommation du véhicule inconnue"
+                  )}
+                  .
+                </p>
+                {gasoil.info.station ? (
+                  <button type="button" className="btn-primary min-h-[52px] flex-col justify-center !gap-0" onClick={() => gasoil.info?.station && gasoil.onLancer(gasoil.info.station)}>
+                    <span>⛽ {gasoil.info.station.nom} avec GO</span>
+                    <span className="text-xs font-normal opacity-80">
+                      {gasoil.info.station.distanceKm.toLocaleString("fr-FR")} km · détour ≈ +{gasoil.info.station.detourKm.toLocaleString("fr-FR")} km
+                    </span>
+                  </button>
+                ) : (
+                  <p className="font-semibold text-orange-ink">Aucune station trouvée à proximité.</p>
+                )}
+              </div>
+            )}
+            {gasoil.erreur && <p className="mt-1 text-xs font-semibold text-orange-ink">Recherche impossible pour le moment.</p>}
+          </div>
+        )}
         <button type="button" className="btn-ghost min-h-[44px] justify-center text-sm" onClick={onPlusTard}>
           Plus tard
         </button>

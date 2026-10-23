@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
-import { RetourDepot, type DestinationRetour } from "@/components/colis/RetourDepot";
+import { RetourDepot, type DestinationRetour, type InfoGasoil } from "@/components/colis/RetourDepot";
 import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -520,7 +520,9 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   // Retour de fin de tournée : dépôt de la tournée et/ou siège de l'entreprise.
   const [siege, setSiege] = useState<{ adresse: string; lat: number | null; lng: number | null } | null>(null);
   /** Retour de fin de tournée lancé dans GO (dépôt ou siège). */
-  const [retourGo, setRetourGo] = useState<{ label: string; lat: number; lng: number } | null>(null);
+  const [retourGo, setRetourGo] = useState<{ label: string; lat: number; lng: number; etape?: "gasoil" } | null>(null);
+  /** Option « passer au gasoil » du retour : recherche de station et consommation estimée. */
+  const [gasoil, setGasoil] = useState<{ info: InfoGasoil | null; chargement: boolean; erreur: boolean; fait: boolean }>({ info: null, chargement: false, erreur: false, fait: false });
   const finDeTournee = run?.status === "in_progress" && stops.length > 0 && pending.length === 0;
   useEffect(() => {
     if (!finDeTournee) return;
@@ -528,6 +530,18 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
       .then((r) => setSiege(r.adresse ? { adresse: r.adresse, lat: r.lat, lng: r.lng } : null))
       .catch(() => setSiege(null));
   }, [finDeTournee]);
+  async function demanderGasoil() {
+    const vers = destinationsRetour.find((d) => d.point)?.point;
+    const ici = maPosition;
+    if (!run || !vers || !ici) return setGasoil((g) => ({ ...g, erreur: true }));
+    setGasoil((g) => ({ ...g, chargement: true, erreur: false }));
+    try {
+      const info = await api<InfoGasoil>(`/api/colis/gasoil?run_id=${run.id}&lat=${ici.lat}&lng=${ici.lng}&vers_lat=${vers.lat}&vers_lng=${vers.lng}`);
+      setGasoil((g) => ({ ...g, info, chargement: false }));
+    } catch {
+      setGasoil((g) => ({ ...g, chargement: false, erreur: true }));
+    }
+  }
   const destinationsRetour: DestinationRetour[] = [];
   if (run && run.start_lat !== null && run.start_lng !== null) {
     destinationsRetour.push({
@@ -641,6 +655,15 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
       {enNavigation && run && (
         <GoNavigation
           retour={pending.length === 0 ? retourGo : null}
+          onRetourSuivant={() => {
+            // Plein fait : on repropose le dépôt / le siège.
+            setRetourGo(null);
+            setRetourVu((v) => {
+              const n = new Set(v);
+              n.delete(run.id);
+              return n;
+            });
+          }}
           run={run}
           stops={stops}
           lists={lists}
@@ -672,6 +695,20 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
         <RetourDepot
           destinations={destinationsRetour}
           nomNavigation={libelleNavigation(navPreferee === "go" ? "waze" : navPreferee)}
+          gasoil={
+            gasoil.fait
+              ? null
+              : {
+                  ...gasoil,
+                  onDemander: demanderGasoil,
+                  onLancer: (st) => {
+                    setRetourGo({ label: `⛽ ${st.nom}`, lat: st.lat, lng: st.lng, etape: "gasoil" });
+                    setGasoil((g) => ({ ...g, fait: true }));
+                    setRetourVu((v) => new Set(v).add(run.id));
+                    changerVue("navigation");
+                  },
+                }
+          }
           onLancerGo={(d) => {
             if (!d.point) return;
             setRetourGo({ label: d.detail ? `${d.titre} — ${d.detail}` : d.titre, ...d.point });
