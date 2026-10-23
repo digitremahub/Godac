@@ -549,7 +549,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
                     Copier une semaine type…
                   </button>
                 )}
-                <button type="button" className={`min-h-[44px] rounded-xl bg-orange px-4 text-sm font-semibold text-on-orange shadow-sm hover:bg-orange/90 disabled:opacity-60 ${BTN_MOBILE}`} disabled={publication || occupe} onClick={publier} title="Une notification par chauffeur concerné, avec ses tournées">
+                <button type="button" className={`btn-primary min-h-[44px] !px-4 text-sm disabled:opacity-60 ${BTN_MOBILE}`} disabled={publication || occupe} onClick={publier} title="Une notification par chauffeur concerné, avec ses tournées">
                   {publication ? "Publication…" : "Publier aux chauffeurs"}
                   {donnees.aPrevenir ? <span className="ml-1.5 rounded-full bg-white/25 px-1.5 text-xs">{donnees.aPrevenir}</span> : null}
                 </button>
@@ -565,7 +565,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         )}
 
         {petitEcran && arme && (
-          <p className="flex items-center justify-between gap-2 rounded-xl bg-orange/10 p-3 text-[15px] text-orange-ink" role="status">
+          <p className="flex items-center justify-between gap-2 rounded-xl bg-teal/10 p-3 text-[15px] text-teal-ink" role="status">
             <span>
               Touchez une tournée pour y placer <strong>{nomCourt(arme.full_name)}</strong>.
             </span>
