@@ -55,7 +55,25 @@ export default function CguPage() {
         </p>
       </Article>
 
-      <Article n={5} titre="Disponibilité">
+      <Article n={5} titre="Essai GO Navigation : statistiques d’usage">
+        <ul className={listeLegale}>
+          <li>
+            Pendant l’essai, l’Éditeur mesure l’usage de manière agrégée et anonyme (nombre de tournées, fonctions utilisées) afin
+            d’améliorer le service.
+          </li>
+          <li>
+            Le détail de l’usage (tournées, étapes, horaires) n’est consulté qu’avec l’accord facultatif de l’Utilisateur, donné à
+            l’inscription ou depuis « Mon compte », et retirable à tout moment. Le refus ou le retrait n’a aucune incidence sur
+            l’essai.
+          </li>
+          <li>Les noms et adresses des clients finaux de l’Utilisateur ne sont pas consultés par ce biais.</li>
+        </ul>
+        <p>
+          Voir la <Link href="/confidentialite" className={lien}>politique de confidentialité</Link> pour les durées de conservation.
+        </p>
+      </Article>
+
+      <Article n={6} titre="Disponibilité">
         <p>
           L’Éditeur s’efforce de rendre le service accessible en permanence, sous réserve des opérations de maintenance et
           des aléas des réseaux, dans les conditions de l’<Link href="/sla" className={lien}>engagement de service</Link>{" "}
@@ -63,14 +81,14 @@ export default function CguPage() {
         </p>
       </Article>
 
-      <Article n={6} titre="Propriété intellectuelle">
+      <Article n={7} titre="Propriété intellectuelle">
         <p>
           L’application, la marque GODAC et leurs contenus sont protégés. L’Utilisateur bénéficie d’un droit d’usage limité à
           son activité pour l’Entreprise, pendant la durée de son accès.
         </p>
       </Article>
 
-      <Article n={7} titre="Contact et droit applicable">
+      <Article n={8} titre="Contact et droit applicable">
         <p>
           Pour toute question : <a href={`mailto:${EDITEUR.email}`} className={lien}>{EDITEUR.email}</a>, ou en priorité
           l’Entreprise. Les présentes CGU sont soumises au droit français.

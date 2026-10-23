@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { fetchGodac } from "@/lib/http/fetch-godac";
-import { DUREE_ESSAI_JOURS } from "@/lib/go-navigation/offre";
+import { ACCORD_USAGE_TEXTE, DUREE_ESSAI_JOURS } from "@/lib/go-navigation/offre";
 
 /**
  * Formulaire de la page /go-navigation/[jeton] : prénom, nom, e-mail, mot
@@ -17,6 +17,8 @@ export function FormulaireGoNavigation({ jeton, invitePar = null }: { jeton: str
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [cgu, setCgu] = useState(false);
+  // Accord facultatif : jamais coché par défaut.
+  const [partageUsageDetail, setPartageUsageDetail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -27,7 +29,7 @@ export function FormulaireGoNavigation({ jeton, invitePar = null }: { jeton: str
     const r = await fetchGodac<{ redirection: string }>("/api/public/go-navigation/inscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jeton, prenom, nom, email, motDePasse, cgu }),
+      body: JSON.stringify({ jeton, prenom, nom, email, motDePasse, cgu, partageUsageDetail }),
     });
     if (!r.ok) {
       setErreur(r.refus.message);
@@ -87,6 +89,12 @@ export function FormulaireGoNavigation({ jeton, invitePar = null }: { jeton: str
               politique de confidentialité
             </Link>
             .
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={partageUsageDetail} onChange={(e) => setPartageUsageDetail(e.target.checked)} />
+          <span>
+            {ACCORD_USAGE_TEXTE} <span className="text-navy/55">(facultatif)</span>
           </span>
         </label>
         {erreur && (

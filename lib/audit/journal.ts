@@ -43,6 +43,8 @@ export const ACTIONS_AUDIT = {
   go_apporteur_invitation_creee: "Invitation à usage unique « Faire essayer GO » créée",
   go_apporteur_invitation_revoquee: "Invitation « Faire essayer GO » révoquée",
   go_apporteur_droit_modifie: "Droit « Faire essayer GO » modifié (personne ou toute l'équipe)",
+  accord_usage_essai: "Essai GO : accord de partage du détail d'usage donné ou retiré",
+  usage_essai_detail_consulte: "Essai GO : détail d'usage consulté par GODAC (avec accord)",
   recommandation_employeur: "Recommandation d'employeur envoyée à GODAC (GO)",
   amende_creee: "Amende enregistrée (avis joint)",
   amende_responsable_valide: "Amende : responsable validé et notifié",

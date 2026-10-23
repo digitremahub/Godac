@@ -12,6 +12,9 @@ import { DisplayPreferences } from "@/components/account/DisplayPreferences";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
 import { CodeSecoursNaissance } from "@/components/account/CodeSecoursNaissance";
 import { isModuleEnabled } from "@/lib/organization/modules";
+import { AccordUsageEssai } from "@/components/account/AccordUsageEssai";
+import { lireEtatOffre } from "@/lib/go-navigation/etat";
+import { lireAccordUsage } from "@/lib/go-navigation/accord-usage";
 import Link from "next/link";
 
 const PAYSLIP_MONTH_LABEL = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
@@ -40,6 +43,9 @@ export default async function AccountPage() {
     contactEmail = data?.contact_email ?? null;
     authMethod = data?.auth_method ?? null;
   }
+  // Compte d'essai GO Navigation : accord facultatif de partage du détail d'usage
+  // (carte absente si les colonnes ne sont pas encore là).
+  const accordUsage = (await lireEtatOffre(supabase, appUser.organization_id)).goNavigation ? await lireAccordUsage(supabase, appUser.organization_id) : null;
   const pushEnabled = await isModuleEnabled(supabase, appUser.organization_id, "push_notifications");
 
   // Raccourci de téléchargement directement accessible sur son propre
@@ -76,6 +82,8 @@ export default async function AccountPage() {
           <p>{ROLE_LABELS[appUser.role]}</p>
         </div>
       </Card>
+
+      {accordUsage?.disponible && <AccordUsageEssai accepteInitial={accordUsage.accepte} le={accordUsage.le} />}
 
       {pushEnabled && <PushNotificationToggle />}
 

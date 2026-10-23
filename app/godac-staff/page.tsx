@@ -58,6 +58,10 @@ export default async function GodacStaffPage() {
           Invitations GO Navigation →
         </Link>
         {" · "}
+        <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
+          Usage des essais →
+        </Link>
+        {" · "}
         <Link href="/godac-staff/recommandations" className="font-semibold text-teal-ink hover:underline">
           Recommandations d&apos;employeur →
         </Link>

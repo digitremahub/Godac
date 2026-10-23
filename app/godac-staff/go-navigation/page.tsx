@@ -70,6 +70,10 @@ export default async function InvitationsGoNavigationPage() {
         <Link href="/godac-staff" className="text-teal-ink hover:underline">
           ← Backoffice opérateur
         </Link>
+        {" · "}
+        <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
+          Usage des essais →
+        </Link>
       </p>
       {error ? (
         <Card>

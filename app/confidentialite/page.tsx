@@ -158,6 +158,24 @@ export default function ConfidentialitePage() {
         </p>
       </Section>
 
+      <Section title="Essai GO Navigation : statistiques d'usage">
+        <p>
+          Pendant l&apos;essai GO Navigation, nous mesurons l&apos;usage de manière <strong>agrégée et anonyme</strong> (nombre de
+          tournées et d&apos;arrêts, fonctions utilisées, lectures d&apos;étiquettes) pour améliorer le service.
+        </p>
+        <p>
+          Le <strong>détail</strong> de l&apos;usage (tournées, étapes, horaires, chronologie des actions) n&apos;est consulté
+          qu&apos;avec votre <strong>accord facultatif</strong>, donné à l&apos;inscription (case non cochée par défaut) ou depuis
+          « Mon compte », et que vous pouvez retirer à tout moment : la consultation s&apos;arrête alors. Ne pas donner cet accord, ou
+          le retirer, n&apos;a aucune incidence sur votre essai. Les dates et le texte de l&apos;accord sont conservés comme preuve, et
+          chaque consultation du détail est tracée dans le journal d&apos;audit de votre organisation.
+        </p>
+        <p>
+          Ces consultations ne portent ni sur les noms, adresses ou téléphones des clients finaux que vous livrez, ni sur vos
+          positions GPS. Les données de l&apos;essai sont conservées selon les durées de la section suivante.
+        </p>
+      </Section>
+
       <Section title="Durée de conservation">
         <p>
           Les durées ci-dessous suivent les recommandations de la CNIL (référentiel « gestion du personnel »,
