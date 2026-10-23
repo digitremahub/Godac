@@ -1,6 +1,7 @@
 import { garderPage } from "@/lib/acces/garde-page";
 import { ChauffeurDashboard } from "@/components/dashboard/ChauffeurDashboard";
 import { ManagerDashboard } from "@/components/dashboard/ManagerDashboard";
+import { ChefEquipeDashboard } from "@/components/dashboard/ChefEquipeDashboard";
 import { ComptableDashboard } from "@/components/dashboard/ComptableDashboard";
 import { DirectionDashboard } from "@/components/dashboard/DirectionDashboard";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
@@ -24,6 +25,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     case "chauffeur":
       return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} presenceMonth={searchParams.presence} />;
     case "manager":
+      // Chef d'équipe : son équipe, ses véhicules, amendes et contestations, notifications.
+      return <ChefEquipeDashboard appUser={appUser} enabledModules={enabledModules} />;
     case "exploitation":
       // Exploitation : le tableau de bord du manager, sur toute l'organisation.
       return <ManagerDashboard appUser={appUser} enabledModules={enabledModules} />;

@@ -37,3 +37,22 @@ describe("guides par rôle", () => {
     expect(guideDe("x").role).toBe("chauffeur");
   });
 });
+
+describe("guide du manager : accueil", () => {
+  it("décrit le nouvel accueil (équipe, véhicules, amendes, notifications), sans paie", () => {
+    const g = guideDe("manager");
+    expect(g.sections[0]!.titre).toBe("Votre accueil");
+    expect(g.sections[0]!.etapes.map((e) => e.titre)).toEqual([
+      "Votre équipe en un coup d'œil",
+      "Les véhicules de votre service",
+      "Amendes et contestations ouvertes",
+      "Notifications de l'exploitation et de la direction",
+    ]);
+    const liens = g.sections[0]!.etapes.map((e) => e.lien?.href ?? "");
+    expect(liens.some((h) => h.startsWith("/equipe/paie"))).toBe(false);
+  });
+  it("le manager qui conduit le retrouve, après les écrans du chauffeur ; l'exploitation non", () => {
+    expect(guideDe("manager", true).sections.some((s) => s.titre === "Votre accueil")).toBe(true);
+    expect(guideDe("exploitation").sections.some((s) => s.titre === "Votre accueil")).toBe(false);
+  });
+});
