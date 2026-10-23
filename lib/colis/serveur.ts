@@ -4,6 +4,8 @@ import type { AppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { LISTE_PRINCIPALE, type Liste } from "@/lib/colis/listes";
 import { normaliserSemaine, type FicheHoraires } from "@/lib/colis/horaires";
+import { lireArrivee, lireDepart, type Arrivee, type Depart } from "@/lib/colis/extremites";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 export const RUN_FIELDS = "id, name, run_date, status, start_label, start_lat, start_lng, return_to_start, optimized_at, started_at, planned_start, service_id";
 export const STOP_FIELDS = "id, list_id, position, parcel_code, parcel_count, address, lat, lng, recipient, phone, notes, status, done_at, delivered_place, proof_photo_path, proof_photo_paths, window_start, window_end, kind, proof_code, weight_kg, failure_reason, packages_picked_up, packages_delivered, relay_name";
@@ -18,7 +20,7 @@ export async function moduleActif(supabase: SupabaseClient, organizationId: stri
 }
 
 /** Point de départ par défaut : dépôt du premier service du chauffeur, sinon celui de l'entreprise. */
-async function depotDuChauffeur(supabase: SupabaseClient, appUser: Pick<AppUser, "id" | "organization_id">) {
+export async function depotDuChauffeur(supabase: SupabaseClient, appUser: Pick<AppUser, "id" | "organization_id">) {
   const [{ data: services }, { data: org }] = await Promise.all([
     supabase.from("user_services").select("services(name, depot_address, depot_lat, depot_lng)").eq("user_id", appUser.id),
     supabase.from("organizations").select("depot_address, depot_lat, depot_lng").eq("id", appUser.organization_id).single(),
@@ -140,6 +142,30 @@ export async function ficheClotureeDuJour(supabase: SupabaseClient, appUser: Pic
 export async function tourneeParId(supabase: SupabaseClient, appUser: AppUser, id: string) {
   const { data } = await supabase.from("delivery_runs").select(RUN_FIELDS).eq("id", id).eq("driver_id", appUser.id).maybeSingle();
   return data;
+}
+
+/**
+ * Départ et arrivée mémorisés de l'optimisation (migration 20261102000001).
+ * `persiste` est faux tant que la migration n'est pas appliquée : l'appareil
+ * garde alors le choix lui-même.
+ */
+export async function lireExtremitesRun(supabase: SupabaseClient, runId: string): Promise<{ depart: Depart | null; arrivee: Arrivee | null; persiste: boolean }> {
+  const { data, error } = await supabase.from("delivery_runs").select("optim_depart, optim_arrivee").eq("id", runId).maybeSingle();
+  if (error || !data) return { depart: null, arrivee: null, persiste: false };
+  const r = data as { optim_depart?: unknown; optim_arrivee?: unknown };
+  return { depart: lireDepart(r.optim_depart), arrivee: lireArrivee(r.optim_arrivee), persiste: true };
+}
+
+/** Mémorise le choix ; false si les colonnes n'existent pas encore (migration non appliquée). */
+export async function ecrireExtremitesRun(supabase: SupabaseClient, runId: string, extremites: { depart?: Depart | null; arrivee?: Arrivee | null }): Promise<boolean> {
+  const update: Record<string, unknown> = {};
+  if (extremites.depart !== undefined) update.optim_depart = extremites.depart;
+  if (extremites.arrivee !== undefined) update.optim_arrivee = extremites.arrivee;
+  if (!Object.keys(update).length) return true;
+  const { error } = await supabase.from("delivery_runs").update(update).eq("id", runId);
+  if (!error) return true;
+  if (estSchemaManquant(error)) return false;
+  throw new Error(error.message);
 }
 
 /** Listes d'une tournée, dans leur ordre. */

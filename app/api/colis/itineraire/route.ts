@@ -2,7 +2,8 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { depotDuChauffeur, lireExtremitesRun, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { resoudreExtremites } from "@/lib/colis/extremites";
 import { ligneDroite, troncons, type Itineraire, type Point } from "@/lib/colis/itineraire";
 import { manoeuvresOsrm, type EtapeOsrm } from "@/lib/colis/manoeuvres";
 
@@ -74,18 +75,27 @@ export async function POST(req: Request) {
     return NextResponse.json(await troncon([depart, { lat: Number(arret.lat), lng: Number(arret.lng) }], true));
   }
 
-  const { data: stops } = await supabase
-    .from("delivery_stops")
-    .select("lat, lng")
-    .eq("run_id", run.id)
-    .eq("status", "pending")
-    .not("lat", "is", null)
-    .order("position");
-  const points: Point[] = [
-    ...(parsed.data.depuis ? [parsed.data.depuis] : depot ? [depot] : []),
-    ...(stops ?? []).map((s) => ({ lat: Number(s.lat), lng: Number(s.lng) })),
-    ...(run.return_to_start && depot ? [depot] : []),
-  ];
+  const [{ data: tous }, memorise] = await Promise.all([
+    supabase.from("delivery_stops").select("id, lat, lng, status, address, list_id, position").eq("run_id", run.id).order("position"),
+    lireExtremitesRun(supabase, run.id),
+  ]);
+  const stops = (tous ?? []).filter((s) => s.status === "pending" && s.lat !== null);
+  // Départ et arrivée choisis (dépôt, adresse, arrêt…) : le tracé les inclut ; sans choix, comportement historique.
+  let depotEff = depot;
+  if (!depotEff) {
+    const trouve = (await depotDuChauffeur(supabase, appUser).catch(() => null)) as { lat: number | string; lng: number | string } | null;
+    if (trouve) depotEff = { lat: Number(trouve.lat), lng: Number(trouve.lng) };
+  }
+  const ext = resoudreExtremites({ depart: memorise.depart, arrivee: memorise.arrivee, depot: depotEff, position: parsed.data.depuis ?? null, arrets: (tous ?? []) as never[], retourParDefaut: run.return_to_start });
+  const debut: Point | null = !ext.erreur && memorise.depart ? ext.depart : (parsed.data.depuis ?? depot);
+  const fin: Point | null = !ext.erreur && memorise.arrivee ? ext.fin : run.return_to_start && depot ? depot : null;
+  const suite = stops.map((s) => ({ lat: Number(s.lat), lng: Number(s.lng) }));
+  // Un arrêt choisi comme départ ouvre le tracé : pas de point en double.
+  if (debut && suite[0] && Math.abs(suite[0].lat - debut.lat) < 1e-6 && Math.abs(suite[0].lng - debut.lng) < 1e-6) suite.shift();
+  const memeLieu = (a: Point, b: Point) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
+  // Un arrêt choisi comme arrivée ferme le tracé de la même façon.
+  const finTrace = fin && suite.length && memeLieu(suite[suite.length - 1]!, fin) ? null : fin;
+  const points: Point[] = [...(debut ? [debut] : []), ...suite, ...(finTrace ? [finTrace] : [])];
   if (points.length < 2) return NextResponse.json({ ligne: [], distanceKm: 0, dureeMin: 0, approx: false });
 
   const parties = await Promise.all(troncons(points).map((t) => troncon(t)));

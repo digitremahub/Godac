@@ -10,7 +10,7 @@ import { minutesParis } from "@/lib/colis/heure-paris";
  *   livraisons (trajet + remise), appliqué aux arrêts restants ;
  * - « estimation » avant : trajet restant (durée de l'itinéraire si connue,
  *   sinon distance × 1,3 à 35 km/h) + 3 min de remise par arrêt.
- * Le retour au dépôt est ajouté s'il est prévu.
+ * Le retour (au dépôt ou au point d'arrivée choisi) est ajouté s'il est prévu.
  *
  * Horaires d'ouverture (lib/colis/horaires.ts) : quand un arrêt restant a
  * des créneaux (`fenetres`, minutes depuis minuit à Paris), on estime
@@ -55,6 +55,12 @@ export function estimerAvancement(
     position?: { lat: number; lng: number } | null;
     depot?: { lat: number; lng: number } | null;
     retourDepot?: boolean;
+    /**
+     * Point d'arrivée choisi (dépôt, adresse, départ…) : le trajet du dernier
+     * arrêt jusqu'à lui compte dans l'heure de fin. null : pas de retour
+     * imposé ; absent : `retourDepot` s'applique.
+     */
+    arrivee?: { lat: number; lng: number } | null;
     /** Durée de trajet restante connue (itinéraire routier), en minutes. */
     minutesItineraire?: number | null;
   } = {},
@@ -72,8 +78,8 @@ export function estimerAvancement(
 
   const localises = restants.filter((a): a is ArretEstimation & { lat: number; lng: number } => a.lat !== null && a.lng !== null);
   const dernierPoint = localises.length ? localises[localises.length - 1]! : options.position ?? null;
-  const retour =
-    options.retourDepot && options.depot && dernierPoint ? minutesTrajet(haversineKm(dernierPoint, options.depot)) : 0;
+  const cibleRetour = options.arrivee !== undefined ? options.arrivee : options.retourDepot ? (options.depot ?? null) : null;
+  const retour = cibleRetour && dernierPoint ? minutesTrajet(haversineKm(dernierPoint, cibleRetour)) : 0;
 
   const horodates = faits
     .map((a) => (a.done_at ? Date.parse(a.done_at) : NaN))

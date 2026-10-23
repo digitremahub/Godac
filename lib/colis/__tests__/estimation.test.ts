@@ -43,4 +43,16 @@ describe("avancement de tournée", () => {
   it("tournée terminée : pas d'heure de fin", () => {
     expect(estimerAvancement([arret("delivered", "2026-10-13T09:00:00Z")], { maintenant }).finEstimee).toBeNull();
   });
+
+  it("le point d'arrivée choisi ajoute le trajet de retour à l'heure de fin", () => {
+    const restants = [arret("pending"), arret("pending")];
+    const sans = estimerAvancement(restants, { maintenant, position: { lat: 45.7, lng: 4.8 } });
+    const loin = { lat: 45.7, lng: 4.95 }; // ≈ 12 km
+    const avec = estimerAvancement(restants, { maintenant, position: { lat: 45.7, lng: 4.8 }, arrivee: loin });
+    expect(Date.parse(avec.finEstimee!) - Date.parse(sans.finEstimee!)).toBeGreaterThan(20 * 60_000);
+    // arrivee prime sur retourDepot ; null = pas de retour imposé.
+    const depot = { lat: 45.7, lng: 5.2 };
+    expect(estimerAvancement(restants, { maintenant, position: { lat: 45.7, lng: 4.8 }, depot, retourDepot: true, arrivee: null }).finEstimee).toBe(sans.finEstimee);
+    expect(estimerAvancement(restants, { maintenant, position: { lat: 45.7, lng: 4.8 }, depot, retourDepot: true }).finEstimee).not.toBe(sans.finEstimee);
+  });
 });

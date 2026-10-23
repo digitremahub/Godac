@@ -35,6 +35,23 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
   return total;
 }
 
+/** Longueur d'un chemin départ → arrêts → point d'arrivée (null : pas de trajet final). */
+export function longueurChemin(depart: Point | null, arrets: Point[], fin: Point | null, distance: (a: Point, b: Point) => number = distanceEstimee): number {
+  let total = 0;
+  let prev = depart;
+  for (const p of arrets) {
+    if (prev) total += distance(prev, p);
+    prev = p;
+  }
+  if (fin && prev) total += distance(prev, fin);
+  return total;
+}
+
+/** Deux points au même endroit (≈ 1 m) : un retour « au départ » referme la boucle. */
+export function memePoint(a: Point | null, b: Point | null): boolean {
+  return Boolean(a && b && Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lng - b.lng) < 1e-5);
+}
+
 /**
  * Renvoie les indices des arrêts dans l'ordre optimisé. `depart` est le
  * dépôt (ou la position du chauffeur) ; `retour` ferme la boucle vers lui.
