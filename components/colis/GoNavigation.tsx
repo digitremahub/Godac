@@ -52,6 +52,7 @@ import {
   zoomSelonVitesse,
   type EtatCamera,
 } from "@/lib/colis/conduite";
+import { enDepassement, kmhDepuisMs } from "@/lib/colis/limitation-vitesse";
 import { CLE_FEUILLE, FEUILLE_PAR_DEFAUT, adresseCourte, decouperTrace, lirePositionFeuille, positionApresGeste, repeteAdresse, type PositionFeuille } from "@/lib/colis/feuille";
 import { etaArret, type EtaArret } from "@/lib/colis/eta";
 import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
@@ -138,6 +139,10 @@ export function GoNavigation(p: GoNavigationProps) {
   const feuilleMemo = useRef<PositionFeuille>(FEUILLE_PAR_DEFAUT);
   const [menuVues, setMenuVues] = useState(false);
   const [position, setPosition] = useState<Point | null>(null);
+  /** Vitesse réelle (km/h, GPS) et limitation indicative de la route (OpenStreetMap). */
+  const [vitesseKmh, setVitesseKmh] = useState<number | null>(null);
+  const [limiteKmh, setLimiteKmh] = useState<number | null>(null);
+  const derniereLimite = useRef<{ pos: Point; t: number } | null>(null);
   const [erreurGps, setErreurGps] = useState<string | null>(null);
   const [vue, setVue] = useState<Vue>("ensemble");
   const [voix, setVoix] = useState(false);
@@ -372,6 +377,21 @@ export function GoNavigation(p: GoNavigationProps) {
     });
   }, [prete, stops, cible?.id, run.start_lat, run.start_lng, run.start_label]);
 
+  // Limitation de vitesse : relue après 100 m ou 30 s, jamais en rafale.
+  useEffect(() => {
+    if (!position) return;
+    const d = derniereLimite.current;
+    if (d && distanceM(d.pos, position) < 100 && Date.now() - d.t < 30_000) return;
+    derniereLimite.current = { pos: position, t: Date.now() };
+    let annule = false;
+    api<{ limite: number | null }>(`/api/colis/limitation?lat=${position.lat}&lng=${position.lng}`)
+      .then((r) => !annule && setLimiteKmh(r.limite))
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [position]);
+
   // Position en direct (navigator.geolocation.watchPosition).
   const derniereRemontee = useRef(0);
   const dernierFix = useRef<(Point & { t: number }) | null>(null);
@@ -401,6 +421,7 @@ export function GoNavigation(p: GoNavigationProps) {
           capLisse.current = lisserCap(capLisse.current, mesure, 0.5);
           capConnu.current = true;
         }
+        setVitesseKmh(kmhDepuisMs(vitesse));
         zoomLisse.current = lisserZoom(zoomLisse.current, zoomSelonVitesse(vitesse));
         const vers: EtatCamera = { lng: pos.lng, lat: pos.lat, cap: capLisse.current ?? 0, zoom: zoomLisse.current };
         const intervalle = dernierPoint.current === null ? null : t - dernierPoint.current;
@@ -922,6 +943,24 @@ export function GoNavigation(p: GoNavigationProps) {
           )}
         </div>
       </div>
+
+      {/* Vitesse réelle et limitation de la route (indicatif : le panneau sur place fait foi) */}
+      {position && vitesseKmh !== null && (
+        <div
+          className="absolute right-3 z-10 flex items-end gap-2"
+          style={{ bottom: `${Math.round(Math.min(hauteur, (typeof window !== "undefined" ? window.innerHeight : 800) * 0.6)) + 12}px` }}
+          role="status"
+          aria-label={`Vitesse ${vitesseKmh} kilomètres par heure${limiteKmh !== null ? `, limitation ${limiteKmh}` : ""}`}
+        >
+          {limiteKmh !== null && (
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border-[5px] border-red-600 bg-white text-base font-extrabold text-black shadow-pop">{limiteKmh}</span>
+          )}
+          <span className={`flex h-14 min-w-[3.5rem] flex-col items-center justify-center rounded-2xl px-2 shadow-pop ${enDepassement(vitesseKmh, limiteKmh) ? "bg-red-600 text-white" : "bg-marine text-white"}`}>
+            <span className="text-xl font-extrabold leading-none tabular-nums">{vitesseKmh}</span>
+            <span className="text-[10px] font-semibold leading-none opacity-80">km/h</span>
+          </span>
+        </div>
+      )}
 
       {/* Recentrer (le chauffeur a déplacé la carte) */}
       {vue === "libre" && position && (
