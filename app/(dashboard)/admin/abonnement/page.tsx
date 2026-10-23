@@ -10,7 +10,9 @@ import { limiteVehicules } from "@/lib/acces/limites-serveur";
 import { getFullCatalog, priceFor, type PlanId } from "@/lib/organization/catalog";
 import { estEnEssai } from "@/lib/organization/facturation-modules";
 import { moduleDisponible } from "@/lib/pays/pays";
-import { bornesMoisParis, derniersMois, lignesConsommation, resoudreFormule, unitesEnDepassement, montantCentimes } from "@/lib/usage/quotas";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { lecturesInclusesOrganisation } from "@/lib/usage/inclus-livreur";
+import { bornesMoisParis, derniersMois, inclusEffectif, lignesConsommation, resoudreFormule, unitesEnDepassement, montantCentimes } from "@/lib/usage/quotas";
 
 type Vue = "formule" | "modules";
 
@@ -137,6 +139,8 @@ async function chargerConsommation(supabase: Supabase, organizationId: string, f
 
   const prixRows = prix.map((p) => ({ ...p, unit_price_eur: Number(p.unit_price_eur) }));
   const inclus = Object.fromEntries((quotas ?? []).map((q) => [q.feature, Number(q.included_per_month)]));
+  // Lectures IA : volume par chauffeur de l'app Livreur (le plus favorable).
+  inclus.ocr_label = inclusEffectif(inclus.ocr_label ?? 0, await lecturesInclusesOrganisation(createAdminSupabaseClient(), organizationId));
   const utilise = Object.fromEntries(((totaux ?? []) as { feature: string; units: number }[]).map((t) => [t.feature, Number(t.units)]));
 
   const historique: HistoriqueMois[] = periodes.map((periode) => {

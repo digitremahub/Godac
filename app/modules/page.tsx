@@ -1,3 +1,4 @@
+import { LECTURES_PAR_CHAUFFEUR } from "@/lib/usage/quotas";
 import { estModuleVendable } from "@/lib/acces/catalogue";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -128,6 +129,12 @@ export default async function ModulesPage() {
                           </li>
                         ))}
                     </ul>
+                    {m.key === "route_optimizer" && (
+                      <p className="mt-2 text-navy/65">
+                        Lectures par photo (étiquettes, bordereaux, adresses) incluses par chauffeur et par mois : {LECTURES_PAR_CHAUFFEUR.map((l, i, tab) => `${l.parChauffeur}${l.jusqua === null ? ` au-delà de ${tab[i - 1]?.jusqua ?? 0} chauffeurs` : ` jusqu'à ${l.jusqua} chauffeurs`}`).join(", ")}. Une fois le volume atteint, la
+                        saisie manuelle reste complète (scan des codes-barres, recherche et saisie des adresses).
+                      </p>
+                    )}
                   </div>
                 )}
                 {alwaysIncluded ? (
@@ -183,7 +190,7 @@ export default async function ModulesPage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-navy/60">Volumes par mois et par entreprise ; prix hors taxes.</p>
+            <p className="mt-2 text-xs text-navy/60">Volumes par mois et par entreprise (lectures d&apos;étiquettes : le volume par chauffeur de l&apos;application Livreur s&apos;applique s&apos;il est plus favorable) ; prix hors taxes.</p>
           </section>
         )}
 

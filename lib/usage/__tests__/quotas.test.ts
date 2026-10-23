@@ -162,3 +162,27 @@ describe("quotaEffectif (plafond propre à l'organisation)", () => {
     expect(messageRefus("quota_mensuel", "route_optimization", { inclusParMois: 300, plafondJour: 60, prixUnitaire: 0, plafondPropre: true })).toContain("pendant votre essai");
   });
 });
+
+import { inclusEffectif, lecturesInclusesLivreur } from "@/lib/usage/quotas";
+
+describe("lectures IA incluses par chauffeur (app Livreur)", () => {
+  it("volume dégressif selon la taille de l'équipe", () => {
+    expect(lecturesInclusesLivreur(0)).toBe(0);
+    expect(lecturesInclusesLivreur(1)).toBe(300);
+    expect(lecturesInclusesLivreur(5)).toBe(1500);
+    expect(lecturesInclusesLivreur(6)).toBe(1500);
+    expect(lecturesInclusesLivreur(15)).toBe(3750);
+    expect(lecturesInclusesLivreur(30)).toBe(6000);
+    expect(lecturesInclusesLivreur(60)).toBe(9000);
+    expect(lecturesInclusesLivreur(61)).toBe(7320);
+    expect(lecturesInclusesLivreur(100)).toBe(12000);
+  });
+  it("le plus favorable de la formule et du volume par chauffeur l'emporte", () => {
+    expect(inclusEffectif(300, 1500)).toBe(1500);
+    expect(inclusEffectif(8000, 1500)).toBe(8000);
+  });
+  it("le refus rappelle que la saisie manuelle reste disponible", () => {
+    expect(messageRefus("quota_mensuel", "ocr_label", { inclusParMois: 300, plafondJour: 100, prixUnitaire: 0.03 })).toContain("saisie manuelle reste disponible");
+    expect(messageRefus("quota_mensuel", "ocr_ticket", { inclusParMois: 300, plafondJour: 100, prixUnitaire: 0.05 })).not.toContain("saisie manuelle");
+  });
+});
