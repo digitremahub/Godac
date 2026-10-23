@@ -7,6 +7,7 @@ import { Card } from "@/components/ui";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { IconPointRelais, IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
 import { ParcelScanner } from "@/components/colis/ParcelScanner";
+import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { enqueueOfflineMutation, isNetworkFailure } from "@/lib/offline/outbox";
@@ -163,6 +164,9 @@ export function TourneeColis({
   const [scanStatus, setScanStatus] = useState("");
   const scanQueue = useRef<{ image: string; code: string | null; telephone: string | null }[]>([]);
   const scanProcessing = useRef(false);
+  /** Étiquettes lues pendant que la caméra reste ouverte : à vérifier une par une à la fermeture du scanner. */
+  const [brouillons, setBrouillons] = useState<Draft[]>([]);
+  const codesScannes = useRef(new Set<string>());
   const [edition, setEdition] = useState<{ id: string; adresse: string; destinataire: string; telephone: string; colis: number; type: TypeArret; poids: string; relais: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [livraison, setLivraison] = useState<Stop | null>(null);
@@ -281,6 +285,11 @@ export function TourneeColis({
     await recharger(run.id);
   }
 
+  // Télécharge le lecteur de codes-barres (ZXing) en tâche de fond : le scanner s'ouvre ensuite sans attente.
+  useEffect(() => {
+    const t = setTimeout(prechargerDetecteur, 1500);
+    return () => clearTimeout(t);
+  }, []);
   useEffect(() => {
     recharger(runInitial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,6 +299,12 @@ export function TourneeColis({
     // Pas pendant le chargement d'une autre tournée (évite un « aucune tournée » transitoire).
     if (runs && (run || !activeId)) onEtat?.(run, stops);
   }, [runs, run, stops, activeId, onEtat]);
+  useEffect(() => {
+    if (!scanner && !draft && brouillons.length) {
+      setDraft(brouillons[0]!);
+      setBrouillons(brouillons.slice(1));
+    }
+  }, [scanner, draft, brouillons]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -382,32 +397,19 @@ export function TourneeColis({
     }
   }
 
-  /** Lit les étiquettes en série, pendant que la caméra reste ouverte. */
-  async function lireImageScannee(image: string, code: string | null, telephone: string | null): Promise<boolean> {
+  /** Lit les étiquettes en série, pendant que la caméra reste ouverte : le brouillon lu rejoint la file « à vérifier ». */
+  async function lireImageScannee(image: string, code: string | null, telephone: string | null) {
     setBusy("photo");
     try {
-      const lu = await api<EtiquetteLueEcran>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) });
+      const lu = await api<EtiquetteLueEcran>("/api/colis/etiquette", { method: "POST", body: JSON.stringify({ image, mediaType: "image/jpeg" }) }, 30_000);
+      // Une lecture OCR peut confondre des lignes d'étiquette : le brouillon est toujours validé par le chauffeur.
       const d: Draft = { adresse: lu.adresse ?? "", destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? telephone ?? "", code: code ?? lu.code, type: "livraison", poids: champPoids(lu.poids), ...creneauLu(lu.creneau) };
-      // Seuls le numéro et l'adresse sont bloquants. Nom, téléphone et poids
-      // restent facultatifs : ne pas interrompre le chauffeur pour ces champs.
-      const manquants = [
-        !d.code && "numéro de colis",
-        d.adresse.trim().length < 5 && "adresse",
-      ].filter(Boolean);
-      // Une lecture OCR peut confondre des lignes d'étiquette : toujours faire valider le brouillon.
-      setDraft(d);
-      setScanner(false);
-      setToast({
-        ok: manquants.length === 0,
-        text: manquants.length === 0
-          ? "Étiquette lue : vérifiez les informations avant d'ajouter le colis."
-          : "Lecture partielle : complétez " + manquants.join(", ") + " avant l'ajout.",
-      });
-      return false;
+      setBrouillons((b) => [...b, d]);
+      return true;
     } catch (e) {
-      setDraft({ adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" });
-      setScanner(false);
-      setToast({ ok: false, text: "Lecture impossible pour " + (code ?? "ce colis") + " : " + networkErrorMessage(e) + ". Complétez l’adresse." });
+      // Échec : le colis n'est pas perdu, son numéro rejoint la file avec l'adresse à saisir.
+      setBrouillons((b) => [...b, { adresse: "", destinataire: "", telephone: telephone ?? "", code, type: "livraison", poids: "" }]);
+      setToast({ ok: false, text: "Lecture impossible pour " + (code ?? "ce colis") + " : " + networkErrorMessage(e) + ". Vous complétez l’adresse à la fin du scan." });
       return false;
     } finally { setBusy(null); }
   }
@@ -420,28 +422,29 @@ export function TourneeColis({
         const item = scanQueue.current.shift()!;
         setScanStatus("Colis " + (item.code ?? "détecté") + " — lecture des informations…");
         const ok = await lireImageScannee(item.image, item.code, item.telephone);
-        if (!ok) { scanQueue.current = []; setScanStatus(""); return; }
-        setScanStatus(scanQueue.current.length ? "Colis ajouté · " + scanQueue.current.length + " en attente" : "Colis " + (item.code ?? "") + " ajouté");
+        setScanStatus(`${ok ? "Colis " + (item.code ?? "") + " lu" : "Lecture impossible pour " + (item.code ?? "un colis")}${scanQueue.current.length ? " · " + scanQueue.current.length + " en attente" : ""}`);
       }
     } finally { scanProcessing.current = false; }
   }
 
+  /** `false` : le scanner natif s'arrête (QR complet ouvert dans le formulaire) ; `true` : on continue de scanner. */
   function onCode(text: string, image?: string): boolean {
     const lu = analyserCode(text, pays);
+    // Un colis déjà lu pendant ce scan n'est pas relu (l'API sait aussi refuser les doublons à l'ajout).
+    if (lu.code && codesScannes.current.has(lu.code)) {
+      setScanStatus("Colis " + lu.code + " déjà scanné");
+      return true;
+    }
     if (lu.adresse) {
       const d: Draft = { adresse: lu.adresse, destinataire: lu.destinataire ?? "", telephone: lu.telephone ?? "", code: lu.code, type: "livraison", poids: champPoids(lu.poids) };
-      // Toujours demander confirmation : les champs d'un QR ne sont pas normalisés.
-      setScanner(false);
-      setDraft(d);
-      setToast({
-        ok: Boolean(d.code && d.adresse.trim().length >= 5),
-        text: d.code && d.adresse.trim().length >= 5
-          ? "QR lu : vérifiez l'adresse et le numéro avant d'ajouter le colis."
-          : "QR lu partiellement : vérifiez et complétez les informations avant l'ajout.",
-      });
-      return false;
+      if (lu.code) codesScannes.current.add(lu.code);
+      // Toujours demander confirmation (champs d'un QR non normalisés), mais sans fermer la caméra.
+      setBrouillons((b) => [...b, d]);
+      setScanStatus("QR lu : " + (lu.code ?? "adresse") + " · à vérifier à la fin du scan");
+      return true;
     }
     if (lectureEtiquette && image) {
+      if (lu.code) codesScannes.current.add(lu.code);
       scanQueue.current.push({ image, code: lu.code, telephone: lu.telephone ?? null });
       setScanStatus("Code lu : " + (lu.code ?? text) + " · lecture automatique");
       void traiterFileScans();
@@ -475,7 +478,7 @@ export function TourneeColis({
       const lu = await api<EtiquetteLueEcran>("/api/colis/etiquette", {
         method: "POST",
         body: JSON.stringify({ image, mediaType: "image/jpeg" }),
-      });
+      }, 30_000);
       setDraft((d) => ({
         adresse: lu.adresse ?? d?.adresse ?? "",
         destinataire: lu.destinataire ?? d?.destinataire ?? "",
@@ -958,7 +961,16 @@ export function TourneeColis({
           }}
         />
       )}
-      {scanner && <ParcelScanner onCode={onCode} onClose={() => { setScanner(false); scanQueue.current = []; setScanStatus(""); }} statut={scanStatus} />}
+      {scanner && (
+        <ParcelScanner
+          onCode={onCode}
+          capturerImage={lectureEtiquette}
+          // Les étiquettes en cours de lecture se terminent en arrière-plan : on ne vide pas la file.
+          onClose={() => { setScanner(false); setScanStatus(""); codesScannes.current.clear(); }}
+          statut={scanStatus + (brouillons.length ? (scanStatus ? " · " : "") + brouillons.length + " à vérifier" : "")}
+          bouton={brouillons.length || scanProcessing.current ? "Terminer et vérifier les colis" : "Terminer le scan"}
+        />
+      )}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
 
       {selecteur}
@@ -1155,6 +1167,7 @@ export function TourneeColis({
             </button>
           </div>
           {draft.code && <p className="text-xs text-navy/60">Colis n° {draft.code}</p>}
+          {brouillons.length > 0 && <p className="text-xs font-semibold text-teal-ink">Encore {brouillons.length} colis scanné{brouillons.length > 1 ? "s" : ""} à vérifier après celui-ci.</p>}
           <ChoixTypeArret value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
           {choixCible}
           {draft.type === "point_relais" && (

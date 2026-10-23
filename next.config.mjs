@@ -84,6 +84,11 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Lecteur de codes-barres (ZXing, 1 Mo) : nom de fichier stable, donc revalidé chaque semaine plutôt que « immutable ».
+        source: "/zxing/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=2592000" }],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
