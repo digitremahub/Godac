@@ -7,6 +7,7 @@ import { ENCADREMENT } from "@/lib/acces/catalogue";
 import { parisDay } from "@/lib/utils/paris-time";
 import { messageDecisionSalarie, verifierDeclaration } from "@/lib/arrets/declaration";
 import { lireArrets, notifierArret } from "@/lib/arrets/serveur";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const bodySchema = z.discriminatedUnion("action", [
@@ -18,7 +19,8 @@ const bodySchema = z.discriminatedUnion("action", [
 /**
  * Décision sur un arrêt déclaré (encadrement du service, paie) : valider,
  * refuser avec un motif, ou corriger le type et les dates. Le salarié est
- * notifié de la décision. Jamais sur son propre arrêt (sauf direction).
+ * notifié de la décision. Jamais sur son propre arrêt (sauf direction
+ * seule, tracée « auto-validée ») ; rang strictement supérieur (lib/hierarchie).
  * Les montants d'IJSS restent saisis par la paie, sur le bulletin.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,9 +36,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const arret = lecture.lignes[0];
   if (!arret) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
   if (!lecture.declarationActive) return NextResponse.json({ error: "Mise à jour de la base en attente : décision indisponible." }, { status: 503 });
-  if (arret.userId === appUser.id && appUser.role !== "direction") {
-    return NextResponse.json({ error: "Votre propre arrêt est vérifié par votre responsable." }, { status: 403 });
-  }
+  // Hiérarchie : jamais son propre arrêt (sauf direction seule), rang supérieur ; la paie garde ses droits.
+  const garde = await garderDecision(supabase, appUser, arret.userId, { paie: true });
+  if (!garde.ok) return garde.reponse;
 
   const maintenant = new Date().toISOString();
   let maj: Record<string, unknown>;
@@ -74,6 +76,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
   }
 
+  if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "work_stoppages", id, decision: corps.action });
   await journaliser({
     organizationId: appUser.organization_id,
     userId: appUser.id,

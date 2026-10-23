@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasRole } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { garderDecision } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({ status: z.enum(["done", "cancelled"]) });
 
@@ -21,6 +22,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const supabase = await createServerSupabaseClient();
+  const { data: convocation } = await supabase.from("convocations").select("employee_id").eq("id", id).maybeSingle();
+  if (convocation?.employee_id) {
+    const garde = await garderDecision(supabase, appUser, convocation.employee_id);
+    if (!garde.ok) return garde.reponse;
+  }
   const { error } = await supabase.from("convocations").update(parsed.data).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { nextStatusAfterManager, type RentalRequestStatus } from "@/lib/rental/workflow";
 import { addRentalEvent, transmitRentalRequest } from "@/lib/rental/server";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 
 const bodySchema = z.object({
   action: z.enum(["valider", "refuser", "transmettre", "terminer"]),
@@ -45,6 +46,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!request) return NextResponse.json({ error: "Demande introuvable." }, { status: 404 });
   const status = request.status as RentalRequestStatus;
   const now = new Date().toISOString();
+
+  // Hiérarchie : la demande au loueur découle de la demande d'entretien ; son auteur ne la valide ni ne la refuse lui-même.
+  const { data: origine } = await supabase.from("vehicle_interventions").select("requested_by").eq("id", request.intervention_id).maybeSingle();
+  if (origine?.requested_by) {
+    const garde = await garderDecision(supabase, appUser, origine.requested_by);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "rental_maintenance_requests", id, decision: action });
+  }
 
   if (action === "transmettre") {
     if (!nextStatusAfterManager(status, "transmettre")) {

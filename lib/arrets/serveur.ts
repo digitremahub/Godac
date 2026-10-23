@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { estSchemaManquant, estValeurEnumInconnue } from "@/lib/rattachement/tolerance";
+import { destinatairesDe } from "@/lib/hierarchie/serveur";
 import { affectationsTouchees, type AffectationPlanning, type StatutArret } from "@/lib/arrets/declaration";
 
 /**
@@ -119,21 +120,27 @@ export async function serviceDuSalarie(db: Db, userId: string, preferes: readonl
  */
 export async function notifierArret(
   admin: Db,
-  a: { organizationId: string; message: string; arretId: string; severity?: "info" | "warning"; recipientUserId?: string | null; serviceId?: string | null },
+  a: { organizationId: string; message: string; arretId: string; severity?: "info" | "warning"; recipientUserId?: string | null; serviceId?: string | null; demandeurId?: string | null },
 ): Promise<void> {
-  const ligne: Record<string, unknown> = {
+  const base: Record<string, unknown> = {
     organization_id: a.organizationId,
     type: "work_stoppage",
     severity: a.severity ?? "warning",
     message: a.message,
     related_table: "work_stoppages",
     related_id: a.arretId,
-    ...(a.recipientUserId ? { recipient_user_id: a.recipientUserId } : { recipient_roles: ["manager", "exploitation", "direction"] }),
-    ...(a.serviceId && !a.recipientUserId ? { service_id: a.serviceId } : {}),
   };
-  let { error } = await admin.from("alerts").insert(ligne);
+  // Hiérarchie : l'alerte monte d'un niveau (jamais vers l'auteur ni un pair) ; sans auteur connu, diffusion historique.
+  let lignes: Record<string, unknown>[];
+  if (a.recipientUserId) lignes = [{ ...base, recipient_user_id: a.recipientUserId }];
+  else if (a.demandeurId) {
+    const destinataires = await destinatairesDe(admin, a.organizationId, a.demandeurId);
+    lignes = destinataires.map((u) => ({ ...base, recipient_user_id: u.id }));
+  } else lignes = [{ ...base, recipient_roles: ["manager", "exploitation", "direction"], ...(a.serviceId ? { service_id: a.serviceId } : {}) }];
+  if (lignes.length === 0) return;
+  let { error } = await admin.from("alerts").insert(lignes);
   if (error && estValeurEnumInconnue(error)) {
-    ({ error } = await admin.from("alerts").insert({ ...ligne, type: a.recipientUserId ? "planning_validated" : "planning_conflict", related_table: null, related_id: null }));
+    ({ error } = await admin.from("alerts").insert(lignes.map((l) => ({ ...l, type: l.recipient_user_id && a.recipientUserId ? "planning_validated" : "planning_conflict", related_table: null, related_id: null }))));
   }
   if (error) console.error("arrêts : alerte non créée", error.message);
 }

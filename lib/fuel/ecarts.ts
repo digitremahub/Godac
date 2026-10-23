@@ -17,6 +17,7 @@
  * statut. Pur — utilisé côté serveur (pages, API) comme côté navigateur.
  */
 
+import { peutDecider } from "@/lib/hierarchie/demandes";
 import { ticketAmountMismatch, ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
 
 /** Tolérances identiques aux triggers SQL (migration 121). */
@@ -191,24 +192,34 @@ export interface DroitsEcart {
 }
 
 /**
- * Qui peut agir sur l'écart d'un plein. Encadrement seulement (manager,
- * direction) pour le traitement ; un manager qui conduit ne traite pas
- * l'écart de son propre plein (la direction, si). Le chauffeur du plein
- * peut seulement répondre à une demande d'explication en cours.
+ * Qui peut agir sur l'écart d'un plein. Le traitement suit la hiérarchie
+ * des demandes (lib/hierarchie/demandes.ts) : jamais son propre plein
+ * (sauf une direction seule), rang strictement supérieur à celui du
+ * conducteur du plein — un manager traite l'écart d'un chauffeur,
+ * l'exploitation ou la direction celui d'un manager. Le chauffeur du
+ * plein peut seulement répondre à une demande d'explication en cours.
  * La RLS de fuel_gap_reviews applique la même règle en base.
+ * `roleChauffeur` : rôle du conducteur du plein (chauffeur par défaut) ;
+ * `directionCount` : comptes direction actifs (2 par défaut : pas
+ * d'auto-validation).
  */
 export function droitsEcart(params: {
   role: string;
   userId: string;
   driverId: string | null | undefined;
   statut: StatutEcart;
+  roleChauffeur?: string | null;
+  directionCount?: number;
 }): DroitsEcart {
   const { role, userId, driverId, statut } = params;
   const sonPlein = Boolean(driverId) && driverId === userId;
-  // Exploitation : comme un manager (jamais son propre plein), sur toute l'organisation.
-  const encadrement = role === "direction" || ((role === "manager" || role === "exploitation") && !sonPlein);
+  const verdict = peutDecider({
+    decideur: { id: userId, role },
+    demandeur: { id: driverId ?? "", role: params.roleChauffeur ?? (sonPlein ? role : "chauffeur") },
+    directionCount: params.directionCount ?? 2,
+  });
   return {
-    traiter: encadrement && statut !== "aucun" && statut !== "traite",
+    traiter: verdict.ok && statut !== "aucun" && statut !== "traite" && role !== "chauffeur",
     repondre: sonPlein && statut === "explication_demandee",
   };
 }

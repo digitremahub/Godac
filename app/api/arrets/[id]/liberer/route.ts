@@ -4,6 +4,7 @@ import { journaliser } from "@/lib/audit/journal";
 import { ENCADREMENT } from "@/lib/acces/catalogue";
 import { affectationsALiberer } from "@/lib/arrets/declaration";
 import { affectationsPendantArret, lireArrets } from "@/lib/arrets/serveur";
+import { garderDecision } from "@/lib/hierarchie/serveur";
 
 /**
  * « Libérer ces N affectations » : retire le salarié en arrêt de ses
@@ -21,6 +22,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const arret = (await lireArrets(supabase, { id })).lignes[0];
   if (!arret) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+  // Hiérarchie : on ne réorganise pas le planning de son propre arrêt.
+  const garde = await garderDecision(supabase, appUser, arret.userId);
+  if (!garde.ok) return garde.reponse;
   if (arret.statut === "refuse") return NextResponse.json({ error: "Arrêt refusé : rien à libérer." }, { status: 422 });
 
   const aLiberer = affectationsALiberer(await affectationsPendantArret(supabase, appUser.organization_id, arret.userId, arret.du, arret.au), arret);

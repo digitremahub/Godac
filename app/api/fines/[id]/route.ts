@@ -5,6 +5,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { journaliser } from "@/lib/audit/journal";
 import { messageAmendeAttribuee, messageAmendeStatut } from "@/lib/rattachement/notifications";
 import { notifier, peutDesignerChauffeur, rechercherResponsableAmende } from "@/lib/rattachement/serveur";
+import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 import { estSchemaManquant, estValeurEnumInconnue } from "@/lib/rattachement/tolerance";
 
 const bodySchema = z.object({
@@ -94,6 +95,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: chauffeur } = await supabase.from("users").select("id, full_name").eq("id", driverId).eq("organization_id", appUser.organization_id).maybeSingle();
     if (!chauffeur) return NextResponse.json({ error: "Chauffeur introuvable." }, { status: 404 });
     if (!(await peutDesignerChauffeur(supabase, appUser, driverId))) return NextResponse.json({ error: "Ce chauffeur n'appartient pas à vos services." }, { status: 403 });
+    // Hiérarchie : le responsable désigné est le « demandeur » : personne ne se désigne ni ne règle sa propre amende.
+    const garde = await garderDecision(supabase, appUser, driverId);
+    if (!garde.ok) return garde.reponse;
+    if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "fines", id, decision: "responsable_valide" });
     // Créneau choisi : doit être celui du chauffeur désigné, sinon il n'est pas gardé.
     if (planningEntryId) {
       const { data: entry } = await supabase.from("planning_entries").select("driver_id").eq("id", planningEntryId).maybeSingle();
@@ -131,6 +136,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (body.status) {
+    if (fine.driver_id) {
+      const garde = await garderDecision(supabase, appUser, fine.driver_id);
+      if (!garde.ok) return garde.reponse;
+      if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "fines", id, decision: body.status });
+    }
     const { error } = await supabase.from("fines").update({ status: body.status }).eq("id", id);
     if (error && estValeurEnumInconnue(error)) return NextResponse.json({ error: "Statut « classée » indisponible : migration 20261026000003 à appliquer." }, { status: 409 });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -152,6 +162,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!fine.driver_id) {
       return NextResponse.json({ error: "Validez d'abord le chauffeur responsable." }, { status: 422 });
     }
+    const garde = await garderDecision(supabase, appUser, fine.driver_id);
+    if (!garde.ok) return garde.reponse;
     const message = messageAmendeAttribuee({ infractionAt: fine.infraction_at, immatriculation, montant: Number(fine.amount), montantMinore: fine.reduced_amount ?? null, dateLimite: fine.payment_deadline ?? null, reference: fine.reference });
     const alertError = await notifier(admin, { organizationId: appUser.organization_id, type: "fine_notification", severity: "warning", message, relatedTable: "fines", relatedId: id, recipientUserId: fine.driver_id });
     if (alertError) return NextResponse.json({ error: alertError }, { status: 500 });
