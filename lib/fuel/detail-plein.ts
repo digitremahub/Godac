@@ -54,6 +54,12 @@ export interface TicpeDuPlein {
   justificatif: { type: string | null; present: boolean; libelle: string };
   /** L'encadrement peut déclarer un relevé de carte ou une facture. */
   justificatifModifiable: boolean;
+  /** Plein écarté du montant comme doublon probable (à lever par une personne). */
+  doublon?: boolean;
+  /** L'encadrement peut confirmer « deux pleins distincts ». */
+  doublonLevable?: boolean;
+  /** Doublon déjà levé par une personne. */
+  doublonLeveLe?: string | null;
 }
 
 export interface DetailPlein {

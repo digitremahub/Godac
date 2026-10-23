@@ -124,6 +124,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           montant: l.montant,
           justificatif: l.justificatif,
           justificatifModifiable: ["manager", "exploitation", "direction"].includes(appUser.role) && !e.ticket_photo_path,
+          doublon: l.doublon === true,
+          doublonLeveLe: calcul.pleins.get(id)?.ticpe_doublon_leve_le ?? null,
+          doublonLevable: ["manager", "exploitation", "direction"].includes(appUser.role) && (l.doublon === true || Boolean(calcul.pleins.get(id)?.ticpe_doublon_leve_le)),
         };
       }
     } catch (err) {

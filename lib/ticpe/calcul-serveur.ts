@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 import { bornesPeriode } from "@/lib/ticpe/export";
+import { exclureDoublons } from "@/lib/ticpe/doublons";
 import { appliquerPlafond, calculerPlein, type Depassement, type LigneTicpe, type PleinTicpe } from "@/lib/ticpe/montant";
 import { plafondEffectif } from "@/lib/ticpe/reglages";
 import { chargerParametresTicpe, type ParametresTicpe } from "@/lib/ticpe/serveur";
@@ -37,6 +38,7 @@ export interface CalculTicpe {
 }
 
 const COLONNES_PLEIN = "id, vehicle_id, driver_id, occurred_at, liters, unit_price, status, product, station_name, tank_id, ticket_photo_path, vehicle_km";
+const COLONNES_DOUBLON = "ticpe_doublon_leve_le";
 
 /**
  * Calcule la TICPE de l'organisation sur des années civiles entières
@@ -69,7 +71,10 @@ export async function calculerTicpe(
       cuveAvecFacture: cuve?.avecFacture ?? false,
     });
   });
-  const { lignes, depassements } = appliquerPlafond(brutes, plafondEffectif(parametres.reglages), parametres.reglages.plafond_periode);
+  // Doublon probable (ticket + relevé de carte) : une des deux lignes est écartée tant qu'une personne ne l'a pas levé.
+  const fiables = pleinsRes.rows.filter((p) => ["manual", "validated"].includes(p.status));
+  const sansDoublon = exclureDoublons(brutes, fiables);
+  const { lignes, depassements } = appliquerPlafond(sansDoublon, plafondEffectif(parametres.reglages), parametres.reglages.plafond_periode);
   return {
     parametres,
     evalues,
@@ -104,9 +109,13 @@ async function chargerPleins(supabase: SupabaseClient, organizationId: string, o
       { maxRows: 100000 },
     );
   if (opts.vehicleIds && opts.vehicleIds.length === 0) return { rows: [] as PleinCharge[], truncated: false };
-  const complet = await lire(`${COLONNES_PLEIN}, ticpe_justificatif, ticpe_justificatif_ref`);
-  if (!complet.error) return complet;
-  if (!estSchemaManquant({ message: complet.error })) console.error("pleins TICPE", complet.error);
+  // Colonnes ajoutées par des migrations : on essaie la lecture complète, puis sans les colonnes les plus récentes.
+  const JUSTIF = "ticpe_justificatif, ticpe_justificatif_ref";
+  for (const colonnes of [`${COLONNES_PLEIN}, ${JUSTIF}, ${COLONNES_DOUBLON}`, `${COLONNES_PLEIN}, ${JUSTIF}`]) {
+    const res = await lire(colonnes);
+    if (!res.error) return res;
+    if (!estSchemaManquant({ message: res.error })) console.error("pleins TICPE", res.error);
+  }
   return lire(COLONNES_PLEIN);
 }
 

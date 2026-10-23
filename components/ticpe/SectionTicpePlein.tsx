@@ -33,8 +33,22 @@ export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: stri
     await onModifie();
   }
 
+  async function doublon(lever: boolean) {
+    setBusy(true);
+    setRefus(null);
+    const r = await fetchGodac(`/api/fuel-entries/${entryId}/doublon`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lever }),
+    });
+    setBusy(false);
+    if (!r.ok) return setRefus(r.refus);
+    await onModifie();
+  }
+
   return (
     <div className="text-sm">
+      <BandeauRefus refus={refus} onFermer={() => setRefus(null)} />
       {ticpe.statut === "exclu" ? (
         <p className="text-navy/70">Non compté : {ticpe.raison}</p>
       ) : (
@@ -67,6 +81,22 @@ export function SectionTicpePlein({ entryId, ticpe, onModifie }: { entryId: stri
           </div>
           {ticpe.statut === "taux_manquant" && ticpe.raison && <p className="col-span-full text-xs text-orange-ink">{ticpe.raison}</p>}
         </dl>
+      )}
+      {ticpe.doublonLevable && ticpe.doublon && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-orange-ink">
+          Ce plein ressemble à un autre (même véhicule, même jour, litres proches).
+          <button type="button" className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => doublon(true)}>
+            Confirmer deux pleins distincts
+          </button>
+        </p>
+      )}
+      {ticpe.doublonLevable && !ticpe.doublon && ticpe.doublonLeveLe && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-navy/70">
+          Deux pleins distincts confirmés le {new Date(ticpe.doublonLeveLe).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}.
+          <button type="button" className="btn-ghost !px-2 !py-0.5 text-xs" disabled={busy} onClick={() => doublon(false)}>
+            Annuler la confirmation
+          </button>
+        </p>
       )}
       <p className={`mt-2 ${ticpe.justificatif.present ? "text-navy/70" : "text-orange-ink"}`}>
         Justificatif à conserver : {ticpe.justificatif.libelle}

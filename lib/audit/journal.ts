@@ -16,6 +16,7 @@ export const ACTIONS_AUDIT = {
   rapport_correction: "Rapport de tournée corrigé",
   rapport_relecture: "Scans de rapport relus",
   plein_modification: "Plein modifié",
+  plein_doublon_leve: "Doublon probable levé : deux pleins distincts confirmés",
   ecart_carburant_traite: "Écart carburant justifié / classé",
   ecart_carburant_explication: "Explication demandée au chauffeur sur un écart carburant",
   livraison_cuve_annulee: "Livraison de cuve annulée",

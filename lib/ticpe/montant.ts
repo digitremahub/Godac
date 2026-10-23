@@ -35,6 +35,8 @@ export interface PleinTicpe {
   ticket_photo_path?: string | null;
   ticpe_justificatif?: string | null;
   ticpe_justificatif_ref?: string | null;
+  /** Une personne a confirmé « deux pleins distincts » (migration 20261101000003). */
+  ticpe_doublon_leve_le?: string | null;
 }
 
 /** Jour calendaire de Paris (AAAA-MM-JJ) d'un instant ISO. */
@@ -124,6 +126,8 @@ export interface LigneTicpe {
   litresHorsPlafond: number;
   montant: number;
   justificatif: Justificatif;
+  /** Écartée du montant : doublon probable, pas encore levé par une personne. */
+  doublon?: boolean;
 }
 
 export interface ContextePlein {

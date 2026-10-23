@@ -3,14 +3,14 @@ import { BAREME_PAR_DEFAUT } from "@/lib/ticpe/bareme";
 import { compterParGravite, controlesPeriode, doublonsProbables, litresProches, type PleinControle, type VehiculeControle } from "@/lib/ticpe/controles";
 import { eligibiliteVehicule, type VehiculeEligibilite } from "@/lib/ticpe/eligibilite";
 import { appliquerPlafond, calculerPlein, type PleinTicpe } from "@/lib/ticpe/montant";
-import { REGLAGES_PAR_DEFAUT, type ReglagesTicpe } from "@/lib/ticpe/reglages";
+import { REGLAGES_PAR_DEFAUT, plafondEffectif, type ReglagesTicpe } from "@/lib/ticpe/reglages";
 
 const camion: VehiculeEligibilite = { type: "PL", ptac_kg: 19000, fuel_type: "Diesel" };
 
 function scenario(
   pleins: (Partial<PleinTicpe> & { id: string })[],
   vehicules: Record<string, VehiculeEligibilite & { registration?: string; tank_capacity_liters?: number }> = { v1: camion },
-  opts: { reglages?: ReglagesTicpe; aCarteGrise?: boolean; anomalies?: string[]; plafond?: number } = {},
+  opts: { reglages?: ReglagesTicpe; aCarteGrise?: boolean; anomalies?: string[]; plafond?: number | null } = {},
 ) {
   const reglages = opts.reglages ?? REGLAGES_PAR_DEFAUT;
   const vmap = new Map<string, VehiculeControle>();
@@ -19,7 +19,7 @@ function scenario(
   }
   const complets: PleinTicpe[] = pleins.map((p) => ({ vehicle_id: "v1", occurred_at: "2026-03-10T08:00:00Z", liters: 300, status: "validated", product: "gazole", ticket_photo_path: "t.jpg", ...p }));
   const brutes = complets.map((p) => calculerPlein(p, { eligibilite: vmap.get(p.vehicle_id)?.eligibilite ?? null, reglages, bareme: BAREME_PAR_DEFAUT, surcharges: [] }));
-  const { lignes, depassements } = appliquerPlafond(brutes, opts.plafond ?? reglages.plafond_litres, reglages.plafond_periode);
+  const { lignes, depassements } = appliquerPlafond(brutes, opts.plafond ?? plafondEffectif(reglages), reglages.plafond_periode);
   return controlesPeriode({
     periode: { debut: "2026-03-01", fin: "2026-03-31" },
     lignes,
@@ -62,6 +62,17 @@ describe("contrôles avant déclaration", () => {
     ]);
     expect(p).toMatchObject([{ code: "doublon", gravite: "bloquant", objet: { id: "b" } }]);
   });
+  it("scénario de l'audit : ticket 12:00 + relevé 00:00 le même jour : doublon bloquant sur le plein écarté, puis levé", () => {
+    const base = [
+      { id: "ticket", occurred_at: "2026-03-10T11:00:00Z", liters: 300 },
+      { id: "releve", occurred_at: "2026-03-09T23:00:00Z", liters: 300, ticket_photo_path: null, ticpe_justificatif: "releve_carte" },
+    ];
+    const p = scenario(base);
+    expect(p).toMatchObject([{ code: "doublon", gravite: "bloquant", objet: { id: "releve" }, lien: "/carburant/pleins?plein=releve" }]);
+    expect(p[0]!.detail).toContain("n'est pas compté");
+    const leve = scenario(base.map((x) => (x.id === "releve" ? { ...x, ticpe_doublon_leve_le: "2026-03-11T09:00:00Z" } : x)));
+    expect(leve).toEqual([]);
+  });
   it("PTAC inconnu : bloquant sur le véhicule", () => {
     const p = scenario([{ id: "a" }, { id: "b", occurred_at: "2026-03-12T08:00:00Z" }], { v1: { ...camion, ptac_kg: null } });
     expect(p).toMatchObject([{ code: "ptac_inconnu", gravite: "bloquant", lien: "/flotte/vehicules/v1" }]);
@@ -100,9 +111,11 @@ describe("contrôles avant déclaration", () => {
 
 describe("doublons", () => {
   const p = (id: string, vehicle_id: string, occurred_at: string, liters: number) => ({ id, vehicle_id, occurred_at, liters });
-  it("limites : 30 minutes, 1 L ou 2 %", () => {
+  it("limites : 30 minutes ou même jour de Paris, 2 L ou 2 %", () => {
     expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "v", "2026-01-01T08:30:00Z", 101)])).toHaveLength(1);
-    expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "v", "2026-01-01T08:31:00Z", 100)])).toHaveLength(0);
+    // Au-delà de 30 minutes : doublon seulement le même jour de Paris.
+    expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "v", "2026-01-01T08:31:00Z", 100)])).toHaveLength(1);
+    expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "v", "2026-01-02T08:31:00Z", 100)])).toHaveLength(0);
     expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "v", "2026-01-01T08:10:00Z", 103)])).toHaveLength(0);
     expect(doublonsProbables([p("a", "v", "2026-01-01T08:00:00Z", 100), p("b", "w", "2026-01-01T08:10:00Z", 100)])).toHaveLength(0);
   });
@@ -110,5 +123,7 @@ describe("doublons", () => {
     expect(litresProches(500, 509)).toBe(true);
     expect(litresProches(500, 511)).toBe(false);
     expect(litresProches(20, 21)).toBe(true);
+    expect(litresProches(20, 22)).toBe(true);
+    expect(litresProches(20, 22.5)).toBe(false);
   });
 });
