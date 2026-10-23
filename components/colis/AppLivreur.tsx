@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { distanceM } from "@/lib/colis/navigation";
+import { RetourDepot } from "@/components/colis/RetourDepot";
 import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
@@ -77,6 +79,8 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Fiche en cours de modification (erreur de saisie à la base). */
   const [ficheEdition, setFicheEdition] = useState(false);
+  /** Tournées pour lesquelles la proposition de retour au dépôt a été vue (fermée ou lancée). */
+  const [retourVu, setRetourVu] = useState<Set<string>>(new Set());
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
   const [vue, setVue] = useState<Vue>(vueInitiale ?? "liste");
@@ -640,6 +644,16 @@ export function AppLivreur({ prenom, pays = "FR", vueInitiale, lectureEtiquette 
 
       {feuilleOptim && run && (
         <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee })} />
+      )}
+
+      {run?.status === "in_progress" && stops.length > 0 && pending.length === 0 && run.start_lat !== null && run.start_lng !== null && !retourVu.has(run.id) && (
+        <RetourDepot
+          depot={run.start_label ?? "dépôt"}
+          distanceKm={maPosition ? distanceM(maPosition, { lat: Number(run.start_lat), lng: Number(run.start_lng) }) / 1000 : null}
+          lien={lienExterne({ lat: Number(run.start_lat), lng: Number(run.start_lng), address: run.start_label ?? "dépôt" } as Stop)}
+          nomNavigation={libelleNavigation(navPreferee === "go" ? "waze" : navPreferee)}
+          onPlusTard={() => setRetourVu((v) => new Set(v).add(run.id))}
+        />
       )}
 
       {/* Bouton flottant : retour dans GO Navigation depuis la liste, la carte ou une fiche. */}
