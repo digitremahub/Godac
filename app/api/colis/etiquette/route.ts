@@ -8,6 +8,9 @@ import { moduleActif } from "@/lib/colis/serveur";
 import { lireEtiquette } from "@/lib/colis/lecture-ia";
 import { codePays } from "@/lib/pays/serveur";
 
+// Photo + appel IA (borné à 20 s, un nouvel essai possible) : la limite par défaut de la fonction est trop courte.
+export const maxDuration = 60;
+
 const bodySchema = z.object({
   image: z.string().min(100).max(8_000_000),
   mediaType: z.enum(["image/jpeg", "image/png", "image/webp"]),
@@ -26,11 +29,15 @@ export async function POST(req: Request) {
   const appUser = g.appUser;
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
-  const parsed = bodySchema.safeParse(await req.json());
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Photo invalide." }, { status: 400 });
   const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "ocr_label");
   if (!quota.ok) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
   const result = await lireEtiquette(parsed.data.image, parsed.data.mediaType, await codePays(appUser.organization_id));
-  if (!result.ok) return NextResponse.json({ error: "Étiquette illisible — saisissez l'adresse." }, { status: 422 });
+  if (!result.ok) {
+    if (result.type === "occupe") return NextResponse.json({ error: "Lecture momentanément indisponible (service saturé) — réessayez dans un instant ou saisissez l'adresse." }, { status: 503 });
+    if (result.type === "indisponible") return NextResponse.json({ error: "Lecture d'étiquette indisponible — saisissez l'adresse." }, { status: 503 });
+    return NextResponse.json({ error: "Étiquette illisible — rapprochez-vous, évitez les reflets, ou saisissez l'adresse." }, { status: 422 });
+  }
   return NextResponse.json(result.etiquette);
 }

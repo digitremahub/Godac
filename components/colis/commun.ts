@@ -75,8 +75,18 @@ export interface RunResume {
   nbRestants: number;
 }
 
-export async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: init?.body ? { "Content-Type": "application/json" } : undefined });
+export async function api<T>(url: string, init?: RequestInit, delaiMs?: number): Promise<T> {
+  const ctrl = delaiMs ? new AbortController() : null;
+  const minuterie = ctrl ? setTimeout(() => ctrl.abort(), delaiMs) : null;
+  let res: Response;
+  try {
+    res = await fetch(url, { ...init, ...(ctrl ? { signal: ctrl.signal } : {}), headers: init?.body ? { "Content-Type": "application/json" } : undefined });
+  } catch (e) {
+    if (ctrl?.signal.aborted) throw new Error("La lecture prend trop de temps : vérifiez votre connexion et réessayez.");
+    throw e;
+  } finally {
+    if (minuterie) clearTimeout(minuterie);
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Erreur réseau");
   return json as T;
