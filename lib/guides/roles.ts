@@ -187,7 +187,7 @@ const ENCADREMENT: SectionGuide[] = [
   {
     titre: "Carburant, flotte et entretien",
     etapes: [
-      { titre: "Traiter les écarts carburant", texte: "La tuile « Écarts carburant à traiter » de l'accueil ouvre la page Pleins filtrée sur « À traiter » : ouvrez « Détails » pour justifier, classer ou demander une explication au chauffeur.", lien: { href: "/carburant/pleins?a_traiter=1", label: "Écarts à traiter" } },
+      { titre: "Traiter les écarts carburant", texte: "Dans Carburant › Pleins, filtre « À traiter » (c'est aussi la tuile « Écarts carburant à traiter » de l'accueil de l'exploitation et de la direction) : ouvrez « Détails » pour justifier, classer ou demander une explication au chauffeur.", lien: { href: "/carburant/pleins?a_traiter=1", label: "Écarts à traiter" } },
       { titre: "Vérifier les tickets", texte: "« Tickets à vérifier » regroupe les tickets et compteurs lus automatiquement, à confirmer avant enregistrement.", lien: { href: "/carburant/revue-ocr", label: "Tickets à vérifier" }, module: "ocr" },
       { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/carburant/cuves", label: "Cuves" } },
       { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
@@ -218,6 +218,38 @@ const ENCADREMENT: SectionGuide[] = [
   },
 ];
 
+/** Accueil du manager (chef d'équipe) : l'essentiel de son équipe et de ses services d'un coup d'œil. */
+const ACCUEIL_MANAGER: SectionGuide = {
+  titre: "Votre accueil",
+  etapes: [
+    {
+      titre: "Votre équipe en un coup d'œil",
+      texte:
+        "L'accueil ne montre que vos services. En haut, les compteurs du jour : en tournée, disponibles, absents. « Mon équipe » liste chaque membre actif avec son état (en tournée, disponible, en congé, en arrêt de travail, non planifié), calculé d'après le planning du jour, les congés approuvés et les arrêts de travail. Touchez une ligne pour ouvrir la fiche. Aucune donnée de paie n'y figure.",
+      lien: { href: "/equipe/utilisateurs", label: "Équipe" },
+    },
+    {
+      titre: "Les véhicules de votre service",
+      texte:
+        "« Véhicules de mon service » indique pour chaque véhicule s'il est en tournée (avec son chauffeur), disponible ou en entretien, et le signale « à surveiller » quand un document ou un contrôle (assurance, contrôle technique…) expire sous 30 jours ou est expiré.",
+      lien: { href: "/flotte/vehicules", label: "Flotte" },
+      module: "fleet",
+    },
+    {
+      titre: "Amendes et contestations ouvertes",
+      texte:
+        "Les amendes et contestations clients encore ouvertes qui concernent les véhicules ou les chauffeurs de vos services, les plus anciennes d'abord. Ce qui vous concerne vous-même est signalé : vous ne le décidez pas, il revient à l'exploitation ou à la direction.",
+      lien: { href: "/flotte/amendes", label: "Amendes" },
+      module: "fines",
+    },
+    {
+      titre: "Notifications de l'exploitation et de la direction",
+      texte: "Les dernières notifications ouvertes qui vous sont destinées, les non lues d'abord ; « Voir toutes » ouvre le centre de notifications. Une ligne « Demandes de mon équipe en attente » apparaît quand des congés ou des entretiens attendent une décision.",
+      lien: { href: "/communication/alertes", label: "Notifications" },
+    },
+  ],
+};
+
 export const GUIDES: GuideRole[] = [
   {
     role: "chauffeur",
@@ -229,7 +261,7 @@ export const GUIDES: GuideRole[] = [
     role: "manager",
     titre: "Guide du manager",
     intro: "Vous organisez l'activité de votre service : planning, chauffeurs, carburant, véhicules et réclamations. Ce guide reprend vos tâches courantes.",
-    sections: [...ENCADREMENT, AIDE],
+    sections: [ACCUEIL_MANAGER, ...ENCADREMENT, AIDE],
   },
   {
     role: "exploitation",
@@ -333,7 +365,7 @@ export const GUIDE_MANAGER_CONDUCTEUR: GuideRole = {
   role: "manager",
   titre: "Guide du manager qui conduit",
   intro: "Vous roulez et vous encadrez : vous avez à la fois les écrans du chauffeur (Mon espace : tournées, planning, véhicule ; pleins, colis) et ceux du manager (planning, validations, flotte).",
-  sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ...ENCADREMENT, AIDE],
+  sections: [DEMARRER_CHAUFFEUR, ...QUOTIDIEN_CHAUFFEUR, ACCUEIL_MANAGER, ...ENCADREMENT, AIDE],
 };
 
 /** Exploitation qui conduit aussi : son guide, précédé des écrans du chauffeur. */
