@@ -2,7 +2,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { depotDuChauffeur, lireExtremitesRun, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { depotDuService, lireExtremitesRun, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { resoudreExtremites } from "@/lib/colis/extremites";
 import { ligneDroite, troncons, type Itineraire, type Point } from "@/lib/colis/itineraire";
 import { manoeuvresOsrm, type EtapeOsrm } from "@/lib/colis/manoeuvres";
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
   // Départ et arrivée choisis (dépôt, adresse, arrêt…) : le tracé les inclut ; sans choix, comportement historique.
   let depotEff = depot;
   if (!depotEff) {
-    const trouve = (await depotDuChauffeur(supabase, appUser).catch(() => null)) as { lat: number | string; lng: number | string } | null;
+    const trouve = (await depotDuService(supabase, appUser, run.service_id).catch(() => null)) as { lat: number | string; lng: number | string } | null;
     if (trouve) depotEff = { lat: Number(trouve.lat), lng: Number(trouve.lng) };
   }
   const ext = resoudreExtremites({ depart: memorise.depart, arrivee: memorise.arrivee, depot: depotEff, position: parsed.data.depuis ?? null, arrets: (tous ?? []) as never[], retourParDefaut: run.return_to_start });
