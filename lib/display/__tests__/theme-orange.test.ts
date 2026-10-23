@@ -94,13 +94,12 @@ describe("thème Orange GODAC (clair)", () => {
     expect(ratio(t("c-teal-ink"), melange(t("c-teal"), 0.12, t("c-surface")))).toBeGreaterThanOrEqual(AA);
   });
 
-  it("boutons : marine sur orange GODAC, blanc sur orange-ink et sur le rouge", () => {
+  it("boutons : marine sur orange GODAC et sur l'ambre d'alerte, blanc sur orange-ink", () => {
     expect(ratio(MARINE, t("c-teal"))).toBeGreaterThanOrEqual(AA); // btn-primary
     expect(ratio(MARINE, t("c-teal-hover"))).toBeGreaterThanOrEqual(AA);
     expect(ratio(BLANC, t("c-teal-ink"))).toBeGreaterThanOrEqual(AA);
-    expect(ratio(BLANC, t("c-orange"))).toBeGreaterThanOrEqual(AA); // btn-danger
-    expect(ratio(BLANC, t("c-orange-hover"))).toBeGreaterThanOrEqual(AA);
-    expect(ratio(BLANC, t("c-orange-ink"))).toBeGreaterThanOrEqual(AA);
+    expect(ratio(t("c-on-orange"), t("c-orange"))).toBeGreaterThanOrEqual(AA); // btn-danger (ambre)
+    expect(ratio(t("c-on-orange"), t("c-orange-hover"))).toBeGreaterThanOrEqual(AA);
   });
 
   it("textes d'état lisibles (erreur, succès, alerte, relais)", () => {
@@ -129,9 +128,10 @@ describe("thème Orange sombre", () => {
     }
   });
 
-  it("boutons : marine sur orange GODAC, blanc sur le rouge", () => {
+  it("boutons : marine sur orange GODAC et sur l'ambre d'alerte", () => {
     expect(ratio(MARINE, t("c-teal"))).toBeGreaterThanOrEqual(AA);
-    expect(ratio(BLANC, t("c-orange"))).toBeGreaterThanOrEqual(AA);
+    expect(ratio(t("c-on-orange"), t("c-orange"))).toBeGreaterThanOrEqual(AA);
+    expect(ratio(t("c-on-orange"), t("c-orange-hover"))).toBeGreaterThanOrEqual(AA);
   });
 
   it("l'erreur reste distincte de l'accent", () => {
