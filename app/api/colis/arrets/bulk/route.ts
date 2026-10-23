@@ -254,9 +254,11 @@ export async function POST(req: Request) {
         lng: p.lng,
         // Une ramasse est un arrêt, pas un colis (même règle que l'ajout unitaire).
         parcel_count: ajout,
-        // Colonnes posées seulement quand le point les porte : une liste
-        // importée garde exactement la même insertion qu'avant.
-        ...(p.type !== "livraison" ? { kind: p.type } : {}),
+        // `kind` est toujours posé : dans une insertion groupée, PostgREST met à
+        // null les colonnes absentes d'une ligne dès qu'une autre ligne les porte
+        // (relais + livraisons dans le même import) → violation de not-null.
+        kind: p.type,
+        // Autres colonnes posées seulement quand le point les porte.
         ...(codes.length ? { parcel_code: code(null) } : {}),
         ...(p.poids ? { weight_kg: p.poids } : {}),
         ...(p.window_start ? { window_start: p.window_start } : {}),

@@ -167,10 +167,10 @@ describe("pages et colis", () => {
   const p1 = normaliserPage(
     page("123,456", 1, [
       bloc({ position: 1, colis: [{ numero: "10000000000001", poids_kg: 5 }], nombre_colis: 1, poids_total_kg: 5 }),
-      bloc({ position: 2, nombre_colis: 2, poids_total_kg: 10 }),
+      bloc({ position: 2, nom: "DURAND PAUL", adresse: "4 AVENUE DU TEST", nombre_colis: 2, poids_total_kg: 10 }),
     ]),
   );
-  const p2 = normaliserPage(page("123456", 2, [bloc({ position: 3, nombre_colis: 1, poids_total_kg: 4 })]));
+  const p2 = normaliserPage(page("123456", 2, [bloc({ position: 3, nom: "LEROY JEAN", adresse: "9 RUE DU PORT", nombre_colis: 1, poids_total_kg: 4 })]));
 
   it("en-tête normalisé", () => {
     expect(p1.entete).toMatchObject({ numero: "123456", page: 1, date: "2026-03-05", totalColis: 6, totalPoidsKg: 40 });
@@ -294,6 +294,30 @@ describe("autres transporteurs (données fictives)", () => {
     expect(arrets).toHaveLength(1);
     expect(arrets[0]).toMatchObject({ nom: "MARTIN ALICE", colis: ["10000000000005", "10000000000006"], nombreColis: 2 });
     expect(memeArret(arrets[0]!, normaliserBloc(bloc({ nom: "AUTRE CLIENT", adresse: "9 RUE Z", localite: "F-31000 TOULOUSE" })))).toBe(false);
+  });
+
+  it("même destinataire à la même adresse sur plusieurs lignes : un seul arrêt (relais à 18 colis)", () => {
+    const lignes = Array.from({ length: 18 }, (_, i) =>
+      bloc({ position: i + 1, nom: "TABAC DU CENTRE", adresse: "3 PLACE DE LA GARE", localite: "F-66000 PERPIGNAN", nombre_colis: 1, poids_total_kg: 2, colis: [{ numero: `2000000000${String(i).padStart(4, "0")}`, poids_kg: 2 }] }),
+    );
+    const autre = bloc({ position: 19, nom: "DURAND PAUL", adresse: "8 RUE DES ECOLES", localite: "F-66000 PERPIGNAN", colis: [{ numero: "30000000000001", poids_kg: 1 }] });
+    const arrets = fusionnerPages([normaliserPage(page("9", 1, [...lignes, autre]))]);
+    expect(arrets).toHaveLength(2);
+    expect(arrets[0]).toMatchObject({ nom: "TABAC DU CENTRE", nombreColis: 18, position: 1, lignes: 18 });
+    expect(arrets[0]!.colis).toHaveLength(18);
+    expect(arrets[0]!.poidsKg).toBe(36);
+    expect(arrets[1]).toMatchObject({ nom: "DURAND PAUL", nombreColis: 1 });
+    expect(pointDepuisArret(arrets[0]!).colis).toBe(18);
+    expect(pointDepuisArret(arrets[0]!).notes).toContain("18 lignes du bordereau regroupées");
+  });
+
+  it("même nom et même adresse mais ramasse et livraison, ou adresse différente : arrêts séparés", () => {
+    const livraison = bloc({ position: 1, nom: "ENTREPOT NORD", adresse: "1 ZONE INDUSTRIELLE", localite: "F-66000 PERPIGNAN", colis: [{ numero: "40000000000001", poids_kg: 1 }] });
+    const ramasse = bloc({ position: 2, codes: ["CR"], nom: "ENTREPOT NORD", adresse: "1 ZONE INDUSTRIELLE", localite: "F-66000 PERPIGNAN", colis: [] });
+    const ailleurs = bloc({ position: 3, nom: "ENTREPOT NORD", adresse: "9 AVENUE DU PORT", localite: "F-66000 PERPIGNAN", colis: [{ numero: "40000000000002", poids_kg: 1 }] });
+    const sansNom = bloc({ position: 4, nom: null, adresse: "1 ZONE INDUSTRIELLE", localite: "F-66000 PERPIGNAN", colis: [{ numero: "40000000000003", poids_kg: 1 }] });
+    const arrets = fusionnerPages([normaliserPage(page("9", 1, [livraison, ramasse, ailleurs, sansNom]))]);
+    expect(arrets).toHaveLength(4);
   });
 
   it("liste des n° de colis jamais coupée au milieu d'un n°", () => {

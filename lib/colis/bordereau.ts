@@ -341,6 +341,8 @@ export interface ArretBordereau {
   plages: Plage[] | null;
   mentions: string | null;
   doutes: Doute[];
+  /** Nombre de lignes du bordereau regroupées dans cet arrêt (même nom et même adresse) ; absent = 1. */
+  lignes?: number;
 }
 
 /** Bloc lu → arrêt prêt pour l'aperçu. `pays` : pays de l'entreprise (téléphone). */
@@ -574,6 +576,54 @@ export function fusionnerPages(pages: PageBordereau[]): ArretBordereau[] {
     cles.add(cle);
     sortie.push(nouveaux.length === a.colis.length ? { ...a, cle } : { ...a, cle, colis: nouveaux, nombreColis: Math.max(nouveaux.length, a.nombreColis - (a.colis.length - nouveaux.length)) });
   }
+  return regrouperMemeAdresse(sortie);
+}
+
+/**
+ * Lignes du bordereau qui ont le MÊME destinataire à la MÊME adresse (un
+ * point relais qui reçoit 18 colis, une société avec plusieurs bons) :
+ * un seul arrêt, avec tous les colis, le poids total et la position de la
+ * première ligne. Même type d'arrêt seulement (une ramasse reste à part
+ * d'une livraison), nom, rue et code postal identiques et non vides.
+ */
+export function regrouperMemeAdresse(arrets: ArretBordereau[]): ArretBordereau[] {
+  const sortie: ArretBordereau[] = [];
+  const index = new Map<string, number>();
+  for (const a of arrets) {
+    const nom = lettres(a.nom);
+    const rue = lettres(a.rue);
+    if (!nom || !rue) {
+      sortie.push(a);
+      continue;
+    }
+    const cle = `${typeArretBloc(a.type)}|${nom}|${rue}|${a.codePostal ?? ""}`;
+    const i = index.get(cle);
+    if (i === undefined) {
+      index.set(cle, sortie.length);
+      sortie.push(a);
+      continue;
+    }
+    const base = sortie[i]!;
+    const colis = [...new Set([...base.colis, ...a.colis])];
+    const poids = base.poidsKg === null && a.poidsKg === null ? null : Math.round(((base.poidsKg ?? 0) + (a.poidsKg ?? 0)) * 1000) / 1000;
+    const positions = [base.position, a.position].filter((n): n is number => n !== null);
+    sortie[i] = {
+      ...base,
+      position: positions.length ? Math.min(...positions) : null,
+      codes: [...new Set([...base.codes, ...a.codes])],
+      colis,
+      nombreColis: base.nombreColis + a.nombreColis,
+      poidsKg: poids,
+      contact: base.contact ?? a.contact,
+      telephone: base.telephone ?? a.telephone,
+      horairesTexte: base.horairesTexte ?? a.horairesTexte,
+      fenetre: base.fenetre ?? a.fenetre,
+      plages: base.plages ?? a.plages,
+      mentions: [...new Set([base.mentions, a.mentions].filter((m): m is string => Boolean(m)))].join(" · ") || null,
+      doutes: [...new Set([...base.doutes, ...a.doutes])].filter((d) => !(d === "position" && positions.length) && !(d === "poids" && poids)),
+      lignes: (base.lignes ?? 1) + (a.lignes ?? 1),
+    };
+  }
   return sortie;
 }
 
@@ -644,6 +694,7 @@ export function notesArret(a: ArretBordereau, transporteur: string | null = null
     a.expediteur ? `Expéditeur : ${a.expediteur}` : null,
     a.horairesTexte && !a.plages && !a.fenetre ? `Horaires : ${a.horairesTexte}` : null,
     a.plages && a.plages.length > 1 ? `Horaires : ${a.plages.map((p) => `${p.debut}–${p.fin}`).join(" / ")}` : null,
+    a.lignes && a.lignes > 1 ? `${a.lignes} lignes du bordereau regroupées (même destinataire, même adresse)` : null,
     a.mentions,
   ].filter(Boolean);
   return morceaux.length ? morceaux.join(" · ").slice(0, 500) : null;
