@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/audit/journal";
-import { ACCUEIL_GO_NAVIGATION, formulaireInscriptionSchema } from "@/lib/go-navigation/offre";
+import { ACCORD_USAGE_VERSION, ACCUEIL_GO_NAVIGATION, formulaireInscriptionSchema } from "@/lib/go-navigation/offre";
 import { inscrireGoNavigation, limiteAtteinte, noterAcces } from "@/lib/go-navigation/serveur";
 
 /**
@@ -37,6 +37,16 @@ export async function POST(req: Request) {
     targetId: r.organizationId,
     details: { offre: "go_navigation", apporteur_user_id: r.apporteurUserId, lien_id: r.lienId },
   });
+  if (r.accordUsage) {
+    await journaliser({
+      organizationId: r.organizationId,
+      userId: r.userId,
+      action: "accord_usage_essai",
+      targetTable: "organizations",
+      targetId: r.organizationId,
+      details: { accord: true, version: ACCORD_USAGE_VERSION, via: "inscription" },
+    });
+  }
   // Trace aussi chez l'apporteur (journal de son organisation) : qui a fait essayer GO.
   if (r.apporteurUserId && r.apporteurOrgId) {
     await journaliser({

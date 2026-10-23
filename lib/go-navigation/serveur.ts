@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clientIp } from "@/lib/rental/public-access";
 import { genererJetonInvitation, hacherIpInscription, hacherJetonInvitation, LIMITES_INSCRIPTION, ressembleJetonInvitation } from "@/lib/go-navigation/jeton";
+import { enregistrerAccordUsage } from "@/lib/go-navigation/accord-usage";
 import { apporteurAutorise } from "@/lib/partage-go/serveur";
 import { attributionDepuis, depasseMaxInscriptions, libelleApporteur, lienUtilisable, type Attribution } from "@/lib/partage-go/apporteur";
 import {
@@ -113,7 +114,7 @@ export async function libelleInvitePar(admin: SupabaseClient, attribution: Attri
 }
 
 export type ResultatInscription =
-  | { ok: true; organizationId: string; userId: string; apporteurUserId: string | null; apporteurOrgId: string | null; lienId: string | null }
+  | { ok: true; organizationId: string; userId: string; apporteurUserId: string | null; apporteurOrgId: string | null; lienId: string | null; accordUsage: boolean }
   | { ok: false; statut: number; message: string; echecJeton?: boolean };
 
 /**
@@ -200,7 +201,17 @@ export async function inscrireGoNavigation(admin: SupabaseClient, form: Formulai
     if (errAttribution) console.error("inscrireGoNavigation: attribution de l'apporteur non enregistrée", errAttribution.message);
   }
 
-  return { ok: true, organizationId: organizationId as string, userId: cree.user.id, apporteurUserId: jeton.attribution.referred_by_user_id, apporteurOrgId: jeton.attribution.referred_by_org_id, lienId: jeton.attribution.referral_link_id };
+  // Accord facultatif de partage du détail d'usage : enregistré (avec la date
+  // et le texte exact) uniquement s'il a été coché. Même principe : un échec
+  // ne défait pas le compte, la personne peut le donner ensuite depuis « Mon compte ».
+  let accordUsage = false;
+  if (form.partageUsageDetail === true) {
+    const accord = await enregistrerAccordUsage(admin, organizationId as string, true, maintenant);
+    accordUsage = accord.ok;
+    if (!accord.ok) console.error("inscrireGoNavigation: accord d'usage non enregistré", accord.migrationManquante ? "(migration absente)" : "");
+  }
+
+  return { ok: true, organizationId: organizationId as string, userId: cree.user.id, accordUsage, apporteurUserId: jeton.attribution.referred_by_user_id, apporteurOrgId: jeton.attribution.referred_by_org_id, lienId: jeton.attribution.referral_link_id };
 }
 
 /**

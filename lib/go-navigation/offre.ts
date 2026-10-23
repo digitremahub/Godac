@@ -130,6 +130,20 @@ export function invitationUtilisable(inv: LigneInvitation | null | undefined, ma
   return Boolean(inv) && statutInvitation(inv!, maintenant) === "envoyee";
 }
 
+// ── Accord facultatif de partage du détail d'usage ──────────────────
+
+/** Version du texte d'accord : à incrémenter à chaque modification du texte. */
+export const ACCORD_USAGE_VERSION = "2026-11-v1";
+
+/** Texte exact affiché à côté de la case (jamais cochée par défaut). */
+export const ACCORD_USAGE_TEXTE =
+  "J'accepte que GODAC consulte le détail de mon usage de GO (tournées, étapes, horaires — sans les noms ni adresses de mes clients) pour améliorer l'application. Je peux retirer cet accord à tout moment.";
+
+/** Preuve enregistrée avec la date : version + texte exact accepté. */
+export function preuveAccordUsage(): string {
+  return `${ACCORD_USAGE_VERSION} | ${ACCORD_USAGE_TEXTE}`;
+}
+
 // ── Formulaire d'inscription ────────────────────────────────────────
 
 export const formulaireInscriptionSchema = z.object({
@@ -139,6 +153,9 @@ export const formulaireInscriptionSchema = z.object({
   email: z.string().trim().toLowerCase().email("Adresse e-mail invalide.").max(254),
   motDePasse: z.string().min(10, "Mot de passe : 10 caractères minimum.").max(128),
   cgu: z.literal(true, { errorMap: () => ({ message: "Vous devez accepter les conditions générales d'utilisation." }) }),
+  // Accord facultatif de partage du détail d'usage : absent ou décoché = faux
+  // (les liens d'essai déjà envoyés et les anciens formulaires restent valides).
+  partageUsageDetail: z.boolean().optional().default(false),
 });
 export type FormulaireInscription = z.infer<typeof formulaireInscriptionSchema>;
 
