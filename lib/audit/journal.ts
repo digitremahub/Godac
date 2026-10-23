@@ -56,7 +56,8 @@ export const ACTIONS_AUDIT = {
   arret_declare: "Arrêt de travail déclaré ou saisi",
   arret_decision: "Arrêt de travail validé, refusé ou corrigé",
   demande_auto_validee: "Demande auto-validée (direction unique)",
-  arret_affectations_liberees: "Affectations du planning libérées (salarié en arrêt)",
+  traitement_groupe: "Traitement groupé (À traiter aujourd'hui) : nombre d'éléments traités et refusés",
+  arret_affectations_liberees:"Affectations du planning libérées (salarié en arrêt)",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

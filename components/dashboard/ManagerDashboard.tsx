@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { ATraiterAttente, ATraiterBloc } from "@/components/dashboard/ATraiterBloc";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -131,6 +133,13 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description={toutLOrganisation ? "Vue d'ensemble de toute l'entreprise." : "Vue d'ensemble de votre équipe."} />
       {autoClockEnabled && <AssistedClock hasOpenTour={Boolean(openTour)} />}
+
+      {/* Exploitation : une seule liste de tout ce qui attend une décision, triée par urgence (page dédiée : actions groupées). */}
+      {appUser.role === "exploitation" && (
+        <Suspense fallback={<ATraiterAttente />}>
+          <ATraiterBloc appUser={appUser} enabledModules={enabledModules} ecartsIds={ecartsRes.ids} />
+        </Suspense>
+      )}
 
       {isManagerChauffeur && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
