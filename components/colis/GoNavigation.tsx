@@ -264,6 +264,14 @@ export function GoNavigation(p: GoNavigationProps) {
       const debutGeste = (e: { originalEvent?: unknown }) => {
         if (e.originalEvent && vueRef.current === "conduite") gestePerso.current = true;
       };
+      const poser = () => (doigtCarte.current = true);
+      const lever = () => (doigtCarte.current = false);
+      m.on("touchstart", poser);
+      m.on("mousedown", poser);
+      window.addEventListener("touchend", lever, { passive: true });
+      window.addEventListener("touchcancel", lever, { passive: true });
+      window.addEventListener("mouseup", lever);
+      leverCarte.current = lever;
       m.on("dragstart", quitterSuivi);
       m.on("zoomstart", debutGeste);
       m.on("rotatestart", debutGeste);
@@ -285,6 +293,11 @@ export function GoNavigation(p: GoNavigationProps) {
     })();
     return () => {
       annule = true;
+      if (leverCarte.current) {
+        window.removeEventListener("touchend", leverCarte.current);
+        window.removeEventListener("touchcancel", leverCarte.current);
+        window.removeEventListener("mouseup", leverCarte.current);
+      }
       cancelAnimationFrame(raf.current);
       raf.current = 0;
       carte.current?.remove();
@@ -321,11 +334,14 @@ export function GoNavigation(p: GoNavigationProps) {
   /** Rotation / inclinaison / zoom choisis à la main en vue conduite (relatifs au cap et au zoom automatiques) : remis à zéro au recentrage. */
   const persoCamera = useRef<{ cap: number; pitch: number | null; zoom: number }>({ cap: 0, pitch: null, zoom: 0 });
   const gestePerso = useRef(false);
+  /** Doigt (ou souris) posé sur la carte : la caméra de suivi ne bouge pas pendant le geste. */
+  const doigtCarte = useRef(false);
+  const leverCarte = useRef<(() => void) | null>(null);
 
   function dessiner(e: EtatCamera) {
     moi.current?.setLngLat([e.lng, e.lat]).setRotation(e.cap);
     const m = carte.current;
-    if (m && vueRef.current === "conduite" && !gestePerso.current && performance.now() > transitionJusqua.current) {
+    if (m && vueRef.current === "conduite" && !gestePerso.current && !doigtCarte.current && performance.now() > transitionJusqua.current) {
       const c = persoCamera.current;
       m.jumpTo({ center: [e.lng, e.lat], bearing: e.cap + c.cap, zoom: e.zoom === null ? undefined : e.zoom + c.zoom, pitch: c.pitch ?? PITCH_CONDUITE, padding: (margesCache.current ??= margesC()) });
     }
@@ -700,10 +716,12 @@ export function GoNavigation(p: GoNavigationProps) {
   // ——— Feuille : cartes à faire glisser ———
   const defile = useRef<HTMLDivElement>(null);
   const defilementAuto = useRef(0);
+  /** Doigt posé sur la rangée de cartes : ni choix d'arrêt ni recentrage automatique pendant le geste. */
+  const doigtCartes = useRef(false);
   const indexCible = cible ? restants.indexOf(cible) : -1;
   useEffect(() => {
     const el = defile.current;
-    if (!el || indexCible < 0 || feuille !== "moyenne") return;
+    if (!el || indexCible < 0 || feuille !== "moyenne" || doigtCartes.current) return;
     const carteEl = el.children[indexCible] as HTMLElement | undefined;
     if (!carteEl) return;
     const gauche = carteEl.offsetLeft - (el.clientWidth - carteEl.offsetWidth) / 2;
@@ -716,7 +734,7 @@ export function GoNavigation(p: GoNavigationProps) {
     clearTimeout(finDefilement.current);
     finDefilement.current = setTimeout(() => {
       const el = defile.current;
-      if (!el || Date.now() - defilementAuto.current < 600) return;
+      if (!el || doigtCartes.current || Date.now() - defilementAuto.current < 600) return;
       const centre = el.scrollLeft + el.clientWidth / 2;
       let k = 0;
       let ecart = Infinity;
@@ -730,7 +748,7 @@ export function GoNavigation(p: GoNavigationProps) {
       });
       const s = restants[k];
       if (s && s.id !== cible?.id) setSelection(s.id);
-    }, 140);
+    }, 180);
   }
 
   // ——— Feuille : trois positions (réduite, moyenne, pleine), mémorisée ———
@@ -1176,6 +1194,15 @@ export function GoNavigation(p: GoNavigationProps) {
                   id="go-feuille-contenu"
                   ref={defile}
                   onScroll={auDefilement}
+                  onTouchStart={() => (doigtCartes.current = true)}
+                  onTouchEnd={() => {
+                    doigtCartes.current = false;
+                    auDefilement();
+                  }}
+                  onTouchCancel={() => {
+                    doigtCartes.current = false;
+                    auDefilement();
+                  }}
                   className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[6%] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-0.5 [scrollbar-width:none]"
                   aria-label="Arrêts à faire (glisser pour passer d'un arrêt à l'autre)"
                 >
