@@ -26,13 +26,12 @@ export function arretSuivi<T extends ArretNav>(stops: readonly T[], selection: s
 }
 
 /**
- * Arrêt à suivre après la clôture de `clotureId` : le premier restant placé
- * APRÈS lui dans l'ordre, sinon le premier restant (arrêts laissés avant).
+ * Arrêt à suivre après la clôture de `clotureId` : le premier restant dans
+ * l'ordre de la tournée. Un arrêt livré en avance (le 6 avant le 4) ne fait
+ * donc pas sauter les arrêts laissés avant : on revient au 4.
  */
 export function arretApresCloture<T extends ArretNav>(stops: readonly T[], clotureId: string): T | null {
-  const i = stops.findIndex((s) => s.id === clotureId);
-  const restants = (s: T) => s.status === "pending" && s.id !== clotureId;
-  return (i >= 0 ? stops.slice(i + 1).find(restants) : undefined) ?? stops.find(restants) ?? null;
+  return stops.find((s) => s.status === "pending" && s.id !== clotureId) ?? null;
 }
 
 /** Distance en mètres d'un point à un segment (projection plane locale, suffisante à l'échelle d'une rue). */
