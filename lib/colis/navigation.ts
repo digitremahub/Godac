@@ -59,9 +59,9 @@ export function ecartAuTrace(position: Point, ligne: readonly [number, number][]
 }
 
 /** Au-delà de cet écart au tracé, le chauffeur a quitté l'itinéraire. */
-export const ECART_MAX_M = 60;
+export const ECART_MAX_M = 40;
 /** Délai minimal entre deux recalculs pour un simple écart (ménage le service d'itinéraires). */
-export const DELAI_RECALCUL_MS = 20_000;
+export const DELAI_RECALCUL_MS = 10_000;
 /** Rayon d'arrivée à l'arrêt. */
 export const RAYON_ARRIVEE_M = 60;
 

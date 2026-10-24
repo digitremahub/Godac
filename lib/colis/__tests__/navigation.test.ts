@@ -23,7 +23,7 @@ describe("arrêt suivi et passage au suivant", () => {
 describe("écart au tracé et recalcul", () => {
   // Tracé est-ouest le long du parallèle 48.85.
   const ligne: [number, number][] = [[2.30, 48.85], [2.32, 48.85]];
-  it("sur le tracé : écart ≈ 0 ; à ~111 m au nord : > 60 m", () => {
+  it("sur le tracé : écart ≈ 0 ; à ~111 m au nord : > 40 m", () => {
     expect(ecartAuTrace({ lat: 48.85, lng: 2.31 }, ligne)).toBeLessThan(1);
     const e = ecartAuTrace({ lat: 48.851, lng: 2.31 }, ligne);
     expect(e).toBeGreaterThan(100);
