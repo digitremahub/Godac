@@ -26,6 +26,7 @@ const LABELS: Record<string, string> = {
   sms_confirmed_sent: "Envoi du SMS confirmé",
   call_started: "Appel lancé",
   call_confirmed: "Appel effectué confirmé",
+  contact_recorded: "Contact avec le client",
   note: "Note",
 };
 

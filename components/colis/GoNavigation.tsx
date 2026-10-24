@@ -13,10 +13,17 @@ import { EtapeCreneau, useHorairesOuverture } from "@/components/colis/EtapeCren
 import { CRENEAU_AUCUN, validerChoix, type ChoixCreneau } from "@/lib/colis/creneau";
 import { dateParis } from "@/lib/colis/heure-paris";
 import { pastille, marqueurVehicule, etatVehicule } from "@/components/colis/marqueurs";
-import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type Stop } from "@/components/colis/commun";
+import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type Stop, type Toast } from "@/components/colis/commun";
+import { PastillesContact } from "@/components/colis/ContactsArret";
+import { InterrupteurMode } from "@/components/colis/InterrupteurMode";
+import { libelleLivre } from "@/lib/colis/mode-simple";
+import type { ChampContact } from "@/lib/colis/contacts";
+import { attacherAppuiLong, gestesAppuiLong } from "@/lib/colis/appui-long";
+import { DELAI_ANNULATION_MS } from "@/lib/colis/retrait";
+import { patchArret } from "@/lib/colis/envoi-arret";
 import { lienSms, lienTel } from "@/lib/colis/telephone";
 import { formatPoids } from "@/lib/colis/poids";
-import { estPointRelais, estRamasse, libelleFait, type TypeArret } from "@/lib/colis/livraison";
+import { estPointRelais, estRamasse, type TypeArret } from "@/lib/colis/livraison";
 import { RESEAUX_RELAIS } from "@/lib/colis/relais";
 import { heureFin, type Avancement } from "@/lib/colis/estimation";
 import { nomGroupe, grouperParListe } from "@/lib/colis/listes";
@@ -103,7 +110,17 @@ export interface GoNavigationProps {
   /** Retour à la liste des arrêts de l'app chauffeur. */
   onFermer: () => void;
   onRecharger: () => Promise<void>;
-  onToast: (t: { ok: boolean; text: string }) => void;
+  onToast: (t: Toast) => void;
+  /** Mode simple : « Livré » / « Non livré » seulement (ni lieu, ni preuve, ni quantités). */
+  modeSimple: boolean;
+  /** Interrupteur du menu : bascule en cours de tournée, effet immédiat. */
+  onModeSimple: (vers: boolean) => void;
+  /** « Message envoyé » / « Eu au téléphone » : une coche en 1 clic. */
+  onContact: (s: Stop, champ: ChampContact, valeur: boolean) => void;
+  /** Retire l'adresse sans confirmation ; le message « Annuler » est affiché par l'écran chauffeur. */
+  onRetirer: (s: Stop) => void;
+  /** Appel lancé depuis un bouton « Appeler » (propose « Eu au téléphone » au retour). */
+  onAppel: (s: Stop) => void;
   /** Livré / ramassé / déposé au relais (feuille de livraison, saisie des quantités de ramasse). */
   onTerminer: (s: Stop) => void;
   /** Clôture : choix (fait / échec) ou directement les motifs d'échec. */
@@ -160,6 +177,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const [voix, setVoix] = useState(false);
   const [trajet, setTrajet] = useState<Itineraire | null>(null);
   const [ajout, setAjout] = useState(false);
+  /** Menu rapide d'un arrêt (appui long sur une ligne ou un repère de la carte). */
+  const [menuArret, setMenuArret] = useState<Stop | null>(null);
   /** Arrêt dont l'adresse est en cours de correction (erreur de saisie à la base). */
   const [correction, setCorrection] = useState<Stop | null>(null);
   const [recherche, setRecherche] = useState("");
@@ -417,6 +436,7 @@ export function GoNavigation(p: GoNavigationProps) {
       const el = pastille(String(i + 1), s.status, s.id === cible?.id, estRamasse(s), estPointRelais(s));
       if (s.status !== "pending") el.style.opacity = "0.55";
       el.setAttribute("aria-label", `${estRamasse(s) ? "Ramasse" : estPointRelais(s) ? "Point relais" : "Arrêt"} ${i + 1} — ${s.address}`);
+      if (s.status === "pending") attacherAppuiLong(el, () => setMenuArret(s));
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         if (s.status === "pending") {
@@ -1027,12 +1047,12 @@ export function GoNavigation(p: GoNavigationProps) {
             aria-expanded={menuVues}
             aria-controls="go-menu-vues"
           >
-            Vues ▾
+            Options ▾
           </button>
           {menuVues && (
             <>
               <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuVues(false)} />
-              <div id="go-menu-vues" role="menu" aria-label="Vues de la carte" className="absolute right-0 top-full z-10 mt-1.5 flex w-56 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
+              <div id="go-menu-vues" role="menu" aria-label="Options de GO" className="absolute right-0 top-full z-10 mt-1.5 flex w-64 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
                 <button
                   type="button"
                   role="menuitem"
@@ -1068,6 +1088,11 @@ export function GoNavigation(p: GoNavigationProps) {
                   >
                     Conduite (suivre ma position)
                   </button>
+                )}
+                {!fige && (
+                  <div className="mt-1 border-t border-navy/10 pt-1.5">
+                    <InterrupteurMode simple={p.modeSimple} onChange={p.onModeSimple} />
+                  </div>
                 )}
               </div>
             </>
@@ -1152,7 +1177,7 @@ export function GoNavigation(p: GoNavigationProps) {
             </button>
             {cible && !enRetour && !fige ? (
               <button type="button" className="btn-primary min-h-[52px] shrink-0 justify-center !px-4 text-base" onClick={() => p.onTerminer(cible)}>
-                {estRamasse(cible) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(cible) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(cible)}
+                {!p.modeSimple && estRamasse(cible) ? <IconRamasse className="h-5 w-5" /> : !p.modeSimple && estPointRelais(cible) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleLivre(p.modeSimple, cible)}
               </button>
             ) : (
               (!cible || enRetour) &&
@@ -1234,6 +1259,10 @@ export function GoNavigation(p: GoNavigationProps) {
                       onFiche={p.onFiche}
                       onPasser={p.onPasser}
                       onCorriger={setCorrection}
+                      modeSimple={p.modeSimple}
+                      onContact={p.onContact}
+                      onRetirer={p.onRetirer}
+                      onAppel={p.onAppel}
                     />
                   ))}
                 </div>
@@ -1266,6 +1295,7 @@ export function GoNavigation(p: GoNavigationProps) {
                         <li
                           ref={props?.ref}
                           style={props?.style}
+                          {...(fige ? {} : gestesAppuiLong(() => setMenuArret(s)))}
                           className={`relative flex items-center gap-2.5 overflow-hidden rounded-xl bg-surface py-2.5 pr-2 shadow-card ${s.id === cible?.id ? "ring-2 ring-teal" : ""} ${estRamasse(s) || estPointRelais(s) ? "pl-4" : "pl-2.5"}`}
                         >
                           <EncocheArret stop={s} />
@@ -1284,13 +1314,28 @@ export function GoNavigation(p: GoNavigationProps) {
                               <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
                             </span>
                           </button>
+                          {!fige &&
+                            (p.modeSimple ? (
+                              <>
+                                <button type="button" className="btn-primary min-h-[44px] shrink-0 !px-3 !py-1 text-xs" onClick={() => p.onTerminer(s)} aria-label={`Livré — ${s.recipient ?? s.address}`}>
+                                  <IconCheck className="h-4 w-4" /> Livré
+                                </button>
+                                <button type="button" className="btn-secondary min-h-[44px] shrink-0 !px-2.5 !py-1 text-xs text-orange-ink" onClick={() => p.onCloture(s, "echec")} aria-label={`Non livré — ${s.recipient ?? s.address}`}>
+                                  <IconX className="h-4 w-4" /> Non livré
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="min-h-[44px] shrink-0 rounded-full border border-navy/15 px-2.5 text-xs font-semibold text-navy/80" onClick={() => p.onCloture(s, "choix")} aria-label={`Clôturer ${s.recipient ?? s.address}`}>
+                                Clôturer
+                              </button>
+                            ))}
                           {!fige && (
-                            <button type="button" className="shrink-0 rounded-full border border-navy/15 px-2.5 py-2 text-xs font-semibold text-navy/80" onClick={() => p.onCloture(s, "choix")} aria-label={`Clôturer ${s.recipient ?? s.address}`}>
-                              Clôturer
+                            <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy/[0.06] text-lg font-bold text-navy" onClick={() => setMenuArret(s)} aria-label={`Modifier, retirer ou passer ${s.recipient ?? s.address}`} aria-haspopup="dialog">
+                              ⋯
                             </button>
                           )}
                           {s.phone && (
-                            <a href={lienTel(s.phone)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address}`}>
+                            <a href={lienTel(s.phone)} onClick={() => p.onAppel(s)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address}`}>
                               <IconPhone className="h-4 w-4" />
                             </a>
                           )}
@@ -1353,12 +1398,30 @@ export function GoNavigation(p: GoNavigationProps) {
           stop={correction}
           position={position}
           depot={run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null}
+          onRecharger={p.onRecharger}
           onFermer={() => setCorrection(null)}
-          onCorrigee={async (texte, ok) => {
+          onCorrigee={async (texte, ok, annuler) => {
             setCorrection(null);
             await p.onRecharger();
-            p.onToast({ ok, text: texte });
+            p.onToast({ ok, text: texte, ...(annuler ? { dureeMs: DELAI_ANNULATION_MS, actions: [{ label: "Annuler", onClick: annuler }] } : {}) });
           }}
+        />
+      )}
+
+      {menuArret && (
+        <MenuRapideArret
+          stop={stops.find((x) => x.id === menuArret.id) ?? menuArret}
+          numero={numero(menuArret)}
+          modeSimple={p.modeSimple}
+          peutPasser={restants.length > 1}
+          onFermer={() => setMenuArret(null)}
+          onLivre={p.onTerminer}
+          onNonLivre={(x) => p.onCloture(x, "echec")}
+          onCorriger={setCorrection}
+          onRetirer={p.onRetirer}
+          onPasser={p.onPasser}
+          onContact={p.onContact}
+          onFiche={p.onFiche}
         />
       )}
 
@@ -1497,6 +1560,10 @@ function CarteArret({
   onFiche,
   onPasser,
   onCorriger,
+  modeSimple,
+  onContact,
+  onRetirer,
+  onAppel,
 }: {
   stop: Stop;
   numero: number;
@@ -1510,7 +1577,7 @@ function CarteArret({
   fige: boolean;
   plusieurs: boolean;
   busy: boolean;
-} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser"> & { onCorriger: (s: Stop) => void }) {
+} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser" | "modeSimple" | "onContact" | "onRetirer" | "onAppel"> & { onCorriger: (s: Stop) => void }) {
   const secondaire = [s.business_name, s.recipient].filter((v): v is string => Boolean(v) && !repeteAdresse(v, s.address)).join(" · ");
   const [plus, setPlus] = useState(false);
   const pastilleBase = "inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-xs font-semibold";
@@ -1546,7 +1613,7 @@ function CarteArret({
       {!fige && (
         <div className="grid grid-cols-[2fr_1fr] gap-2">
           <button type="button" className="btn-primary min-h-[48px] justify-center !py-2.5 text-base" onClick={() => onTerminer(s)}>
-            {estRamasse(s) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(s) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(s)}
+            {!modeSimple && estRamasse(s) ? <IconRamasse className="h-5 w-5" /> : !modeSimple && estPointRelais(s) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleLivre(modeSimple, s)}
           </button>
           <button type="button" className="btn-secondary min-h-[48px] justify-center !px-2 !py-2.5 text-orange-ink" onClick={() => onCloture(s, "echec")}>
             <IconX className="h-5 w-5" /> Non livré
@@ -1557,7 +1624,7 @@ function CarteArret({
       <div className="flex flex-wrap items-center gap-1.5">
         <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
         {s.phone ? (
-          <a href={lienTel(s.phone)} className={`${pastilleBase} bg-teal/15 text-teal-ink`} aria-label={`Appeler ${s.recipient ?? s.address}`}>
+          <a href={lienTel(s.phone)} onClick={() => onAppel(s)} className={`${pastilleBase} bg-teal/15 text-teal-ink`} aria-label={`Appeler ${s.recipient ?? s.address}`}>
             <IconPhone className="h-4 w-4" /> Appeler
           </a>
         ) : (
@@ -1565,6 +1632,9 @@ function CarteArret({
             <IconPhone className="h-4 w-4" /> Ajouter le n°
           </button>
         )}
+        <PastillesContact stop={s} disabled={fige} onChange={(champ, v) => onContact(s, champ, v)} />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" className={pastilleAction} onClick={() => onHoraires(s)}>
           🕘 Horaires
         </button>
@@ -1574,6 +1644,16 @@ function CarteArret({
         {!fige && (
           <button type="button" className={pastilleAction} onClick={() => onCorriger(s)}>
             ✏️ Adresse
+          </button>
+        )}
+        {!fige && plusieurs && (
+          <button type="button" className={pastilleAction} disabled={busy} onClick={() => onPasser(s)}>
+            Passer plus tard
+          </button>
+        )}
+        {!fige && (
+          <button type="button" className={`${pastilleBase} bg-navy/[0.05] text-orange-ink`} onClick={() => onRetirer(s)} aria-label={`Retirer l'adresse ${s.address}`}>
+            Retirer
           </button>
         )}
         <button type="button" className={pastilleAction} onClick={() => setPlus((v) => !v)} aria-expanded={plus} aria-controls={`go-plus-${s.id}`}>
@@ -1593,11 +1673,6 @@ function CarteArret({
           <a href={gmaps(s)} target="_blank" rel="noreferrer" className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
             <IconMapPin className="h-4 w-4" /> Google Maps
           </a>
-          {!fige && plusieurs && (
-            <button type="button" className="btn-ghost col-span-2 min-h-[44px] justify-center !py-2 text-sm text-navy/70" disabled={busy} onClick={() => onPasser(s)}>
-              Passer plus tard (en fin de tournée)
-            </button>
-          )}
         </div>
       )}
     </section>
@@ -1617,25 +1692,33 @@ function CorrectionAdresse({
   depot,
   onFermer,
   onCorrigee,
+  onRecharger,
 }: {
   stop: Stop;
   position: Point | null;
   depot: Point | null;
+  onRecharger: () => Promise<void>;
   onFermer: () => void;
-  onCorrigee: (texte: string, ok: boolean) => Promise<void>;
+  /** `annuler` : remet l'ancienne adresse (message « Annuler » de l'écran). */
+  onCorrigee: (texte: string, ok: boolean, annuler?: () => void) => Promise<void>;
 }) {
   const [adresse, setAdresse] = useState(stop.address);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const inchangee = adresse.trim() === stop.address.trim();
 
-  async function enregistrer() {
-    if (adresse.trim().length < 5) return setErreur("Saisissez une adresse (5 caractères au moins).");
+  /** Choisir une suggestion enregistre tout de suite (pas de bouton en plus) ; « Annuler » rétablit l'ancienne adresse. */
+  async function enregistrer(texte = adresse) {
+    const nouvelle = texte.trim();
+    if (nouvelle.length < 5) return setErreur("Saisissez une adresse (5 caractères au moins).");
+    if (nouvelle === stop.address.trim()) return onFermer();
     setEnvoi(true);
     setErreur(null);
     try {
-      await api(`/api/colis/arrets/${stop.id}`, { method: "PATCH", body: JSON.stringify({ adresse: adresse.trim() }) });
-      await onCorrigee("Adresse corrigée : le trajet est recalculé.", true);
+      const issue = await patchArret(stop.id, { adresse: nouvelle });
+      if (issue === "en_attente") return void (await onCorrigee("Pas de réseau : la correction est conservée et sera appliquée au retour du réseau.", true));
+      const ancienne = stop.address;
+      await onCorrigee("Adresse corrigée : le trajet est recalculé.", true, () => void patchArret(stop.id, { adresse: ancienne }).then(() => onRecharger()).catch(() => undefined));
     } catch (e) {
       setErreur(networkErrorMessage(e));
     } finally {
@@ -1649,19 +1732,19 @@ function CorrectionAdresse({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="correction-adresse-titre" className="font-display text-xl font-bold">Corriger l&apos;adresse</h2>
-            <p className="text-sm text-navy/60">Erreur de saisie à la base : l&apos;adresse est remplacée et localisée de nouveau, sans quitter GO.</p>
+            <p className="text-sm text-navy/60">Choisissez une suggestion : l&apos;adresse est remplacée et localisée de nouveau, sans quitter GO.</p>
           </div>
           <button type="button" className="btn-ghost !px-2 !py-1" onClick={onFermer} aria-label="Fermer">
             ✕
           </button>
         </div>
-        <AdresseInput value={adresse} autoFocus biais={position ?? depot} onChange={setAdresse} onChoisir={(sug) => setAdresse(sug.adresse)} />
+        <AdresseInput value={adresse} autoFocus biais={position ?? depot} onChange={setAdresse} onChoisir={(sug) => { setAdresse(sug.adresse); void enregistrer(sug.adresse); }} />
         {erreur && (
           <p role="alert" className="text-sm font-semibold text-orange-ink">
             {erreur}
           </p>
         )}
-        <button type="button" className="btn-primary min-h-[48px] justify-center !py-3 text-base" disabled={envoi || inchangee || adresse.trim().length < 5} onClick={enregistrer}>
+        <button type="button" className="btn-primary min-h-[48px] justify-center !py-3 text-base" disabled={envoi || inchangee || adresse.trim().length < 5} onClick={() => void enregistrer()}>
           {envoi ? "Enregistrement…" : "Enregistrer l'adresse"}
         </button>
       </section>
@@ -1828,6 +1911,84 @@ function AjoutAdresse({
         {erreur && <p className="rounded-lg bg-orange/10 px-3 py-2 text-sm font-semibold text-orange-ink">{erreur}</p>}
         <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={envoi || adresse.trim().length < 5 || !validerChoix(creneau).ok} onClick={ajouter}>
           {envoi ? "Ajout…" : "Ajouter à la tournée"}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Menu rapide d'un arrêt (appui long sur sa ligne ou son repère, ou « ⋯ ») :
+ * toutes les actions de l'arrêt en un seul écran, sans confirmation — retirer
+ * se défait avec « Annuler ». Zones tactiles de 48 px.
+ */
+function MenuRapideArret({
+  stop: s,
+  numero,
+  modeSimple,
+  peutPasser,
+  onFermer,
+  onLivre,
+  onNonLivre,
+  onCorriger,
+  onRetirer,
+  onPasser,
+  onContact,
+  onFiche,
+}: {
+  stop: Stop;
+  numero: number;
+  modeSimple: boolean;
+  peutPasser: boolean;
+  onFermer: () => void;
+  onLivre: (s: Stop) => void;
+  onNonLivre: (s: Stop) => void;
+  onCorriger: (s: Stop) => void;
+  onRetirer: (s: Stop) => void;
+  onPasser: (s: Stop) => void;
+  onContact: (s: Stop, champ: ChampContact, valeur: boolean) => void;
+  onFiche: (s: Stop) => void;
+}) {
+  const agir = (f: (s: Stop) => void) => () => {
+    onFermer();
+    f(s);
+  };
+  const action = "flex min-h-[48px] items-center rounded-xl bg-navy/[0.05] px-4 text-left text-sm font-semibold text-navy";
+  return (
+    <div className="fixed inset-0 z-[75] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="menu-arret-titre" onClick={onFermer}>
+      <section className="flex max-h-[85dvh] w-full max-w-md flex-col gap-2 overflow-y-auto rounded-t-3xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="menu-arret-titre" className="min-w-0 font-display text-base font-bold leading-snug">
+            Arrêt {numero} · {s.address}
+          </h2>
+          <button type="button" className="btn-ghost min-h-[44px] !px-2" onClick={onFermer} aria-label="Fermer">
+            ✕
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="btn-primary min-h-[48px] justify-center" onClick={agir(onLivre)}>
+            <IconCheck className="h-5 w-5" /> {libelleLivre(modeSimple, s)}
+          </button>
+          <button type="button" className="btn-secondary min-h-[48px] justify-center text-orange-ink" onClick={agir(onNonLivre)}>
+            <IconX className="h-5 w-5" /> Non livré
+          </button>
+        </div>
+        <button type="button" className={action} onClick={agir(onCorriger)}>
+          ✏️ Modifier l&apos;adresse
+        </button>
+        {peutPasser && (
+          <button type="button" className={action} onClick={agir(onPasser)}>
+            Passer à plus tard
+          </button>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          <PastillesContact stop={s} onChange={(champ, v) => onContact(s, champ, v)} />
+        </div>
+        <button type="button" className={action} onClick={agir(onFiche)}>
+          Fiche de l&apos;arrêt
+        </button>
+        <button type="button" className={`${action} text-orange-ink`} onClick={agir(onRetirer)}>
+          Retirer cette adresse
         </button>
       </section>
     </div>

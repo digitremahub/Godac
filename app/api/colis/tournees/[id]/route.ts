@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/audit/journal";
-import { avecHoraires, avecProfessionnel, ecrireExtremitesRun, lireExtremitesRun, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
+import { avecContacts, avecHoraires, avecProfessionnel, ecrireExtremitesRun, ecrireModeSimpleRun, lireExtremitesRun, lireModeSimpleRun, listesDeTournee, moduleActif, tourneeParId, STOP_FIELDS } from "@/lib/colis/serveur";
 import { schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
@@ -27,13 +27,14 @@ async function contexte(id: string) {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await contexte((await params).id);
   if ("erreur" in ctx) return ctx.erreur;
-  const [{ data: stops }, lists, extremites] = await Promise.all([
+  const [{ data: stops }, lists, extremites, mode] = await Promise.all([
     ctx.supabase.from("delivery_stops").select(STOP_FIELDS).eq("run_id", ctx.run.id).order("position").order("created_at"),
     listesDeTournee(ctx.supabase, ctx.run.id),
     lireExtremitesRun(ctx.supabase, ctx.run.id),
+    lireModeSimpleRun(ctx.supabase, ctx.run.id),
   ]);
   const ordonnes = ordonnerParListe((stops ?? []) as { id: string; list_id: string | null; position: number; address: string }[], lists);
-  return NextResponse.json({ run: { ...ctx.run, optim_depart: extremites.depart, optim_arrivee: extremites.arrivee, optim_persiste: extremites.persiste }, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecProfessionnel(ctx.supabase, ordonnes)) });
+  return NextResponse.json({ run: { ...ctx.run, optim_depart: extremites.depart, optim_arrivee: extremites.arrivee, optim_persiste: extremites.persiste, mode_simple: mode.modeSimple, mode_simple_persiste: mode.persiste }, lists, stops: await avecHoraires(ctx.supabase, ctx.appUser.organization_id, await avecContacts(ctx.supabase, await avecProfessionnel(ctx.supabase, ordonnes))) });
 }
 
 const patchSchema = z.object({
@@ -49,6 +50,8 @@ const patchSchema = z.object({
   /** Départ / arrivée de l'optimisation (épingles 📌 comprises) ; null = choix par défaut. */
   optim_depart: schemaDepart.nullable().optional(),
   optim_arrivee: schemaArrivee.nullable().optional(),
+  /** Mode simple (Livré / Non livré seulement) : modifiable tant que la tournée n'est pas clôturée. */
+  mode_simple: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,7 +59,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ("erreur" in ctx) return ctx.erreur;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
-  const { heure_depart, optim_depart, optim_arrivee, ...champs } = parsed.data;
+  const { heure_depart, optim_depart, optim_arrivee, mode_simple, ...champs } = parsed.data;
+  if (mode_simple !== undefined && ctx.run.status === "done") return NextResponse.json({ error: "Tournée clôturée : son mode ne peut plus changer." }, { status: 409 });
   const update: Record<string, unknown> = { ...champs };
   if (heure_depart !== undefined) update.planned_start = heure_depart === null ? null : ecrireHeure(lireHeure(heure_depart)!);
   // Début réel de la livraison (estimation de fin) ; à la clôture, la
@@ -76,7 +80,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: e instanceof Error ? e.message : "Enregistrement impossible." }, { status: 500 });
     }
   }
-  return NextResponse.json({ ok: true, persiste });
+  // Mode simple : `mode_simple_persiste` faux tant que la migration n'est pas appliquée (l'appareil garde le choix).
+  let modePersiste = true;
+  if (mode_simple !== undefined) {
+    try {
+      modePersiste = await ecrireModeSimpleRun(ctx.supabase, ctx.run.id, mode_simple);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Enregistrement impossible." }, { status: 500 });
+    }
+  }
+  return NextResponse.json({ ok: true, persiste, mode_simple_persiste: modePersiste });
 }
 
 /**

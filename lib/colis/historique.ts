@@ -348,6 +348,9 @@ export interface ArretDetail {
   packages_picked_up?: number | null;
   weight_kg?: number | string | null;
   failure_reason?: string | null;
+  /** Message envoyé / eu au téléphone ; absents avant la migration 20261103000006. */
+  contact_message?: boolean | null;
+  contact_phone?: boolean | null;
   lat: number | string | null;
   lng: number | string | null;
 }
@@ -359,19 +362,21 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
   if (!toutes) q = q.eq("driver_id", userId);
   const { data: run } = await q.maybeSingle();
   if (!run) return null;
+  const colonnesArret = "id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng, relay_name, packages_picked_up";
+  const lireArrets = (colonnes: string) => supabase.from("delivery_stops").select(colonnes).eq("run_id", id).order("position").order("created_at");
+  // Contacts du client (migration 20261103000006) : repli sans ces colonnes tant qu'elle n'est pas appliquée.
+  const arretsAvecContacts = async () => {
+    const avec = await lireArrets(`${colonnesArret}, contact_message, contact_phone, contact_at`);
+    return avec.error ? lireArrets(colonnesArret) : avec;
+  };
   const [{ data: stops }, { data: listes }, { data: chauffeur }] = await Promise.all([
-    supabase
-      .from("delivery_stops")
-      .select("id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng, relay_name, packages_picked_up")
-      .eq("run_id", id)
-      .order("position")
-      .order("created_at"),
+    arretsAvecContacts(),
     supabase.from("delivery_lists").select("id, name, position").eq("run_id", id).order("position"),
     supabase.from("users").select("full_name").eq("id", run.driver_id).maybeSingle(),
   ]);
   const ls = (listes ?? []) as Liste[];
   const nom = new Map(ls.map((l) => [l.id, l.name]));
-  const arretsOrdonnes = ordonnerParListe((stops ?? []) as ArretDetail[], ls).map((s) => ({ ...s, liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE }));
+  const arretsOrdonnes = ordonnerParListe((stops ?? []) as unknown as ArretDetail[], ls).map((s) => ({ ...s, liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE }));
   // L’historique reflète l’ordre réel de passage : heure de clôture de l’arrêt,
   // puis position prévue en secours. Les arrêts non clôturés restent à la fin.
   const arrets = arretsOrdonnes.sort((a, b) => {
@@ -437,6 +442,8 @@ export interface LigneColis {
   relay_name: string | null;
   proof_photo_path: string | null;
   failure_reason: string | null;
+  contact_message?: boolean | null;
+  contact_phone?: boolean | null;
   done_at: string | null;
 }
 
@@ -455,23 +462,27 @@ export async function rechercherColis(
   recherche: RechercheColis,
 ): Promise<{ lignes: LigneColis[]; tronque: boolean; erreur: string | null } | null> {
   if (!recherche.q && !recherche.statut) return null;
-  let q = supabase
-    .from("delivery_stops")
-    .select(
-      "id, run_id, address, recipient, parcel_code, parcel_count, status, kind, delivered_place, proof_code, relay_name, proof_photo_path, failure_reason, done_at, delivery_runs!inner(run_date, name, driver_id)",
-    )
-    .gte("delivery_runs.run_date", filtres.du)
-    .lte("delivery_runs.run_date", filtres.au)
-    .order("done_at", { ascending: false, nullsFirst: false })
-    .limit(RESULTATS_MAX + 1);
-  if (!toutes) q = q.eq("delivery_runs.driver_id", userId);
-  else if (filtres.chauffeur) q = q.eq("delivery_runs.driver_id", filtres.chauffeur);
-  if (recherche.statut) q = q.eq("status", recherche.statut);
-  if (recherche.q) {
-    const motif = `%${recherche.q}%`;
-    q = q.or(`parcel_code.ilike.${motif},recipient.ilike.${motif},address.ilike.${motif},relay_name.ilike.${motif}`);
-  }
-  const { data, error } = await q;
+  const colonnes = "id, run_id, address, recipient, parcel_code, parcel_count, status, kind, delivered_place, proof_code, relay_name, proof_photo_path, failure_reason, done_at, delivery_runs!inner(run_date, name, driver_id)";
+  const requete = (cols: string) => {
+    let q = supabase
+      .from("delivery_stops")
+      .select(cols)
+      .gte("delivery_runs.run_date", filtres.du)
+      .lte("delivery_runs.run_date", filtres.au)
+      .order("done_at", { ascending: false, nullsFirst: false })
+      .limit(RESULTATS_MAX + 1);
+    if (!toutes) q = q.eq("delivery_runs.driver_id", userId);
+    else if (filtres.chauffeur) q = q.eq("delivery_runs.driver_id", filtres.chauffeur);
+    if (recherche.statut) q = q.eq("status", recherche.statut);
+    if (recherche.q) {
+      const motif = `%${recherche.q}%`;
+      q = q.or(`parcel_code.ilike.${motif},recipient.ilike.${motif},address.ilike.${motif},relay_name.ilike.${motif}`);
+    }
+    return q;
+  };
+  // Contacts du client (migration 20261103000006) : repli sans ces colonnes tant qu'elle n'est pas appliquée.
+  let { data, error } = await requete(`${colonnes}, contact_message, contact_phone`);
+  if (error) ({ data, error } = await requete(colonnes));
   if (error) return { lignes: [], tronque: false, erreur: error.message };
   const brutes = (data ?? []) as any[];
   const ids = [...new Set(brutes.map((s) => s.delivery_runs?.driver_id).filter(Boolean))] as string[];

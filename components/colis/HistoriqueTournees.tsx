@@ -8,6 +8,7 @@ import { estMarque, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
 import { BadgeArret, EncocheArret } from "@/components/colis/Ramasse";
 import { formatPoids } from "@/lib/colis/poids";
 import { libelleMotif } from "@/lib/colis/cloture";
+import { libelleContacts } from "@/lib/colis/contacts";
 
 const STATUTS: Record<string, string> = { loading: "En chargement", in_progress: "En livraison", done: "Clôturée" };
 
@@ -182,6 +183,7 @@ function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awai
                       s.done_at && heure(s.done_at),
                       s.status === "delivered" && libellePreuve(s),
                       s.status === "failed" && libelleMotif(s.failure_reason),
+                      libelleContacts(s),
                       s.recipient,
                       s.parcel_count > 1 && `${s.parcel_count} colis`,
                       formatPoids(s.weight_kg),
@@ -263,6 +265,7 @@ function ResultatsColis({
                   <td className={`whitespace-nowrap px-3 py-2 ${s.status === "failed" ? "text-orange-ink" : ""}`}>
                     {s.kind && s.kind !== "livraison" ? libelleStatut(s) : STATUT_ARRET[s.status]}
                     {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs">{libelleMotif(s.failure_reason)}</span>}
+                    {libelleContacts(s) && <span className="block text-xs text-navy/70">{libelleContacts(s)}</span>}
                   </td>
                   <td className="px-3 py-2">
                     {s.status === "delivered" ? (libellePreuve(s) ?? "—") : "—"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -19,7 +19,16 @@ import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
 import { BadgeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
 import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
-import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop, type Toast } from "@/components/colis/commun";
+import { ToastColis } from "@/components/colis/ToastColis";
+import { PastillesContact, CasesContact } from "@/components/colis/ContactsArret";
+import { InterrupteurMode } from "@/components/colis/InterrupteurMode";
+import { useModeSimple } from "@/components/colis/useModeSimple";
+import { useSuiviAppel } from "@/components/colis/useSuiviAppel";
+import { appliquerContacts, libelleContacts, type ChampContact, type DemandeContacts } from "@/lib/colis/contacts";
+import { libelleLivre, motifParDefaut } from "@/lib/colis/mode-simple";
+import { DELAI_ANNULATION_MS, creerRetraitsDifferes, sansRetraits } from "@/lib/colis/retrait";
+import { patchArret, retirerArret } from "@/lib/colis/envoi-arret";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
@@ -81,12 +90,17 @@ export function AppLivreur({
   const [recoOuverte, setRecoOuverte] = useState(false);
   const [runs, setRuns] = useState<RunResume[] | null>(null);
   const [run, setRun] = useState<Run | null>(null);
-  const [stops, setStops] = useState<Stop[]>([]);
+  const [stopsBruts, setStops] = useState<Stop[]>([]);
+  /** Adresses retirées dont la suppression attend la fin du délai d'annulation. */
+  const [retires, setRetires] = useState<Set<string>>(new Set());
+  const stops = useMemo(() => sansRetraits(stopsBruts, retires), [stopsBruts, retires]);
+  const retraits = useRef(creerRetraitsDifferes());
   const [lists, setLists] = useState<Liste[]>([]);
   /** Feuille « Départ / arrivée » du recalcul en cours de route. */
   const [feuilleOptim, setFeuilleOptim] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const fermerToast = useCallback(() => setToast(null), []);
   const [voirTermines, setVoirTermines] = useState(false);
   const [confirmationLancement, setConfirmationLancement] = useState(false);
   /** Recherche d'une adresse, d'un destinataire, d'une ville ou d'un code colis. */
@@ -113,6 +127,8 @@ export function AppLivreur({
   const preparationDemandeeRef = useRef(false);
   preparationDemandeeRef.current = preparationDemandee;
   const horaires = useHoraires(run, stops, maPosition);
+  const { simple, basculer: basculerMode } = useModeSimple(run, setToast);
+  const { lancerAppel, proposition: propositionAppel } = useSuiviAppel(stops, (s) => void basculerContact(s, "contact_phone", true));
   const dernierEnvoi = useRef(0);
 
   useEffect(() => {
@@ -277,11 +293,16 @@ export function AppLivreur({
     void charger(run?.id);
   }
 
+  // Retraits en attente d'annulation : envoyés tout de suite si l'écran se ferme ou passe en arrière-plan.
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
+    const envoyer = () => void retraits.current.vider();
+    window.addEventListener("pagehide", envoyer);
+    const r = retraits.current;
+    return () => {
+      window.removeEventListener("pagehide", envoyer);
+      void r.vider();
+    };
+  }, []);
 
   // Écran toujours allumé pendant la livraison (Android / iOS récents).
   useEffect(() => {
@@ -310,8 +331,8 @@ export function AppLivreur({
     charger(id);
   }
 
-  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
-  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+  /** Clôture (livré / non livré avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null; contacts?: DemandeContacts }, annulable = false) {
     setStops((all) =>
       all.map((x) =>
         x.id === s.id
@@ -325,13 +346,27 @@ export function AppLivreur({
           : x,
       ),
     );
+    if (echec?.contacts) setStops((all) => appliquerContacts(all, s.id, echec.contacts!));
     if (status !== "pending") navigator.vibrate?.(40);
+    const corps = JSON.stringify({ status, run_id: run?.id, ...(echec ? { motif: echec.motif, precision: echec.precision, ...echec.contacts } : {}) });
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: corps });
+      // Livré / Non livré en 1 clic (mode simple) : « Annuler » reste à portée pendant quelques secondes.
+      if (annulable) {
+        setToast({
+          ok: true,
+          text: status === "delivered" ? "Livré" : "Non livré (absent)",
+          dureeMs: DELAI_ANNULATION_MS,
+          actions: [
+            { label: "Annuler", onClick: () => void statut({ ...s, status }, "pending") },
+            ...(status === "failed" ? [{ label: "Préciser", onClick: () => setCloture({ stop: { ...s, status: "failed", failure_reason: echec?.motif ?? "absent" }, mode: "echec" }) }] : []),
+          ],
+        });
+      }
     } catch (e) {
       if (isNetworkFailure(e)) {
         try {
-          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: corps });
           setToast({ ok: true, text: "Action enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
           return;
         } catch (queueError) {
@@ -342,8 +377,74 @@ export function AppLivreur({
     }
   }
 
+  /** « Non livré » en 1 clic (mode simple) : motif par défaut selon le type d'arrêt, précision facultative ensuite. */
+  const nonLivreRapide = (s: Stop) => statut(s, "failed", { motif: motifParDefaut(s.kind), precision: null }, true);
+
+  /** « Non livré » : 1 clic en mode simple, sinon la fiche du motif. */
+  function demanderNonLivre(s: Stop, mode: "choix" | "echec") {
+    if (simple && mode === "echec") void nonLivreRapide(s);
+    else setCloture({ stop: s, mode });
+  }
+
+  /** Motif, précision ou contacts d'un arrêt déjà « Non livré », corrigés après coup. */
+  async function preciserNonLivre(s: Stop, motif: MotifEchec, precision: string | null, contacts: DemandeContacts) {
+    setStops((all) => appliquerContacts(all.map((x) => (x.id === s.id ? { ...x, failure_reason: motif } : x)), s.id, contacts));
+    try {
+      const issue = await patchArret(s.id, { run_id: run?.id, motif, precision, ...contacts });
+      setToast({ ok: true, text: issue === "en_attente" ? "Enregistré sur le téléphone, synchronisé au retour du réseau." : "Non livré mis à jour." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+      await charger(run?.id);
+    }
+  }
+
+  /** « Message envoyé » / « Eu au téléphone » : une coche, 1 clic, enregistrée tout de suite (file hors ligne comprise). */
+  async function basculerContact(s: Stop, champ: ChampContact, valeur: boolean) {
+    setStops((all) => appliquerContacts(all, s.id, { [champ]: valeur }));
+    try {
+      const issue = await patchArret(s.id, { run_id: run?.id, [champ]: valeur });
+      if (issue === "en_attente") setToast({ ok: true, text: "Enregistré sur le téléphone, synchronisé au retour du réseau." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+      await charger(run?.id);
+    }
+  }
+
+  /**
+   * Retire une adresse en 1 clic, sans confirmation : elle disparaît tout de
+   * suite, « Annuler » la remet pendant quelques secondes, puis la suppression
+   * est envoyée (file hors ligne comprise).
+   */
+  function retirerAdresse(s: Stop) {
+    setRetires((r) => new Set(r).add(s.id));
+    const libere = () =>
+      setRetires((r) => {
+        const n = new Set(r);
+        n.delete(s.id);
+        return n;
+      });
+    retraits.current.planifier(s.id, async () => {
+      try {
+        await retirerArret(s.id, document.visibilityState === "hidden");
+        setStops((all) => all.filter((x) => x.id !== s.id));
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+      } finally {
+        libere();
+      }
+    });
+    setToast({
+      ok: true,
+      text: "Adresse retirée",
+      dureeMs: DELAI_ANNULATION_MS,
+      actions: [{ label: "Annuler", onClick: () => retraits.current.annuler(s.id) && libere() }],
+    });
+  }
+
   /** Valide les quantités physiques d'une ramasse ; livraison et point relais passent par la feuille de livraison. */
   async function terminer(s: Stop) {
+    // Mode simple : « Livré » clôt tout de suite, sans lieu, preuve ni quantité.
+    if (simple) return void (await statut(s, "delivered", undefined, true));
     if (estRamasse(s)) {
       const valeur = prompt(`Nombre de colis récupérés — ${s.recipient ?? s.address}`, String(s.packages_picked_up ?? s.parcel_count ?? 1));
       if (valeur === null) return;
@@ -382,26 +483,25 @@ export function AppLivreur({
     }
   }
 
-  /** Passe temporairement cet arrêt en fin de file sans le marquer comme livré. */
+  /** Passe cet arrêt en fin de sa liste sans le marquer comme livré : 1 clic, « Annuler » le remet à sa place. */
   async function passerAdresseSuivante(s: Stop) {
     if (!run) return;
-    const restant = arretsRestants(stops).length;
-    if (restant < 2) return;
-    setBusy(true);
+    const liste = s.list_id ?? null;
+    const apres = stops.slice(stops.indexOf(s) + 1).find((x) => (x.list_id ?? null) === liste);
+    const changements = reordonner(stops, s.id, { list_id: liste, avant_id: null });
+    if (changements.length === 0) return void setToast({ ok: true, text: "Cet arrêt est déjà le dernier de sa liste." });
+    setStops((all) => appliquerChangements(all, changements));
     try {
-      for (let i = 0; i < restant; i++) {
-        await api(`/api/colis/arrets/${s.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ run_id: run.id, deplacer: "bas" }),
-        });
-      }
-      await charger(run.id);
-      setToast({ ok: true, text: "Arrêt déplacé en fin de tournée. Il reste à traiter." });
+      await patchArret(s.id, { run_id: run.id, deposer: { list_id: liste, avant_id: null } });
+      setToast({
+        ok: true,
+        text: "Arrêt passé en fin de liste : il reste à traiter.",
+        dureeMs: DELAI_ANNULATION_MS,
+        actions: apres ? [{ label: "Annuler", onClick: () => void deposer(s.id, { list_id: liste, avant_id: apres.id }) }] : undefined,
+      });
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       await charger(run.id);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -718,7 +818,12 @@ export function AppLivreur({
           onRecharger={rechargerRun}
           onToast={setToast}
           onTerminer={terminer}
-          onCloture={(s, mode) => setCloture({ stop: s, mode })}
+          onCloture={demanderNonLivre}
+          modeSimple={simple}
+          onModeSimple={basculerMode}
+          onContact={basculerContact}
+          onRetirer={retirerAdresse}
+          onAppel={lancerAppel}
           onTelephone={ajouterTelephone}
           onHoraires={setHorairesStop}
           onFiche={setDetailsStop}
@@ -779,11 +884,8 @@ export function AppLivreur({
         />
       )}
 
-      {toast && (
-        <p role="status" className={`fixed inset-x-4 top-24 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
-          {toast.text}
-        </p>
-      )}
+      <ToastColis toast={toast} onFermer={fermerToast} />
+      {propositionAppel}
 
       {cloture && (
         <ClotureSheet
@@ -797,10 +899,11 @@ export function AppLivreur({
             setCloture(null);
             terminer(s);
           }}
-          onEchec={async (motif, precision) => {
+          onEchec={async (motif, precision, contacts) => {
             const s = cloture.stop;
             setCloture(null);
-            await statut(s, "failed", { motif, precision });
+            if (s.status === "failed") await preciserNonLivre(s, motif, precision, contacts);
+            else await statut(s, "failed", { motif, precision, contacts });
           }}
         />
       )}
@@ -863,7 +966,7 @@ export function AppLivreur({
                     <IconNavigation className="h-4 w-4" /> Y aller
                   </a>
                   {arretCarte.phone ? (
-                    <a href={lienTel(arretCarte.phone)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
+                    <a href={lienTel(arretCarte.phone)} onClick={() => lancerAppel(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
                       <IconPhone className="h-4 w-4" /> Appeler
                     </a>
                   ) : (
@@ -873,7 +976,7 @@ export function AppLivreur({
                   )}
                   {arretCarte.status === "pending" ? (
                     <button type="button" className="btn-primary justify-center !px-2 !py-2.5 text-sm" onClick={() => terminer(arretCarte)}>
-                      <IconCheck className="h-4 w-4" /> {libelleFait(arretCarte)}
+                      <IconCheck className="h-4 w-4" /> {libelleLivre(simple, arretCarte)}
                     </button>
                   ) : run.status !== "done" && (
                     <button type="button" className="btn-ghost justify-center !px-2 !py-2.5 text-sm" onClick={() => statut(arretCarte, "pending")}>
@@ -916,16 +1019,19 @@ export function AppLivreur({
               <>
             <p className="mt-4 break-words text-lg font-semibold">{detailsStop.address}</p>
               {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
-              {detailsStop.phone && <p className="mt-1 text-sm">{detailsStop.phone}</p>}
+              {detailsStop.phone && <a href={lienTel(detailsStop.phone)} onClick={() => lancerAppel(detailsStop)} className="mt-1 inline-block text-sm text-teal-ink underline">{detailsStop.phone}</a>}
               {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
               <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
+              <div className="mt-3">
+                <CasesContact valeur={stops.find((x) => x.id === detailsStop.id) ?? detailsStop} onChange={(champ, v) => void basculerContact(detailsStop, champ, v)} />
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
                 <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Google Maps</a>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
-                <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>Traiter cet arrêt</button>
+                <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>{simple ? "Livré" : "Traiter cet arrêt"}</button>
               </div>
                 <button type="button" className="btn-ghost mt-2 min-h-[44px] w-full justify-center text-sm" onClick={() => setFicheEdition(true)}>✏️ Modifier la fiche</button>
               </>
@@ -1000,7 +1106,7 @@ export function AppLivreur({
 
             {prochain.phone ? (
               <div className="grid grid-cols-[1fr_auto] gap-2">
-                <a href={lienTel(prochain.phone)} className="btn-secondary justify-center border-teal/70 !py-3.5 text-base text-teal-ink">
+                <a href={lienTel(prochain.phone)} onClick={() => lancerAppel(prochain)} className="btn-secondary justify-center border-teal/70 !py-3.5 text-base text-teal-ink">
                   <IconPhone className="h-5 w-5" /> Appeler · {prochain.phone}
                 </a>
                 <a href={lienSms(prochain.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !px-4 !py-3.5" aria-label="Envoyer un SMS « j'arrive »">
@@ -1013,6 +1119,9 @@ export function AppLivreur({
               </button>
             )}
 
+            <div className="flex flex-wrap gap-1.5">
+              <PastillesContact stop={prochain} onChange={(champ, v) => void basculerContact(prochain, champ, v)} />
+            </div>
             {run.status === "in_progress" && navPreferee === "go" && (
               <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={() => changerVue("navigation")}>
                 <IconNavigation className="h-5 w-5 text-teal" /> Ouvrir GO Navigation
@@ -1069,9 +1178,9 @@ export function AppLivreur({
             )}
             <div className="grid grid-cols-[2fr_1fr] gap-2">
               <button type="button" className="btn-primary justify-center !py-4 text-lg" onClick={() => terminer(prochain)}>
-                {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : estPointRelais(prochain) ? <IconPointRelais className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {libelleFait(prochain)}
+                {!simple && estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : !simple && estPointRelais(prochain) ? <IconPointRelais className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {libelleLivre(simple, prochain)}
               </button>
-              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
+              <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => demanderNonLivre(prochain, "echec")}>
                 <IconX className="h-5 w-5" /> Non livré
               </button>
             </div>
@@ -1094,6 +1203,7 @@ export function AppLivreur({
           </section>
         )}
 
+        {run && run.status !== "done" && run.status !== "loading" && <InterrupteurMode simple={simple} onChange={(v) => void basculerMode(v)} />}
         {run?.status === "in_progress" && (
           <button type="button" className="btn-secondary min-h-[44px] justify-center" onClick={() => setPreparationDemandee(true)}>
             <IconQrCode className="h-5 w-5" /> Ajouter ou modifier des colis
@@ -1174,16 +1284,31 @@ export function AppLivreur({
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
                       <div className="mt-1.5 flex flex-wrap gap-2">
-                        <button type="button" className="rounded-full border border-teal/40 px-3 py-1.5 text-xs font-semibold text-teal-ink hover:bg-teal/10" onClick={() => setDetailsStop(s)}>
+                        <button type="button" className="min-h-[44px] rounded-full border border-teal/40 px-3 text-xs font-semibold text-teal-ink hover:bg-teal/10" onClick={() => setDetailsStop(s)}>
                           Ouvrir la fiche
                         </button>
-                        <button
-                          type="button"
-                          className="rounded-full border border-navy/15 px-3 py-1.5 text-xs font-semibold text-navy/80 hover:border-teal"
-                          onClick={() => setCloture({ stop: s, mode: "choix" })}
-                          aria-label={`Clôturer ${s.recipient ?? s.address}`}
-                        >
-                          Clôturer ›
+                        {simple ? (
+                          <>
+                            <button type="button" className="btn-primary min-h-[44px] !px-4 !py-1 text-xs" onClick={() => void terminer(s)} aria-label={`Livré — ${s.recipient ?? s.address}`}>
+                              <IconCheck className="h-4 w-4" /> Livré
+                            </button>
+                            <button type="button" className="btn-secondary min-h-[44px] !px-3 !py-1 text-xs text-orange-ink" onClick={() => demanderNonLivre(s, "echec")} aria-label={`Non livré — ${s.recipient ?? s.address}`}>
+                              <IconX className="h-4 w-4" /> Non livré
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="min-h-[44px] rounded-full border border-navy/15 px-3 text-xs font-semibold text-navy/80 hover:border-teal"
+                            onClick={() => setCloture({ stop: s, mode: "choix" })}
+                            aria-label={`Clôturer ${s.recipient ?? s.address}`}
+                          >
+                            Clôturer ›
+                          </button>
+                        )}
+                        <PastillesContact stop={s} onChange={(champ, v) => void basculerContact(s, champ, v)} />
+                        <button type="button" className="min-h-[44px] rounded-full border border-navy/15 px-3 text-xs font-semibold text-orange-ink" onClick={() => retirerAdresse(s)} aria-label={`Retirer ${s.recipient ?? s.address}`}>
+                          Retirer
                         </button>
                         {triActif && (
                           <>
@@ -1206,7 +1331,7 @@ export function AppLivreur({
                       🕘
                     </button>
                     {s.phone ? (
-                      <a href={lienTel(s.phone)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                      <a href={lienTel(s.phone)} onClick={() => lancerAppel(s)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal/15 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                         <IconPhone className="h-5 w-5" />
                       </a>
                     ) : (
@@ -1256,6 +1381,7 @@ export function AppLivreur({
                       {estPointRelais(s) && <span className="mr-1 font-semibold text-relais-ink">Relais{s.relay_name ? ` ${s.relay_name}` : ""} ·</span>}
                       {s.address}
                       {s.status === "failed" && libelleMotif(s.failure_reason) && <span className="block text-xs text-orange-ink">{libelleMotif(s.failure_reason)}</span>}
+                      {libelleContacts(s) && <span className="block text-xs text-navy/70">{libelleContacts(s)}</span>}
                       {s.status === "delivered" && s.delivered_place === "point_relais" && <span className="block truncate text-xs text-relais-ink">{libellePreuve(s)}</span>}
                     </p>
                     {s.proof_code && (
@@ -1274,8 +1400,13 @@ export function AppLivreur({
                         <IconPhone className="h-4 w-4" />
                       </a>
                     )}
+                    {run.status !== "done" && s.status === "failed" && (
+                      <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs" onClick={() => setCloture({ stop: s, mode: "echec" })}>
+                        Préciser
+                      </button>
+                    )}
                     {run.status !== "done" && (
-                      <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
+                      <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
                         Annuler
                       </button>
                     )}
