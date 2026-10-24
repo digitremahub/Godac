@@ -114,6 +114,10 @@ export interface GoNavigationProps {
   onPasser: (s: Stop) => void;
   onDeposer: (id: string, cible: CibleDepot) => Promise<void>;
   onReoptimiser: () => Promise<void>;
+  /** Optimise les arrêts restants en partant de l'arrêt choisi (il devient le prochain). */
+  onOptimiserDepuisArret?: (stopId: string) => Promise<void>;
+  /** Ouvre la feuille « Départ / arrivée » de l'optimisation. */
+  onReglagesOptimisation?: () => void;
   /** Fin de tournée : retour guidé dans GO vers le dépôt ou le siège (arrêts tous traités). */
   retour?: { label: string; lat: number; lng: number; etape?: "gasoil" } | null;
   /** Après le passage au gasoil : repartir vers le dépôt / le siège. */
@@ -143,6 +147,9 @@ export function GoNavigation(p: GoNavigationProps) {
   /** Dernière position réduite / moyenne choisie (la liste pleine n'est qu'un passage). */
   const feuilleMemo = useRef<PositionFeuille>(FEUILLE_PAR_DEFAUT);
   const [menuVues, setMenuVues] = useState(false);
+  /** Menu « Optimiser » (depuis ma position / depuis une adresse choisie / réglages) et sélecteur d'adresse. */
+  const [menuOptim, setMenuOptim] = useState(false);
+  const [choixDepuis, setChoixDepuis] = useState(false);
   const [position, setPosition] = useState<Point | null>(null);
   /** Vitesse réelle (km/h, GPS) et limitation indicative de la route (OpenStreetMap). */
   const [vitesseKmh, setVitesseKmh] = useState<number | null>(null);
@@ -864,6 +871,67 @@ export function GoNavigation(p: GoNavigationProps) {
               + Adresse
             </button>
           )}
+          {!fige && run.status === "in_progress" && restants.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setMenuOptim((v) => !v)}
+                disabled={p.busy}
+                className="min-h-[44px] rounded-full bg-marine px-3.5 text-xs font-bold text-white shadow-pop disabled:opacity-60"
+                aria-haspopup="menu"
+                aria-expanded={menuOptim}
+                aria-controls="go-menu-optim"
+              >
+                {p.busy ? "Calcul…" : "⚡ Optimiser"}
+              </button>
+              {menuOptim && (
+                <>
+                  <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuOptim(false)} />
+                  <div id="go-menu-optim" role="menu" aria-label="Optimiser la tournée" className="absolute right-0 top-full z-10 mt-1.5 flex w-64 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
+                      onClick={() => {
+                        setMenuOptim(false);
+                        void p.onReoptimiser();
+                      }}
+                    >
+                      Depuis ma position
+                      <span className="block text-xs font-normal text-navy/60">Prochaine adresse la plus proche</span>
+                    </button>
+                    {p.onOptimiserDepuisArret && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
+                        onClick={() => {
+                          setMenuOptim(false);
+                          setChoixDepuis(true);
+                        }}
+                      >
+                        Depuis une adresse choisie…
+                        <span className="block text-xs font-normal text-navy/60">L&apos;adresse devient le prochain arrêt</span>
+                      </button>
+                    )}
+                    {p.onReglagesOptimisation && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="min-h-[48px] rounded-xl px-3 text-left text-sm text-navy/80 hover:bg-navy/5"
+                        onClick={() => {
+                          setMenuOptim(false);
+                          p.onReglagesOptimisation?.();
+                        }}
+                      >
+                        Départ et arrivée…
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
           {vue === "ensemble" && (
             <button
               type="button"
@@ -1156,6 +1224,43 @@ export function GoNavigation(p: GoNavigationProps) {
           </>
         )}
       </div>
+
+      {choixDepuis && p.onOptimiserDepuisArret && (
+        <div className="fixed inset-0 z-[75] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="optim-depuis-titre">
+          <section className="flex max-h-[85dvh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="optim-depuis-titre" className="font-display text-xl font-bold">
+                  Optimiser depuis une adresse
+                </h2>
+                <p className="text-sm text-navy/60">Choisissez l&apos;adresse de départ : elle devient le prochain arrêt, les autres suivent de proche en proche.</p>
+              </div>
+              <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setChoixDepuis(false)} aria-label="Fermer">
+                ✕
+              </button>
+            </div>
+            <ul className="flex flex-col gap-1.5">
+              {restants
+                .filter((s) => s.lat !== null && s.lng !== null)
+                .map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-navy/10 px-3 text-left hover:bg-navy/5"
+                      onClick={() => {
+                        setChoixDepuis(false);
+                        void p.onOptimiserDepuisArret?.(s.id);
+                      }}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-bold text-white">{numero(s)}</span>
+                      <span className="min-w-0 text-sm font-semibold leading-snug">{adresseCourte(s.address)}</span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </section>
+        </div>
+      )}
 
       {correction && (
         <CorrectionAdresse
