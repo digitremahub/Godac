@@ -12,9 +12,10 @@ describe("arrêt suivi et passage au suivant", () => {
     expect(arretSuivi([s("a", "delivered"), s("b"), s("c", "failed"), s("d")], "c")?.id).toBe("b");
   });
   it("tout est fait : null", () => expect(arretSuivi([s("a", "delivered")], "a")).toBeNull());
-  it("après clôture : le restant suivant dans l'ordre, sinon le premier laissé avant", () => {
-    expect(arretApresCloture(stops, "c")?.id).toBe("d");
+  it("après clôture : toujours le premier restant dans l'ordre (le 6 livré avant le 4 → retour au 4)", () => {
+    expect(arretApresCloture(stops, "c")?.id).toBe("b");
     expect(arretApresCloture(stops, "d")?.id).toBe("b");
+    expect(arretApresCloture([s("a", "delivered"), s("b"), s("c")], "b")?.id).toBe("c");
     expect(arretApresCloture([s("x")], "x")).toBeNull();
   });
 });
