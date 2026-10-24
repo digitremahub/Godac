@@ -1235,7 +1235,7 @@ export function GoNavigation(p: GoNavigationProps) {
                     doigtCartes.current = false;
                     auDefilement();
                   }}
-                  className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[6%] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-0.5 [scrollbar-width:none]"
+                  className="flex min-h-0 flex-1 touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-[6%] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-0.5 [scrollbar-width:none]"
                   aria-label="Arrêts à faire (glisser pour passer d'un arrêt à l'autre)"
                 >
                   {restants.map((s) => (
@@ -1584,7 +1584,7 @@ function CarteArret({
   const pastilleAction = `${pastilleBase} bg-navy/[0.05]`;
   return (
     <section
-      className={`relative flex max-h-full w-[88%] max-w-md shrink-0 snap-center flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border-2 bg-surface px-3.5 py-3 shadow-card ${suivi ? bordureArret(s, "border-teal/70") : "border-transparent"}`}
+      className={`relative flex max-h-full w-[88%] max-w-md shrink-0 snap-center flex-col gap-2 overflow-y-auto overscroll-y-contain touch-pan-x touch-pan-y rounded-2xl border-2 bg-surface px-3.5 py-3 shadow-card ${suivi ? bordureArret(s, "border-teal/70") : "border-transparent"}`}
       aria-label={`Arrêt ${numero} sur ${total}${suivi ? ", en cours de navigation" : ""}`}
     >
       <EncocheArret stop={s} large />
