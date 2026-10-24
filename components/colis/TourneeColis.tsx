@@ -1080,7 +1080,7 @@ export function TourneeColis({
               {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(prochain) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(prochain)}
             </button>
             <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
-              <IconX className="h-5 w-5" /> Échec / absent
+              <IconX className="h-5 w-5" /> Non livré
             </button>
           </div>
           <div className="flex flex-wrap gap-2">

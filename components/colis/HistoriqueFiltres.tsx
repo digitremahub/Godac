@@ -91,7 +91,7 @@ export function HistoriqueFiltres({
         <select aria-label="Filtrer par statut de livraison" className="input !w-auto" value={searchParams.get("statut") ?? ""} onChange={(e) => changer("statut", e.target.value)}>
           <option value="">Tous les statuts</option>
           <option value="delivered">Livrés</option>
-          <option value="failed">Échecs</option>
+          <option value="failed">Non livrés</option>
           <option value="pending">Non faits</option>
         </select>
         <button type="submit" className="btn-secondary !py-2 text-sm">

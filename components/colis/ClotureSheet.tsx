@@ -98,7 +98,7 @@ export function ClotureSheet({
               </button>
             ) : (
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" disabled={envoi} onClick={() => setMotif("absent")}>
-                <IconX className="h-5 w-5" /> Échec / absent
+                <IconX className="h-5 w-5" /> Non livré
               </button>
             )}
           </div>
