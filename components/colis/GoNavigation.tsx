@@ -502,6 +502,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const traceDepuisGps = useRef(false);
   const dernierCalcul = useRef(0);
   const enCalcul = useRef(false);
+  const stopsRef = useRef(stops);
+  stopsRef.current = stops;
   const tracer = useCallback(
     async (versId: string, depuis: Point | null) => {
       if (enCalcul.current) return;
@@ -510,7 +512,10 @@ export function GoNavigation(p: GoNavigationProps) {
       cibleTracee.current = versId;
       traceDepuisGps.current = Boolean(depuis);
       try {
-        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify(versId === ID_RETOUR && p.retour ? { run_id: run.id, depuis, cible: ID_RETOUR, point: { lat: p.retour.lat, lng: p.retour.lng } } : { run_id: run.id, depuis, cible: versId }) });
+        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify(versId === ID_RETOUR && p.retour ? { run_id: run.id, depuis, cible: ID_RETOUR, point: { lat: p.retour.lat, lng: p.retour.lng } } : (() => {
+          const a = stopsRef.current.find((x) => x.id === versId);
+          return { run_id: run.id, depuis, cible: versId, ...(depuis && a && a.lat !== null && a.lng !== null ? { point: { lat: Number(a.lat), lng: Number(a.lng) } } : {}) };
+        })()) });
         if (cibleTracee.current !== versId) return;
         setTrajet(it);
         (carte.current?.getSource("trajet") as GeoJSONSource | undefined)?.setData(ligneGeo(it.ligne));
