@@ -15,7 +15,7 @@ const bodySchema = z.object({
    * chauffeur, sinon le dépôt) au lieu de toute la suite de la tournée.
    */
   cible: z.union([z.string().uuid(), z.literal("retour")]).nullable().optional(),
-  /** Destination du retour de fin de tournée (dépôt, siège) quand `cible` vaut « retour ». */
+  /** Destination : retour de fin de tournée (dépôt, siège) quand `cible` vaut « retour » ; avec `cible` et `depuis`, voie rapide sans base de données. */
   point: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
 });
 
@@ -35,7 +35,7 @@ async function troncon(points: Point[], etapes = false): Promise<Itineraire> {
   try {
     const res = await fetch(`${ROUTING_URL}/route/v1/driving/${coords}?overview=full&geometries=geojson${etapes ? "&steps=true" : ""}`, {
       headers: { "User-Agent": "GODAC (https://godac.app)" },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(5000),
     });
     const data = (await res.json()) as {
       code?: string;
@@ -61,10 +61,12 @@ export async function POST(req: Request) {
   const g = await garderApi({ modules: ["route_optimizer"] });
   if (!g.ok) return g.reponse;
   const appUser = g.appUser;
-  const supabase = await createServerSupabaseClient();
-  if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  // Voie rapide (GO Navigation, recalcul en route) : position et destination fournies, aucun accès base de données.
+  if (parsed.data.cible && parsed.data.depuis && parsed.data.point) return NextResponse.json(await troncon([parsed.data.depuis, parsed.data.point], true));
+  const supabase = await createServerSupabaseClient();
+  if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const run = await tourneeParId(supabase, appUser, parsed.data.run_id);
   if (!run) return NextResponse.json({ error: "Tournée introuvable." }, { status: 404 });
 

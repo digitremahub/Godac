@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arretApresCloture, arretSuivi, doitRecalculer, ecartAuTrace, formatDistance, formatDuree, meilleureInsertion, resteSurTrace, DELAI_RECALCUL_MS } from "@/lib/colis/navigation";
+import { arretApresCloture, arretSuivi, doitRecalculer, ecartAuTrace, formatDistance, formatDuree, meilleureInsertion, resteSurTrace, DELAI_RECALCUL_MS, DELAI_ECART_FRANC_MS } from "@/lib/colis/navigation";
 import { reordonner } from "@/lib/colis/reordonner";
 
 const s = (id: string, status = "pending", extra: Record<string, unknown> = {}) => ({ id, status, ...extra });
@@ -38,6 +38,11 @@ describe("écart au tracé et recalcul", () => {
   it("écart : recalcul, mais pas trop souvent", () => {
     expect(doitRecalculer(base)).toBe(true);
     expect(doitRecalculer({ ...base, maintenant: 1000 })).toBe(false);
+    // Petit écart (~35 m) : attend le délai ; franchement hors tracé (~111 m) : repart après 1,5 s.
+    const petit = { ...base, position: { lat: 48.85032, lng: 2.31 } };
+    expect(doitRecalculer({ ...petit, maintenant: DELAI_ECART_FRANC_MS + 1 })).toBe(false);
+    expect(doitRecalculer({ ...petit, maintenant: DELAI_RECALCUL_MS })).toBe(true);
+    expect(doitRecalculer({ ...base, maintenant: DELAI_ECART_FRANC_MS + 1 })).toBe(true);
     expect(doitRecalculer({ ...base, position: { lat: 48.85, lng: 2.31 } })).toBe(false);
   });
   it("distance restante le long du tracé", () => {

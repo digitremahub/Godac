@@ -59,9 +59,12 @@ export function ecartAuTrace(position: Point, ligne: readonly [number, number][]
 }
 
 /** Au-delà de cet écart au tracé, le chauffeur a quitté l'itinéraire. */
-export const ECART_MAX_M = 40;
+export const ECART_MAX_M = 30;
 /** Délai minimal entre deux recalculs pour un simple écart (ménage le service d'itinéraires). */
-export const DELAI_RECALCUL_MS = 10_000;
+export const DELAI_RECALCUL_MS = 4_000;
+/** Au-delà de cet écart, le chauffeur est franchement hors itinéraire : recalcul quasi immédiat. */
+export const ECART_FRANC_M = 80;
+export const DELAI_ECART_FRANC_MS = 1_500;
 /** Rayon d'arrivée à l'arrêt. */
 export const RAYON_ARRIVEE_M = 60;
 
@@ -81,8 +84,10 @@ export function doitRecalculer(e: {
 }): boolean {
   if (!e.cible) return false;
   if (e.cible !== e.cibleTracee || !e.ligne) return true;
-  if (!e.position || e.maintenant - e.dernierCalcul < DELAI_RECALCUL_MS) return false;
-  return ecartAuTrace(e.position, e.ligne) > ECART_MAX_M;
+  if (!e.position || e.maintenant - e.dernierCalcul < DELAI_ECART_FRANC_MS) return false;
+  const ecart = ecartAuTrace(e.position, e.ligne);
+  if (ecart > ECART_FRANC_M) return true;
+  return ecart > ECART_MAX_M && e.maintenant - e.dernierCalcul >= DELAI_RECALCUL_MS;
 }
 
 /** Distance à vol d'oiseau en mètres. */
