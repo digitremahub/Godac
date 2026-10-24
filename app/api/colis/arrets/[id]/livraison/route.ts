@@ -3,14 +3,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
+import { lireModeSimpleRun, moduleActif, STOP_FIELDS } from "@/lib/colis/serveur";
+import { refusPreuveSelonMode } from "@/lib/colis/mode-simple";
 import { MESSAGE_TOURNEE_CLOTUREE, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
-import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, refusPreuve, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
+import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, RETOURS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 
 const BUCKET = "delivery-proofs";
 const bodySchema = z.object({
-  lieu: z.enum(LIEUX_LIVRAISON.map((l) => l.key) as [string, ...string[]]),
+  /** Lieu de remise ; facultatif seulement pour une tournée en mode simple (aucune preuve exigée). */
+  lieu: z.enum(LIEUX_LIVRAISON.map((l) => l.key) as [string, ...string[]]).optional(),
   precision: z.string().trim().max(200).nullable().optional(),
   // Photo JPEG réduite côté téléphone (≈ 1600 px) : 5 Mo en base64 au plus.
   image: z.string().max(7_000_000).nullable().optional(),
@@ -46,24 +48,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   const { precision, message_laisse, reserve } = parsed.data;
-  const lieu = parsed.data.lieu as LieuLivraison;
+  const lieuDemande = parsed.data.lieu as LieuLivraison | undefined;
   const images = (parsed.data.images?.length ? parsed.data.images : parsed.data.image ? [parsed.data.image] : []).slice(0, 3);
 
   const { data: stop } = await supabase
     .from("delivery_stops")
-    .select("id, status, notes, kind, relay_name, address, proof_photo_path, proof_photo_paths, delivery_runs(run_date, status)")
+    .select("id, run_id, status, notes, kind, relay_name, address, proof_photo_path, proof_photo_paths, delivery_runs(run_date, status)")
     .eq("id", id)
     .maybeSingle();
   if (!stop) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
   if (tourneeCloturee(stop as never)) return NextResponse.json({ error: MESSAGE_TOURNEE_CLOTUREE }, { status: 409 });
+  // Mode simple : « Livré » sans lieu ni preuve (ni photo, ni QR code, ni relais).
+  const simple = (await lireModeSimpleRun(supabase, stop.run_id)).modeSimple;
+  if (!lieuDemande && !simple) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  const lieu = (lieuDemande ?? "main_propre") as LieuLivraison;
   const pointRelais = stop.kind === "point_relais";
   // Un arrêt point relais se clôture par un dépôt au relais.
-  if (pointRelais && !relaisObligatoire(lieu)) return NextResponse.json({ error: "Arrêt point relais : validez le dépôt au relais." }, { status: 400 });
+  if (pointRelais && !simple && !relaisObligatoire(lieu)) return NextResponse.json({ error: "Arrêt point relais : validez le dépôt au relais." }, { status: 400 });
   // Code scanné : QR code du destinataire, ou code / bordereau du relais (facultatif avec une photo).
   const codeQr = qrObligatoire(lieu) || relaisObligatoire(lieu) ? normaliserCodeQr(parsed.data.code_qr) : null;
   const relais = relaisObligatoire(lieu) ? (normaliserNomRelais(parsed.data.relais) ?? (pointRelais ? normaliserNomRelais(stop.relay_name) : null)) : null;
   // L'arrêt point relais est le relais lui-même : son nom n'est pas exigé.
-  const preuveManquante = refusPreuve({ lieu, photo: images.length > 0, code: codeQr, relais: relais ?? (pointRelais ? stop.address : null) });
+  const preuveManquante = refusPreuveSelonMode(simple, { lieu, photo: images.length > 0, code: codeQr, relais: relais ?? (pointRelais ? stop.address : null) });
   if (preuveManquante) return NextResponse.json({ error: preuveManquante }, { status: 400 });
   // N'importe quel arrêt de la tournée peut être livré, mais une seule fois.
   const refus = refusCloture(stop.status, "delivered");
@@ -102,7 +108,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .update({
       status: "delivered",
       done_at: new Date().toISOString(),
-      delivered_place: lieu,
+      delivered_place: simple && !lieuDemande ? null : lieu,
       proof_photo_path: paths[0] ?? null,
       proof_photo_paths: paths,
       proof_code: codeQr,

@@ -19,6 +19,10 @@ export interface Run {
   optim_arrivee?: Arrivee | null;
   /** false : colonnes absentes, le choix reste sur l'appareil. */
   optim_persiste?: boolean;
+  /** Mode simple : seulement « Livré » / « Non livré » (migration 20261103000006) ; absent = mode complet. */
+  mode_simple?: boolean;
+  /** false : colonne absente, le mode reste sur l'appareil. */
+  mode_simple_persiste?: boolean;
 }
 export interface Stop {
   id: string;
@@ -58,6 +62,10 @@ export interface Stop {
   /** Créneau ponctuel du jour (« 10:00:00 »), prioritaire sur l'annuaire. */
   window_start?: string | null;
   window_end?: string | null;
+  /** Contacts du client cochés par le chauffeur ; absents avant la migration 20261103000006. */
+  contact_message?: boolean;
+  contact_phone?: boolean;
+  contact_at?: string | null;
   /** Professionnel détecté à la saisie (nom de l'entreprise ou du commerce) ; absent avant la migration 190. */
   business_name?: string | null;
   /** Fiche de l'annuaire des adresses pro (horaires d'ouverture), si l'adresse y figure. */
@@ -73,6 +81,15 @@ export interface RunResume {
   nbArrets: number;
   nbColis: number;
   nbRestants: number;
+}
+
+/** Message affiché en haut de l'écran, avec des actions facultatives (« Annuler »). */
+export interface Toast {
+  ok: boolean;
+  text: string;
+  actions?: { label: string; onClick: () => void }[];
+  /** Durée d'affichage ; 3,5 s par défaut. */
+  dureeMs?: number;
 }
 
 export async function api<T>(url: string, init?: RequestInit, delaiMs?: number): Promise<T> {

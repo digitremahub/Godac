@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { IconCheck, IconPointRelais, IconRamasse, IconX } from "@/components/layout/icons";
 import { motifsPour, type MotifEchec } from "@/lib/colis/cloture";
+import { CasesContact } from "@/components/colis/ContactsArret";
+import type { DemandeContacts } from "@/lib/colis/contacts";
 import { estPointRelais, estRamasse, typeArret } from "@/lib/colis/livraison";
 import { BadgeArret } from "@/components/colis/Ramasse";
 import type { Stop } from "@/components/colis/commun";
@@ -11,7 +13,10 @@ import type { Stop } from "@/components/colis/commun";
  * Clôture d'un arrêt, dans l'ordre ou non : livré (la feuille de
  * livraison s'ouvre ensuite, avec ses modes de remise et preuves ; une
  * ramasse est simplement marquée faite) ou échec / absent avec motif.
- * `mode="echec"` ouvre directement le choix du motif (bouton « Absent »).
+ * `mode="echec"` ouvre directement le choix du motif (bouton « Non livré »).
+ * Le motif s'accompagne des cases « Message envoyé » / « Eu au téléphone ».
+ * Sur un arrêt déjà « Non livré » (mode simple : motif par défaut posé en 1
+ * clic), la fiche sert à préciser le motif et les contacts après coup.
  */
 export function ClotureSheet({
   stop,
@@ -28,19 +33,26 @@ export function ClotureSheet({
   horsOrdre: boolean;
   mode?: "choix" | "echec";
   onLivrer: () => void;
-  onEchec: (motif: MotifEchec, precision: string | null) => Promise<void> | void;
+  onEchec: (motif: MotifEchec, precision: string | null, contacts: DemandeContacts) => Promise<void> | void;
   onClose: () => void;
 }) {
   const ramasse = estRamasse(stop);
   const relais = estPointRelais(stop);
-  const [motif, setMotif] = useState<MotifEchec | null>(mode === "echec" ? (relais ? "ferme" : "absent") : null);
+  const dejaNonLivre = stop.status === "failed";
+  const [motif, setMotif] = useState<MotifEchec | null>(dejaNonLivre ? ((stop.failure_reason as MotifEchec | null) ?? "absent") : mode === "echec" ? (relais ? "ferme" : "absent") : null);
+  const [contacts, setContacts] = useState({ contact_message: stop.contact_message === true, contact_phone: stop.contact_phone === true });
+  /** Seules les cases modifiées partent : un arrêt déjà coché n'est pas réécrit. */
+  const contactsModifies = (): DemandeContacts => ({
+    ...(contacts.contact_message !== (stop.contact_message === true) ? { contact_message: contacts.contact_message } : {}),
+    ...(contacts.contact_phone !== (stop.contact_phone === true) ? { contact_phone: contacts.contact_phone } : {}),
+  });
   const [precision, setPrecision] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
   async function signalerRamasse(motifRapide: "rien_a_ramasser" | "ferme") {
     setEnvoi(true);
     try {
-      await onEchec(motifRapide, null);
+      await onEchec(motifRapide, null, {});
     } finally {
       setEnvoi(false);
     }
@@ -50,7 +62,7 @@ export function ClotureSheet({
     if (!motif) return;
     setEnvoi(true);
     try {
-      await onEchec(motif, precision.trim() || null);
+      await onEchec(motif, precision.trim() || null, contactsModifies());
     } finally {
       setEnvoi(false);
     }
@@ -104,7 +116,7 @@ export function ClotureSheet({
           </div>
         ) : (
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-semibold">Motif de l&apos;échec</legend>
+            <legend className="mb-2 text-sm font-semibold">{dejaNonLivre ? "Préciser le « Non livré »" : "Motif du « Non livré »"}</legend>
             <div className="grid grid-cols-2 gap-2">
               {motifsPour(typeArret(stop.kind)).map((m) => (
                 <button
@@ -124,12 +136,13 @@ export function ClotureSheet({
               onChange={(e) => setPrecision(e.target.value)}
               maxLength={200}
               placeholder={motif === "autre" ? "Précisez le motif" : "Précision (facultatif) : avis de passage, code porte…"}
-              aria-label="Précision sur l'échec"
+              aria-label="Précision sur le « Non livré »"
             />
+            <CasesContact valeur={contacts} onChange={(champ, v) => setContacts((c) => ({ ...c, [champ]: v }))} />
             <button type="button" className="btn-primary mt-1 justify-center !py-3.5 text-base" disabled={envoi || (motif === "autre" && !precision.trim())} onClick={valider}>
-              {envoi ? "Envoi…" : "Valider l'échec"}
+              {envoi ? "Envoi…" : dejaNonLivre ? "Enregistrer" : "Valider « Non livré »"}
             </button>
-            {mode === "choix" && (
+            {mode === "choix" && !dejaNonLivre && (
               <button type="button" className="btn-ghost w-fit !px-2 text-sm" onClick={() => setMotif(null)}>
                 ‹ Retour
               </button>

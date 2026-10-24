@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
@@ -22,7 +22,17 @@ import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
 import { arretsRestants, libelleMotif, prochainArret, type MotifEchec } from "@/lib/colis/cloture";
-import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop } from "@/components/colis/commun";
+import { ToastColis } from "@/components/colis/ToastColis";
+import { ChoixModeTournee } from "@/components/colis/ChoixModeTournee";
+import { InterrupteurMode } from "@/components/colis/InterrupteurMode";
+import { PastillesContact } from "@/components/colis/ContactsArret";
+import { useModeSimple } from "@/components/colis/useModeSimple";
+import { useSuiviAppel } from "@/components/colis/useSuiviAppel";
+import { appliquerContacts, libelleContacts, type ChampContact, type DemandeContacts } from "@/lib/colis/contacts";
+import { libelleLivre, motifParDefaut } from "@/lib/colis/mode-simple";
+import { DELAI_ANNULATION_MS, creerRetraitsDifferes, sansRetraits } from "@/lib/colis/retrait";
+import { patchArret, retirerArret } from "@/lib/colis/envoi-arret";
+import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop, type Toast } from "@/components/colis/commun";
 import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { AdresseInput } from "@/components/colis/AdresseInput";
@@ -153,7 +163,11 @@ export function TourneeColis({
   const [affectationOuverte, setAffectationOuverte] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
-  const [stops, setStops] = useState<Stop[]>([]);
+  const [stopsBruts, setStops] = useState<Stop[]>([]);
+  /** Adresses retirées dont la suppression attend la fin du délai d'annulation. */
+  const [retires, setRetires] = useState<Set<string>>(new Set());
+  const stops = useMemo(() => sansRetraits(stopsBruts, retires), [stopsBruts, retires]);
+  const retraits = useRef(creerRetraitsDifferes());
   const [lists, setLists] = useState<Liste[]>([]);
   /** Liste où vont les colis ajoutés (scan, saisie, import) ; null = liste implicite. */
   const [cible, setCible] = useState<string | null>(AUTO);
@@ -172,7 +186,10 @@ export function TourneeColis({
   const [livraison, setLivraison] = useState<Stop | null>(null);
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
   const [cloture, setCloture] = useState<{ stop: Stop; mode: "choix" | "echec" } | null>(null);
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const fermerToast = useCallback(() => setToast(null), []);
+  /** Choix du mode (complet / simple) avant la création d'une tournée. */
+  const [choixCreation, setChoixCreation] = useState(false);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
@@ -181,6 +198,8 @@ export function TourneeColis({
   /** Feuille « Optimiser l'ordre » : départ et arrivée. */
   const [feuilleOptim, setFeuilleOptim] = useState(false);
   const horaires = useHoraires(run, stops);
+  const { simple, basculer: basculerMode } = useModeSimple(run, setToast);
+  const { lancerAppel, proposition: propositionAppel } = useSuiviAppel(stops, (s) => void basculerContact(s, "contact_phone", true));
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -240,11 +259,17 @@ export function TourneeColis({
     chargerTournee(id);
   }
 
-  async function nouvelleTournee() {
+  /** « Nouvelle tournée » : l'encadrement affecte, un chauffeur choisit d'abord son interface (complète ou simple). */
+  function nouvelleTournee() {
     if (encadrement && !conduit) { setAffectationOuverte(true); return; }
+    setChoixCreation(true);
+  }
+
+  async function creerTournee(modeSimple: boolean) {
     setBusy("nouvelle");
     try {
-      const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({}) });
+      const { run: cree } = await api<{ run: Run }>("/api/colis/tournees", { method: "POST", body: JSON.stringify({ mode_simple: modeSimple }) });
+      setChoixCreation(false);
       try {
         localStorage.setItem("godac-tournee-colis", cree.id);
       } catch {
@@ -253,6 +278,7 @@ export function TourneeColis({
       await recharger(cree.id);
       setToast({ ok: true, text: `${cree.name ?? "Tournée"} créée : scannez vos colis.` });
     } catch (e) {
+      setChoixCreation(false);
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
       setBusy(null);
@@ -317,11 +343,16 @@ export function TourneeColis({
       setBrouillons(brouillons.slice(1));
     }
   }, [scanner, draft, brouillons]);
+  // Retraits en attente d'annulation : envoyés tout de suite si l'écran se ferme.
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
+    const envoyer = () => void retraits.current.vider();
+    window.addEventListener("pagehide", envoyer);
+    const r = retraits.current;
+    return () => {
+      window.removeEventListener("pagehide", envoyer);
+      void r.vider();
+    };
+  }, []);
 
   async function ajouter(d: Draft) {
     const creneau = validerChoix(d.creneau ?? CRENEAU_AUCUN);
@@ -567,8 +598,8 @@ export function TourneeColis({
     setToast({ ok: true, text: role === "premier" ? "📌 Cet arrêt sera toujours le premier : réoptimisez pour recalculer le reste." : "📌 Cet arrêt sera toujours le dernier : réoptimisez pour recalculer le reste." });
   }
 
-  /** Clôture (livré / échec avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
-  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null }) {
+  /** Clôture (livré / non livré avec motif) ou annulation d'un arrêt, dans n'importe quel ordre. */
+  async function statut(s: Stop, status: Stop["status"], echec?: { motif: MotifEchec; precision: string | null; contacts?: DemandeContacts }, annulable = false) {
     setStops((all) =>
       all.map((x) =>
         x.id === s.id
@@ -582,12 +613,26 @@ export function TourneeColis({
           : x,
       ),
     );
+    if (echec?.contacts) setStops((all) => appliquerContacts(all, s.id, echec.contacts!));
+    const corps = JSON.stringify({ status, run_id: run?.id, ...(echec ? { motif: echec.motif, precision: echec.precision, ...echec.contacts } : {}) });
     try {
-      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+      await api(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: corps });
+      // Livré / Non livré en 1 clic (mode simple) : « Annuler » reste à portée quelques secondes.
+      if (annulable) {
+        setToast({
+          ok: true,
+          text: status === "delivered" ? "Livré" : "Non livré (absent)",
+          dureeMs: DELAI_ANNULATION_MS,
+          actions: [
+            { label: "Annuler", onClick: () => void statut({ ...s, status }, "pending") },
+            ...(status === "failed" ? [{ label: "Préciser", onClick: () => setCloture({ stop: { ...s, status: "failed", failure_reason: echec?.motif ?? "absent" }, mode: "echec" }) }] : []),
+          ],
+        });
+      }
     } catch (e) {
       if (isNetworkFailure(e)) {
         try {
-          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: JSON.stringify({ status, run_id: run?.id, ...(echec ?? {}) }) });
+          await enqueueOfflineMutation(`/api/colis/arrets/${s.id}`, { method: "PATCH", body: corps });
           setToast({ ok: true, text: "Action enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
           return;
         } catch (queueError) {
@@ -598,10 +643,55 @@ export function TourneeColis({
     }
   }
 
-  async function supprimer(s: Stop) {
-    if (!(await confirmer({ titre: "Retirer cet arrêt ?", message: `« ${s.address} » sera retiré de la tournée colis.`, action: "Retirer", danger: true }))) return;
-    setStops((all) => all.filter((x) => x.id !== s.id));
-    await api(`/api/colis/arrets/${s.id}`, { method: "DELETE" }).catch(() => recharger(run?.id));
+  /** « Non livré » : 1 clic en mode simple (motif par défaut, précision ensuite), sinon la fiche du motif. */
+  function demanderNonLivre(s: Stop, mode: "choix" | "echec") {
+    if (simple && mode === "echec") void statut(s, "failed", { motif: motifParDefaut(s.kind), precision: null }, true);
+    else setCloture({ stop: s, mode });
+  }
+
+  /** Motif, précision ou contacts d'un arrêt déjà « Non livré », corrigés après coup. */
+  async function preciserNonLivre(s: Stop, motif: MotifEchec, precision: string | null, contacts: DemandeContacts) {
+    setStops((all) => appliquerContacts(all.map((x) => (x.id === s.id ? { ...x, failure_reason: motif } : x)), s.id, contacts));
+    try {
+      await patchArret(s.id, { run_id: run?.id, motif, precision, ...contacts });
+      setToast({ ok: true, text: "Non livré mis à jour." });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+      await recharger(run?.id);
+    }
+  }
+
+  /** « Message envoyé » / « Eu au téléphone » : une coche, 1 clic. */
+  async function basculerContact(s: Stop, champ: ChampContact, valeur: boolean) {
+    setStops((all) => appliquerContacts(all, s.id, { [champ]: valeur }));
+    try {
+      await patchArret(s.id, { run_id: run?.id, [champ]: valeur });
+    } catch (e) {
+      setToast({ ok: false, text: networkErrorMessage(e) });
+      await recharger(run?.id);
+    }
+  }
+
+  /** Retire l'adresse sans confirmation : « Annuler » la remet pendant quelques secondes, puis la suppression part. */
+  function supprimer(s: Stop) {
+    setRetires((r) => new Set(r).add(s.id));
+    const libere = () =>
+      setRetires((r) => {
+        const n = new Set(r);
+        n.delete(s.id);
+        return n;
+      });
+    retraits.current.planifier(s.id, async () => {
+      try {
+        await retirerArret(s.id, document.visibilityState === "hidden");
+        setStops((all) => all.filter((x) => x.id !== s.id));
+      } catch (e) {
+        setToast({ ok: false, text: networkErrorMessage(e) });
+      } finally {
+        libere();
+      }
+    });
+    setToast({ ok: true, text: "Adresse retirée", dureeMs: DELAI_ANNULATION_MS, actions: [{ label: "Annuler", onClick: () => retraits.current.annuler(s.id) && libere() }] });
   }
 
   async function enregistrerEdition() {
@@ -631,8 +721,9 @@ export function TourneeColis({
     }
   }
 
-  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite. */
+  /** « Livré » ouvre la feuille de livraison (mode de remise, preuve) ; une ramasse est simplement marquée faite ; en mode simple, tout se clôt en 1 clic. */
   function terminer(s: Stop) {
+    if (simple) return statut(s, "delivered", undefined, true);
     if (estRamasse(s)) return statut(s, "delivered");
     setLivraison(s);
   }
@@ -802,11 +893,8 @@ export function TourneeColis({
     return (
       <div className="flex flex-col gap-4">
         {modalAffectation}
-        {toast && (
-          <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
-            {toast.text}
-          </p>
-        )}
+        {choixCreation && <ChoixModeTournee busy={busy !== null} onChoisir={(m) => void creerTournee(m)} onFermer={() => setChoixCreation(false)} />}
+        <ToastColis toast={toast} onFermer={fermerToast} haut="top-4" />
         <Card className="flex flex-col items-start gap-3">
           <h2 className="text-lg">Aucune tournée colis en cours</h2>
           <p className="text-sm text-navy/65">Créez une tournée colis, scannez vos colis, puis laissez GODAC calculer l&apos;ordre de passage. Vous pouvez en faire plusieurs par jour.</p>
@@ -924,11 +1012,9 @@ export function TourneeColis({
 
   return (
     <div className="flex flex-col gap-4 pb-24">
-      {toast && (
-        <p role="status" className={`fixed inset-x-4 top-4 z-[70] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-pop ${toast.ok ? "bg-marine text-white" : "bg-orange text-on-orange"}`}>
-          {toast.text}
-        </p>
-      )}
+      <ToastColis toast={toast} onFermer={fermerToast} haut="top-4" />
+      {propositionAppel}
+      {choixCreation && <ChoixModeTournee busy={busy !== null} onChoisir={(m) => void creerTournee(m)} onFermer={() => setChoixCreation(false)} />}
       {cloture && (
         <ClotureSheet
           stop={cloture.stop}
@@ -941,10 +1027,11 @@ export function TourneeColis({
             setCloture(null);
             terminer(s);
           }}
-          onEchec={async (motif, precision) => {
+          onEchec={async (motif, precision, contacts) => {
             const s = cloture.stop;
             setCloture(null);
-            await statut(s, "failed", { motif, precision });
+            if (s.status === "failed") await preciserNonLivre(s, motif, precision, contacts);
+            else await statut(s, "failed", { motif, precision, contacts });
           }}
         />
       )}
@@ -1007,6 +1094,7 @@ export function TourneeColis({
           </button>}
         </div>
       </div>
+      {run.status !== "done" && <InterrupteurMode simple={simple} onChange={(v) => void basculerMode(v)} />}
       <label className="relative block">
         <span className="sr-only">Rechercher une adresse dans la tournée</span>
         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45">⌕</span>
@@ -1061,7 +1149,7 @@ export function TourneeColis({
           </div>
           {prochain.phone && (
             <div className="grid grid-cols-2 gap-2">
-              <a href={lienTel(prochain.phone)} className="btn-secondary justify-center border-teal/70 !py-3 text-teal-ink">
+              <a href={lienTel(prochain.phone)} onClick={() => lancerAppel(prochain)} className="btn-secondary justify-center border-teal/70 !py-3 text-teal-ink">
                 <IconPhone className="h-4 w-4" /> Appeler
               </a>
               <a href={lienSms(prochain.phone, SMS_ARRIVEE)} className="btn-secondary justify-center !py-3">
@@ -1077,9 +1165,9 @@ export function TourneeColis({
               <IconMapPin className="h-4 w-4" /> Google Maps
             </a>
             <button type="button" className="btn-primary justify-center !py-3 text-base" onClick={() => terminer(prochain)}>
-              {estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(prochain) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(prochain)}
+              {!simple && estRamasse(prochain) ? <IconRamasse className="h-5 w-5" /> : !simple && estPointRelais(prochain) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleLivre(simple, prochain)}
             </button>
-            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
+            <button type="button" className="btn-secondary justify-center !py-3 text-orange-ink" onClick={() => demanderNonLivre(prochain, "echec")}>
               <IconX className="h-5 w-5" /> Non livré
             </button>
           </div>
@@ -1345,6 +1433,7 @@ export function TourneeColis({
                               estRamasse(s) && s.status !== "pending" && libelleStatut(s),
                               s.status === "delivered" && libellePreuve(s),
                               s.status === "failed" && libelleMotif(s.failure_reason),
+                              libelleContacts(s),
                               s.lat === null && "⚠ adresse non localisée",
                             ]
                               .filter(Boolean)
@@ -1359,7 +1448,7 @@ export function TourneeColis({
                           )}
                         </div>
                         {s.phone && s.status === "pending" && (
-                          <a href={lienTel(s.phone)} className="btn-ghost !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
+                          <a href={lienTel(s.phone)} onClick={() => lancerAppel(s)} className="btn-ghost min-h-[44px] !px-2 !py-1 text-teal-ink" aria-label={`Appeler ${s.recipient ?? s.address} (${s.phone})`}>
                             <IconPhone className="h-4 w-4" />
                           </a>
                         )}
@@ -1368,24 +1457,35 @@ export function TourneeColis({
                             📷 Photo
                           </a>
                         )}
+                        {s.status === "failed" && run.status !== "done" && (
+                          <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs" onClick={() => setCloture({ stop: s, mode: "echec" })}>
+                            Préciser
+                          </button>
+                        )}
                         {s.status !== "pending" && run.status !== "done" && (
-                          <button type="button" className="btn-ghost !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
+                          <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs" onClick={() => statut(s, "pending")}>
                             Annuler
                           </button>
                         )}
                       </div>
                       {s.status === "pending" && run.status !== "done" && edition?.id !== s.id && (
                         <div className="mt-1.5 flex flex-wrap gap-1 pl-9 text-xs">
-                          {enLivraison && (
-                            <button
-                              type="button"
-                              className="btn-secondary !px-3 !py-1 font-semibold"
-                              onClick={() => setCloture({ stop: s, mode: "choix" })}
-                              aria-label={`Clôturer ${s.address}`}
-                            >
-                              Clôturer
-                            </button>
-                          )}
+                          {enLivraison &&
+                            (simple ? (
+                              <>
+                                <button type="button" className="btn-primary min-h-[44px] !px-3 !py-1 font-semibold" onClick={() => void terminer(s)} aria-label={`Livré — ${s.address}`}>
+                                  Livré
+                                </button>
+                                <button type="button" className="btn-secondary min-h-[44px] !px-3 !py-1 font-semibold text-orange-ink" onClick={() => demanderNonLivre(s, "echec")} aria-label={`Non livré — ${s.address}`}>
+                                  Non livré
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="btn-secondary min-h-[44px] !px-3 !py-1 font-semibold" onClick={() => setCloture({ stop: s, mode: "choix" })} aria-label={`Clôturer ${s.address}`}>
+                                Clôturer
+                              </button>
+                            ))}
+                          <PastillesContact stop={s} onChange={(champ, v) => void basculerContact(s, champ, v)} />
                           {s.lat !== null && (
                             epingleDe(choix.depart, choix.arrivee, s.id) ? (
                               <button type="button" className="btn-ghost min-h-[44px] !px-3 sm:min-h-0 sm:!px-2 sm:!py-1" onClick={() => epingleArret(s, null)} aria-label={`Retirer l'épingle de ${s.address}`}>
@@ -1429,7 +1529,7 @@ export function TourneeColis({
                           <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => setHorairesStop(s)} aria-label={`Horaires — ${s.address}`}>
                             Horaires
                           </button>
-                          <button type="button" className="btn-ghost !px-2 !py-1 text-orange-ink" onClick={() => supprimer(s)} aria-label={`Retirer ${s.address}`}>
+                          <button type="button" className="btn-ghost min-h-[44px] !px-2 !py-1 text-orange-ink" onClick={() => supprimer(s)} aria-label={`Retirer ${s.address}`}>
                             Retirer
                           </button>
                           {multi && lists.length > 1 && (

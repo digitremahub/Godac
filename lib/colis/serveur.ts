@@ -186,6 +186,38 @@ export async function ecrireExtremitesRun(supabase: SupabaseClient, runId: strin
   throw new Error(error.message);
 }
 
+/**
+ * Mode simple de la tournée (migration 20261103000006). `persiste` est faux
+ * tant que la migration n'est pas appliquée : l'appareil garde alors le choix.
+ */
+export async function lireModeSimpleRun(supabase: SupabaseClient, runId: string): Promise<{ modeSimple: boolean; persiste: boolean }> {
+  const { data, error } = await supabase.from("delivery_runs").select("mode_simple").eq("id", runId).maybeSingle();
+  if (error || !data) return { modeSimple: false, persiste: false };
+  return { modeSimple: (data as { mode_simple?: boolean | null }).mode_simple === true, persiste: true };
+}
+
+/** Mémorise le mode ; false si la colonne n'existe pas encore (migration non appliquée). */
+export async function ecrireModeSimpleRun(supabase: SupabaseClient, runId: string, modeSimple: boolean): Promise<boolean> {
+  const { error } = await supabase.from("delivery_runs").update({ mode_simple: modeSimple }).eq("id", runId);
+  if (!error) return true;
+  if (estSchemaManquant(error)) return false;
+  throw new Error(error.message);
+}
+
+/** Contacts du client (message, téléphone) de chaque arrêt (migration 20261103000006 ; faux partout si elle n'est pas appliquée). */
+export async function avecContacts<T extends { id: string }>(supabase: SupabaseClient, stops: T[]): Promise<(T & { contact_message: boolean; contact_phone: boolean; contact_at: string | null })[]> {
+  const contacts = new Map<string, { contact_message: boolean | null; contact_phone: boolean | null; contact_at: string | null }>();
+  for (let i = 0; i < stops.length; i += 200) {
+    const { data, error } = await supabase.from("delivery_stops").select("id, contact_message, contact_phone, contact_at").in("id", stops.slice(i, i + 200).map((s) => s.id));
+    if (error) break;
+    for (const c of (data ?? []) as { id: string; contact_message: boolean | null; contact_phone: boolean | null; contact_at: string | null }[]) contacts.set(c.id, c);
+  }
+  return stops.map((s) => {
+    const c = contacts.get(s.id);
+    return { ...s, contact_message: c?.contact_message === true, contact_phone: c?.contact_phone === true, contact_at: c?.contact_at ?? null };
+  });
+}
+
 /** Listes d'une tournée, dans leur ordre. */
 export async function listesDeTournee(supabase: SupabaseClient, runId: string): Promise<Liste[]> {
   const { data } = await supabase.from("delivery_lists").select(LIST_FIELDS).eq("run_id", runId).order("position").order("created_at");

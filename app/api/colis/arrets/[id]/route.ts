@@ -12,12 +12,17 @@ import { MESSAGE_TOURNEE_CLOTUREE, MOTIFS_ECHEC, libelleMotif, refusCloture, tou
 import { TYPES_ARRET, type TypeArret } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 import { reordonner } from "@/lib/colis/reordonner";
+import { majContacts } from "@/lib/colis/contacts";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
   /** Échec : motif (« absent », « adresse_introuvable »…) et précision facultative, ajoutée aux consignes. */
   motif: z.enum(MOTIFS_ECHEC.map((m) => m.key) as [string, ...string[]]).optional(),
   precision: z.string().trim().max(200).nullable().optional(),
+  /** Contacts du client : « Message envoyé » et « Eu au téléphone » (cochés ou décochés, y compris après la clôture de l'arrêt). */
+  contact_message: z.boolean().optional(),
+  contact_phone: z.boolean().optional(),
   /** Tournée attendue : l'arrêt doit lui appartenir (clôture depuis la liste). */
   run_id: z.string().uuid().optional(),
   /** Livraison, ramasse (enlèvement chez un expéditeur) ou point relais. */
@@ -65,7 +70,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const creneauRefuse = parsed.error.issues.find((i) => i.path[0] === "creneau");
     return NextResponse.json({ error: creneauRefuse?.message ?? "Requête invalide." }, { status: 400 });
   }
-  const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, deposer, list_id, creneau } = parsed.data;
+  const { adresse, status, motif, precision, run_id, type, relais, poids, notes, destinataire, telephone, parcel_count, packages_picked_up, packages_delivered, deplacer, deposer, list_id, creneau, contact_message, contact_phone } = parsed.data;
 
   // Tournée clôturée : plus aucune modification de ses arrêts (ni annulation
   // d'une livraison, ni réordonnancement). La base le refuse aussi
@@ -174,6 +179,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       update.notes = [actuel.notes, `${libelleMotif(motif ?? "absent")} : ${precision}`].filter(Boolean).join(" · ").slice(0, 500);
     }
   }
+  // Motif / précision d'un « Non livré » corrigés après coup (mode simple : motif par défaut, précisé ensuite).
+  if (!status && (motif || precision)) {
+    const { data: actuel } = await supabase.from("delivery_stops").select("status, notes").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (!actuel) return NextResponse.json({ error: "Arrêt introuvable." }, { status: 404 });
+    if (actuel.status !== "failed") return NextResponse.json({ error: "Seul un arrêt non livré a un motif." }, { status: 409 });
+    if (motif) update.failure_reason = motif;
+    if (precision) update.notes = [actuel.notes, `${libelleMotif(motif ?? "absent")} : ${precision}`].filter(Boolean).join(" · ").slice(0, 500);
+  }
+  // Contacts : lus de façon tolérante (colonnes absentes tant que la migration n'est pas appliquée).
+  let contacts: { update: Record<string, unknown>; details: string } | null = null;
+  if (contact_message !== undefined || contact_phone !== undefined) {
+    const { data: avant } = await supabase.from("delivery_stops").select("contact_message, contact_phone, contact_at").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    contacts = majContacts(avant ?? {}, { ...(contact_message !== undefined ? { contact_message } : {}), ...(contact_phone !== undefined ? { contact_phone } : {}) }, new Date().toISOString());
+    if (contacts) Object.assign(update, contacts.update);
+  }
   if (type) {
     update.kind = type;
     if (type !== "point_relais" && !status) update.relay_name = null;
@@ -186,10 +206,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const geo = await geocodeAddress(adresse, await codePays(appUser.organization_id));
     Object.assign(update, { address: adresse, lat: geo?.lat ?? null, lng: geo?.lng ?? null });
   }
-  let maj = supabase.from("delivery_stops").update(update).eq("id", id).eq("organization_id", appUser.organization_id);
-  // Garde contre deux clôtures simultanées (deux téléphones, double appui).
-  if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
-  const { data, error } = await maj.select(`${STOP_FIELDS}, run_id`).maybeSingle();
+  const ecrire = (colonnes: Record<string, unknown>) => {
+    let maj = supabase.from("delivery_stops").update(colonnes).eq("id", id).eq("organization_id", appUser.organization_id);
+    // Garde contre deux clôtures simultanées (deux téléphones, double appui).
+    if (status) maj = status === "pending" ? maj.neq("status", "pending") : maj.eq("status", "pending");
+    return maj.select(`${STOP_FIELDS}, run_id`).maybeSingle();
+  };
+  let { data, error } = await ecrire(update);
+  // Colonnes de contact absentes (migration non appliquée) : le reste de la demande passe quand même.
+  if (error && contacts && estSchemaManquant(error)) {
+    const { contact_message: _m, contact_phone: _p, contact_at: _a, ...sansContacts } = update;
+    contacts = null;
+    if (!Object.keys(sansContacts).length) return NextResponse.json({ error: "Contacts indisponibles : la mise à jour de la base n'est pas encore appliquée." }, { status: 503 });
+    ({ data, error } = await ecrire(sansContacts));
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: status ? "Arrêt déjà clôturé ou modifié entre-temps : actualisez." : "Arrêt introuvable." }, { status: status ? 409 : 404 });
   const events: Record<string, unknown>[] = [];
@@ -216,8 +246,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     event_type: "pickup_count_recorded", new_value: { packages_picked_up },
     details: `Nombre réel de colis ramassés enregistré : ${packages_picked_up ?? "inconnu"}`,
   });
+  if (contacts) events.push({
+    organization_id: appUser.organization_id, run_id: data.run_id, stop_id: data.id, actor_id: appUser.id,
+    event_type: "contact_recorded", new_value: { contact_message: contacts.update.contact_message, contact_phone: contacts.update.contact_phone },
+    details: contacts.details,
+  });
   if (events.length) await journaliserArret(supabase, events);
-  return NextResponse.json({ stop: data });
+  return NextResponse.json({ stop: { ...data, ...(contacts ? { contact_message: contacts.update.contact_message, contact_phone: contacts.update.contact_phone, contact_at: contacts.update.contact_at } : {}) } });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
