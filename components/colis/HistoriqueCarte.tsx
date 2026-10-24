@@ -246,7 +246,7 @@ export default function HistoriqueCarte({ runId, stops, depot }: Props) {
             <span className="inline-block h-3 w-3 rounded-full" style={{ background: C.livre }} aria-hidden="true" /> Fait
           </li>
           <li className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-full" style={{ background: C.echec }} aria-hidden="true" /> Échec
+            <span className="inline-block h-3 w-3 rounded-full" style={{ background: C.echec }} aria-hidden="true" /> Non livré
           </li>
           <li className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-3 rounded-full" style={{ background: C.nonFait }} aria-hidden="true" /> Non fait

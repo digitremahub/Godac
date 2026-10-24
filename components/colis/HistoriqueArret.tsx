@@ -17,7 +17,7 @@ const LABELS: Record<string, string> = {
   stop_created: "Arrêt ajouté à la tournée",
   status_changed: "Changement de statut",
   delivered: "Livraison / ramasse effectuée",
-  failed: "Échec de livraison",
+  failed: "Non livré",
   reopened: "Arrêt rouvert",
   reordered: "Ordre de tournée modifié",
   list_changed: "Liste de tournée modifiée",

@@ -1078,7 +1078,7 @@ export function GoNavigation(p: GoNavigationProps) {
           {limiteKmh !== null && (
             <span className="flex h-12 w-12 items-center justify-center rounded-full border-[5px] bg-white text-base font-extrabold text-black shadow-pop" style={{ borderColor: "#d62718" }}>{limiteKmh}</span>
           )}
-          <span className={`flex h-14 min-w-[3.5rem] flex-col items-center justify-center rounded-2xl px-2 shadow-pop ${enDepassement(vitesseKmh, limiteKmh) ? "bg-orange text-on-orange" : "bg-marine text-white"}`}>
+          <span className="flex h-14 min-w-[3.5rem] flex-col items-center justify-center rounded-2xl bg-marine px-2 text-white shadow-pop" style={enDepassement(vitesseKmh, limiteKmh) ? { backgroundColor: "#d62718" } : undefined}>
             <span className="text-xl font-extrabold leading-none tabular-nums">{vitesseKmh}</span>
             <span className="text-[10px] font-semibold leading-none opacity-80">km/h</span>
           </span>
@@ -1501,7 +1501,7 @@ function CarteArret({
             {estRamasse(s) ? <IconRamasse className="h-5 w-5" /> : estPointRelais(s) ? <IconPointRelais className="h-5 w-5" /> : <IconCheck className="h-5 w-5" />} {libelleFait(s)}
           </button>
           <button type="button" className="btn-secondary min-h-[48px] justify-center !px-2 !py-2.5 text-orange-ink" onClick={() => onCloture(s, "echec")}>
-            <IconX className="h-5 w-5" /> Échec
+            <IconX className="h-5 w-5" /> Non livré
           </button>
         </div>
       )}

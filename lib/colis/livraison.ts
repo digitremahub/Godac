@@ -131,6 +131,6 @@ export function libelleStatut(s: { kind?: string | null; status: string }): stri
   }
   const ramasse = estRamasse(s);
   if (s.status === "delivered") return ramasse ? "Ramassé" : "Livré";
-  if (s.status === "failed") return ramasse ? "Ramasse manquée" : "Échec / absent";
+  if (s.status === "failed") return ramasse ? "Ramasse manquée" : "Non livré";
   return ramasse ? "Ramasse non faite" : "Non fait";
 }

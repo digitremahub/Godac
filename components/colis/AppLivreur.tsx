@@ -1072,7 +1072,7 @@ export function AppLivreur({
                 {estRamasse(prochain) ? <IconRamasse className="h-6 w-6" /> : estPointRelais(prochain) ? <IconPointRelais className="h-6 w-6" /> : <IconCheck className="h-6 w-6" />} {libelleFait(prochain)}
               </button>
               <button type="button" className="btn-secondary justify-center !py-4 text-orange-ink" onClick={() => setCloture({ stop: prochain, mode: "echec" })}>
-                <IconX className="h-5 w-5" /> Absent
+                <IconX className="h-5 w-5" /> Non livré
               </button>
             </div>
           </section>

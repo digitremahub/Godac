@@ -67,7 +67,7 @@ export function HistoriqueTournees({
                 <th className="px-3 py-2.5 text-right">Listes</th>
                 <th className="px-3 py-2.5 text-right">Arrêts</th>
                 <th className="px-3 py-2.5 text-right">Livrés</th>
-                <th className="px-3 py-2.5 text-right">Échecs</th>
+                <th className="px-3 py-2.5 text-right">Non livrés</th>
                 <th className="px-3 py-2.5 text-right">Colis</th>
                 <th className="px-3 py-2.5">Début → fin</th>
                 <th className="px-3 py-2.5 text-right">Km ≈</th>
@@ -206,7 +206,7 @@ function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awai
   );
 }
 
-const STATUT_ARRET: Record<string, string> = { delivered: "Livré", failed: "Échec", pending: "Non fait" };
+const STATUT_ARRET: Record<string, string> = { delivered: "Livré", failed: "Non livré", pending: "Non fait" };
 
 /** Résultats de la recherche d'un colis (code, destinataire, adresse) sur la période. */
 function ResultatsColis({
