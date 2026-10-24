@@ -259,10 +259,24 @@ export function GoNavigation(p: GoNavigationProps) {
         vueRef.current = "libre";
         setVue("libre");
       };
+      // Zoom, rotation et inclinaison à deux doigts : on reste en vue conduite, la caméra
+      // suit toujours la voiture avec l'orientation / l'inclinaison / le zoom choisis.
+      const debutGeste = (e: { originalEvent?: unknown }) => {
+        if (e.originalEvent && vueRef.current === "conduite") gestePerso.current = true;
+      };
       m.on("dragstart", quitterSuivi);
-      m.on("zoomstart", quitterSuivi);
-      m.on("rotatestart", quitterSuivi);
-      m.on("pitchstart", quitterSuivi);
+      m.on("zoomstart", debutGeste);
+      m.on("rotatestart", debutGeste);
+      m.on("pitchstart", debutGeste);
+      m.on("moveend", () => {
+        if (!gestePerso.current) return;
+        gestePerso.current = false;
+        const e = affiche.current;
+        if (!e || vueRef.current !== "conduite") return;
+        let dc = m.getBearing() - e.cap;
+        dc = ((((dc + 180) % 360) + 360) % 360) - 180;
+        persoCamera.current = { cap: dc, pitch: Math.max(0, Math.min(60, m.getPitch())), zoom: e.zoom === null ? 0 : m.getZoom() - e.zoom };
+      });
       // Boussole : le « N » pointe vers le nord de la carte.
       m.on("rotate", () => {
         if (boussoleRef.current) boussoleRef.current.style.transform = `rotate(${-m.getBearing()}deg)`;
@@ -304,11 +318,16 @@ export function GoNavigation(p: GoNavigationProps) {
   /** Marges de la vue conduite, recalculées à chaque point GPS (pas à chaque image). */
   const margesCache = useRef<ReturnType<typeof margesConduite> | null>(null);
 
+  /** Rotation / inclinaison / zoom choisis à la main en vue conduite (relatifs au cap et au zoom automatiques) : remis à zéro au recentrage. */
+  const persoCamera = useRef<{ cap: number; pitch: number | null; zoom: number }>({ cap: 0, pitch: null, zoom: 0 });
+  const gestePerso = useRef(false);
+
   function dessiner(e: EtatCamera) {
     moi.current?.setLngLat([e.lng, e.lat]).setRotation(e.cap);
     const m = carte.current;
-    if (m && vueRef.current === "conduite" && performance.now() > transitionJusqua.current) {
-      m.jumpTo({ center: [e.lng, e.lat], bearing: e.cap, zoom: e.zoom, pitch: PITCH_CONDUITE, padding: (margesCache.current ??= margesC()) });
+    if (m && vueRef.current === "conduite" && !gestePerso.current && performance.now() > transitionJusqua.current) {
+      const c = persoCamera.current;
+      m.jumpTo({ center: [e.lng, e.lat], bearing: e.cap + c.cap, zoom: e.zoom === null ? undefined : e.zoom + c.zoom, pitch: c.pitch ?? PITCH_CONDUITE, padding: (margesCache.current ??= margesC()) });
     }
   }
   function boucle(t: number) {
@@ -336,6 +355,7 @@ export function GoNavigation(p: GoNavigationProps) {
     clearTimeout(ajustement.current);
     vueRef.current = "conduite";
     setVue("conduite");
+    persoCamera.current = { cap: 0, pitch: null, zoom: 0 };
     const d = duree(800);
     transitionJusqua.current = performance.now() + d + 50;
     m.easeTo({ center: [e.lng, e.lat], bearing: e.cap, zoom: e.zoom, pitch: PITCH_CONDUITE, padding: margesC(), duration: d });
@@ -787,6 +807,32 @@ export function GoNavigation(p: GoNavigationProps) {
     setSelection(s.id);
     setFeuille("moyenne");
   }
+
+  // Plein écran sur iPhone (Safari) : pas de zoom de la page au pincement (la carte zoome seule),
+  // pas de défilement de la page derrière, retour au coin haut-gauche si la page avait glissé.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const avant = meta?.getAttribute("content") ?? null;
+    meta?.setAttribute("content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover");
+    const html = document.documentElement;
+    const body = document.body;
+    const style = { html: html.style.cssText, body: body.style.cssText };
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    window.scrollTo(0, 0);
+    const recaler = () => {
+      if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);
+    };
+    window.addEventListener("scroll", recaler, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", recaler);
+      if (meta && avant !== null) meta.setAttribute("content", avant);
+      html.style.cssText = style.html;
+      body.style.cssText = style.body;
+    };
+  }, []);
 
   const faits = stops.length - restants.length;
 
