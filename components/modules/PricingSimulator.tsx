@@ -37,6 +37,10 @@ export function PricingSimulator({
   const addonsSetupTotal = selectedAddons.reduce((sum, x) => sum + Number(x.price?.setup_price ?? 0), 0);
   const total = (plan?.monthly_base_price ?? 0) + addonsTotal;
   const setupTotal = (plan?.setup_price ?? 0) + addonsSetupTotal;
+  const firstYearTotal = setupTotal + total * 12;
+  const yearTwoTotal = total * 12;
+  const euro = (value: number) =>
+    new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
   const selection = new URLSearchParams({ plan: planId, modules: selectedAddons.map((x) => x.module.key).join(",") }).toString();
 
   return (
@@ -51,26 +55,45 @@ export function PricingSimulator({
         <ModuleSelector modules={modules} prices={prices} planId={planId} selected={selectedModuleKeys} onChange={setSelectedModuleKeys} />
       </div>
 
-      <Card className="flex flex-col gap-3 border-teal/30 bg-teal/5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-navy/70">Estimation pour le plan {plan?.name}</p>
-          <p className="text-3xl font-bold tabular-nums text-teal-ink">
-            {total.toFixed(2)} €{setupTotal > 0 ? "*" : ""}
-            <span className="text-base font-normal text-navy/60">/mois</span>
-          </p>
-          {setupTotal > 0 && (
-            <p className="text-xs text-navy/60">
-              * + {plan && setupTotal === Number(plan.setup_price) ? libelleMiseEnService(plan) : `${setupTotal.toFixed(2)} €`} de mise en service
-              {plan && plan.setup_installments > 1 && setupTotal !== Number(plan.setup_price) ? ` (formule payable en ${plan.setup_installments} fois)` : ""}
+      <Card className="flex flex-col gap-5 border-teal/30 bg-teal/5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm text-navy/70">Abonnement mensuel · plan {plan?.name}</p>
+            <p className="text-3xl font-bold tabular-nums text-teal-ink">
+              {euro(total)}<span className="text-base font-normal text-navy/60">/mois HT</span>
             </p>
-          )}
+          </div>
+          <p className="text-sm text-navy/70">Mise en service : <span className="font-semibold text-navy">{euro(setupTotal)}</span> HT</p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-navy/10 bg-white/70 p-3">
+            <p className="text-xs text-navy/60">Coût total année 1</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-navy">{euro(firstYearTotal)} HT</p>
+            <p className="mt-1 text-xs text-navy/60">Mise en service + 12 mensualités</p>
+          </div>
+          <div className="rounded-lg border border-navy/10 bg-white/70 p-3">
+            <p className="text-xs text-navy/60">Équivalent mensuel année 1</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-navy">{euro(firstYearTotal / 12)} HT/mois</p>
+            <p className="mt-1 text-xs text-navy/60">Pour comparer les offres à périmètre égal</p>
+          </div>
+          <div className="rounded-lg border border-navy/10 bg-white/70 p-3">
+            <p className="text-xs text-navy/60">Coût récurrent année 2</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-navy">{euro(yearTwoTotal)} HT</p>
+            <p className="mt-1 text-xs text-navy/60">Abonnement sur 12 mois, hors usage éventuel</p>
+          </div>
+        </div>
+        {setupTotal > 0 && (
+          <p className="text-xs text-navy/60">
+            La mise en service est facturée une seule fois. {plan && plan.setup_installments > 1 ? `Le tarif du plan prévoit un paiement en ${plan.setup_installments} fois.` : "Elle couvre le paramétrage et le démarrage selon le périmètre retenu."}
+            Les consommations hors forfait éventuelles sont indiquées séparément dans le catalogue.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
           <Link href={`/contact?${selection}`} className="btn-primary">
-            Demander une démo
+            Construire mon offre premium
           </Link>
           <Link href={`/bon-de-commande?${selection}`} className="btn-secondary">
-            Bon de commande
+            Voir le bon de commande
           </Link>
           <Link href="/sign-up" className="btn-ghost">
             Créer mon organisation
