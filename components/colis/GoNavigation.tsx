@@ -738,6 +738,11 @@ export function GoNavigation(p: GoNavigationProps) {
   const defilementAuto = useRef(0);
   /** Doigt posé sur la rangée de cartes : ni choix d'arrêt ni recentrage automatique pendant le geste. */
   const doigtCartes = useRef(false);
+  /** Vue conduite : carte regardée en glissant, sans changer le guidage tant que le chauffeur n'a pas appuyé sur « Y aller ». */
+  const [consulte, setConsulte] = useState<string | null>(null);
+  useEffect(() => {
+    if (vue !== "conduite" || cible?.id === consulte) setConsulte(null);
+  }, [vue, cible?.id, consulte]);
   const indexCible = cible ? restants.indexOf(cible) : -1;
   useEffect(() => {
     const el = defile.current;
@@ -767,7 +772,9 @@ export function GoNavigation(p: GoNavigationProps) {
         }
       });
       const s = restants[k];
-      if (s && s.id !== cible?.id) setSelection(s.id);
+      if (!s) return;
+      if (vueRef.current === "conduite") setConsulte(s.id === cible?.id ? null : s.id);
+      else if (s.id !== cible?.id) setSelection(s.id);
     }, 180);
   }
 
@@ -1238,6 +1245,7 @@ export function GoNavigation(p: GoNavigationProps) {
                       numero={numero(s)}
                       total={stops.length}
                       suivi={s.id === cible?.id}
+                      onAller={consulte === s.id ? () => { setSelection(s.id); setConsulte(null); } : undefined}
                       prochain={s.id === restants[0]?.id}
                       nomListe={multi ? nomListe(s) : null}
                       horaires={horaires}
@@ -1538,6 +1546,7 @@ function CarteArret({
   numero,
   total,
   suivi,
+  onAller,
   prochain,
   nomListe,
   horaires,
@@ -1560,6 +1569,8 @@ function CarteArret({
   numero: number;
   total: number;
   suivi: boolean;
+  /** Vue conduite : carte consultée sans être suivie ; appuyer pour y guider. */
+  onAller?: () => void;
   prochain: boolean;
   nomListe: string | null;
   horaires: Horaires;
@@ -1577,6 +1588,11 @@ function CarteArret({
       aria-label={`Arrêt ${numero} sur ${total}${suivi ? ", en cours de navigation" : ""}`}
     >
       <EncocheArret stop={s} large />
+      {onAller && (
+        <button type="button" className="btn-dark min-h-[44px] justify-center text-sm" onClick={onAller}>
+          🧭 Y aller (guidage vers cet arrêt)
+        </button>
+      )}
       <div>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-ink">
           <BadgeArret stop={s} />
