@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { longueurParcours, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 
 const depot: Point = { lat: 45.75, lng: 4.85 }; // Lyon
 
@@ -56,5 +56,19 @@ describe("optimiserOrdre sans point de départ (compte d'essai sans dépôt)", (
   it("avec un départ connu, l'arrêt le plus proche passe en premier (inchangé)", () => {
     const ordre = optimiserOrdre({ lat: 43, lng: 1.9 }, ligne, false);
     expect(ordre[0]).toBe(0);
+  });
+});
+
+describe("plusProcheVoisin : prochaine adresse la plus proche", () => {
+  const ligne = [0, 1, 2, 3, 4].map((i) => ({ lat: 43, lng: 2 + i * 0.1 }));
+  it("enchaîne toujours l'arrêt non visité le plus proche du point courant", () => {
+    const melange = [ligne[3]!, ligne[0]!, ligne[4]!, ligne[2]!, ligne[1]!];
+    // Départ à l'ouest : 0, 1, 2, 3, 4 (indices du tableau mélangé : 1, 4, 3, 0, 2).
+    expect(plusProcheVoisin({ lat: 43, lng: 1.9 }, melange)).toEqual([1, 4, 3, 0, 2]);
+  });
+  it("sans départ : part d'une extrémité, pas de l'arrêt saisi en premier", () => {
+    const melange = [ligne[2]!, ligne[0]!, ligne[4]!, ligne[1]!, ligne[3]!];
+    const ordre = plusProcheVoisin(null, melange);
+    expect(new Set([melange[ordre[0]!]!.lng, melange[ordre[ordre.length - 1]!]!.lng])).toEqual(new Set([2, 2.4]));
   });
 });

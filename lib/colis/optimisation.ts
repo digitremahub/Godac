@@ -38,7 +38,8 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
 /**
  * « Prochaine adresse la plus proche » : depuis le départ, on enchaîne
  * toujours l'arrêt non visité le plus proche du point courant. Sans départ,
- * le premier arrêt de la liste ouvre le chemin.
+ * le chemin s'ouvre sur une extrémité (l'arrêt le plus éloigné du centre),
+ * jamais sur l'arrêt qui se trouve en tête de la liste saisie.
  */
 export function plusProcheVoisin(depart: Point | null, arrets: Point[], distance: (a: Point, b: Point) => number = distanceKm): number[] {
   const restant = arrets.map((_, i) => i);
@@ -46,7 +47,16 @@ export function plusProcheVoisin(depart: Point | null, arrets: Point[], distance
   let courant: Point | null = depart;
   while (restant.length) {
     let meilleur = 0;
-    if (courant) {
+    if (!courant && arrets.length > 1) {
+      // Pas de départ : on part d'une extrémité plutôt que du premier arrêt saisi.
+      const cLat = arrets.reduce((t, p) => t + p.lat, 0) / arrets.length;
+      const cLng = arrets.reduce((t, p) => t + p.lng, 0) / arrets.length;
+      let loin = -1;
+      restant.forEach((i, k) => {
+        const d = distance({ lat: cLat, lng: cLng }, arrets[i]!);
+        if (d > loin) [loin, meilleur] = [d, k];
+      });
+    } else if (courant) {
       let dMin = Infinity;
       restant.forEach((i, k) => {
         const d = distance(courant!, arrets[i]!);

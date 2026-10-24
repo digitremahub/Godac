@@ -109,7 +109,7 @@ export async function POST(req: Request) {
   const matrice = await matriceRoutiere(pointsRoutage);
   const distance = matrice.distance;
   const retour = Boolean(ext.fin && depart && memePoint(ext.fin, depart));
-  const strategie = parsed.data.strategie ?? "optimal";
+  const strategie = parsed.data.strategie ?? "proche";
   const extremites = { premierId: ext.premierId, dernierId: ext.dernierId, fin: ext.fin, strategie };
 
   // Ordre global des villages : toutes les listes s'enchaînent dans un seul

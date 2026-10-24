@@ -18,7 +18,7 @@ import {
   simulerPassages,
   type Fenetres,
 } from "@/lib/colis/horaires";
-import { optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { sequenceParListes } from "@/lib/colis/listes";
 import { estimerAvancement, minutesTrajet } from "@/lib/colis/estimation";
 import { distanceKm } from "@/lib/colis/optimisation";
@@ -199,10 +199,10 @@ describe("heures de passage", () => {
 describe("ordre de passage avec horaires", () => {
   const pts = [est(2), est(4), est(6), est(8)];
 
-  it("sans horaires : exactement l'ordre habituel", () => {
+  it("sans horaires : exactement l'ordre habituel (prochaine adresse la plus proche)", () => {
     const arrets = [est(5), est(1), est(3), { lat: 45.76, lng: 4.86 }].map((point) => ({ point, fenetres: null }));
     const r = ordonnerAvecHoraires(depot, arrets, { debut: 480 });
-    expect(r.ordre).toEqual(optimiserOrdre(depot, arrets.map((a) => a.point)));
+    expect(r.ordre).toEqual(plusProcheVoisin(depot, arrets.map((a) => a.point)));
     expect(r.fermes).toEqual([]);
   });
 

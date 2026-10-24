@@ -388,7 +388,7 @@ export function ordonnerAvecHoraires(
     strategie?: "optimal" | "proche";
   },
 ): { ordre: number[]; fermes: number[]; impossibles: number[] } {
-  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET, distance = distanceKm, strategie = "optimal" } = options;
+  const { debut, retour = true, arrivee = null, minutesParArret = MINUTES_PAR_ARRET, distance = distanceKm, strategie = "proche" } = options;
   const n = arrets.length;
   const trajet = (a: Point | null, b: Point | null) => (a && b ? minutesTrajet(distance(a, b)) : 0);
   const fermes: number[] = [];
