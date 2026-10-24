@@ -38,7 +38,8 @@ export function longueurParcours(depart: Point | null, arrets: Point[], retour: 
 /**
  * « Prochaine adresse la plus proche » : depuis le départ, on enchaîne
  * toujours l'arrêt non visité le plus proche du point courant. Sans départ,
- * le premier arrêt de la liste ouvre le chemin.
+ * le chemin s'ouvre sur une extrémité (l'arrêt le plus éloigné du centre),
+ * jamais sur l'arrêt qui se trouve en tête de la liste saisie.
  */
 export function plusProcheVoisin(depart: Point | null, arrets: Point[], distance: (a: Point, b: Point) => number = distanceKm): number[] {
   const restant = arrets.map((_, i) => i);
@@ -46,7 +47,16 @@ export function plusProcheVoisin(depart: Point | null, arrets: Point[], distance
   let courant: Point | null = depart;
   while (restant.length) {
     let meilleur = 0;
-    if (courant) {
+    if (!courant && arrets.length > 1) {
+      // Pas de départ : on part d'une extrémité plutôt que du premier arrêt saisi.
+      const cLat = arrets.reduce((t, p) => t + p.lat, 0) / arrets.length;
+      const cLng = arrets.reduce((t, p) => t + p.lng, 0) / arrets.length;
+      let loin = -1;
+      restant.forEach((i, k) => {
+        const d = distance({ lat: cLat, lng: cLng }, arrets[i]!);
+        if (d > loin) [loin, meilleur] = [d, k];
+      });
+    } else if (courant) {
       let dMin = Infinity;
       restant.forEach((i, k) => {
         const d = distance(courant!, arrets[i]!);
@@ -89,12 +99,16 @@ export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = t
   // (dépôt, position du chauffeur), l'arrêt le plus proche doit passer en premier.
   if (n <= 1 || (n <= 2 && !arrivee && !depart)) return arrets.map((_, i) => i);
 
-  // Nœud 0 = départ (ou premier arrêt s'il n'y a pas de départ).
-  const pts: Point[] = depart ? [depart, ...arrets] : arrets;
-  const offset = depart ? 1 : 0;
+  // Nœud 0 = départ. Sans départ (compte d'essai sans dépôt, pas de GPS), un nœud
+  // fictif à distance nulle de tous les arrêts joue le départ : le chemin est alors
+  // « ouvert » et le premier arrêt n'est plus figé à sa place d'origine (sinon l'ordre
+  // de saisie imposait toujours le même sens, quoi que l'on déplace).
+  const libre = !depart;
+  const pts: Point[] = depart ? [depart, ...arrets] : [arrets[0]!, ...arrets];
+  const offset = 1;
   const m = pts.length;
-  const d: number[][] = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => (i === j ? 0 : distance(pts[i]!, pts[j]!))));
-  const ferme = retour && Boolean(depart);
+  const d: number[][] = Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => (i === j ? 0 : libre && (i === 0 || j === 0) ? 0 : distance(pts[i]!, pts[j]!))));
+  const ferme = retour && !libre;
   // Distance de chaque nœud au point d'arrivée imposé (sinon on referme sur le départ).
   const da = arrivee ? pts.map((p) => distance(p, arrivee)) : null;
 
@@ -105,7 +119,21 @@ export function optimiserOrdre(depart: Point | null, arrets: Point[], retour = t
   for (let k = 1; k < m; k++) {
     const last = tour[tour.length - 1]!;
     let best = -1;
-    for (let j = 0; j < m; j++) if (!visite[j] && (best < 0 || d[last]![j]! < d[last]![best]!)) best = j;
+    if (libre && last === 0) {
+      // Départ libre : on part d'une extrémité (l'arrêt le plus éloigné du centre).
+      const cx = arrets.reduce((t, p) => t + p.lat, 0) / n;
+      const cy = arrets.reduce((t, p) => t + p.lng, 0) / n;
+      let loin = -1;
+      for (let j = 1; j < m; j++) {
+        const dist = distance({ lat: cx, lng: cy }, pts[j]!);
+        if (dist > loin) {
+          loin = dist;
+          best = j;
+        }
+      }
+    } else {
+      for (let j = 0; j < m; j++) if (!visite[j] && (best < 0 || d[last]![j]! < d[last]![best]!)) best = j;
+    }
     tour.push(best);
     visite[best] = true;
   }

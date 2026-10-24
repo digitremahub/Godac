@@ -30,6 +30,8 @@ const bodySchema = z.object({
   arrivee: schemaArrivee.nullable().optional(),
   /** « proche » : recalcul en cours de route, prochaine adresse la plus proche depuis la position (défaut : plus court trajet). */
   strategie: z.enum(["optimal", "proche"]).optional(),
+  /** false : départ / arrivée utilisés pour ce calcul seulement, sans modifier le choix mémorisé de la tournée (optimisation ponctuelle depuis ma position ou une adresse). */
+  memoriser: z.boolean().optional(),
 });
 
 /**
@@ -94,7 +96,7 @@ export async function POST(req: Request) {
   if (!quota.ok) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
 
   // Choix mémorisé sur la tournée (sans effet tant que la migration n'est pas appliquée).
-  if (parsed.data.depart !== undefined || parsed.data.arrivee !== undefined) {
+  if (parsed.data.memoriser !== false && (parsed.data.depart !== undefined || parsed.data.arrivee !== undefined)) {
     await ecrireExtremitesRun(supabase, run.id, { depart: choixDepart, arrivee: choixArrivee }).catch(() => false);
   }
 
@@ -109,7 +111,7 @@ export async function POST(req: Request) {
   const matrice = await matriceRoutiere(pointsRoutage);
   const distance = matrice.distance;
   const retour = Boolean(ext.fin && depart && memePoint(ext.fin, depart));
-  const strategie = parsed.data.strategie ?? "optimal";
+  const strategie = parsed.data.strategie ?? "proche";
   const extremites = { premierId: ext.premierId, dernierId: ext.dernierId, fin: ext.fin, strategie };
 
   // Ordre global des villages : toutes les listes s'enchaînent dans un seul

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { BoutonGoFlottant } from "@/components/colis/BoutonGoFlottant";
 import { RetourDepot, type DestinationRetour, type InfoGasoil } from "@/components/colis/RetourDepot";
 import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
@@ -447,22 +448,29 @@ export function AppLivreur({
    * position connue), puis les arrêts restants s'enchaînent de la prochaine
    * adresse la plus proche à la suivante, jusqu'à l'arrivée choisie.
    */
-  async function reoptimiser(choix?: { depart: Depart | null; arrivee: Arrivee }): Promise<string | null> {
+  async function reoptimiser(choix?: { depart: Depart | null; arrivee: Arrivee }, origine = "votre position", ponctuel = false): Promise<string | null> {
     if (!run) return null;
     setBusy(true);
     try {
       const depuis = await lirePositionGps(maPosition);
       setMaPosition(depuis);
-      if (choix) setRun(await memoriserChoix(run, choix.depart, choix.arrivee));
+      if (choix && !ponctuel) setRun(await memoriserChoix(run, choix.depart, choix.arrivee));
       const r = await api<ResumeOptimisation>("/api/colis/optimiser", {
         method: "POST",
-        body: JSON.stringify({ run_id: run.id, depuis, strategie: "proche", ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : {}) }),
+        body: JSON.stringify({
+          run_id: run.id,
+          depuis,
+          strategie: "proche",
+          // Ponctuel (depuis ma position / une adresse choisie) : le choix mémorisé de la tournée n'est pas modifié.
+          ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : { depart: { mode: "position" } }),
+          ...(ponctuel || !choix ? { memoriser: false } : {}),
+        }),
       });
       await charger(run.id);
       const hors = r.horsHoraires.length + r.impossibles.length;
       setToast({
         ok: !hors && !r.fermes.length,
-        text: `Ordre recalculé depuis votre position : ≈ ${r.kmApres} km${r.extremites ? ` jusqu'à ${r.extremites.arrivee}` : ""}${r.finEstimee ? ` · fin vers ${heureFin(r.finEstimee)}` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
+        text: `Ordre recalculé depuis ${origine} : ≈ ${r.kmApres} km${r.extremites ? ` jusqu'à ${r.extremites.arrivee}` : ""}${r.finEstimee ? ` · fin vers ${heureFin(r.finEstimee)}` : ""}${r.distanceRoutiere === false ? " · estimation, moteur routier indisponible" : " · distances routières"}${hors ? ` · ${hors} adresse(s) hors horaires` : ""}${r.fermes.length ? ` · ${r.fermes.length} fermée(s) aujourd'hui, en fin de liste` : ""}.`,
       });
       return null;
     } catch (e) {
@@ -717,6 +725,11 @@ export function AppLivreur({
           onPasser={passerAdresseSuivante}
           onDeposer={deposer}
           onReoptimiser={() => reoptimiser().then(() => undefined)}
+          onOptimiserDepuisArret={(id) =>
+            // L'adresse choisie ouvre le parcours ; l'arrivée mémorisée (ou le retour au dépôt) est conservée.
+            reoptimiser({ depart: { mode: "arret", arret_id: id }, arrivee: choix.arrivee ?? (run && run.start_lat !== null && run.start_lng !== null ? { mode: "depot" } : { mode: "libre" }) }, "l'adresse choisie", true).then(() => undefined)
+          }
+          onReglagesOptimisation={() => setFeuilleOptim(true)}
           onItineraire={setItineraire}
           onPosition={setMaPosition}
           traceActive={traceActive}
@@ -757,18 +770,13 @@ export function AppLivreur({
 
       {/* Bouton flottant : retour dans GO Navigation depuis la liste, la carte ou une fiche. */}
       {run?.status === "in_progress" && !enNavigation && !enPreparation && pending.length > 0 && (
-        <button
-          type="button"
-          onClick={() => {
+        <BoutonGoFlottant
+          onOuvrir={() => {
             setDetailsStop(null);
             setFicheEdition(false);
             changerVue("navigation");
           }}
-          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-4 z-[60] flex min-h-[56px] items-center gap-2 rounded-full bg-teal px-5 text-base font-bold text-on-teal shadow-pop"
-          aria-label="Retourner dans GO Navigation"
-        >
-          <IconNavigation className="h-5 w-5" /> GO
-        </button>
+        />
       )}
 
       {toast && (

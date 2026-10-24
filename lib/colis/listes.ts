@@ -159,7 +159,7 @@ export function sequenceParListes(
   }));
   const derniere = groupes.reduce((k, g, i) => (g.avecGps.length || g.dernier ? i : k), -1);
   // Point où la tournée se termine après le dernier arrêt.
-  const strategie = horaires?.strategie ?? extremites?.strategie ?? "optimal";
+  const strategie = horaires?.strategie ?? extremites?.strategie ?? "proche";
   const cibleFin = extremites?.fin !== undefined ? extremites.fin : retour ? depart : null;
 
   const sequence = faits.map((s) => s.id);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { longueurParcours, optimiserOrdre, type Point } from "@/lib/colis/optimisation";
+import { longueurParcours, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 
 const depot: Point = { lat: 45.75, lng: 4.85 }; // Lyon
 
@@ -30,5 +30,45 @@ describe("optimiserOrdre", () => {
     expect(optimiserOrdre(depot, [])).toEqual([]);
     expect(optimiserOrdre(depot, [depot])).toEqual([0]);
     expect(optimiserOrdre(null, [depot, { lat: 46, lng: 5 }, { lat: 45.8, lng: 4.9 }]).length).toBe(3);
+  });
+});
+
+describe("optimiserOrdre sans point de départ (compte d'essai sans dépôt)", () => {
+  // Cinq arrêts alignés d'ouest en est ; le point de départ n'est pas connu.
+  const ligne = [0, 1, 2, 3, 4].map((i) => ({ lat: 43, lng: 2 + i * 0.1 }));
+  const longueur = (ordre: number[], pts: typeof ligne) => ordre.slice(1).reduce((t, idx, k) => t + Math.hypot(pts[idx]!.lat - pts[ordre[k]!]!.lat, pts[idx]!.lng - pts[ordre[k]!]!.lng), 0);
+
+  it("ne fige plus le premier arrêt saisi : un ordre mélangé donne le chemin le plus court", () => {
+    const melange = [ligne[2]!, ligne[0]!, ligne[4]!, ligne[1]!, ligne[3]!];
+    const ordre = optimiserOrdre(null, melange, true);
+    expect([...ordre].sort()).toEqual([0, 1, 2, 3, 4]);
+    const optimum = 0.4;
+    expect(longueur(ordre, melange)).toBeCloseTo(optimum, 6);
+  });
+
+  it("le résultat ne dépend pas de l'arrêt placé en premier", () => {
+    const a = [ligne[1]!, ligne[0]!, ligne[2]!, ligne[3]!, ligne[4]!];
+    const b = [ligne[3]!, ligne[4]!, ligne[0]!, ligne[2]!, ligne[1]!];
+    expect(longueur(optimiserOrdre(null, a, true), a)).toBeCloseTo(0.4, 6);
+    expect(longueur(optimiserOrdre(null, b, true), b)).toBeCloseTo(0.4, 6);
+  });
+
+  it("avec un départ connu, l'arrêt le plus proche passe en premier (inchangé)", () => {
+    const ordre = optimiserOrdre({ lat: 43, lng: 1.9 }, ligne, false);
+    expect(ordre[0]).toBe(0);
+  });
+});
+
+describe("plusProcheVoisin : prochaine adresse la plus proche", () => {
+  const ligne = [0, 1, 2, 3, 4].map((i) => ({ lat: 43, lng: 2 + i * 0.1 }));
+  it("enchaîne toujours l'arrêt non visité le plus proche du point courant", () => {
+    const melange = [ligne[3]!, ligne[0]!, ligne[4]!, ligne[2]!, ligne[1]!];
+    // Départ à l'ouest : 0, 1, 2, 3, 4 (indices du tableau mélangé : 1, 4, 3, 0, 2).
+    expect(plusProcheVoisin({ lat: 43, lng: 1.9 }, melange)).toEqual([1, 4, 3, 0, 2]);
+  });
+  it("sans départ : part d'une extrémité, pas de l'arrêt saisi en premier", () => {
+    const melange = [ligne[2]!, ligne[0]!, ligne[4]!, ligne[1]!, ligne[3]!];
+    const ordre = plusProcheVoisin(null, melange);
+    expect(new Set([melange[ordre[0]!]!.lng, melange[ordre[ordre.length - 1]!]!.lng])).toEqual(new Set([2, 2.4]));
   });
 });

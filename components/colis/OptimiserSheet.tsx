@@ -130,7 +130,8 @@ export function OptimiserSheet({
     if (d0?.mode === "adresse" && !enLivraison) return "adresse";
     if (d0?.mode === "position" || enLivraison) return "position";
     if (d0?.mode === "depot" && depotConnu) return "depot";
-    return depotConnu ? "depot" : "libre";
+    // Sans dépôt (compte d'essai) : la position actuelle ; sans GPS, le serveur calcule le chemin le plus court sans départ imposé.
+    return depotConnu ? "depot" : "position";
   });
   const [dArret, setDArret] = useState(d0?.mode === "arret" && idsValides.has(d0.arret_id) ? d0.arret_id : "");
   const [dLieu, setDLieu] = useState<Lieu | null>(d0?.mode === "adresse" ? { label: d0.label, lat: d0.lat, lng: d0.lng } : null);
@@ -258,7 +259,7 @@ export function OptimiserSheet({
               <Option actif={dKind === "adresse"} onChoisir={() => setDKind("adresse")} titre="Une autre adresse">
                 {champAdresse(dTexte, setDTexte, dLieu, setDLieu)}
               </Option>
-              {!depotConnu && <Option actif={dKind === "libre"} onChoisir={() => setDKind("libre")} titre="Pas de départ imposé" detail="L'ordre part du premier arrêt." />}
+              {!depotConnu && <Option actif={dKind === "libre"} onChoisir={() => setDKind("libre")} titre="Pas de départ imposé" detail="Le trajet le plus court est calculé sans point de départ imposé." />}
             </>
           )}
         </section>
