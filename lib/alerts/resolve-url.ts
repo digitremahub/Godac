@@ -74,6 +74,8 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   fine_notification: (id) => ({ id: "flotte.amendes", suite: id ? `?amende=${encodeURIComponent(id)}` : "" }),
   // Contestation client : la fiche (le chauffeur attributaire ouvre la même page, limitée aux siennes).
   customer_dispute: (id) => ({ id: "exploitation.contestations", suite: id ? `?fiche=${encodeURIComponent(id)}` : "" }),
+  // Tournée en retard (palier à surveiller / en retard) : le suivi en direct, tournée mise en avant.
+  tournee_retard: (id) => ({ id: "exploitation.suivi", suite: id ? `?tournee=${encodeURIComponent(id)}` : "" }),
   // Arrêt de travail déclaré : à vérifier, tournées à remplacer (encadrement du service).
   work_stoppage: (id) => ({ id: "equipe.arrets", suite: id ? `?arret=${encodeURIComponent(id)}` : "" }),
 };

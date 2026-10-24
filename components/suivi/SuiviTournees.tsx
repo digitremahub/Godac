@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { Map as CarteMap, Marker } from "maplibre-gl";
+import type { Map as CarteMap, Marker, Popup } from "maplibre-gl";
 import type { TourneeSuivie } from "@/app/api/suivi/route";
 import { heureFin } from "@/lib/colis/estimation";
+import { LIBELLES_ETAT, aSurveiller, libelleRetard } from "@/lib/exploitation/retards";
+import { BlocRetards } from "@/components/suivi/BlocRetards";
+import { COULEUR_ETAT } from "@/components/suivi/etat";
+import { ficheChauffeur } from "@/components/suivi/fiche";
 
 const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.org/styles/liberty";
 const COULEURS = ["#1BE4C1", "#2F7CF6", "#F25A22", "#A855F7", "#F5C842", "#EC4899", "#22C55E", "#0EA5E9"];
-const RAFRAICHISSEMENT_MS = 30_000;
+const RAFRAICHISSEMENT_MS = 20_000;
 
 function initiales(nom: string) {
   return nom
@@ -29,9 +33,12 @@ function depuis(iso: string | null | undefined): string {
  * Suivi des tournées colis du jour pour la direction et l'exploitation :
  * dernière position partagée par chaque chauffeur (pendant sa tournée
  * uniquement), arrêts restants, avancement et fin estimée, filtre par
- * service. Rafraîchi toutes les 30 secondes.
+ * service. Bloc « Retards » en tête ; sur la carte, la pastille de chaque
+ * chauffeur a la couleur de son état (dans les temps, à surveiller, en
+ * retard, hors ligne) et le nombre d'arrêts restants ; un clic ouvre sa
+ * fiche. Rafraîchi toutes les 20 secondes, en pause quand l'onglet est caché.
  */
-export function SuiviTournees({ services }: { services: { id: string; name: string }[] }) {
+export function SuiviTournees({ services, tourneeInitiale }: { services: { id: string; name: string }[]; tourneeInitiale?: string }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<CarteMap | null>(null);
   const lib = useRef<typeof import("maplibre-gl") | null>(null);
@@ -42,7 +49,11 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
   const [tournees, setTournees] = useState<TourneeSuivie[] | null>(null);
   const [maj, setMaj] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [focus, setFocus] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(tourneeInitiale ?? null);
+  // Fiche chauffeur ouverte : rouverte après chaque rafraîchissement des marqueurs.
+  const fiche = useRef<Popup | null>(null);
+  const ficheId = useRef<string | null>(tourneeInitiale ?? null);
+  const reconstruction = useRef(false);
   // Tournées terminées : repliées sur une ligne, dépliées au clic.
   const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
 
@@ -61,9 +72,29 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
 
   useEffect(() => {
     cadre.current = false;
+    let minuteur: ReturnType<typeof setInterval> | null = null;
+    const demarrer = () => {
+      if (!minuteur) minuteur = setInterval(charger, RAFRAICHISSEMENT_MS);
+    };
+    const arreter = () => {
+      if (minuteur) clearInterval(minuteur);
+      minuteur = null;
+    };
+    // Onglet caché : on ne sollicite plus le serveur ; au retour, mise à jour immédiate.
+    const visibilite = () => {
+      if (document.hidden) arreter();
+      else {
+        charger();
+        demarrer();
+      }
+    };
     charger();
-    const t = setInterval(charger, RAFRAICHISSEMENT_MS);
-    return () => clearInterval(t);
+    if (!document.hidden) demarrer();
+    document.addEventListener("visibilitychange", visibilite);
+    return () => {
+      arreter();
+      document.removeEventListener("visibilitychange", visibilite);
+    };
   }, [charger]);
 
   useEffect(() => {
@@ -91,6 +122,9 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
     const m = carte.current;
     const maplibregl = lib.current;
     if (!m || !maplibregl || !prete || !tournees) return;
+    reconstruction.current = true;
+    fiche.current?.remove();
+    fiche.current = null;
     marqueurs.current.forEach((mk) => mk.remove());
     marqueurs.current = [];
     const pts: [number, number][] = [];
@@ -144,16 +178,19 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
         if (!attenue) pts.push([a.lng, a.lat]);
       });
       if (t.position) {
+        const etat = t.retard?.etat ?? "dans_les_temps";
+        const c = COULEUR_ETAT[t.statut === "in_progress" ? etat : "hors_ligne"];
         const el = document.createElement("button");
         el.type = "button";
         el.textContent = initiales(t.chauffeur);
-        el.setAttribute("aria-label", `${t.chauffeur} — ${depuis(t.position.at)}`);
+        el.setAttribute("aria-label", `${t.chauffeur} — ${LIBELLES_ETAT[etat]} — ${t.adressesRestantes} arrêt${t.adressesRestantes > 1 ? "s" : ""} restant${t.adressesRestantes > 1 ? "s" : ""} — ${depuis(t.position.at)}`);
         Object.assign(el.style, {
+          position: "relative",
           width: "36px",
           height: "36px",
           borderRadius: "999px",
-          background: couleur,
-          color: "#0A0F1E",
+          background: c.fond,
+          color: c.texte,
           border: "3px solid #FFFFFF",
           boxShadow: "0 2px 8px rgba(10,15,30,.4)",
           font: "700 12px system-ui, sans-serif",
@@ -161,9 +198,43 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
           opacity: attenue ? "0.35" : "1",
           zIndex: "3",
         });
-        el.addEventListener("click", () => setFocus((f) => (f === t.id ? null : t.id)));
+        // Pastille : arrêts restants.
+        const pastille = document.createElement("span");
+        pastille.textContent = String(t.adressesRestantes);
+        Object.assign(pastille.style, {
+          position: "absolute",
+          top: "-8px",
+          right: "-8px",
+          minWidth: "18px",
+          height: "18px",
+          padding: "0 4px",
+          borderRadius: "999px",
+          background: "#0A0F1E",
+          color: "#FFFFFF",
+          border: "2px solid #FFFFFF",
+          font: "700 10px/14px system-ui, sans-serif",
+          textAlign: "center",
+          boxSizing: "border-box",
+        });
+        el.append(pastille);
+        const ouvrirFiche = () => {
+          fiche.current?.remove();
+          const popup = new maplibregl.Popup({ offset: 22, closeButton: true, maxWidth: "320px" }).setLngLat([t.position!.lng, t.position!.lat]).setDOMContent(ficheChauffeur(t));
+          popup.on("close", () => {
+            if (!reconstruction.current && fiche.current === popup) ficheId.current = null;
+          });
+          popup.addTo(m);
+          fiche.current = popup;
+          ficheId.current = t.id;
+        };
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          ouvrirFiche();
+          setFocus(t.id);
+        });
         marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([t.position.lng, t.position.lat]).addTo(m));
         if (!attenue) pts.push([t.position.lng, t.position.lat]);
+        if (ficheId.current === t.id) ouvrirFiche();
       }
     });
     if (pts.length && (!cadre.current || focus)) {
@@ -171,6 +242,7 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
       const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0]!, pts[0]!));
       m.fitBounds(b, { padding: 60, maxZoom: 14, duration: 500 });
     }
+    reconstruction.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournees, prete, focus]);
 
@@ -192,7 +264,7 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
           </select>
         </label>
         <p className="text-xs text-navy/55">
-          {maj ? `Mis à jour ${depuis(maj)} · actualisation automatique toutes les 30 s` : "Chargement…"}
+          {maj ? `Mis à jour ${depuis(maj)} · actualisation automatique toutes les 20 s` : "Chargement…"}
         </p>
         {focus && (
           <button type="button" className="btn-ghost !py-1 text-xs" onClick={() => setFocus(null)}>
@@ -201,6 +273,7 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
         )}
       </div>
       {erreur && <p className="rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">{erreur}</p>}
+      {tournees && <BlocRetards tournees={tournees} onVoir={(id) => (ficheId.current = id, setFocus(id))} />}
 
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <div className="order-2 flex flex-col gap-3 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto">
@@ -265,7 +338,17 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
                     <p className="text-navy/55">fin estimée</p>
                   </div>
                 </div>
-                {t.statut === "in_progress" && <p className="mt-1 text-[11px] text-navy/50">📍 {depuis(t.position?.at)}</p>}
+                {t.statut === "in_progress" && (
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-navy/50">
+                    <span>📍 {depuis(t.position?.at)}</span>
+                    {t.retard && aSurveiller(t.retard) && (
+                      <span className="rounded-full px-2 py-0.5 font-bold" style={{ background: COULEUR_ETAT[t.retard.etat].fond, color: COULEUR_ETAT[t.retard.etat].texte }}>
+                        {LIBELLES_ETAT[t.retard.etat]}
+                        {t.retard.retardMin > 0 ? ` · +${libelleRetard(t.retard.retardMin)}` : ""}
+                      </span>
+                    )}
+                  </p>
+                )}
                 <div className="mt-3 border-t border-navy/10 pt-2">
                   <p className="mb-1 text-xs font-semibold text-navy/70">Ordre de passage</p>
                   <ol className="flex flex-col gap-1">
@@ -288,8 +371,19 @@ export function SuiviTournees({ services }: { services: { id: string; name: stri
             );
           })}
         </div>
-        <div className="order-1 h-[55vh] overflow-hidden rounded-2xl border border-navy/10 lg:order-2 lg:h-[70vh]">
-          <div ref={conteneur} className="h-full w-full" role="region" aria-label="Carte des tournées en cours" />
+        <div className="order-1 flex flex-col gap-2 lg:order-2">
+          <div className="h-[55vh] overflow-hidden rounded-2xl border border-navy/10 lg:h-[70vh]">
+            <div ref={conteneur} className="h-full w-full" role="region" aria-label="Carte des tournées en cours" />
+          </div>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy/65" aria-label="Légende des pastilles chauffeur">
+            {(["dans_les_temps", "a_surveiller", "en_retard", "hors_ligne"] as const).map((e) => (
+              <li key={e} className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-full" style={{ background: COULEUR_ETAT[e].fond }} aria-hidden="true" />
+                {LIBELLES_ETAT[e]}
+              </li>
+            ))}
+            <li>Le chiffre = arrêts restants</li>
+          </ul>
         </div>
       </div>
       <p className="text-xs text-navy/50">

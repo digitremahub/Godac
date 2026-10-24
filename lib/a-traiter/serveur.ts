@@ -10,6 +10,9 @@ import { LIBELLES_CONTROLE, type CodeControle, type PointARegler } from "@/lib/t
 import { prochaineEcheance } from "@/lib/ticpe/echeances";
 import { controlesDeLaPeriode } from "@/lib/ticpe/periode-serveur";
 import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
+import { chargerTourneesSuivies } from "@/lib/exploitation/suivi-serveur";
+import { notifierRetards } from "@/lib/exploitation/retards-serveur";
+import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards } from "@/lib/exploitation/retards";
 import { nextDay, parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { PLAFOND_PAR_SOURCE, construireListe, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
 
@@ -352,6 +355,29 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
             ecran: "exploitation.planning",
             href: lienPlanning(t.id),
             personneId: t.driver_id,
+          })),
+        };
+      },
+    },
+    {
+      // Tournées en cours en retard probable, à surveiller ou dont le chauffeur n'a plus de signal.
+      // Périmètre du suivi : un manager ne voit que les chauffeurs de ses services.
+      type: "retard_tournee",
+      nom: "retards en cours",
+      ecran: "exploitation.suivi",
+      lire: async () => {
+        const tournees = await chargerTourneesSuivies(supabase, appUser, { statuts: ["in_progress"], maintenant });
+        await notifierRetards(org, tournees);
+        const retards = trierRetards(tournees.filter((t) => t.retard && aSurveiller(t.retard)).map((t) => ({ ...t.retard!, tournee: t })));
+        return {
+          brutes: retards.map(({ tournee: t, ...r }) => ({
+            type: "retard_tournee" as const,
+            id: t.id,
+            libelle: `${t.nom ?? "Tournée"} · ${LIBELLES_ETAT[r.etat].toLowerCase()}`,
+            detail: [t.chauffeur, r.retardMin > 0 ? `retard estimé ${libelleRetard(r.retardMin)}` : null, `${r.arretsRestants} arrêt${r.arretsRestants > 1 ? "s" : ""} restant${r.arretsRestants > 1 ? "s" : ""}`, r.horsLigne ? `position ${libelleSignal(r.signal, r.derniereMajMin)}` : null].filter(Boolean).join(" · "),
+            critique: r.palier === "en_retard",
+            ecran: "exploitation.suivi",
+            href: `${urlDe("exploitation.suivi")}?tournee=${t.id}`,
           })),
         };
       },

@@ -1,0 +1,12 @@
+-- Exploitation, étape 2 : type d'alerte « tournée en retard » (suivi en
+-- direct). Une alerte par tournée, par palier (à surveiller = warning,
+-- en retard = critical) et par jour, créée par le serveur au chargement
+-- du suivi (lib/exploitation/retards-serveur.ts), relayée en cloche, push
+-- et e-mail comme les autres alertes d'encadrement ; le lien ouvre le
+-- suivi sur la tournée (lib/alerts/resolve-url.ts).
+--
+-- Fichier séparé : une nouvelle valeur d'enum ne peut pas être utilisée
+-- dans la transaction qui l'ajoute (l'index unique est dans 20261104000002).
+-- ADDITIVE et rejouable. NON appliquée à la création : tant qu'elle ne
+-- l'est pas, le code n'envoie simplement pas de notification.
+alter type public.alert_type add value if not exists 'tournee_retard';
