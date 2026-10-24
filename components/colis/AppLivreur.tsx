@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMessage, IconNavigation, IconPhone, IconRefresh, IconX } from "@/components/layout/icons";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
+import { BoutonGoFlottant } from "@/components/colis/BoutonGoFlottant";
 import { RetourDepot, type DestinationRetour, type InfoGasoil } from "@/components/colis/RetourDepot";
 import { FicheEdition } from "@/components/colis/FicheEdition";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
@@ -757,18 +758,13 @@ export function AppLivreur({
 
       {/* Bouton flottant : retour dans GO Navigation depuis la liste, la carte ou une fiche. */}
       {run?.status === "in_progress" && !enNavigation && !enPreparation && pending.length > 0 && (
-        <button
-          type="button"
-          onClick={() => {
+        <BoutonGoFlottant
+          onOuvrir={() => {
             setDetailsStop(null);
             setFicheEdition(false);
             changerVue("navigation");
           }}
-          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-4 z-[60] flex min-h-[56px] items-center gap-2 rounded-full bg-teal px-5 text-base font-bold text-on-teal shadow-pop"
-          aria-label="Retourner dans GO Navigation"
-        >
-          <IconNavigation className="h-5 w-5" /> GO
-        </button>
+        />
       )}
 
       {toast && (
