@@ -67,12 +67,15 @@ export default async function ModulesPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
         <SiteHeader />
         <div className="relative mx-auto max-w-3xl px-5 pb-20 pt-10 text-center sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Carburant inclus dans tous les plans · modules à la carte</p>
-          <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Contrôlez le carburant, ajoutez le reste quand vous voulez</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Une plateforme premium · un seul outil pour piloter votre activité</p>
+          <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Toute votre exploitation, au même endroit. Sans compromis sur la qualité.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg font-light text-white/75">
-            Chaque plan est dimensionné pour votre nombre de véhicules et inclut le contrôle du carburant (pleins, tickets lus
-            automatiquement, cuves, écarts traités). Tournée colis avec GO Navigation, planning, flotte, paie transport&nbsp;: les
-            autres modules s&apos;activent à la carte, dans le même outil.
+            GODAC réunit le carburant, la flotte, les tournées, le planning et les fonctions RH dans un environnement cohérent.
+            Moins d&apos;outils à gérer, moins de ressaisies et une vision plus claire pour décider. Choisissez le socle adapté à votre
+            flotte, puis ajoutez les modules dont votre entreprise a réellement besoin.
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-sm text-white/65">
+            Une mise en service accompagnée, un abonnement lisible et un interlocuteur pour faire évoluer votre organisation.
           </p>
         </div>
       </div>
@@ -80,9 +83,17 @@ export default async function ModulesPage() {
     <main className="px-5 py-16 sm:px-6">
       <div className="mx-auto max-w-6xl">
 
-        <div className="mb-16">
+        <section className="mb-16" aria-labelledby="offre-sur-mesure">
+          <div className="mb-6 max-w-3xl">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-teal-ink">Une offre pensée pour durer</p>
+            <h2 id="offre-sur-mesure" className="text-2xl sm:text-3xl">Le coût est clair avant de vous engager</h2>
+            <p className="mt-3 text-navy/70">
+              Comparez le coût complet de votre sélection : abonnement, mise en service et budget récurrent.
+              GODAC mise sur la valeur d&apos;une plateforme unifiée, plutôt que sur l&apos;addition de logiciels qui communiquent mal entre eux.
+            </p>
+          </div>
           <PricingSimulator plans={plans} modules={modules} prices={prices} />
-        </div>
+        </section>
 
         <section className="mb-16" aria-labelledby="nouveautes">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
