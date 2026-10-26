@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEUIL_ARRET_KMH, SEUIL_MOUVEMENT_KMH, elementsConduite, enMouvementApres, type EntreeEpure } from "@/lib/colis/epure-conduite";
+import { SEUIL_ARRET_KMH, SEUIL_MOUVEMENT_KMH, bandeauDeplie, elementsConduite, enMouvementApres, type EntreeEpure } from "@/lib/colis/epure-conduite";
 
 const base: EntreeEpure = { mouvement: false, vue: "conduite", position: { lat: 45, lng: 4 }, fige: false, enCours: true, traceActive: true };
 
@@ -49,5 +49,24 @@ describe("éléments de l'écran de conduite", () => {
   });
   it("tournée clôturée : pas de ligne d'état", () => {
     expect(elementsConduite({ ...base, fige: true }).ligneEtat).toBe(false);
+  });
+});
+
+describe("bandeau de guidage compact", () => {
+  it("à l'arrêt, les détails sont dépliés ; en mouvement, le bandeau reste minimal", () => {
+    expect(bandeauDeplie(false, null)).toBe(true);
+    expect(bandeauDeplie(true, null)).toBe(false);
+  });
+  it("le toucher du bandeau l'emporte, dans les deux sens", () => {
+    expect(bandeauDeplie(true, true)).toBe(true);
+    expect(bandeauDeplie(false, false)).toBe(false);
+  });
+  it("les détails (avancement, fin estimée) suivent le dépliage, sauf tournée clôturée", () => {
+    expect(elementsConduite({ ...base, mouvement: true, choixBandeau: true }).ligneEtat).toBe(true);
+    expect(elementsConduite({ ...base, choixBandeau: false }).ligneEtat).toBe(false);
+    expect(elementsConduite({ ...base, choixBandeau: true, fige: true }).ligneEtat).toBe(false);
+  });
+  it("le trajet enregistré reste affiché même bandeau replié", () => {
+    expect(elementsConduite({ ...base, mouvement: true, choixBandeau: false }).indicateurTrace).toBe(true);
   });
 });

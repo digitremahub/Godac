@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MARQUE_HISTORIQUE_GO, ROUTE_GO, ROUTE_TOURNEE, estEntreeGo, retourFermeGo, routeApresSortie } from "@/lib/colis/sortie-go";
+import { afficherPreparation, type EtapeParcours } from "@/lib/colis/parcours";
+import { ECRAN_APRES_GO, ECRAN_REPRISE_GO, MARQUE_HISTORIQUE_GO, ROUTE_GO, ROUTE_TOURNEE, estEntreeGo, retourFermeGo, routeApresSortie } from "@/lib/colis/sortie-go";
 
 const racine = path.resolve(__dirname, "../../..");
 
@@ -39,5 +40,24 @@ describe("sortie de GO Navigation", () => {
     expect(app).toContain("onFermer={fermerGo}");
     const go = readFileSync(path.join(racine, "components/colis/GoNavigation.tsx"), "utf8");
     expect(go).not.toMatch(/router\.(push|replace)|history\.back/);
+  });
+});
+
+describe("écran affiché après GO", () => {
+  it("la sortie de GO arrive sur Préparer, à toutes les étapes (tournée démarrée comprise)", () => {
+    const etapes: EtapeParcours[] = ["preparer", "demarrer", "livrer", "cloturer", "terminee"];
+    for (const e of etapes) expect(afficherPreparation(e, ECRAN_APRES_GO.preparationDemandee)).toBe(true);
+    expect(ECRAN_APRES_GO.vue).toBe("liste");
+  });
+  it("« Reprendre GO » referme la préparation et rouvre la navigation", () => {
+    expect(ECRAN_REPRISE_GO).toEqual({ preparationDemandee: false, vue: "navigation" });
+    expect(afficherPreparation("livrer", ECRAN_REPRISE_GO.preparationDemandee)).toBe(false);
+  });
+  it("l'écran de livraison n'a plus d'onglet « Arrêts » ; la préparation propose « Reprendre GO »", () => {
+    const app = readFileSync(path.join(racine, "components/colis/AppLivreur.tsx"), "utf8");
+    expect(app).not.toContain('"liste", "carte", "navigation"');
+    expect(app).not.toMatch(/\? "Arrêts" :/);
+    expect(app).toContain("Reprendre GO");
+    expect(app).toContain("ECRAN_APRES_GO");
   });
 });

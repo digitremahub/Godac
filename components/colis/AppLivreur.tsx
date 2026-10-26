@@ -33,6 +33,7 @@ import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
+import { separerReportes } from "@/lib/colis/villages";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
@@ -43,7 +44,10 @@ import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremit
 import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
 import { useSortieGo } from "@/components/colis/useSortieGo";
+import { ECRAN_APRES_GO, ECRAN_REPRISE_GO } from "@/lib/colis/sortie-go";
+import { arretAAfficher } from "@/lib/colis/recherche-arret";
 import { SortieDepotLivreur } from "@/components/time-clock/SortieDepotLivreur";
+import type { FixGps } from "@/components/time-clock/useSortieDepot";
 import { RecommanderEmployeur } from "@/components/recommandation/RecommanderEmployeur";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
@@ -119,6 +123,14 @@ export function AppLivreur({
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
   const [maPosition, setMaPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** Dernier point GPS avec sa précision : transmis au pointage (présence au dépôt, sortie). */
+  const [fixGps, setFixGps] = useState<FixGps | null>(null);
+  const memoriserFix = useCallback((pos: { lat: number; lng: number }, precision?: number) => {
+    setMaPosition(pos);
+    setFixGps({ ...pos, precision: precision ?? null });
+  }, []);
+  /** Une tournée a été en cours dans cette session : la sortie du dépôt attend alors d'avoir revu le chauffeur au dépôt. */
+  const tourneeVueEnCours = useRef(false);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Préparation ouverte à la demande pendant la livraison (« Ajouter ou modifier des colis »). */
@@ -143,6 +155,7 @@ export function AppLivreur({
   // Pendant la tournée en cours : dernière position envoyée à l'exploitation
   // (au plus une fois par minute, écran ouvert), jamais en dehors.
   const runEnCours = run?.status === "in_progress" ? run.id : null;
+  if (runEnCours) tourneeVueEnCours.current = true;
   // Trajet réellement emprunté (historique), même règle : tournée en cours, partage non mis en pause.
   const traceActive = useTraceGps(runEnCours, partage);
   useEffect(() => {
@@ -153,14 +166,14 @@ export function AppLivreur({
         const maintenant = Date.now();
         if (maintenant - dernierEnvoi.current < ENVOI_POSITION_MS) return;
         dernierEnvoi.current = maintenant;
-        setMaPosition(pos);
+        memoriserFix(pos, p.coords.accuracy);
         fetch("/api/colis/position", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runEnCours, ...pos }) }).catch(() => undefined);
       },
       () => undefined,
       { enableHighAccuracy: true, maximumAge: 30_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [runEnCours, partage]);
+  }, [runEnCours, partage, memoriserFix]);
 
   function basculerPartage() {
     const suivant = !partage;
@@ -237,8 +250,10 @@ export function AppLivreur({
       }
       const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${choix}`);
       setRun(data.run);
-      setStops(data.stops);
-      setLists(data.lists ?? []);
+      // Adresses reportées au lancement (villages décochés) : conservées, hors de la tournée en cours.
+      const { actifs, listes } = separerReportes(data.stops, data.lists ?? []);
+      setStops(actifs);
+      setLists(listes);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       setRuns((r) => r ?? []);
@@ -528,12 +543,12 @@ export function AppLivreur({
     setConfirmationLancement(true);
   }
 
-  /** Après confirmation (tournée + villages) : ordre global calculé si besoin, puis départ. */
-  async function demarrer() {
+  /** Après confirmation (tournée + villages) : ordre global calculé si besoin (ou si des villages ont été mis de côté), puis départ. */
+  async function demarrer(modifie = false) {
     if (!run) return;
     setBusy(true);
     try {
-      if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
+      if ((modifie || !run.optimized_at) && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
       await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
       setConfirmationLancement(false);
       await charger(run.id);
@@ -585,7 +600,16 @@ export function AppLivreur({
 
   async function cloturer() {
     if (!run) return;
-    await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }).catch(() => undefined);
+    const corps = JSON.stringify({ status: "done" });
+    try {
+      await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: corps });
+    } catch (e) {
+      // Sans réseau la clôture part en file d'attente : une tournée restée « en cours » bloquerait la sortie du dépôt.
+      if (isNetworkFailure(e)) {
+        await enqueueOfflineMutation(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: corps }).catch(() => undefined);
+        setToast({ ok: true, text: "Clôture enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
+      } else setToast({ ok: false, text: networkErrorMessage(e) });
+    }
     await charger(null);
   }
 
@@ -642,8 +666,33 @@ export function AppLivreur({
   const enCarte = !enPreparation && vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
   // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
   const enNavigation = !enPreparation && vue === "navigation" && run !== null && run.status === "in_progress";
-  // Fermer GO (« ‹ », fin de tournée, retour du navigateur ou d'Android) ramène à « Ma tournée colis », jamais au tableau de bord.
-  const fermerGo = useSortieGo(enNavigation, () => changerVue("liste"));
+  // Fermer GO (« ‹ », fin de tournée, retour du navigateur ou d'Android) ramène à « Ma tournée colis » sur PRÉPARER, jamais au tableau de bord.
+  const fermerGo = useSortieGo(enNavigation, () => {
+    setPreparationDemandee(ECRAN_APRES_GO.preparationDemandee);
+    changerVue(ECRAN_APRES_GO.vue);
+  });
+  /** « Reprendre GO » depuis la préparation (ou ouverture de GO depuis la livraison) : un clic. */
+  function ouvrirGo() {
+    setDetailsStop(null);
+    setFicheEdition(false);
+    setPreparationDemandee(ECRAN_REPRISE_GO.preparationDemandee);
+    changerVue(ECRAN_REPRISE_GO.vue);
+  }
+  // Recherche dans la liste : un seul résultat (ou Entrée) l'affiche directement sur la carte, avec son numéro.
+  const idsTrouves = terme ? pending.filter(correspond).map((s) => s.id) : [];
+  const cleTrouves = idsTrouves.join(",");
+  function montrerSurCarte(id: string) {
+    setSelection(id);
+    setRecherche("");
+    changerVue("carte");
+  }
+  useEffect(() => {
+    const id = arretAAfficher(idsTrouves, terme);
+    if (!id || run?.status !== "in_progress") return;
+    const t = setTimeout(() => montrerSurCarte(id), 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terme, cleTrouves]);
   // Retour de fin de tournée : dépôt de la tournée et/ou siège de l'entreprise.
   const [siege, setSiege] = useState<{ adresse: string; lat: number | null; lng: number | null } | null>(null);
   /** Retour de fin de tournée lancé dans GO (dépôt ou siège). */
@@ -704,7 +753,7 @@ export function AppLivreur({
   return (
     <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       {/* Sortie du dépôt pointée automatiquement : surveillance dès qu'aucune tournée n'est en cours (après la clôture, écran de retour au dépôt compris). */}
-      <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} />
+      <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} fix={fixGps} apresCloture={tourneeVueEnCours.current} />
       {!enNavigation && (
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
@@ -779,17 +828,18 @@ export function AppLivreur({
               </button>
             )}
             {run.status !== "loading" && stops.length > 0 && (
-              <div className={`mt-3 grid ${run.status === "in_progress" ? "grid-cols-3" : "grid-cols-2"} rounded-full bg-white/10 p-1 text-sm font-semibold`} role="tablist" aria-label="Affichage">
-                {(run.status === "in_progress" ? (["liste", "carte", "navigation"] as const) : (["liste", "carte"] as const)).map((v) => (
+              // Plus d'onglet « Arrêts » : la liste complète (recherche, actions) est dans la feuille de GO. Un second appui sur l'onglet actif revient à l'arrêt en cours.
+              <div className={`mt-3 grid ${run.status === "in_progress" ? "grid-cols-2" : "grid-cols-1"} rounded-full bg-white/10 p-1 text-sm font-semibold`} role="tablist" aria-label="Affichage">
+                {(run.status === "in_progress" ? (["carte", "navigation"] as const) : (["carte"] as const)).map((v) => (
                   <button
                     key={v}
                     type="button"
                     role="tab"
                     aria-selected={vue === v}
-                    onClick={() => changerVue(v)}
+                    onClick={() => (v === "navigation" ? ouvrirGo() : changerVue(vue === v ? "liste" : v))}
                     className={`min-h-[44px] rounded-full py-1.5 ${vue === v ? "bg-teal text-on-teal" : "text-white/80"}`}
                   >
-                    {v === "liste" ? "Arrêts" : v === "carte" ? "Carte" : "GO Navigation"}
+                    {v === "carte" ? "Carte" : "GO Navigation"}
                   </button>
                 ))}
               </div>
@@ -839,7 +889,7 @@ export function AppLivreur({
           }
           onReglagesOptimisation={() => setFeuilleOptim(true)}
           onItineraire={setItineraire}
-          onPosition={setMaPosition}
+          onPosition={memoriserFix}
           traceActive={traceActive}
         />
       )}
@@ -862,7 +912,7 @@ export function AppLivreur({
                     setRetourGo({ label: `⛽ ${st.nom}`, lat: st.lat, lng: st.lng, etape: "gasoil" });
                     setGasoil((g) => ({ ...g, fait: true }));
                     setRetourVu((v) => new Set(v).add(run.id));
-                    changerVue("navigation");
+                    ouvrirGo();
                   },
                 }
           }
@@ -870,22 +920,14 @@ export function AppLivreur({
             if (!d.point) return;
             setRetourGo({ label: d.detail ? `${d.titre} — ${d.detail}` : d.titre, ...d.point });
             setRetourVu((v) => new Set(v).add(run.id));
-            changerVue("navigation");
+            ouvrirGo();
           }}
           onPlusTard={() => setRetourVu((v) => new Set(v).add(run.id))}
         />
       )}
 
       {/* Bouton flottant : retour dans GO Navigation depuis la liste, la carte ou une fiche. */}
-      {run?.status === "in_progress" && !enNavigation && !enPreparation && pending.length > 0 && (
-        <BoutonGoFlottant
-          onOuvrir={() => {
-            setDetailsStop(null);
-            setFicheEdition(false);
-            changerVue("navigation");
-          }}
-        />
-      )}
+      {run?.status === "in_progress" && !enNavigation && (!enPreparation || preparationDemandee) && pending.length > 0 && <BoutonGoFlottant onOuvrir={ouvrirGo} />}
 
       <ToastColis toast={toast} onFermer={fermerToast} />
       {propositionAppel}
@@ -1048,9 +1090,14 @@ export function AppLivreur({
       {enPreparation && (
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {preparationDemandee && run?.status === "in_progress" ? (
-            <button type="button" className="btn-secondary min-h-[44px] w-full justify-center" onClick={fermerPreparation}>
-              ‹ Retour à la livraison
-            </button>
+            <div className="grid gap-2">
+              <button type="button" className="btn-primary min-h-[52px] w-full justify-center !bg-marine text-base !text-white" onClick={ouvrirGo}>
+                <IconNavigation className="h-5 w-5 text-teal" /> Reprendre GO
+              </button>
+              <button type="button" className="btn-secondary min-h-[44px] w-full justify-center" onClick={fermerPreparation}>
+                ‹ Retour à la livraison
+              </button>
+            </div>
           ) : (
             etape !== "terminee" && (
               <p className="text-sm text-navy/70">
@@ -1126,7 +1173,7 @@ export function AppLivreur({
               <PastillesContact stop={prochain} onChange={(champ, v) => void basculerContact(prochain, champ, v)} />
             </div>
             {run.status === "in_progress" && navPreferee === "go" && (
-              <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={() => changerVue("navigation")}>
+              <button type="button" className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" onClick={ouvrirGo}>
                 <IconNavigation className="h-5 w-5 text-teal" /> Ouvrir GO Navigation
               </button>
             )}
@@ -1148,7 +1195,7 @@ export function AppLivreur({
                 </a>
               )}
               {navPreferee !== "go" && run.status === "in_progress" && (
-                <button type="button" className="btn-secondary justify-center !py-3" onClick={() => changerVue("navigation")}>
+                <button type="button" className="btn-secondary justify-center !py-3" onClick={ouvrirGo}>
                   <IconNavigation className="h-4 w-4 text-teal-ink" /> GO Navigation
                 </button>
               )}
@@ -1227,6 +1274,11 @@ export function AppLivreur({
               type="search"
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
+              onKeyDown={(e) => {
+                // Entrée : le premier résultat s'affiche directement sur la carte.
+                const id = e.key === "Enter" && run?.status === "in_progress" ? arretAAfficher(idsTrouves, terme, true) : null;
+                if (id) (e.preventDefault(), montrerSurCarte(id));
+              }}
               placeholder="Adresse, destinataire, ville ou n° de colis…"
               aria-label="Rechercher une adresse, un destinataire, une ville ou un colis dans la tournée"
             />

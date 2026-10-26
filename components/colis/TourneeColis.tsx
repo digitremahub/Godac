@@ -10,10 +10,11 @@ import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { arretAAfficher, termeRecherche } from "@/lib/colis/recherche-arret";
 import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
-import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
+import { AlerteSansTelephone, BadgeHorsTournee, BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { RESEAUX_RELAIS } from "@/lib/colis/relais";
 import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
@@ -37,6 +38,7 @@ import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from
 import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { AdresseInput } from "@/components/colis/AdresseInput";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
+import { separerReportes } from "@/lib/colis/villages";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { ImportBordereau } from "@/components/colis/ImportBordereau";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
@@ -99,7 +101,7 @@ function NomRelaisInput({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
-/** « Ajouter dans » : rangement automatique dans la liste du village (ou « Hors tournée »). */
+/** « Ajouter dans » : rangement automatique dans la liste du village (ou de la commune, hors tournée). */
 const AUTO = "__auto__";
 
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
@@ -169,6 +171,8 @@ export function TourneeColis({
   const stops = useMemo(() => sansRetraits(stopsBruts, retires), [stopsBruts, retires]);
   const retraits = useRef(creerRetraitsDifferes());
   const [lists, setLists] = useState<Liste[]>([]);
+  /** Adresses mises de côté au lancement (villages décochés) : conservées, hors de la tournée en cours. */
+  const [nbReportes, setNbReportes] = useState(0);
   /** Liste où vont les colis ajoutés (scan, saisie, import) ; null = liste implicite. */
   const [cible, setCible] = useState<string | null>(AUTO);
   const [renommage, setRenommage] = useState<{ id: string | null; nom: string } | null>(null);
@@ -195,6 +199,8 @@ export function TourneeColis({
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
   const [rechercheAdresse, setRechercheAdresse] = useState("");
+  /** Arrêt trouvé par la recherche ou tout juste ajouté : défilé jusqu'à lui et entouré dans la liste. */
+  const [misEnAvant, setMisEnAvant] = useState<string | null>(null);
   /** Feuille « Optimiser l'ordre » : départ et arrivée. */
   const [feuilleOptim, setFeuilleOptim] = useState(false);
   const horaires = useHoraires(run, stops);
@@ -213,8 +219,10 @@ export function TourneeColis({
     try {
       const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${id}`);
       setRun(data.run);
-      setStops(data.stops);
-      setLists(data.lists ?? []);
+      const { actifs, reportes, listes } = separerReportes(data.stops, data.lists ?? []);
+      setStops(actifs);
+      setLists(listes);
+      setNbReportes(reportes.length);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     }
@@ -402,7 +410,7 @@ export function TourneeColis({
                         : d.type === "point_relais"
                           ? "Point relais ajouté."
                           : "Colis ajouté.") +
-                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? " · Rangé dans « Hors tournée »." : ` · Village : ${r.village.nom}.`) : "") +
+                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? ` · Rangé dans « ${r.village.nom} » (hors tournée).` : ` · Village : ${r.village.nom}.`) : "") +
                     (creneau.creneau ? ` · Créneau ${libelleCourt(creneau.creneau)}.` : "") +
                     (r.professionnel ? ` · Professionnel détecté : ${r.professionnel} (recherche de ses horaires…).` : "") +
                     sansTel,
@@ -411,7 +419,10 @@ export function TourneeColis({
       setDraft(null);
       await recharger(run?.id);
       // Adresse pro : horaires cherchés sur internet en arrière-plan, sans bloquer le chargement.
-      if (r.stop?.id && !r.grouped && !r.duplicate) void chercherHoraires([r.stop.id]);
+      if (r.stop?.id && !r.grouped && !r.duplicate) {
+        setMisEnAvant(r.stop.id);
+        void chercherHoraires([r.stop.id]);
+      }
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -831,10 +842,21 @@ export function TourneeColis({
 
   // Arrêts par liste. Une seule liste implicite : affichage identique à une tournée sans liste.
   const groupesComplets = grouperParListe(stops, lists);
-  const termeAdresse = rechercheAdresse.trim().toLocaleLowerCase("fr-FR");
+  const termeAdresse = termeRecherche(rechercheAdresse);
   const groupes = termeAdresse
     ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
     : groupesComplets;
+  // Recherche : un seul résultat est mis en avant tout seul, Entrée prend le premier ; un arrêt ajouté l'est aussi.
+  const idsTrouves = termeAdresse ? groupes.flatMap((g) => g.arrets.map((s) => s.id)) : [];
+  const cleTrouves = idsTrouves.join(",");
+  useEffect(() => {
+    const id = arretAAfficher(idsTrouves, termeAdresse);
+    if (id) setMisEnAvant(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termeAdresse, cleTrouves]);
+  useEffect(() => {
+    if (misEnAvant) document.getElementById(`arret-${misEnAvant}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [misEnAvant, stops.length, cleTrouves]);
   // Recherche d'adresses et d'établissements biaisée autour du dépôt de la tournée.
   const depot = run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
   // Glisser-déposer : arrêts à livrer, hors recherche et hors tournée terminée.
@@ -842,7 +864,7 @@ export function TourneeColis({
   const ordreTri = groupes.flatMap((g) => g.arrets).filter((s) => s.status === "pending").map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
   const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
-  const cibles = [{ id: AUTO, nom: "Automatique (village / Hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
+  const cibles = [{ id: AUTO, nom: "Automatique (village, sinon commune hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
   const choixCible = multi && (
     <label className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
@@ -955,7 +977,10 @@ export function TourneeColis({
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold">{nomGroupe(g)}</p>
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                {nomGroupe(g)}
+                {l?.is_hors_tournee && <BadgeHorsTournee />}
+              </p>
               <p className="text-xs text-navy/60">
                 {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis{formatPoids(sommePoids(g.arrets)) && ` (${formatPoids(sommePoids(g.arrets))})`} · {c.restants} restant{c.restants > 1 ? "s" : ""}
               </p>
@@ -1098,7 +1123,7 @@ export function TourneeColis({
       <label className="relative block">
         <span className="sr-only">Rechercher une adresse dans la tournée</span>
         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45">⌕</span>
-        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
+        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} onKeyDown={(e) => { const id = e.key === "Enter" ? arretAAfficher(idsTrouves, termeAdresse, true) : null; if (id) (e.preventDefault(), setMisEnAvant(id)); }} enterKeyHint="search" placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
         {rechercheAdresse && <button type="button" className="absolute inset-y-0 right-2 px-2 text-sm text-navy/60" onClick={() => setRechercheAdresse("")}>Effacer</button>}
       </label>
       {rechercheAdresse && <p className="-mt-2 text-xs text-navy/60">{groupes.reduce((n, g) => n + g.arrets.length, 0)} résultat(s) sur {stops.length} arrêt(s).</p>}
@@ -1140,6 +1165,7 @@ export function TourneeColis({
               {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : estPointRelais(prochain) ? " à déposer" : ""}`}
               {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
             </span>
+            {groupes.find((g) => g.arrets.includes(prochain))?.liste?.is_hors_tournee && <BadgeHorsTournee />}
           </p>
           <div>
             <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
@@ -1404,7 +1430,7 @@ export function TourneeColis({
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
-                    <li key={s.id} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                    <li key={s.id} id={`arret-${s.id}`} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""} ${s.id === misEnAvant ? "ring-2 ring-inset ring-teal" : ""}`}>
                       <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
                         {triActif && <span className="-my-2.5 -ml-2 flex items-center">{poignee ? <BoutonPoignee poignee={poignee} libelle={s.address} /> : <span className="w-8" aria-hidden="true" />}</span>}
@@ -1639,6 +1665,12 @@ export function TourneeColis({
           </ol>
           </ZoneTri>
         </Card>
+      )}
+
+      {nbReportes > 0 && (
+        <p role="status" className="rounded-xl bg-orange/10 px-3 py-2 text-sm font-semibold text-orange-ink">
+          {nbReportes} adresse{nbReportes > 1 ? "s" : ""} reportée{nbReportes > 1 ? "s" : ""} (villages décochés au lancement) : conservée{nbReportes > 1 ? "s" : ""} dans la liste « Reportés », hors de la tournée en cours.
+        </p>
       )}
 
       {pending.length > 0 && <ExportTournee run={run} stops={pending} listes={lists} />}

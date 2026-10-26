@@ -200,9 +200,10 @@ export async function flushOfflineMutations(): Promise<{ synced: number; pending
       if (e instanceof Error && !isNetworkFailure(e)) reason = e.message;
     }
 
-    if (decisionApresEchec(status, essais) === "abandonner") {
-      // Refus définitif (4xx) ou trop d'essais : l'action est retirée de la
-      // file et signalée, au lieu d'être retentée sans fin.
+    if (decisionApresEchec(status) === "abandonner") {
+      // Refus définitif du serveur (4xx hors 401/408/429) : l'action est
+      // retirée de la file et signalée. Une coupure réseau ou un 5xx ne
+      // fait jamais perdre une action.
       await removeOfflineMutation(item.id);
       abandons.push(reason);
       continue;

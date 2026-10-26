@@ -4,7 +4,8 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ficheClotureeDuJour, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { refusDemarrageFiche } from "@/lib/planning/ouverture-serveur";
-import { assurerListesVillages, listesAvecVillages, planningEtVillages, villagesDeRoute, type VillageDuJour } from "@/lib/colis/villages-serveur";
+import { assurerListeReportes, assurerListesVillages, chargerContexteRangement, listePourAdresse, listesAvecVillages, planningEtVillages, villagesDeRoute, type VillageDuJour } from "@/lib/colis/villages-serveur";
+import { cochesParDefaut, elementDeArret, elementsLancement, estListeReportee, partageReports, selectionLancement } from "@/lib/colis/villages";
 
 async function contexte(runId: string | null) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -21,7 +22,8 @@ async function contexte(runId: string | null) {
 /**
  * Avant le lancement : la tournée du chauffeur d'après le planning du jour
  * (numéro, véhicule, service), ses villages (plus ceux d'un renfort du
- * jour) avec les colis chargés pour chacun, et, sans planning, les
+ * jour) et les communes hors tournée de la fiche, chacun avec ses adresses
+ * et colis chargés (cases à cocher), et, sans planning, les
  * tournées-modèles parmi lesquelles choisir.
  */
 export async function GET(req: Request) {
@@ -43,25 +45,19 @@ export async function GET(req: Request) {
   const [{ passages, villages }, { listes }, { data: stops }, { data: runPlus }] = await Promise.all([
     planningOuModele(),
     listesAvecVillages(supabase, run.id),
-    supabase.from("delivery_stops").select("list_id, parcel_count, status").eq("run_id", run.id),
+    supabase.from("delivery_stops").select("list_id, parcel_count, address").eq("run_id", run.id),
     supabase.from("delivery_runs").select("vehicle_id, service_id, vehicles(registration), services(name)").eq("id", run.id).maybeSingle(),
   ]);
-  const compte = new Map<string | null, { arrets: number; colis: number }>();
-  for (const s of (stops ?? []) as { list_id: string | null; parcel_count: number }[]) {
-    const c = compte.get(s.list_id) ?? { arrets: 0, colis: 0 };
-    c.arrets++;
-    c.colis += s.parcel_count ?? 0;
-    compte.set(s.list_id, c);
-  }
-  const avecListe = (v: VillageDuJour) => {
-    const l = listes.find((x) => x.village_id === v.id);
-    return { id: v.id, name: v.name, postal_code: v.postal_code ?? null, tour_number: v.tour_number, renfort: v.renfort, liste_id: l?.id ?? null, ...(compte.get(l?.id ?? "") ?? { arrets: 0, colis: 0 }) };
-  };
-  const rattachees = new Set(villages.map((v) => listes.find((l) => l.village_id === v.id)?.id).filter(Boolean));
-  const autres = listes
-    .filter((l) => !rattachees.has(l.id) && (compte.get(l.id)?.arrets ?? 0) > 0)
-    .map((l) => ({ id: l.id, name: l.name, hors_tournee: l.is_hors_tournee, ...compte.get(l.id)! }));
-  if (compte.get(null)?.arrets) autres.unshift({ id: "__principale__", name: "Liste principale", hors_tournee: false, ...compte.get(null)! });
+  // Cases à cocher : villages de la tournée, communes hors tournée de la fiche
+  // (une liste par commune) et adresses déjà reportées lors d'un lancement précédent.
+  const elements = elementsLancement({
+    villages: villages.map((v) => ({ id: v.id, nom: v.name })),
+    listes: listes.map((l) => ({ id: l.id, name: l.name, hors_tournee: l.is_hors_tournee, reportee: estListeReportee(l), village_id: l.village_id })),
+    arrets: (stops ?? []) as { list_id: string | null; parcel_count: number; address: string }[],
+  }).map((e) => {
+    const v = villages.find((x) => x.id === e.id);
+    return { ...e, postal_code: v?.postal_code ?? null, tour_number: v?.tour_number ?? null, renfort: v?.renfort ?? false };
+  });
 
   // Sans planning : tournées-modèles de ses services (sinon de l'entreprise) pour un choix manuel.
   let modeles: { id: string; tour_number: string; service_name: string | null; villages: number }[] = [];
@@ -78,24 +74,30 @@ export async function GET(req: Request) {
   return NextResponse.json({
     run: { id: run.id, name: run.name, run_date: run.run_date, vehicle: r?.vehicles?.registration ?? null, service: r?.services?.name ?? null },
     planning: passages.map((p) => ({ tour_number: p.tour_number, start_at: p.start_at, vehicle: p.vehicle, service: p.service_name, renfort: p.is_renfort })),
-    villages: villages.map(avecListe),
-    autres,
+    elements,
+    coches: cochesParDefaut(elements),
     modeles,
   });
 }
 
+/** Identifiants des cases : village (uuid), « liste:<uuid | __principale__> » ou « commune:<clé> » (adresses reportées). */
+const idElement = z.string().min(1).max(120).regex(/^([0-9a-f-]{36}|liste:([0-9a-f-]{36}|__principale__)|commune:.{0,100})$/i);
+
 const postSchema = z.object({
   run_id: z.string().uuid(),
-  /** Villages cochés par le chauffeur : tous ceux de sa tournée doivent l'être. */
-  village_ids: z.array(z.string().uuid()).max(200),
+  /** Cases cochées par le chauffeur (villages et communes hors tournée) : au moins une pour démarrer. */
+  element_ids: z.array(idElement).max(400),
   /** Sans planning : tournée-modèle choisie à la main. */
   route_id: z.string().uuid().nullable().optional(),
 });
 
 /**
- * Confirmation du lancement : le chauffeur a vérifié sa tournée et coché
- * tous ses villages. Crée les listes manquantes (une par village) et
- * enregistre la confirmation ; l'écran optimise puis démarre la tournée.
+ * Confirmation du lancement : le chauffeur a vérifié sa tournée et coché les
+ * villages (et communes hors tournée) qu'il dessert. Crée les listes
+ * manquantes des villages cochés ; les adresses des cases décochées sont
+ * mises de côté dans la liste « Reportés » (jamais supprimées : cochées à
+ * un lancement ultérieur, elles retrouvent leur liste). Enregistre la
+ * confirmation ; l'écran optimise ensuite (reportés exclus) et démarre la tournée.
  */
 export async function POST(req: Request) {
   const parsed = postSchema.safeParse(await req.json().catch(() => null));
@@ -115,21 +117,59 @@ export async function POST(req: Request) {
   } else {
     villages = (await planningEtVillages(supabase, appUser.organization_id, appUser.id, run.run_date, await ficheClotureeDuJour(supabase, appUser, run), run.id)).villages;
   }
-  const coches = new Set(parsed.data.village_ids);
-  const manquants = villages.filter((v) => !coches.has(v.id));
-  if (manquants.length) {
-    return NextResponse.json({ error: `Cochez chaque village pour confirmer que vous le prenez : ${manquants.map((v) => v.name).join(", ")}.` }, { status: 400 });
-  }
+  const villagesNoms = villages.map((v) => ({ id: v.id, nom: v.name }));
+  const { listes } = await listesAvecVillages(supabase, run.id);
+  const { data: lus } = await supabase.from("delivery_stops").select("id, list_id, address, lat, lng, parcel_count").eq("run_id", run.id);
+  const arrets = (lus ?? []) as { id: string; list_id: string | null; address: string; lat: number | string | null; lng: number | string | null; parcel_count: number }[];
+
+  const elements = elementsLancement({
+    villages: villagesNoms,
+    listes: listes.map((l) => ({ id: l.id, name: l.name, hors_tournee: l.is_hors_tournee, reportee: estListeReportee(l), village_id: l.village_id })),
+    arrets,
+  });
+  const choix = selectionLancement(elements, parsed.data.element_ids);
+  if (!choix.ok) return NextResponse.json({ error: choix.erreur }, { status: 400 });
+  const gardes = new Set(choix.gardes.map((e) => e.id));
+  const villagesGardes = villages.filter((v) => gardes.has(v.id));
+
+  let reportes = 0;
+  let repris = 0;
   try {
-    if (villages.length) await assurerListesVillages(supabase, appUser, run.id, villages);
+    if (villagesGardes.length) await assurerListesVillages(supabase, appUser, run.id, villagesGardes);
+    // Listes à jour (villages cochés créés) pour retrouver la liste de chaque arrêt.
+    const rangement = await chargerContexteRangement(supabase, run.id);
+    const { aReporter, aReprendre } = partageReports(arrets, (a) => elementDeArret(a, rangement.listes, villagesNoms), gardes);
+
+    if (aReporter.length) {
+      const liste = await assurerListeReportes(supabase, appUser, run.id, rangement);
+      if (!liste) throw new Error("Impossible de mettre de côté les adresses décochées : réessayez.");
+      const { error } = await supabase.from("delivery_stops").update({ list_id: liste.id }).in("id", aReporter.map((a) => a.id));
+      if (error) throw new Error(`Impossible de mettre de côté les adresses décochées : ${error.message}`);
+      reportes = aReporter.length;
+    }
+    // Adresses reportées à un lancement précédent et cochées cette fois : retour dans la liste de leur village / commune.
+    const parListe = new Map<string, string[]>();
+    for (const a of aReprendre) {
+      const point = a.lat !== null && a.lng !== null && Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lng)) ? { lat: Number(a.lat), lng: Number(a.lng) } : null;
+      const r = await listePourAdresse(supabase, appUser, run.id, { texte: a.address, point }, rangement);
+      if (r.listId) parListe.set(r.listId, [...(parListe.get(r.listId) ?? []), a.id]);
+    }
+    for (const [listId, ids] of parListe) {
+      const { error } = await supabase.from("delivery_stops").update({ list_id: listId }).in("id", ids);
+      if (error) throw new Error(`Impossible de reprendre les adresses reportées : ${error.message}`);
+      repris += ids.length;
+    }
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Création des listes impossible." }, { status: 500 });
   }
   // Colonnes de la migration 190 : sans elles, le lancement reste possible.
   await supabase
     .from("delivery_runs")
-    .update({ launch_confirmed_at: new Date().toISOString(), launch_village_ids: villages.map((v) => v.id), ...(parsed.data.route_id ? { route_id: parsed.data.route_id } : {}) })
+    .update({ launch_confirmed_at: new Date().toISOString(), launch_village_ids: villagesGardes.map((v) => v.id), ...(parsed.data.route_id ? { route_id: parsed.data.route_id } : {}) })
     .eq("id", run.id)
     .then(() => undefined, () => undefined);
-  return NextResponse.json({ ok: true, villages: villages.length });
+  // Des adresses ont changé de liste : l'ordre de passage est à recalculer.
+  const modifie = reportes + repris > 0;
+  if (modifie) await supabase.from("delivery_runs").update({ optimized_at: null }).eq("id", run.id).then(() => undefined, () => undefined);
+  return NextResponse.json({ ok: true, villages: villagesGardes.length, gardes: choix.gardes.length, reportes, repris, modifie });
 }

@@ -218,10 +218,15 @@ export async function avecContacts<T extends { id: string }>(supabase: SupabaseC
   });
 }
 
-/** Listes d'une tournée, dans leur ordre. */
+/**
+ * Listes d'une tournée, dans leur ordre, avec le drapeau « hors tournée »
+ * (migration 190 ; sans elle, le drapeau est absent et le nom en tient lieu).
+ */
 export async function listesDeTournee(supabase: SupabaseClient, runId: string): Promise<Liste[]> {
-  const { data } = await supabase.from("delivery_lists").select(LIST_FIELDS).eq("run_id", runId).order("position").order("created_at");
-  return (data ?? []) as Liste[];
+  const lire = (champs: string) => supabase.from("delivery_lists").select(champs).eq("run_id", runId).order("position").order("created_at");
+  const avec = await lire(`${LIST_FIELDS}, is_hors_tournee`);
+  if (!avec.error) return (avec.data ?? []) as unknown as Liste[];
+  return ((await lire(LIST_FIELDS)).data ?? []) as unknown as Liste[];
 }
 
 /** Une liste, seulement si elle appartient bien à cette tournée (sinon null). */

@@ -8,6 +8,8 @@ import { schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
 import { refusDemarrageFiche } from "@/lib/planning/ouverture-serveur";
+import { refusReouverture } from "@/lib/colis/cloture";
+import { estEncadrement } from "@/lib/roles/perimetre";
 
 async function contexte(id: string) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -67,6 +69,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const fermee = await refusDemarrageFiche(ctx.appUser.organization_id, ctx.run.id);
     if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
   }
+  // Une tournée clôturée est figée : seul l'encadrement la rouvre, et l'action est journalisée.
+  const encadrement = estEncadrement(ctx.appUser.role);
+  const refusRetour = refusReouverture(ctx.run.status, parsed.data.status, encadrement);
+  if (refusRetour) return NextResponse.json({ error: refusRetour }, { status: 409 });
   const update: Record<string, unknown> = { ...champs };
   if (heure_depart !== undefined) update.planned_start = heure_depart === null ? null : ecrireHeure(lireHeure(heure_depart)!);
   // Début réel de la livraison (estimation de fin) ; à la clôture, la
@@ -76,6 +82,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (Object.keys(update).length) {
     const { error } = await ctx.supabase.from("delivery_runs").update(update).eq("id", ctx.run.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (ctx.run.status === "done" && parsed.data.status && parsed.data.status !== "done") {
+      await journaliser({ organizationId: ctx.appUser.organization_id, userId: ctx.appUser.id, action: "tournee_colis_rouverte", targetTable: "delivery_runs", targetId: ctx.run.id, details: { nouveau_statut: parsed.data.status } });
+    }
   }
   // Départ / arrivée : `persiste` faux tant que la migration n'est pas appliquée (l'appareil garde le choix).
   let persiste = true;

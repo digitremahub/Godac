@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { estimerAvancement } from "@/lib/colis/estimation";
-import { arretsRestants, cloturesHorsOrdre, libelleMotif, motifsPour, prochainArret, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
+import { arretsRestants, cloturesHorsOrdre, libelleMotif, motifsPour, prochainArret, refusCloture, refusReouverture, tourneeCloturee } from "@/lib/colis/cloture";
 
 const a = (id: string, status: "pending" | "delivered" | "failed" = "pending") => ({ id, status });
 
@@ -68,5 +68,21 @@ describe("tournée clôturée", () => {
     expect(tourneeCloturee({ delivery_runs: [{ status: "done" }] })).toBe(true);
     expect(tourneeCloturee({ delivery_runs: { status: "in_progress" } })).toBe(false);
     expect(tourneeCloturee({ delivery_runs: null })).toBe(false);
+  });
+});
+
+describe("réouverture d'une tournée clôturée", () => {
+  it("refuse au chauffeur tout retour arrière depuis done", () => {
+    expect(refusReouverture("done", "loading", false)).toMatch(/encadrement/);
+    expect(refusReouverture("done", "in_progress", false)).toMatch(/encadrement/);
+  });
+  it("l'encadrement peut rouvrir", () => {
+    expect(refusReouverture("done", "loading", true)).toBeNull();
+  });
+  it("les autres changements ne sont pas concernés", () => {
+    expect(refusReouverture("done", "done", false)).toBeNull();
+    expect(refusReouverture("done", undefined, false)).toBeNull();
+    expect(refusReouverture("loading", "in_progress", false)).toBeNull();
+    expect(refusReouverture("in_progress", "done", false)).toBeNull();
   });
 });

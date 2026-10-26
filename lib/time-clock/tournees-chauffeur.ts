@@ -7,7 +7,8 @@ import { tourneeClotureeDepuisArrivee } from "@/lib/time-clock/sortie-depot";
  * État des tournées d'un salarié pour décider de la sortie du dépôt :
  * - enCours : une tournée colis (delivery_runs.status = in_progress) ou
  *   une tournée du planning (planning_entries.status = in_progress) est
- *   ouverte, quelle que soit sa date ;
+ *   ouverte depuis le jour d'arrivée (une tournée « fantôme » restée en
+ *   cours les jours précédents ne doit pas bloquer la sortie à vie) ;
  * - cloturee : au moins une tournée clôturée depuis son arrivée
  *   (tourneeClotureeDepuisArrivee).
  * En cas d'erreur de lecture on suppose « en cours » : le doute ne doit
@@ -20,9 +21,18 @@ export async function etatTourneesChauffeur(
   const arrivee = new Date(params.clockedInAt);
   const jourArrivee = dateParis(Number.isNaN(arrivee.getTime()) ? new Date() : arrivee);
 
+  const veille = new Date((Number.isNaN(arrivee.getTime()) ? new Date() : arrivee).getTime() - 24 * 60 * 60 * 1000).toISOString();
+
   const [colisEnCours, planningEnCours, colisClotures, planningClotures] = await Promise.all([
-    supabase.from("delivery_runs").select("id").eq("driver_id", params.userId).eq("status", "in_progress").limit(1),
-    supabase.from("planning_entries").select("id").eq("organization_id", params.organizationId).eq("driver_id", params.userId).eq("status", "in_progress").limit(1),
+    supabase.from("delivery_runs").select("id").eq("driver_id", params.userId).eq("status", "in_progress").gte("run_date", jourArrivee).limit(1),
+    supabase
+      .from("planning_entries")
+      .select("id")
+      .eq("organization_id", params.organizationId)
+      .eq("driver_id", params.userId)
+      .eq("status", "in_progress")
+      .or(`end_at.is.null,end_at.gte.${veille}`)
+      .limit(1),
     supabase.from("delivery_runs").select("run_date").eq("driver_id", params.userId).eq("status", "done").gte("run_date", jourArrivee).limit(20),
     supabase
       .from("planning_entries")
