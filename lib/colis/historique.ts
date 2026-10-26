@@ -19,12 +19,43 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { longueurParcours, type Point } from "@/lib/colis/optimisation";
 import { LISTE_PRINCIPALE, ordonnerParListe, type Liste } from "@/lib/colis/listes";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { fetchAllRows } from "@/lib/utils/fetch-all";
 
 export const PAR_PAGE = 25;
+/** Tournées lues au plus pour une période : au-delà, l'historique l'annonce (jamais tronqué en silence). */
+export const HISTORIQUE_MAX = 5000;
 /** Période proposée par défaut : les 30 derniers jours (aujourd'hui compris). */
 export const JOURS_PAR_DEFAUT = 30;
 const JOUR = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Périmètre d'un rôle d'encadrement dans l'historique colis : `null` =
+ * toute l'organisation (exploitation, direction) ; sinon les chauffeurs
+ * (ses services, plus lui-même) et les services du manager. La RLS de
+ * delivery_runs ouvre toute l'organisation à tout manager : le filtre se fait ici.
+ */
+export interface PerimetreColis {
+  chauffeurs: readonly string[] | null;
+  services: readonly string[] | null;
+}
+
+export const PERIMETRE_TOUT: PerimetreColis = { chauffeurs: null, services: null };
+
+/**
+ * Périmètre selon le rôle. `chauffeursDesServices` : chauffeurs rattachés
+ * aux `mesServices` (user_services). Manager : eux et lui-même ; un
+ * manager sans service ne voit que ses propres tournées.
+ */
+export function perimetrePour(role: string, userId: string, mesServices: readonly string[], chauffeursDesServices: readonly string[]): PerimetreColis {
+  if (role !== "manager") return PERIMETRE_TOUT;
+  return { chauffeurs: [...new Set([userId, ...chauffeursDesServices])], services: [...mesServices] };
+}
+
+/** Le chauffeur est-il dans le périmètre ? */
+export function chauffeurDansPerimetre(p: PerimetreColis, driverId: string): boolean {
+  return p.chauffeurs === null || p.chauffeurs.includes(driverId);
+}
 
 export interface FiltresHistorique {
   du: string;
@@ -209,13 +240,42 @@ export interface Historique {
   chauffeurs: Option[] | null;
   camions: Option[];
   erreur: string | null;
+  /** Plus de tournées que la limite de lecture : la liste est incomplète (à annoncer). */
+  tronque: boolean;
+}
+
+/**
+ * Arrêts et listes des tournées `ids`, par lots de tournées (adresse de
+ * requête courte) et page par page (PostgREST plafonne chaque réponse) : un
+ * export de plusieurs centaines de tournées ne perd aucun arrêt.
+ */
+async function lireArretsEtListes(supabase: SupabaseClient, ids: readonly string[]): Promise<{ arrets: (ArretHistorique & { run_id: string })[]; listes: { run_id: string }[] }> {
+  const arrets: (ArretHistorique & { run_id: string })[] = [];
+  const listes: { run_id: string }[] = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const lot = ids.slice(i, i + 40);
+    const [a, l] = await Promise.all([
+      fetchAllRows<ArretHistorique & { run_id: string }>((de, a) => supabase.from("delivery_stops").select("run_id, status, parcel_count, done_at, lat, lng, position").in("run_id", lot).order("id").range(de, a)),
+      supabase.from("delivery_lists").select("run_id").in("run_id", lot),
+    ]);
+    arrets.push(...a.rows);
+    listes.push(...((l.data ?? []) as { run_id: string }[]));
+  }
+  return { arrets, listes };
 }
 
 /**
  * Tournées de la période, filtrées et paginées. `toutes` : encadrement
  * (toutes les tournées de l'entreprise) ; sinon celles de `userId` seulement.
  */
-export async function historiqueTournees(supabase: SupabaseClient, userId: string, toutes: boolean, filtres: FiltresHistorique): Promise<Historique> {
+export async function historiqueTournees(
+  supabase: SupabaseClient,
+  userId: string,
+  toutes: boolean,
+  filtres: FiltresHistorique,
+  perimetre: PerimetreColis = PERIMETRE_TOUT,
+  options: { parPage?: number } = {},
+): Promise<Historique> {
   let q = supabase
     .from("delivery_runs")
     .select("id, name, run_date, status, driver_id, vehicle_id, service_id, started_at, start_lat, start_lng, return_to_start, created_at")
@@ -223,19 +283,23 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
     .lte("run_date", filtres.au)
     .order("run_date", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(5000);
+    .limit(HISTORIQUE_MAX + 1);
   if (!toutes) q = q.eq("driver_id", userId);
-  else if (filtres.chauffeur) q = q.eq("driver_id", filtres.chauffeur);
+  else {
+    if (perimetre.chauffeurs) q = q.in("driver_id", perimetre.chauffeurs.length > 0 ? [...perimetre.chauffeurs] : [userId]);
+    if (filtres.chauffeur) q = q.eq("driver_id", filtres.chauffeur);
+  }
 
   const [{ data: runs, error }, { data: services }, { data: vehicules }, { data: chauffeurs }] = await Promise.all([
     q,
     supabase.from("services").select("id, name").order("name"),
-    supabase.from("vehicles").select("id, registration").order("registration"),
+    supabase.from("vehicles").select("id, registration, service_id").order("registration"),
     toutes
       ? supabase.from("users").select("id, full_name").or(FILTRE_CONDUCTEURS).order("full_name")
       : Promise.resolve({ data: null as { id: string; full_name: string }[] | null }),
   ]);
-  const listeRuns = (runs ?? []) as {
+  const tronque = (runs ?? []).length > HISTORIQUE_MAX;
+  const listeRuns = ((runs ?? []).slice(0, HISTORIQUE_MAX)) as {
     id: string;
     name: string | null;
     run_date: string;
@@ -267,26 +331,22 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
   const nomChauffeur = new Map(((noms ?? []) as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name]));
   const nomService = new Map(((services ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
   const immat = new Map(((vehicules ?? []) as { id: string; registration: string }[]).map((v) => [v.id, v.registration]));
+  const dansServices = (id: string | null | undefined) => perimetre.services === null || (Boolean(id) && perimetre.services.includes(id!));
 
   const legeres = listeRuns.map((r) => ({
     ...r,
     camion: camionDeTournee(r, (planning ?? []) as EntreePlanning[]),
     services: [serviceDeTournee(r, (planning ?? []) as EntreePlanning[])].filter((x): x is string => Boolean(x)),
   }));
-  const { items, page, pages, total } = paginer(filtrerLignes(legeres, filtres), filtres.page);
+  const { items, page, pages, total } = paginer(filtrerLignes(legeres, filtres), filtres.page, options.parPage ?? PAR_PAGE);
 
   // Compteurs seulement pour les tournées de la page affichée.
   const ids = items.map((r) => r.id);
-  const [{ data: arrets }, { data: listes }] = await Promise.all([
-    ids.length
-      ? supabase.from("delivery_stops").select("run_id, status, parcel_count, done_at, lat, lng, position").in("run_id", ids)
-      : Promise.resolve({ data: [] as (ArretHistorique & { run_id: string })[] }),
-    ids.length ? supabase.from("delivery_lists").select("run_id").in("run_id", ids) : Promise.resolve({ data: [] as { run_id: string }[] }),
-  ]);
+  const { arrets, listes } = await lireArretsEtListes(supabase, ids);
   const arretsDe = new Map<string, ArretHistorique[]>();
-  for (const s of (arrets ?? []) as (ArretHistorique & { run_id: string })[]) arretsDe.set(s.run_id, [...(arretsDe.get(s.run_id) ?? []), s]);
+  for (const s of arrets) arretsDe.set(s.run_id, [...(arretsDe.get(s.run_id) ?? []), s]);
   const nbListes = new Map<string, number>();
-  for (const l of (listes ?? []) as { run_id: string }[]) nbListes.set(l.run_id, (nbListes.get(l.run_id) ?? 0) + 1);
+  for (const l of listes) nbListes.set(l.run_id, (nbListes.get(l.run_id) ?? 0) + 1);
 
   const lignes: LigneHistorique[] = items.map((r) => {
     const depot = r.start_lat !== null && r.start_lng !== null ? { lat: Number(r.start_lat), lng: Number(r.start_lng) } : null;
@@ -314,17 +374,20 @@ export async function historiqueTournees(supabase: SupabaseClient, userId: strin
     page,
     pages,
     total,
-    services: ((services ?? []) as { id: string; name: string }[]).map((s) => ({ id: s.id, label: s.name })),
+    services: ((services ?? []) as { id: string; name: string }[]).filter((s) => dansServices(s.id)).map((s) => ({ id: s.id, label: s.name })),
     // Chauffeurs actuels + ceux qui ont roulé sur la période (même partis ou changés de rôle depuis).
     chauffeurs: chauffeurs
       ? [
           ...new Map(
-            [...(chauffeurs as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name] as const), ...nomChauffeur.entries()].map(([id, label]) => [id, { id, label }]),
+            [...(chauffeurs as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name] as const), ...nomChauffeur.entries()]
+              .filter(([id]) => chauffeurDansPerimetre(perimetre, id))
+              .map(([id, label]) => [id, { id, label }]),
           ).values(),
         ].sort((a, b) => a.label.localeCompare(b.label, "fr"))
       : null,
-    camions: ((vehicules ?? []) as { id: string; registration: string }[]).map((v) => ({ id: v.id, label: v.registration })),
+    camions: ((vehicules ?? []) as { id: string; registration: string; service_id?: string | null }[]).filter((v) => dansServices(v.service_id)).map((v) => ({ id: v.id, label: v.registration })),
     erreur: error?.message ?? null,
+    tronque,
   };
 }
 
@@ -356,12 +419,14 @@ export interface ArretDetail {
 }
 
 /** Détail en lecture seule d'une tournée de l'historique (null si inaccessible). */
-export async function detailTournee(supabase: SupabaseClient, userId: string, toutes: boolean, id: string) {
+export async function detailTournee(supabase: SupabaseClient, userId: string, toutes: boolean, id: string, perimetre: PerimetreColis = PERIMETRE_TOUT) {
   if (!UUID.test(id)) return null;
   let q = supabase.from("delivery_runs").select("id, name, run_date, status, driver_id, started_at, start_label, start_lat, start_lng").eq("id", id);
   if (!toutes) q = q.eq("driver_id", userId);
   const { data: run } = await q.maybeSingle();
   if (!run) return null;
+  // Manager : la tournée d'un chauffeur d'un autre service est introuvable (la RLS ouvre toute l'organisation).
+  if (!chauffeurDansPerimetre(perimetre, run.driver_id)) return null;
   const colonnesArret = "id, list_id, position, parcel_code, parcel_count, address, recipient, status, done_at, delivered_place, proof_photo_path, notes, kind, proof_code, weight_kg, failure_reason, lat, lng, relay_name, packages_picked_up";
   const lireArrets = (colonnes: string) => supabase.from("delivery_stops").select(colonnes).eq("run_id", id).order("position").order("created_at");
   // Contacts du client (migration 20261103000006) : repli sans ces colonnes tant qu'elle n'est pas appliquée.
@@ -472,6 +537,7 @@ export async function rechercherColis(
   toutes: boolean,
   filtres: FiltresHistorique,
   recherche: RechercheColis,
+  perimetre: PerimetreColis = PERIMETRE_TOUT,
 ): Promise<{ lignes: LigneColis[]; tronque: boolean; erreur: string | null } | null> {
   if (!recherche.q && !recherche.statut) return null;
   const colonnes = "id, run_id, address, recipient, parcel_code, parcel_count, status, kind, delivered_place, proof_code, relay_name, proof_photo_path, failure_reason, done_at, delivery_runs!inner(run_date, name, driver_id)";
@@ -484,7 +550,10 @@ export async function rechercherColis(
       .order("done_at", { ascending: false, nullsFirst: false })
       .limit(RESULTATS_MAX + 1);
     if (!toutes) q = q.eq("delivery_runs.driver_id", userId);
-    else if (filtres.chauffeur) q = q.eq("delivery_runs.driver_id", filtres.chauffeur);
+    else {
+      if (perimetre.chauffeurs) q = q.in("delivery_runs.driver_id", perimetre.chauffeurs.length > 0 ? [...perimetre.chauffeurs] : [userId]);
+      if (filtres.chauffeur) q = q.eq("delivery_runs.driver_id", filtres.chauffeur);
+    }
     if (recherche.statut) q = q.eq("status", recherche.statut);
     if (recherche.q) {
       const motif = `%${recherche.q}%`;

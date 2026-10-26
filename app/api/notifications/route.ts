@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 import { filtreDestinataire } from "@/lib/alerts/lecture";
+import { alerteAffichable } from "@/lib/alerts/destinataires";
 import { modulesActifs } from "@/lib/acces/modules-requete";
 
 const WINDOW_DAYS = 30;
@@ -24,14 +25,16 @@ export async function GET() {
 
   const { data: alerts, error } = await supabase
     .from("alerts")
-    .select("id, type, severity, message, created_at, related_table, related_id, recipient_user_id")
+    .select("id, type, severity, message, created_at, related_table, related_id, recipient_user_id, service_id")
     .or(filtreDestinataire(appUser.id))
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(30);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const ids = (alerts ?? []).map((a) => a.id);
+  // Filet en plus de la RLS : pas d'alerte de tournée pour le comptable ni pour un manager sans service.
+  const visibles = (alerts ?? []).filter((a) => a.recipient_user_id || alerteAffichable(appUser.role, a));
+  const ids = visibles.map((a) => a.id);
   const { data: reads } = ids.length
     ? await supabase.from("alert_reads").select("alert_id").eq("user_id", appUser.id).in("alert_id", ids)
     : { data: [] as { alert_id: string }[] };
@@ -39,7 +42,7 @@ export async function GET() {
   // Lien vers un écran qui s'ouvre pour cette personne (rôle, conduite, modules).
   const modules = await modulesActifs(appUser.organization_id);
 
-  const items = (alerts ?? []).map((a) => ({
+  const items = visibles.map((a) => ({
     id: a.id,
     type: a.type,
     severity: a.severity,

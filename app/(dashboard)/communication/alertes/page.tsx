@@ -16,7 +16,7 @@ export default async function AlertsPage() {
   if (!g.ok) return g.ecran;
   const { appUser, supabase, modules } = g;
   // Diffusées et personnelles (jamais le rappel d'un collègue), non lues d'abord.
-  const alerts = await chargerAlertes(supabase, appUser.id, { limite: 100 });
+  const alerts = await chargerAlertes(supabase, appUser.id, { limite: 100, role: appUser.role });
 
   return (
     <div>

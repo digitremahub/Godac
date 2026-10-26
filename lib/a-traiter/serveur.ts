@@ -19,7 +19,7 @@ import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards 
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
 import { parisDay } from "@/lib/utils/paris-time";
-import { PLAFOND_PAR_SOURCE, construireListe, typeVisiblePour, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
+import { PLAFOND_PAR_SOURCE, ROLES_A_TRAITER, construireListe, typeVisiblePour, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
 
 /**
  * Chargement de « À traiter aujourd'hui » : UNE requête plafonnée par
@@ -117,19 +117,29 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
   const maintenant = options.maintenant ?? new Date();
   const delai = options.delaiMs ?? DELAI_PAR_DEFAUT_MS;
   const ctx = { role: appUser.role, modules, conduit: appUser.conduit };
+  // Garde serveur : « À traiter » n'existe que pour l'encadrement (jamais le chauffeur ni le comptable), quel que soit l'appelant.
+  if (!ROLES_A_TRAITER.includes(appUser.role) || !ecranOuvrable("dashboard.a_traiter", ctx)) return { elements: [], verrouilles: [], erreurs: [], plafonnes: [] };
   const org = appUser.organization_id;
   const aujourdhui = parisDay(maintenant);
   const { debutJour, debutDemain, finDemain } = fenetreAujourdhuiDemain(maintenant);
   // Une tournée « non démarrée » : l'heure prévue est passée depuis au moins 15 minutes.
   const limiteRetard = new Date(maintenant.getTime() - 15 * 60000).toISOString();
+  // Services du manager, lus une fois : planning et demandes d'entretien (lecture ouverte à l'organisation en base) en dépendent.
+  let servicesPromesse: Promise<string[]> | null = null;
+  const mesServices = () => {
+    servicesPromesse ??= (async () => {
+      const { data } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
+      return ((data ?? []) as { service_id: string }[]).map((x) => x.service_id);
+    })();
+    return servicesPromesse;
+  };
   // Planning lu une fois pour les quatre sources de tournées ; manager : ses services seulement (en plus de la RLS).
   let planningPromesse: Promise<LignePlanningJour[]> | null = null;
   const planning = () => {
     planningPromesse ??= (async () => {
       const lignes = await (options.planningDuJour ?? (() => lirePlanningDuJour(supabase, maintenant)))();
       if (appUser.role !== "manager") return lignes;
-      const { data } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
-      const mes = ((data ?? []) as { service_id: string }[]).map((x) => x.service_id);
+      const mes = await mesServices();
       return lignes.filter((l) => dansLePerimetre(appUser.role, mes, l.service_id));
     })();
     return planningPromesse;
@@ -212,14 +222,20 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
         const rows = await lire<any>(
           supabase
             .from("vehicle_interventions")
-            .select("id, type, urgency, created_at, requested_by, vehicles(registration)")
+            .select("id, type, urgency, created_at, requested_by, vehicles(registration, service_id)")
             .eq("status", "scheduled")
             .order("created_at", { ascending: true })
             .limit(PLAFOND_PAR_SOURCE),
         );
+        // La lecture des interventions est ouverte à toute l'organisation (RLS) : le manager ne voit que les véhicules de ses services.
+        const mes = appUser.role === "manager" ? await mesServices() : [];
+        const dansMesServices = (r: any) => {
+          const v = Array.isArray(r.vehicles) ? r.vehicles[0] : r.vehicles;
+          return dansLePerimetre(appUser.role, mes, v?.service_id);
+        };
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
-          brutes: rows.map((r) => ({
+          brutes: rows.filter(dansMesServices).map((r) => ({
             type: "entretien" as const,
             id: r.id,
             libelle: `Entretien${immat(r.vehicles) ? ` · ${immat(r.vehicles)}` : ""}`,

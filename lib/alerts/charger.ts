@@ -1,8 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { alerteAffichable } from "@/lib/alerts/destinataires";
 import { compterNonLues, filtreDestinataire, marquerLues, trierNonLuesDabord } from "@/lib/alerts/lecture";
 
-export const COLONNES_ALERTE = "id, type, severity, message, status, notified_at, created_at, related_table, related_id, recipient_user_id";
+export const COLONNES_ALERTE = "id, type, severity, message, status, notified_at, created_at, related_table, related_id, recipient_user_id, service_id";
 
 export interface AlerteAffichee {
   id: string;
@@ -15,6 +16,7 @@ export interface AlerteAffichee {
   related_table: string | null;
   related_id: string | null;
   recipient_user_id: string | null;
+  service_id?: string | null;
   lu: boolean;
 }
 
@@ -34,12 +36,13 @@ async function idsLus(supabase: SupabaseClient, userId: string, ids: readonly st
 export async function chargerAlertes(
   supabase: SupabaseClient,
   userId: string,
-  { ouvertes = false, limite = 5 }: { ouvertes?: boolean; limite?: number } = {},
+  { ouvertes = false, limite = 5, role }: { ouvertes?: boolean; limite?: number; role?: string } = {},
 ): Promise<AlerteAffichee[]> {
   let q = supabase.from("alerts").select(COLONNES_ALERTE).or(filtreDestinataire(userId));
   if (ouvertes) q = q.eq("status", "open");
   const { data } = await q.order("created_at", { ascending: false }).limit(limite);
-  const alertes = (data ?? []) as Omit<AlerteAffichee, "lu">[];
+  // Filet : les alertes de tournée (nom du chauffeur) ne vont ni au comptable ni à un manager sans service (en plus de la RLS).
+  const alertes = ((data ?? []) as Omit<AlerteAffichee, "lu">[]).filter((a) => !role || a.recipient_user_id || alerteAffichable(role, a));
   const lues = await idsLus(supabase, userId, alertes.map((a) => a.id));
   return trierNonLuesDabord(marquerLues(alertes, lues));
 }

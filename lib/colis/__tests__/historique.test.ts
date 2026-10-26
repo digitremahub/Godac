@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agregerArrets, camionDeTournee, decalerJour, filtrerLignes, jourParis, lireFiltres, paginer, versParams } from "@/lib/colis/historique";
+import { agregerArrets, camionDeTournee, chauffeurDansPerimetre, decalerJour, filtrerLignes, jourParis, lireFiltres, paginer, perimetrePour, versParams } from "@/lib/colis/historique";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -108,5 +108,23 @@ describe("recherche d'un colis dans l'historique", () => {
     expect(lireRecherche({ q: "Dupont", statut: "failed" })).toEqual({ q: "Dupont", statut: "failed" });
     expect(lireRecherche({ q: ["XY12345"], statut: "nimporte" })).toEqual({ q: "XY12345", statut: null });
     expect(lireRecherche({})).toEqual({ q: null, statut: null });
+  });
+});
+
+describe("périmètre de l'historique colis", () => {
+  it("exploitation et direction : toute l'organisation", () => {
+    for (const role of ["exploitation", "direction"]) expect(perimetrePour(role, "u1", ["A"], ["c1"])).toEqual({ chauffeurs: null, services: null });
+  });
+  it("manager : les chauffeurs de ses services et lui-même, jamais un autre service", () => {
+    const p = perimetrePour("manager", "m1", ["A"], ["c1", "c2", "m1"]);
+    expect(p.chauffeurs).toEqual(["m1", "c1", "c2"]);
+    expect(p.services).toEqual(["A"]);
+    expect(chauffeurDansPerimetre(p, "c1")).toBe(true);
+    expect(chauffeurDansPerimetre(p, "c9")).toBe(false);
+  });
+  it("manager sans service : ses propres tournées seulement", () => {
+    const p = perimetrePour("manager", "m1", [], []);
+    expect(p.chauffeurs).toEqual(["m1"]);
+    expect(chauffeurDansPerimetre(p, "c1")).toBe(false);
   });
 });

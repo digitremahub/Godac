@@ -52,7 +52,8 @@ export function AlertList({
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const canAct = viewerRole !== "chauffeur";
+  // Statut partagé : l'encadrement seulement (ni le chauffeur ni le comptable, hors chaîne de décision).
+  const canAct = viewerRole === "manager" || viewerRole === "exploitation" || viewerRole === "direction";
   const nonLues = alerts.filter((a) => a.lu === false).map((a) => a.id);
 
   async function updateStatus(id: string, status: "acknowledged" | "resolved") {

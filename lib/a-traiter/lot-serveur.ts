@@ -102,15 +102,22 @@ export async function traiterLot(p: {
   action: ActionLot;
   commentaire: string | null;
   elements: readonly ElementLot[];
+  /** Motif de refus d'un élément hors du périmètre du rôle (null : autorisé). Jamais de requête pour un élément refusé. */
+  refus?: (el: ElementLot) => string | null;
 }): Promise<ResultatLot> {
-  const perimes = await nonEnAttente(p.supabase, p.elements);
+  const interdits = new Map<string, string>();
+  for (const el of p.elements) {
+    const motif = p.refus?.(el) ?? null;
+    if (motif) interdits.set(cleLot(el), motif);
+  }
+  const perimes = await nonEnAttente(p.supabase, p.elements.filter((el) => !interdits.has(cleLot(el))));
   const resultats: ResultatElement[] = new Array(p.elements.length);
 
   // Par petits groupes : la base n'est pas inondée et l'ordre des résultats reste celui de la sélection.
   for (let i = 0; i < p.elements.length; i += SIMULTANES) {
     const groupe = p.elements.slice(i, i + SIMULTANES);
     const sortie = await Promise.all(
-      groupe.map((el) => (perimes.has(cleLot(el)) ? Promise.resolve(resultatRefuse(el, "Cet élément n'est plus en attente (déjà traité) ou n'est plus dans votre périmètre.")) : traiterUn(el, p.action, p.commentaire))),
+      groupe.map((el) => (interdits.has(cleLot(el)) ? Promise.resolve(resultatRefuse(el, interdits.get(cleLot(el))!)) : perimes.has(cleLot(el)) ? Promise.resolve(resultatRefuse(el, "Cet élément n'est plus en attente (déjà traité) ou n'est plus dans votre périmètre.")) : traiterUn(el, p.action, p.commentaire))),
     );
     sortie.forEach((r, j) => {
       resultats[i + j] = r;
