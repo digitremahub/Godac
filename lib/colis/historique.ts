@@ -369,14 +369,26 @@ export async function detailTournee(supabase: SupabaseClient, userId: string, to
     const avec = await lireArrets(`${colonnesArret}, contact_message, contact_phone, contact_at`);
     return avec.error ? lireArrets(colonnesArret) : avec;
   };
+  // Drapeau « hors tournée » des listes (migration 190) : repli sans lui.
+  const listesAvecDrapeau = async () => {
+    const lire = (champs: string) => supabase.from("delivery_lists").select(champs).eq("run_id", id).order("position");
+    const avec = await lire("id, name, position, is_hors_tournee");
+    return avec.error ? lire("id, name, position") : avec;
+  };
   const [{ data: stops }, { data: listes }, { data: chauffeur }] = await Promise.all([
     arretsAvecContacts(),
-    supabase.from("delivery_lists").select("id, name, position").eq("run_id", id).order("position"),
+    listesAvecDrapeau(),
     supabase.from("users").select("full_name").eq("id", run.driver_id).maybeSingle(),
   ]);
-  const ls = (listes ?? []) as Liste[];
+  const ls = (listes ?? []) as unknown as Liste[];
   const nom = new Map(ls.map((l) => [l.id, l.name]));
-  const arretsOrdonnes = ordonnerParListe((stops ?? []) as unknown as ArretDetail[], ls).map((s) => ({ ...s, liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE }));
+  const horsTournee = new Set(ls.filter((l) => l.is_hors_tournee === true).map((l) => l.id));
+  const arretsOrdonnes = ordonnerParListe((stops ?? []) as unknown as ArretDetail[], ls).map((s) => ({
+    ...s,
+    liste: (s.list_id && nom.get(s.list_id)) || LISTE_PRINCIPALE,
+    /** Liste signalée hors tournée (commune hors des villages de la tournée). */
+    hors_tournee: Boolean(s.list_id && horsTournee.has(s.list_id)),
+  }));
   // L’historique reflète l’ordre réel de passage : heure de clôture de l’arrêt,
   // puis position prévue en secours. Les arrêts non clôturés restent à la fin.
   const arrets = arretsOrdonnes.sort((a, b) => {
