@@ -6,6 +6,7 @@ import { versParams, type Historique, type detailTournee, type LigneColis, type 
 import { SupprimerTourneeDirection } from "@/components/colis/SupprimerTourneeDirection";
 import { estMarque, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
 import { BadgeArret, EncocheArret } from "@/components/colis/Ramasse";
+import { BadgeHorsTournee } from "@/components/colis/AlertesArret";
 import { formatPoids } from "@/lib/colis/poids";
 import { libelleMotif } from "@/lib/colis/cloture";
 import { libelleContacts } from "@/lib/colis/contacts";
@@ -164,7 +165,7 @@ function DetailTournee({ detail, fermer, direction }: { detail: NonNullable<Awai
           {arrets.map((s, i) => (
             <li key={s.id} className={`relative py-2 ${estMarque(s) ? "pl-3" : ""}`}>
               <EncocheArret stop={s} />
-              {plusieursListes && (i === 0 || arrets[i - 1]!.liste !== s.liste) && <p className="pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy/55">{s.liste}</p>}
+              {plusieursListes && (i === 0 || arrets[i - 1]!.liste !== s.liste) && <p className="flex flex-wrap items-center gap-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy/55">{s.liste}{s.hors_tournee && <BadgeHorsTournee />}</p>}
               <div className="flex items-start gap-3">
                 <span
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${

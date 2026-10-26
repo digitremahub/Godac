@@ -33,6 +33,7 @@ import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
+import { separerReportes } from "@/lib/colis/villages";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
@@ -247,8 +248,10 @@ export function AppLivreur({
       }
       const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${choix}`);
       setRun(data.run);
-      setStops(data.stops);
-      setLists(data.lists ?? []);
+      // Adresses reportées au lancement (villages décochés) : conservées, hors de la tournée en cours.
+      const { actifs, listes } = separerReportes(data.stops, data.lists ?? []);
+      setStops(actifs);
+      setLists(listes);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       setRuns((r) => r ?? []);
@@ -538,12 +541,12 @@ export function AppLivreur({
     setConfirmationLancement(true);
   }
 
-  /** Après confirmation (tournée + villages) : ordre global calculé si besoin, puis départ. */
-  async function demarrer() {
+  /** Après confirmation (tournée + villages) : ordre global calculé si besoin (ou si des villages ont été mis de côté), puis départ. */
+  async function demarrer(modifie = false) {
     if (!run) return;
     setBusy(true);
     try {
-      if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
+      if ((modifie || !run.optimized_at) && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
       await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
       setConfirmationLancement(false);
       await charger(run.id);

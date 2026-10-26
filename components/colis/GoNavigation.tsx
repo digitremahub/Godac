@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource, Map as CarteMap, Marker, StyleSpecification } from "maplibre-gl";
 import { IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconPointRelais, IconRamasse, IconX } from "@/components/layout/icons";
 import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
-import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
+import { BadgeHorsTournee, BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { BadgeHoraires, type useHoraires } from "@/components/colis/HorairesSheet";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { AdresseInput } from "@/components/colis/AdresseInput";
@@ -863,6 +863,11 @@ export function GoNavigation(p: GoNavigationProps) {
     const g = groupes.find((x) => x.arrets.includes(s));
     return g ? nomGroupe(g) : null;
   };
+  /** Commune hors tournée de l'arrêt (sa liste est signalée hors tournée), sinon null. */
+  const communeHorsTournee = (s: Stop) => {
+    const g = groupes.find((x) => x.arrets.includes(s));
+    return g?.liste?.is_hors_tournee ? nomGroupe(g) : null;
+  };
 
   function choisirDansListe(s: Stop) {
     setSelection(s.id);
@@ -1186,6 +1191,7 @@ export function GoNavigation(p: GoNavigationProps) {
                       onAller={consulte === s.id ? () => { setSelection(s.id); setConsulte(null); } : undefined}
                       prochain={s.id === restants[0]?.id}
                       nomListe={multi ? nomListe(s) : null}
+                      horsTournee={communeHorsTournee(s)}
                       horaires={horaires}
                       fige={fige}
                       onTerminer={p.onTerminer}
@@ -1227,9 +1233,10 @@ export function GoNavigation(p: GoNavigationProps) {
                           <button type="button" className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => choisirDansListe(s)} aria-label={`Naviguer vers l'arrêt ${numero(s)} — ${s.address}`}>
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold tabular-nums text-teal-sur-menu">{numero(s)}</span>
                             <span className="min-w-0">
-                              {(estRamasse(s) || estPointRelais(s) || !s.phone) && (
+                              {(estRamasse(s) || estPointRelais(s) || !s.phone || communeHorsTournee(s)) && (
                                 <span className="mb-1 flex flex-wrap gap-1">
                                   <BadgeArret stop={s} />
+                                  {communeHorsTournee(s) && <BadgeHorsTournee commune={communeHorsTournee(s)} />}
                                   {!s.phone && <BadgeSansTelephone />}
                                 </span>
                               )}
@@ -1480,6 +1487,7 @@ function CarteArret({
   onAller,
   prochain,
   nomListe,
+  horsTournee,
   horaires,
   fige,
   onTerminer,
@@ -1497,6 +1505,8 @@ function CarteArret({
   onAller?: () => void;
   prochain: boolean;
   nomListe: string | null;
+  /** Commune hors tournée de l'arrêt (badge « Hors tournée »), sinon null. */
+  horsTournee: string | null;
   horaires: Horaires;
   fige: boolean;
   onPlus: (s: Stop) => void;
@@ -1517,6 +1527,7 @@ function CarteArret({
       <div>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-ink">
           <BadgeArret stop={s} />
+          {horsTournee && <BadgeHorsTournee commune={horsTournee} />}
           <span>
             Arrêt {numero} / {total}
             {prochain ? " · prochain" : ""}
@@ -1698,7 +1709,7 @@ function AjoutAdresse({
         return void (await onAjoute("Pas de réseau : l'adresse est conservée et sera ajoutée dès que le réseau revient.", true));
       }
       if (r.duplicate) return void (await onAjoute(r.message ?? "Déjà dans la tournée.", false));
-      const village = r.village ? ` (${r.village.horsTournee ? "hors tournée" : r.village.nom})` : "";
+      const village = r.village ? ` (${r.village.horsTournee ? `${r.village.nom}, hors tournée` : r.village.nom})` : "";
       if (r.grouped || !r.stop) return void (await onAjoute(`Ajouté à l'arrêt déjà prévu à cette adresse${village}.`, true));
       let texte = `Adresse ajoutée${village}`;
       if (placement === "optimiser") {
