@@ -103,6 +103,8 @@ export interface ContexteAffectations {
   lignesVisibles: LigneTournee[];
   /** Ferme ou rouvre une tournée (un clic ; confirmation si la fiche colis liée est en cours). */
   basculerOuverture: (entree: EntreeAffectation) => void;
+  /** Ferme (true) ou rouvre (false) toutes les tournées données (une ligne sur la période affichée). */
+  basculerOuvertureLigne: (entrees: EntreeAffectation[], fermer: boolean) => void;
   /** Ouvre la feuille « Répartir » (tournée fusionnée) de cette affectation. */
   ouvrirRepartition: (entree: EntreeAffectation) => void;
 }
