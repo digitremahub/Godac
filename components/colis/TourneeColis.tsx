@@ -10,6 +10,7 @@ import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import { arretAAfficher, termeRecherche } from "@/lib/colis/recherche-arret";
 import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
@@ -195,6 +196,8 @@ export function TourneeColis({
   /** Résumé de la dernière optimisation (km, fin estimée, hors horaires, fermés). */
   const [resume, setResume] = useState<ResumeOptimisation | null>(null);
   const [rechercheAdresse, setRechercheAdresse] = useState("");
+  /** Arrêt trouvé par la recherche ou tout juste ajouté : défilé jusqu'à lui et entouré dans la liste. */
+  const [misEnAvant, setMisEnAvant] = useState<string | null>(null);
   /** Feuille « Optimiser l'ordre » : départ et arrivée. */
   const [feuilleOptim, setFeuilleOptim] = useState(false);
   const horaires = useHoraires(run, stops);
@@ -411,7 +414,10 @@ export function TourneeColis({
       setDraft(null);
       await recharger(run?.id);
       // Adresse pro : horaires cherchés sur internet en arrière-plan, sans bloquer le chargement.
-      if (r.stop?.id && !r.grouped && !r.duplicate) void chercherHoraires([r.stop.id]);
+      if (r.stop?.id && !r.grouped && !r.duplicate) {
+        setMisEnAvant(r.stop.id);
+        void chercherHoraires([r.stop.id]);
+      }
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -831,10 +837,21 @@ export function TourneeColis({
 
   // Arrêts par liste. Une seule liste implicite : affichage identique à une tournée sans liste.
   const groupesComplets = grouperParListe(stops, lists);
-  const termeAdresse = rechercheAdresse.trim().toLocaleLowerCase("fr-FR");
+  const termeAdresse = termeRecherche(rechercheAdresse);
   const groupes = termeAdresse
     ? groupesComplets.map((g) => ({ ...g, arrets: g.arrets.filter((s) => [s.address, s.recipient ?? "", s.phone ?? "", s.parcel_code ?? ""].some((v) => v.toLocaleLowerCase("fr-FR").includes(termeAdresse))) })).filter((g) => g.arrets.length > 0)
     : groupesComplets;
+  // Recherche : un seul résultat est mis en avant tout seul, Entrée prend le premier ; un arrêt ajouté l'est aussi.
+  const idsTrouves = termeAdresse ? groupes.flatMap((g) => g.arrets.map((s) => s.id)) : [];
+  const cleTrouves = idsTrouves.join(",");
+  useEffect(() => {
+    const id = arretAAfficher(idsTrouves, termeAdresse);
+    if (id) setMisEnAvant(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termeAdresse, cleTrouves]);
+  useEffect(() => {
+    if (misEnAvant) document.getElementById(`arret-${misEnAvant}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [misEnAvant, stops.length, cleTrouves]);
   // Recherche d'adresses et d'établissements biaisée autour du dépôt de la tournée.
   const depot = run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
   // Glisser-déposer : arrêts à livrer, hors recherche et hors tournée terminée.
@@ -1098,7 +1115,7 @@ export function TourneeColis({
       <label className="relative block">
         <span className="sr-only">Rechercher une adresse dans la tournée</span>
         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-navy/45">⌕</span>
-        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
+        <input className="input !pl-9" type="search" value={rechercheAdresse} onChange={(e) => setRechercheAdresse(e.target.value)} onKeyDown={(e) => { const id = e.key === "Enter" ? arretAAfficher(idsTrouves, termeAdresse, true) : null; if (id) (e.preventDefault(), setMisEnAvant(id)); }} enterKeyHint="search" placeholder="Rechercher une adresse, un destinataire ou un code colis…" aria-label="Rechercher dans les adresses de la tournée" />
         {rechercheAdresse && <button type="button" className="absolute inset-y-0 right-2 px-2 text-sm text-navy/60" onClick={() => setRechercheAdresse("")}>Effacer</button>}
       </label>
       {rechercheAdresse && <p className="-mt-2 text-xs text-navy/60">{groupes.reduce((n, g) => n + g.arrets.length, 0)} résultat(s) sur {stops.length} arrêt(s).</p>}
@@ -1404,7 +1421,7 @@ export function TourneeColis({
                 {g.arrets.map((s) => {
                   const i = stops.indexOf(s);
                   const rendu = (props: { ref?: (el: HTMLElement | null) => void; style?: CSSProperties } | null, poignee: Poignee | null) => (
-                    <li key={s.id} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""}`}>
+                    <li key={s.id} id={`arret-${s.id}`} ref={props?.ref} style={props?.style} className={`relative bg-surface py-2.5 pr-4 sm:pr-5 ${estMarque(s) ? "pl-5 sm:pl-6" : "pl-4 sm:pl-5"} ${s.status !== "pending" ? "opacity-55" : ""} ${s.id === misEnAvant ? "ring-2 ring-inset ring-teal" : ""}`}>
                       <EncocheArret stop={s} />
                       <div className="flex items-start gap-3">
                         {triActif && <span className="-my-2.5 -ml-2 flex items-center">{poignee ? <BoutonPoignee poignee={poignee} libelle={s.address} /> : <span className="w-8" aria-hidden="true" />}</span>}

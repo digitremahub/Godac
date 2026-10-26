@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { IconBuilding, IconMapPin } from "@/components/layout/icons";
 import { CacheSuggestions, cleBiais } from "@/lib/colis/cache-adresses";
 import { completerSuggestions, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { suggestionValidee } from "@/lib/colis/recherche-arret";
 
 /** Debounce court : la réponse serveur est rapide (Google ou BAN), on ne retarde pas la frappe. */
 const DEBOUNCE_MS = 150;
@@ -149,7 +150,8 @@ export function AdresseInput({
           if (suggestions.length === 0) return;
           if (e.key === "ArrowDown") (e.preventDefault(), setActif((i) => Math.min(suggestions.length - 1, i + 1)));
           else if (e.key === "ArrowUp") (e.preventDefault(), setActif((i) => Math.max(0, i - 1)));
-          else if (e.key === "Enter" && actif >= 0) (e.preventDefault(), void choisir(suggestions[actif]!));
+          // Entrée choisit la suggestion surlignée, à défaut la première : l'adresse s'affiche tout de suite.
+          else if (e.key === "Enter") (e.preventDefault(), void choisir(suggestions[suggestionValidee(actif, suggestions.length)]!));
           else if (e.key === "Escape") setSuggestions([]);
         }}
         placeholder="Nom de l'entreprise, du commerce ou adresse…"
