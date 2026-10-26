@@ -5,10 +5,14 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { AttachReportPhotoButton } from "@/components/reports/AttachReportPhotoButton";
 import { RelireScansButton } from "@/components/reports/RelireScansButton";
+import type { DonneesGo } from "@/lib/colis/rapport-go";
 import { IconPencil } from "@/components/layout/icons";
 
 export interface ReportRow {
   id: string;
+  driver_id?: string | null;
+  /** Ce que GO a enregistré pour la tournée : complète les champs vides, sans jamais remplacer une valeur lue ou corrigée. */
+  go?: DonneesGo | null;
   tour_number: string;
   start_at: string;
   end_at: string | null;
@@ -168,8 +172,28 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
     }
   }
 
+  /** Valeur de GO pour un champ vide du rapport (texte), ou null. */
+  const CHAMP_GO: Partial<Record<EditableField, keyof DonneesGo>> = {
+    report_departure_time: "depart",
+    report_return_time: "retour",
+    report_stops_total: "arrets",
+    report_stops_delivered: "livres",
+    report_packages_count: "colis",
+    report_pickups: "ramasses",
+    report_packages_picked_up: "colisRamasses",
+    report_packages_returned: "ramenes",
+  };
   function cell(r: ReportRow, field: EditableField, display: string) {
     if (editingId !== r.id || !form) {
+      const cle = CHAMP_GO[field];
+      const go = display === "—" && cle && r.go ? r.go[cle] : null;
+      if (go !== null && go !== undefined) {
+        return (
+          <span className="italic text-navy/70" title="Donnée de GO (tournée colis), faute de lecture sur la photo de la feuille">
+            {String(go)} <span className="text-[10px] font-semibold not-italic text-teal-ink">GO</span>
+          </span>
+        );
+      }
       return display;
     }
     return (
@@ -192,7 +216,7 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
             Relire tous les scans
           </button>
           <span className="text-navy/55">
-            {relecture ?? "Arrêts = stops du scan moins les ramasses · Livrés = colis REMIS. Relance la lecture des scans enregistrés."}
+            {relecture ?? "Arrêts = stops du scan moins les ramasses · Livrés = colis REMIS · « GO » = complété depuis la tournée colis quand la photo n'a pas été lue. Relance la lecture des scans enregistrés."}
           </span>
         </div>
       )}
@@ -243,7 +267,15 @@ export function ReportsTable({ reports, canEdit }: { reports: ReportRow[]; canEd
                 {new Date(r.start_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })}
               </td>
               <td className="py-2" title="Heure du scan de retour, pas l'heure imprimée sur le BL">
-                {r.end_at ? new Date(r.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) : "—"}
+                {r.end_at ? (
+                  new Date(r.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" })
+                ) : r.go?.retour ? (
+                  <span className="italic text-navy/70" title="Dernier arrêt traité dans GO">
+                    {r.go.retour} <span className="text-[10px] font-semibold not-italic text-teal-ink">GO</span>
+                  </span>
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="py-2">{cell(r, "report_stops_total", r.report_stops_total?.toString() ?? "—")}</td>
               <td className="py-2">{cell(r, "report_stops_delivered", r.report_stops_delivered?.toString() ?? "—")}</td>

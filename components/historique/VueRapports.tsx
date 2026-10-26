@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { donneesGo, tourneeDeLigne, type ArretRapport, type TourneeRapport } from "@/lib/colis/rapport-go";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportsTable, type ReportRow } from "@/components/reports/ReportsTable";
@@ -130,7 +131,7 @@ async function TableView({
   let query = supabase
     .from("planning_entries")
     .select(
-      "id, tour_number, start_at, end_at, start_photo_path, start_sheet_path, end_photo_path, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_stops_delivered, report_packages_missing, report_pickups, report_packages_picked_up, report_packages_returned, report_packages_relay, report_departure_time, report_return_time, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
+      "id, tour_number, driver_id, start_at, end_at, start_photo_path, start_sheet_path, end_photo_path, report_bl_number, report_stops_total, report_packages_count, report_priority_count, report_stops_delivered, report_packages_missing, report_pickups, report_packages_picked_up, report_packages_returned, report_packages_relay, report_departure_time, report_return_time, services(name), vehicles(registration), users!planning_entries_driver_id_fkey(full_name)",
     )
     .or(`${REPORT_FIELDS_FILTER},start_photo_path.not.is.null,start_sheet_path.not.is.null,end_photo_path.not.is.null`)
     .gte("start_at", `${from}T00:00:00`)
@@ -153,7 +154,28 @@ async function TableView({
     );
   }
 
-  return <ReportsTable reports={reports} canEdit={canEdit} />;
+  // Champs que la lecture des photos n'a pas trouvés : complétés par ce que GO a enregistré (affichage seulement).
+  const ids = reports.map((r) => r.id);
+  const { data: tournees } = await supabase
+    .from("delivery_runs")
+    .select("id, planning_entry_id, driver_id, run_date, started_at")
+    .or(`planning_entry_id.in.(${ids.join(",")}),driver_id.in.(${[...new Set(reports.map((r) => r.driver_id).filter(Boolean))].join(",")})`)
+    .gte("run_date", from)
+    .lt("run_date", toExclusive);
+  const runs = (tournees ?? []) as TourneeRapport[];
+  const arretsParTournee = new Map<string, ArretRapport[]>();
+  const utiles = [...new Set(reports.map((r) => tourneeDeLigne(r, runs)?.id).filter((id): id is string => Boolean(id)))];
+  for (let i = 0; i < utiles.length; i += 8) {
+    const lot = utiles.slice(i, i + 8);
+    const { data: arrets } = await supabase.from("delivery_stops").select("run_id, status, kind, parcel_count, packages_picked_up, done_at").in("run_id", lot).limit(1000);
+    for (const s of (arrets ?? []) as (ArretRapport & { run_id: string })[]) arretsParTournee.set(s.run_id, [...(arretsParTournee.get(s.run_id) ?? []), s]);
+  }
+  const avecGo = reports.map((r) => {
+    const run = tourneeDeLigne(r, runs);
+    return { ...r, go: run ? donneesGo(run, arretsParTournee.get(run.id) ?? []) : null };
+  });
+
+  return <ReportsTable reports={avecGo} canEdit={canEdit} />;
 }
 
 async function PhotosView({
