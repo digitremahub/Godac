@@ -60,6 +60,40 @@ describe("ordonnerListesGlobalement", () => {
   });
 });
 
+describe("ordonnerListesGlobalement : communes hors tournée", () => {
+  const listes = [
+    { id: "H1", name: "Lodève", position: 0, is_hors_tournee: true },
+    { id: "R", name: "Reportés", position: 1 },
+    { id: "A", name: "Village A", position: 2 },
+    { id: "H2", name: "Clermont", position: 3, is_hors_tournee: true },
+    { id: "B", name: "Village B", position: 4 },
+  ];
+  const arrets = [
+    arret("H1", pt(5, 0)), arret("H1", pt(5, 1)), // hors tournée, tout près du dépôt
+    arret("A", pt(10, 0)), arret("B", pt(20, 0)),
+    arret("H2", pt(28, 0)), arret("H2", pt(28, 1)),
+    arret("R", pt(2, 0)),
+  ];
+
+  it("villages d'abord, puis les communes hors tournée (chacune groupée), « Reportés » en dernier", () => {
+    const r = ordonnerListesGlobalement(arrets, listes, depot, false);
+    expect(r.listes.map((l) => l.id)).toEqual(["A", "B", "H2", "H1", "R"]);
+    expect(r.listes.map((l) => l.position)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("chaque commune hors tournée reste groupée dans la séquence ; les reportés sont ignorés", () => {
+    const r = ordonnerListesGlobalement(arrets, listes, depot, false);
+    const seq = sequenceParListes(arrets.filter((a) => a.list_id !== "R"), r.listes, depot, false);
+    const listeDe = new Map(arrets.map((a) => [a.id, a.list_id]));
+    expect(seq.sequence.map((id) => listeDe.get(id))).toEqual(["A", "B", "H2", "H2", "H1", "H1"]);
+  });
+
+  it("sans village actif : les communes hors tournée s'enchaînent de proche en proche", () => {
+    const r = ordonnerListesGlobalement(arrets.filter((a) => a.list_id === "H1" || a.list_id === "H2"), listes, depot, false);
+    expect(r.listes.slice(0, 2).map((l) => l.id)).toEqual(["H1", "H2"]);
+  });
+});
+
 describe("planifierBlocs (matrice routière découpée)", () => {
   it("blocs de 45 points au plus, toutes les paires de blocs", () => {
     expect(planifierBlocs(10)).toEqual({ blocs: [[0, 10]], requetes: [[0, 0]] });

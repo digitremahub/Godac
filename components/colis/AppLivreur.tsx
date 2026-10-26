@@ -33,6 +33,7 @@ import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
 import { LancementTournee } from "@/components/colis/LancementTournee";
+import { separerReportes } from "@/lib/colis/villages";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
 import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
@@ -46,6 +47,7 @@ import { useSortieGo } from "@/components/colis/useSortieGo";
 import { ECRAN_APRES_GO, ECRAN_REPRISE_GO } from "@/lib/colis/sortie-go";
 import { arretAAfficher } from "@/lib/colis/recherche-arret";
 import { SortieDepotLivreur } from "@/components/time-clock/SortieDepotLivreur";
+import type { FixGps } from "@/components/time-clock/useSortieDepot";
 import { RecommanderEmployeur } from "@/components/recommandation/RecommanderEmployeur";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
 
@@ -121,6 +123,14 @@ export function AppLivreur({
   const [itineraire, setItineraire] = useState<Itineraire | null>(null);
   const [partage, setPartage] = useState(true);
   const [maPosition, setMaPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /** Dernier point GPS avec sa précision : transmis au pointage (présence au dépôt, sortie). */
+  const [fixGps, setFixGps] = useState<FixGps | null>(null);
+  const memoriserFix = useCallback((pos: { lat: number; lng: number }, precision?: number) => {
+    setMaPosition(pos);
+    setFixGps({ ...pos, precision: precision ?? null });
+  }, []);
+  /** Une tournée a été en cours dans cette session : la sortie du dépôt attend alors d'avoir revu le chauffeur au dépôt. */
+  const tourneeVueEnCours = useRef(false);
   /** Arrêt dont on saisit les horaires (adresse pro / créneau du jour). */
   const [horairesStop, setHorairesStop] = useState<Stop | null>(null);
   /** Préparation ouverte à la demande pendant la livraison (« Ajouter ou modifier des colis »). */
@@ -145,6 +155,7 @@ export function AppLivreur({
   // Pendant la tournée en cours : dernière position envoyée à l'exploitation
   // (au plus une fois par minute, écran ouvert), jamais en dehors.
   const runEnCours = run?.status === "in_progress" ? run.id : null;
+  if (runEnCours) tourneeVueEnCours.current = true;
   // Trajet réellement emprunté (historique), même règle : tournée en cours, partage non mis en pause.
   const traceActive = useTraceGps(runEnCours, partage);
   useEffect(() => {
@@ -155,14 +166,14 @@ export function AppLivreur({
         const maintenant = Date.now();
         if (maintenant - dernierEnvoi.current < ENVOI_POSITION_MS) return;
         dernierEnvoi.current = maintenant;
-        setMaPosition(pos);
+        memoriserFix(pos, p.coords.accuracy);
         fetch("/api/colis/position", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runEnCours, ...pos }) }).catch(() => undefined);
       },
       () => undefined,
       { enableHighAccuracy: true, maximumAge: 30_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [runEnCours, partage]);
+  }, [runEnCours, partage, memoriserFix]);
 
   function basculerPartage() {
     const suivant = !partage;
@@ -239,8 +250,10 @@ export function AppLivreur({
       }
       const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${choix}`);
       setRun(data.run);
-      setStops(data.stops);
-      setLists(data.lists ?? []);
+      // Adresses reportées au lancement (villages décochés) : conservées, hors de la tournée en cours.
+      const { actifs, listes } = separerReportes(data.stops, data.lists ?? []);
+      setStops(actifs);
+      setLists(listes);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
       setRuns((r) => r ?? []);
@@ -530,12 +543,12 @@ export function AppLivreur({
     setConfirmationLancement(true);
   }
 
-  /** Après confirmation (tournée + villages) : ordre global calculé si besoin, puis départ. */
-  async function demarrer() {
+  /** Après confirmation (tournée + villages) : ordre global calculé si besoin (ou si des villages ont été mis de côté), puis départ. */
+  async function demarrer(modifie = false) {
     if (!run) return;
     setBusy(true);
     try {
-      if (!run.optimized_at && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
+      if ((modifie || !run.optimized_at) && stops.length > 1) await api("/api/colis/optimiser", { method: "POST", body: JSON.stringify({ run_id: run.id }) });
       await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
       setConfirmationLancement(false);
       await charger(run.id);
@@ -587,7 +600,16 @@ export function AppLivreur({
 
   async function cloturer() {
     if (!run) return;
-    await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }).catch(() => undefined);
+    const corps = JSON.stringify({ status: "done" });
+    try {
+      await api(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: corps });
+    } catch (e) {
+      // Sans réseau la clôture part en file d'attente : une tournée restée « en cours » bloquerait la sortie du dépôt.
+      if (isNetworkFailure(e)) {
+        await enqueueOfflineMutation(`/api/colis/tournees/${run.id}`, { method: "PATCH", body: corps }).catch(() => undefined);
+        setToast({ ok: true, text: "Clôture enregistrée sur le téléphone. Elle sera synchronisée dès le retour du réseau." });
+      } else setToast({ ok: false, text: networkErrorMessage(e) });
+    }
     await charger(null);
   }
 
@@ -731,7 +753,7 @@ export function AppLivreur({
   return (
     <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       {/* Sortie du dépôt pointée automatiquement : surveillance dès qu'aucune tournée n'est en cours (après la clôture, écran de retour au dépôt compris). */}
-      <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} />
+      <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} fix={fixGps} apresCloture={tourneeVueEnCours.current} />
       {!enNavigation && (
       <header className="sticky top-0 z-30 bg-marine px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-pop">
         <div className="flex items-center justify-between gap-3">
@@ -867,7 +889,7 @@ export function AppLivreur({
           }
           onReglagesOptimisation={() => setFeuilleOptim(true)}
           onItineraire={setItineraire}
-          onPosition={setMaPosition}
+          onPosition={memoriserFix}
           traceActive={traceActive}
         />
       )}

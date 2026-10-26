@@ -14,7 +14,7 @@ import { arretAAfficher, termeRecherche } from "@/lib/colis/recherche-arret";
 import { OFFLINE_QUEUE_EVENT, enqueueOfflineMutation, isNetworkFailure, listOfflineMutations } from "@/lib/offline/outbox";
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { formatPoids, lirePoids, sommePoids } from "@/lib/colis/poids";
-import { AlerteSansTelephone, BadgeSansTelephone } from "@/components/colis/AlertesArret";
+import { AlerteSansTelephone, BadgeHorsTournee, BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, typeArret, type TypeArret } from "@/lib/colis/livraison";
 import { RESEAUX_RELAIS } from "@/lib/colis/relais";
 import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
@@ -38,6 +38,7 @@ import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from
 import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { AdresseInput } from "@/components/colis/AdresseInput";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
+import { separerReportes } from "@/lib/colis/villages";
 import { ImportTournee } from "@/components/colis/ImportTournee";
 import { ImportBordereau } from "@/components/colis/ImportBordereau";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
@@ -100,7 +101,7 @@ function NomRelaisInput({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 /** Poids saisi → texte du champ (« 2,5 »). */
-/** « Ajouter dans » : rangement automatique dans la liste du village (ou « Hors tournée »). */
+/** « Ajouter dans » : rangement automatique dans la liste du village (ou de la commune, hors tournée). */
 const AUTO = "__auto__";
 
 const champPoids = (kg: number | string | null | undefined) => (kg === null || kg === undefined || kg === "" ? "" : String(Number(kg)).replace(".", ","));
@@ -170,6 +171,8 @@ export function TourneeColis({
   const stops = useMemo(() => sansRetraits(stopsBruts, retires), [stopsBruts, retires]);
   const retraits = useRef(creerRetraitsDifferes());
   const [lists, setLists] = useState<Liste[]>([]);
+  /** Adresses mises de côté au lancement (villages décochés) : conservées, hors de la tournée en cours. */
+  const [nbReportes, setNbReportes] = useState(0);
   /** Liste où vont les colis ajoutés (scan, saisie, import) ; null = liste implicite. */
   const [cible, setCible] = useState<string | null>(AUTO);
   const [renommage, setRenommage] = useState<{ id: string | null; nom: string } | null>(null);
@@ -216,8 +219,10 @@ export function TourneeColis({
     try {
       const data = await api<{ run: Run; stops: Stop[]; lists?: Liste[] }>(`/api/colis/tournees/${id}`);
       setRun(data.run);
-      setStops(data.stops);
-      setLists(data.lists ?? []);
+      const { actifs, reportes, listes } = separerReportes(data.stops, data.lists ?? []);
+      setStops(actifs);
+      setLists(listes);
+      setNbReportes(reportes.length);
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     }
@@ -405,7 +410,7 @@ export function TourneeColis({
                         : d.type === "point_relais"
                           ? "Point relais ajouté."
                           : "Colis ajouté.") +
-                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? " · Rangé dans « Hors tournée »." : ` · Village : ${r.village.nom}.`) : "") +
+                    (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? ` · Rangé dans « ${r.village.nom} » (hors tournée).` : ` · Village : ${r.village.nom}.`) : "") +
                     (creneau.creneau ? ` · Créneau ${libelleCourt(creneau.creneau)}.` : "") +
                     (r.professionnel ? ` · Professionnel détecté : ${r.professionnel} (recherche de ses horaires…).` : "") +
                     sansTel,
@@ -859,7 +864,7 @@ export function TourneeColis({
   const ordreTri = groupes.flatMap((g) => g.arrets).filter((s) => s.status === "pending").map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
   const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
-  const cibles = [{ id: AUTO, nom: "Automatique (village / Hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
+  const cibles = [{ id: AUTO, nom: "Automatique (village, sinon commune hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
   const choixCible = multi && (
     <label className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
@@ -972,7 +977,10 @@ export function TourneeColis({
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold">{nomGroupe(g)}</p>
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                {nomGroupe(g)}
+                {l?.is_hors_tournee && <BadgeHorsTournee />}
+              </p>
               <p className="text-xs text-navy/60">
                 {c.arrets} arrêt{c.arrets > 1 ? "s" : ""} · {c.colis} colis{formatPoids(sommePoids(g.arrets)) && ` (${formatPoids(sommePoids(g.arrets))})`} · {c.restants} restant{c.restants > 1 ? "s" : ""}
               </p>
@@ -1157,6 +1165,7 @@ export function TourneeColis({
               {prochain.parcel_count > 1 && ` · ${prochain.parcel_count} colis${estRamasse(prochain) ? " à ramasser" : estPointRelais(prochain) ? " à déposer" : ""}`}
               {multi && ` · ${nomGroupe(groupes.find((g) => g.arrets.includes(prochain)) ?? { liste: null })}`}
             </span>
+            {groupes.find((g) => g.arrets.includes(prochain))?.liste?.is_hors_tournee && <BadgeHorsTournee />}
           </p>
           <div>
             <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
@@ -1656,6 +1665,12 @@ export function TourneeColis({
           </ol>
           </ZoneTri>
         </Card>
+      )}
+
+      {nbReportes > 0 && (
+        <p role="status" className="rounded-xl bg-orange/10 px-3 py-2 text-sm font-semibold text-orange-ink">
+          {nbReportes} adresse{nbReportes > 1 ? "s" : ""} reportée{nbReportes > 1 ? "s" : ""} (villages décochés au lancement) : conservée{nbReportes > 1 ? "s" : ""} dans la liste « Reportés », hors de la tournée en cours.
+        </p>
       )}
 
       {pending.length > 0 && <ExportTournee run={run} stops={pending} listes={lists} />}

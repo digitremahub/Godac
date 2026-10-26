@@ -12,13 +12,17 @@ import { dateParis } from "@/lib/colis/heure-paris";
  * choisit lui-même l'heure.
  */
 
-/** Au-delà, la dernière présence au dépôt est trop ancienne pour pointer seule la sortie. */
-export const FRAICHEUR_PRESENCE_MS = 30 * 60 * 1000;
+/**
+ * Au-delà, la dernière présence au dépôt est trop ancienne pour pointer seule la sortie.
+ * 60 min : le chargement au dépôt dure 20 à 40 min, souvent écran verrouillé (l'app ne
+ * lit alors pas la position) ; 30 min laissait presque toujours la sortie en « offre ».
+ */
+export const FRAICHEUR_PRESENCE_MS = 60 * 60 * 1000;
 /** Tolérance d'horloge entre le serveur et la base pour une présence « dans le futur ». */
 const TOLERANCE_HORLOGE_MS = 60 * 1000;
 
 export type DecisionSortie =
-  | { action: "rien"; raison: "organisation_desactivee" | "pas_d_entree" | "tournee_en_cours" | "tournee_non_cloturee" | "position_imprecise" }
+  | { action: "rien"; raison: "organisation_desactivee" | "pas_d_entree" | "tournee_en_cours" | "tournee_non_cloturee" | "position_imprecise" | "proche_du_depot" }
   | { action: "maj_presence" }
   | { action: "sortie_auto"; clockedOutAt: string }
   | { action: "offre"; lastSeenAt: string | null };
@@ -34,6 +38,10 @@ export interface EntreeDecision {
   positionPrecise: boolean;
   /** depotMatch() non nul : dans le rayon d'un dépôt du salarié. */
   auDepot: boolean;
+  /** Franchement hors du dépôt (rayon + marge, loinDuDepot) : entre les deux, on ne conclut rien. */
+  loinDuDepot: boolean;
+  /** Entrée pointée automatiquement : le salarié était alors au dépôt, ce qui vaut présence si rien d'autre n'est mémorisé. */
+  entreeAuto: boolean;
   /** Une tournée colis ou du planning est en cours pour ce salarié. */
   tourneeEnCours: boolean;
   /** Au moins une tournée clôturée depuis son arrivée. */
@@ -65,9 +73,10 @@ export function presenceFraiche(vue: Date, maintenant: Date): boolean {
 /**
  * Que faire d'une position reçue ?
  * - au dépôt (entrée ouverte) → mémoriser la présence ;
- * - précise, hors dépôt, plus de tournée en cours, une tournée clôturée,
- *   présence récente (< 30 min) → sortie automatique à l'heure de la
- *   dernière présence ;
+ * - précise, franchement hors dépôt (rayon + marge), plus de tournée en
+ *   cours, une tournée clôturée, présence récente (< 60 min) → sortie
+ *   automatique à l'heure de la dernière présence (à défaut, l'arrivée
+ *   d'une entrée automatique récente : le fix hors rayon suffit alors) ;
  * - mêmes conditions mais présence absente ou ancienne → simple offre,
  *   rien n'est modifié ;
  * - tout le reste → rien.
@@ -77,12 +86,18 @@ export function decider(e: EntreeDecision): DecisionSortie {
   if (!e.entreeOuverte) return { action: "rien", raison: "pas_d_entree" };
   if (!e.positionPrecise) return { action: "rien", raison: "position_imprecise" };
   if (e.auDepot) return { action: "maj_presence" };
+  if (!e.loinDuDepot) return { action: "rien", raison: "proche_du_depot" };
   if (e.tourneeEnCours) return { action: "rien", raison: "tournee_en_cours" };
   if (!e.tourneeCloturee) return { action: "rien", raison: "tournee_non_cloturee" };
 
   const vue = presenceValide(e.lastDepotSeenAt, e.clockedInAt, e.maintenant);
   if (vue && presenceFraiche(vue, e.maintenant)) {
     return { action: "sortie_auto", clockedOutAt: vue.toISOString() };
+  }
+  // Entrée automatique récente sans présence mémorisée (app fermée dès l'arrivée) : l'arrivée au dépôt fait foi.
+  const arrivee = e.entreeAuto && !vue && e.clockedInAt ? new Date(e.clockedInAt) : null;
+  if (arrivee && !Number.isNaN(arrivee.getTime()) && presenceFraiche(arrivee, e.maintenant)) {
+    return { action: "sortie_auto", clockedOutAt: arrivee.toISOString() };
   }
   return { action: "offre", lastSeenAt: vue ? vue.toISOString() : null };
 }

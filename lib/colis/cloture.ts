@@ -74,6 +74,19 @@ export function refusCloture(actuel: string, demande: StatutArret): string | nul
 
 export const MESSAGE_TOURNEE_CLOTUREE = "Tournée clôturée : ses livraisons ne peuvent plus être modifiées ni annulées.";
 
+export const MESSAGE_REOUVERTURE_REFUSEE = "Tournée clôturée : seul l'encadrement (manager, exploitation, direction) peut la rouvrir.";
+
+/**
+ * Retour arrière d'une tournée clôturée (done vers loading / in_progress) :
+ * réservé à l'encadrement, qui le justifie dans le journal d'audit. Renvoie
+ * le message de refus, ou null. Les autres changements de statut ne sont
+ * pas concernés.
+ */
+export function refusReouverture(actuel: string, demande: string | undefined, encadrement: boolean): string | null {
+  if (actuel !== "done" || !demande || demande === "done") return null;
+  return encadrement ? null : MESSAGE_REOUVERTURE_REFUSEE;
+}
+
 /**
  * Arrêt d'une tournée clôturée (jointure delivery_runs(status), objet ou
  * tableau selon le client Supabase) : figé, rien ne se modifie plus.
