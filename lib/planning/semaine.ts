@@ -20,6 +20,8 @@ export interface AffectationPlanning {
   vehicle_id: string | null;
   start_at: string;
   status: string;
+  /** Tournée ouverte (lib/planning/ouverture.ts) ; absent ou null : ouverte. */
+  tour_open?: boolean | null;
 }
 
 export interface CongePlanning {
@@ -45,12 +47,13 @@ export function statutAffectation(status: string) {
 }
 
 /**
- * Seule une affectation encore « prévue » se déplace, se modifie ou se
- * supprime : PATCH/DELETE /api/planning/entries/[id] ne touchent que
- * status = 'planned' (une tournée démarrée ou terminée est figée).
+ * Seule une affectation encore « prévue » et OUVERTE se déplace, se modifie
+ * ou se supprime : PATCH/DELETE /api/planning/entries/[id] ne touchent que
+ * status = 'planned' (une tournée démarrée ou terminée est figée) et refusent
+ * une tournée fermée tant qu'elle n'est pas rouverte.
  */
-export function estModifiable(a: Pick<AffectationPlanning, "status">): boolean {
-  return a.status === "planned";
+export function estModifiable(a: Pick<AffectationPlanning, "status" | "tour_open">): boolean {
+  return a.status === "planned" && a.tour_open !== false;
 }
 
 // ---------------------------------------------------------------------------

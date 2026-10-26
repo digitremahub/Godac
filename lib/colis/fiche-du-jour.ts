@@ -5,6 +5,9 @@ import { normaliserNomRelais } from "@/lib/colis/relais";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { codePays } from "@/lib/pays/serveur";
 import { assurerListesVillages, planningEtVillages } from "@/lib/colis/villages-serveur";
+import { fusionDeLEntree } from "@/lib/planning/fusion-serveur";
+import { cleRamasse, elementDuVillage, visiblesPour } from "@/lib/planning/fusion";
+import { cleCommune } from "@/lib/colis/villages";
 import { cleAdresse, creerTournee, ficheClotureeDuJour, RUN_FIELDS } from "@/lib/colis/serveur";
 import {
   choixRequis,
@@ -154,14 +157,14 @@ async function preparerFicheDuJourReliee(
   }
 }
 
-type Passage = { tour_number: string | null; service_id: string | null; start_at: string };
+type Passage = { id?: string; tour_number: string | null; service_id: string | null; start_at: string };
 
 /**
  * Charge des affectations sur une fiche : une liste par village, ramasses et
  * points relais (sans doublon d'arrêt). `portes` = toutes les affectations
  * que porte la fiche (nom, heure prévue et service de la fiche).
  */
-async function chargerPassages(supabase: SupabaseClient, conducteur: Conducteur, runId: string, aCharger: Passage[], portes: Passage[]) {
+export async function chargerPassages(supabase: SupabaseClient, conducteur: Conducteur, runId: string, aCharger: Passage[], portes: Passage[]) {
   const tries = [...portes].sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at));
   if (tries.length) {
     // La première affectation fournit l'heure et le service par défaut.
@@ -210,19 +213,42 @@ async function chargerPassages(supabase: SupabaseClient, conducteur: Conducteur,
       const { data: routes, error: erreurRoute } = await routeQuery;
       if (erreurRoute) throw erreurRoute;
       const route = (routes ?? [])[0];
-      if (!route) {
+
+      // Tournée fusionnée (lundi) : seulement les villages et ramasses qui reviennent à ce chauffeur
+      // ou qui sont encore « À attribuer » (lib/planning/fusion.ts › visiblesPour).
+      const fusion = passage.id ? await fusionDeLEntree(conducteur.organization_id, { id: passage.id, service_id: passage.service_id, tour_number: passage.tour_number, start_at: passage.start_at }) : null;
+      const visibles = fusion ? visiblesPour(conducteur.id, fusion.elements, fusion.lignes) : null;
+      if (!route && !fusion) {
         console.warn("[colis/tournees] Modèle de tournée introuvable", { tourNumber: passage.tour_number, serviceId: passage.service_id });
         continue;
       }
 
-      const { data: villages, error: erreurVillages } = await supabase
-        .from("tour_route_villages")
-        .select("id, name, pickup_addresses, planned_stops, position")
-        .eq("route_id", route.id)
-        .order("position");
-      if (erreurVillages) throw erreurVillages;
+      let villages: any[] = [];
+      if (route) {
+        const { data, error: erreurVillages } = await supabase
+          .from("tour_route_villages")
+          .select("id, name, pickup_addresses, planned_stops, position")
+          .eq("route_id", route.id)
+          .order("position");
+        if (erreurVillages) throw erreurVillages;
+        villages = data ?? [];
+      }
+      if (fusion && visibles?.villageIds.size) {
+        const { data, error: erreurOrigine } = await supabase
+          .from("tour_route_villages")
+          .select("id, name, pickup_addresses, planned_stops, position")
+          .in("id", [...visibles.villageIds])
+          .order("position");
+        if (erreurOrigine) throw erreurOrigine;
+        const noms = new Set(villages.map((v: any) => cleCommune(v.name)));
+        villages = [...villages, ...(data ?? []).filter((v: any) => !noms.has(cleCommune(v.name)))];
+      }
 
-      for (const village of villages ?? []) {
+      for (const village of villages) {
+        if (fusion && visibles) {
+          const element = elementDuVillage(village, fusion.elements.villages);
+          if (element && !visibles.villageIds.has(element.cle)) continue;
+        }
         const villageKey = cleAdresse(village.name);
         let liste = listesParVillage.get(villageKey);
         if (!liste) {
@@ -256,6 +282,8 @@ async function chargerPassages(supabase: SupabaseClient, conducteur: Conducteur,
         for (const stop of allStops) {
           const address = stop.address;
           if (address.length < 5) continue;
+          // Ramasse d'une fusion attribuée à un autre chauffeur : pas sur cette fiche.
+          if (stop.kind === "ramasse" && fusion && visibles && fusion.elements.ramasses.some((r) => r.cle === cleRamasse(address)) && !visibles.ramasseCles.has(cleRamasse(address))) continue;
           const stopKey = `${stop.kind}:${cleAdresse(address)}`;
           if (arretsAjoutes.has(stopKey)) continue;
           arretsAjoutes.add(stopKey);

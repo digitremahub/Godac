@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ficheClotureeDuJour, moduleActif, tourneeParId } from "@/lib/colis/serveur";
+import { refusDemarrageFiche } from "@/lib/planning/ouverture-serveur";
 import { assurerListeReportes, assurerListesVillages, chargerContexteRangement, listePourAdresse, listesAvecVillages, planningEtVillages, villagesDeRoute, type VillageDuJour } from "@/lib/colis/villages-serveur";
 import { cochesParDefaut, elementDeArret, elementsLancement, estListeReportee, partageReports, selectionLancement } from "@/lib/colis/villages";
 
@@ -105,6 +106,8 @@ export async function POST(req: Request) {
   if ("erreur" in ctx) return ctx.erreur;
   const { supabase, appUser, run } = ctx;
   if (run.status === "done") return NextResponse.json({ error: "Tournée clôturée." }, { status: 409 });
+  const fermee = await refusDemarrageFiche(appUser.organization_id, run.id);
+  if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
 
   let villages: VillageDuJour[];
   if (parsed.data.route_id) {

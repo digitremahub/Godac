@@ -519,7 +519,11 @@ export function decisionsAffectation(params: {
 }): DecisionJour[] {
   const out: DecisionJour[] = [];
   for (const date of [...new Set(params.dates)].sort()) {
-    const duJour = params.existantes.filter((e) => jourDe(e.start_at) === date && e.status !== "cancelled").sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at));
+    // Une tournée fermée est figée comme une tournée démarrée (lib/planning/ouverture.ts).
+    const duJour = params.existantes
+      .filter((e) => jourDe(e.start_at) === date && e.status !== "cancelled")
+      .map((e) => (e.tour_open === false && e.status === "planned" ? { ...e, status: "fermee" } : e))
+      .sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at));
     const absent = params.driverId !== null && params.absent(params.driverId, date);
     if (!duJour.length) {
       out.push({ type: "creer", date, startAt: params.versUtc(date, params.heure), driverId: absent ? null : params.driverId });
@@ -546,12 +550,13 @@ export function decisionsAffectation(params: {
 }
 
 /** « 4 jours placés, vendredi à remplacer (congé) » */
-export function texteAffectation(r: { places: number; absents: string[]; figees: number; deja: number }, libelleJour: (d: string) => string): string {
+export function texteAffectation(r: { places: number; absents: string[]; figees: number; deja: number; fermees?: number }, libelleJour: (d: string) => string): string {
   const parts: string[] = [];
   if (r.places) parts.push(`${r.places} jour${r.places > 1 ? "s" : ""} placé${r.places > 1 ? "s" : ""}`);
   if (r.deja) parts.push(`${r.deja} déjà en place`);
   if (r.absents.length) parts.push(`${r.absents.map(libelleJour).join(", ")} à remplacer (absent)`);
   if (r.figees) parts.push(`${r.figees} tournée${r.figees > 1 ? "s" : ""} déjà démarrée${r.figees > 1 ? "s" : ""}, inchangée${r.figees > 1 ? "s" : ""}`);
+  if (r.fermees) parts.push(`${r.fermees} tournée${r.fermees > 1 ? "s" : ""} fermée${r.fermees > 1 ? "s" : ""}, inchangée${r.fermees > 1 ? "s" : ""} (à rouvrir pour la modifier)`);
   return parts.join(", ") || "Rien à changer";
 }
 

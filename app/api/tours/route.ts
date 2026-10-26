@@ -10,6 +10,7 @@ import { reportVehicleSwap } from "@/lib/planning/vehicle-swap-alert";
 import { libellePhoto, photoChangementSchema, photosManquantes } from "@/lib/tours/changement-vehicule";
 import { enregistrerPhotosChangement } from "@/lib/tours/photos-changement-serveur";
 import { arretsLivraison } from "@/lib/ocr/arrets";
+import { refusSiFermee } from "@/lib/planning/ouverture-serveur";
 
 const reportFieldsSchema = z.object({
   tour_number: z.string().nullable(),
@@ -212,6 +213,12 @@ export async function POST(req: Request) {
             .maybeSingle()
         ).data
       : null;
+
+  // Tournée fermée par l'encadrement (migration 20261105000001) : pas de démarrage.
+  if (plannedMatch) {
+    const fermee = await refusSiFermee(appUser.organization_id, plannedMatch.id);
+    if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
+  }
 
   // A changed vehicle is detected here, from the planned row's own
   // original vehicle_id — never from a client-supplied "I swapped"

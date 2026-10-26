@@ -5,6 +5,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { couleurChauffeur, initiales, type ArretPlanning, type LigneTournee, type RoutePlanning } from "@/lib/planning/affectation";
 import type { AffectationPlanning, CongePlanning, ModelePlanning, VehiculePlanning } from "@/lib/planning/semaine";
 import type { EntreeAffichee } from "@/components/planning/FenetresPlanning";
+import type { FiltreOuverture } from "@/lib/planning/ouverture";
 
 // ---------------------------------------------------------------------------
 // Données de l'écran d'affectation (lues par la page serveur).
@@ -14,6 +15,18 @@ export type VueAffectation = "jour" | "semaine" | "mois";
 
 export interface EntreeAffectation extends EntreeAffichee {
   end_at?: string | null;
+  /** Fermeture de la tournée (migration 20261105000001) ; `tour_open` est dans AffectationPlanning. */
+  closed_at?: string | null;
+  closed_by?: string | null;
+}
+
+/** Tournée fusionnée du lundi : tournées d'origine et état de la répartition (lib/planning/fusion.ts). */
+export interface FusionPlanning {
+  tournees: string[];
+  total: number;
+  aAttribuer: number;
+  provisoires: number;
+  confirmes: number;
 }
 
 export interface DonneesAffectations {
@@ -41,6 +54,10 @@ export interface DonneesAffectations {
   colis: Record<string, number>;
   /** Fiche colis qui porte chaque affectation : deux affectations sur la même fiche sont « liées ». */
   fiches: Record<string, string>;
+  /** Tournées fusionnées (lundi) de la période, par affectation. Vide sans la migration 20261105000001. */
+  fusions: Record<string, FusionPlanning>;
+  /** Nom de la personne qui a fermé chaque tournée fermée, par affectation. */
+  fermeesPar: Record<string, string | null>;
   /** Chauffeurs à prévenir à la prochaine publication (null : inconnu). */
   aPrevenir: number | null;
   peutModifier: boolean;
@@ -80,6 +97,14 @@ export interface ContexteAffectations {
   allerJour: (date: string) => void;
   /** Ouvre « Heure de la tournée » (date : jour précis d'où l'on vient, sinon la période affichée). */
   ouvrirHeure: (cle: string, date: string | null) => void;
+  /** Filtre Ouvertes / Fermées / Toutes. */
+  filtreOuverture: FiltreOuverture;
+  /** Lignes montrées par le filtre (la vue Jour filtre elle-même ses cartes, jour par jour). */
+  lignesVisibles: LigneTournee[];
+  /** Ferme ou rouvre une tournée (un clic ; confirmation si la fiche colis liée est en cours). */
+  basculerOuverture: (entree: EntreeAffectation) => void;
+  /** Ouvre la feuille « Répartir » (tournée fusionnée) de cette affectation. */
+  ouvrirRepartition: (entree: EntreeAffectation) => void;
 }
 
 export const Contexte = createContext<ContexteAffectations | null>(null);

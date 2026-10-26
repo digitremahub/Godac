@@ -13,6 +13,8 @@ import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
 import { chargerTourneesSuivies } from "@/lib/exploitation/suivi-serveur";
 import { notifierRetards } from "@/lib/exploitation/retards-serveur";
 import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards } from "@/lib/exploitation/retards";
+import { lireFusions } from "@/lib/planning/fusion-serveur";
+import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
 import { nextDay, parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { PLAFOND_PAR_SOURCE, construireListe, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
 
@@ -322,6 +324,45 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
             ecran: "exploitation.planning",
             href: lienPlanning(t.id),
           })),
+        };
+      },
+    },
+    {
+      // Tournées fusionnées du jour (lundi) dont des villages ou des ramasses sont encore « À attribuer ».
+      type: "repartition_a_attribuer",
+      nom: "tournées fusionnées à répartir",
+      ecran: "exploitation.planning",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("planning_entries")
+            .select("id, tour_number, start_at")
+            .in("status", ["planned", "in_progress"])
+            .gte("start_at", debutJour)
+            .lt("start_at", debutDemain)
+            .order("start_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        // Table absente (migration 20261105000001 pas appliquée) : aucune fusion, source vide.
+        const fusions = await lireFusions(supabase, org, rows.map((r) => r.id));
+        return {
+          brutes: rows.flatMap((t) => {
+            const f = fusions.get(t.id);
+            if (!f) return [];
+            const resume = resumeRepartition([...f.elements.villages, ...f.elements.ramasses], f.lignes);
+            if (!resume.aAttribuer) return [];
+            return [
+              {
+                type: "repartition_a_attribuer" as const,
+                id: t.id,
+                libelle: `Tournée fusionnée ${t.tour_number} à répartir`,
+                detail: `${texteAAttribuer(resume)} · départ prévu à ${heure(t.start_at)}`,
+                echeance: t.start_at,
+                ecran: "exploitation.planning",
+                href: lienPlanning(t.id),
+              },
+            ];
+          }),
         };
       },
     },

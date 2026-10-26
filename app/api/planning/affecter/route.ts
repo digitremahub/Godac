@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { decisionsAffectation } from "@/lib/planning/affectation";
 import { absentSelon, lireAbsences } from "@/lib/planning/absences";
+import { jourDe } from "@/lib/planning/semaine";
 import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { ficheApresAffectation, ficheAPreparer, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
@@ -37,7 +38,7 @@ const CHAMPS = "id, service_id, tour_number, driver_id, vehicle_id, start_at, st
  * - affectation prévue sans chauffeur ou avec un autre : ce chauffeur la
  *   prend (l'ancien chauffeur perd sa fiche colis, il est prévenu à la
  *   publication) ;
- * - tournée déjà démarrée : rien ;
+ * - tournée déjà démarrée, ou fermée (planning_entries.tour_open) : rien ;
  * - chauffeur en congé validé ou en arrêt ce jour-là : il n'est PAS placé,
  *   une case vide devient une affectation « à remplacer » (sans chauffeur).
  * Tournée colis active : même question « séparées ou reliées » que
@@ -85,12 +86,22 @@ export async function POST(req: Request) {
       ? parsed.data.vehicle_id
       : (((attribues ?? []) as { id: string; service_id: string | null }[]).find((v) => v.service_id === service_id) ?? (attribues ?? [])[0])?.id ?? null;
 
+  // Tournées fermées (migration 20261105000001) : figées comme les tournées démarrées, tant qu'on ne les rouvre pas.
+  // Lecture à part et tolérante : sans la colonne, aucune tournée n'est fermée.
+  const idsExistantes = ((existantes ?? []) as AffectationPlanning[]).map((e) => e.id);
+  const { data: fermeesLues } = idsExistantes.length
+    ? await supabase.from("planning_entries").select("id").in("id", idsExistantes).eq("tour_open", false)
+    : { data: null };
+  const fermeesIds = new Set(((fermeesLues ?? []) as { id: string }[]).map((e) => e.id));
+  const joursFermes = new Set(((existantes ?? []) as AffectationPlanning[]).filter((e) => fermeesIds.has(e.id)).map((e) => jourDe(e.start_at)));
+  const existantesVues = ((existantes ?? []) as AffectationPlanning[]).map((e) => (fermeesIds.has(e.id) ? { ...e, tour_open: false } : e));
+
   const decisions = decisionsAffectation({
     dates,
     driverId: driver_id,
     heure,
     imposerHeure: imposer_heure,
-    existantes: (existantes ?? []) as AffectationPlanning[],
+    existantes: existantesVues,
     absent: absentSelon(absences),
     versUtc: parisWallTimeToUtcISOString,
   });
@@ -130,11 +141,15 @@ export async function POST(req: Request) {
   const avertissements: string[] = [];
   const absents: string[] = [];
   let figees = 0;
+  let fermees = 0;
   let deja = 0;
 
   for (const d of decisions) {
     if (d.type === "rien") {
-      if (d.raison === "figee") figees++;
+      if (d.raison === "figee") {
+        if (joursFermes.has(d.date)) fermees++;
+        else figees++;
+      }
       else if (d.raison === "deja") deja++;
       else absents.push(d.date);
       continue;
@@ -191,5 +206,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ places, absents, figees, deja, ids, warning: [...new Set(avertissements)].join(" ") || null });
+  return NextResponse.json({ places, absents, figees, fermees, deja, ids, warning: [...new Set(avertissements)].join(" ") || null });
 }

@@ -17,7 +17,9 @@ import {
   type LigneTournee,
 } from "@/lib/planning/affectation";
 import { HEURE_VALIDE } from "@/lib/planning/heure";
-import { basculerRang, chauffeursAffiches, heureDe, joursDeLaSemaine, JOURS_COURTS, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
+import { basculerRang, chauffeursAffiches, estModifiable, heureDe, joursDeLaSemaine, JOURS_COURTS, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
+import { estOuverte } from "@/lib/planning/ouverture";
+import { BoutonOuverture, BoutonRepartir, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
 
 export type CibleFeuille = { type: "case"; cle: string; date: string } | { type: "ligne"; cle: string };
 
@@ -57,6 +59,8 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
   const datesCible = useMemo(() => (!ligne ? [] : cible.type === "case" ? [cible.date] : joursChoisis(periode, rangs, depuis)), [cible, ligne, periode, rangs, depuis]);
   const entrees: EntreeAffectation[] = cible.type === "case" && ligne ? (ctx.parCase.get(cleCaseTournee(ligne.cle, cible.date)) ?? []) : [];
   const tenue = entrees.find((e) => e.driver_id);
+  // Tournée fermée : on ne change plus son chauffeur tant qu'elle n'est pas rouverte.
+  const fermee = cible.type === "case" && entrees.length > 0 && entrees.every((e) => !estOuverte(e));
   // Heure de départ : celle de la case (ou habituelle de la tournée), modifiable ici.
   const heureInitiale = entrees[0] ? heureDe(entrees[0].start_at) : (ligne?.heure ?? "07:00");
   const [heure, setHeure] = useState(heureInitiale);
@@ -98,7 +102,7 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
       {entrees.length > 0 && (
         <ul className="mb-3 flex flex-col gap-2">
           {entrees.map((e) => {
-            const modifiable = e.status === "planned";
+            const modifiable = estModifiable(e);
             const nom = e.driver_id ? ctx.nomChauffeur(e.driver_id) : null;
             return (
               <li key={e.id} className="rounded-xl border border-navy/10 p-2.5">
@@ -108,9 +112,11 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
                     <strong>{nom ?? "À remplacer"}</strong>
                     <span className="block text-xs text-navy/60">
                       {heureDe(e.start_at)} · {e.vehicles?.registration ?? "sans véhicule"}
-                      {modifiable ? "" : ` · ${statutAffectation(e.status).libelle.toLowerCase()}`}
+                      {e.status === "planned" ? "" : ` · ${statutAffectation(e.status).libelle.toLowerCase()}`}
                     </span>
                   </span>
+                  <PastilleFermee entree={e} />
+                  <PastilleFusion entree={e} />
                 </div>
                 {donnees.peutModifier && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -122,6 +128,8 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
                     <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm" onClick={() => actions.modifier(e)}>
                       {modifiable ? "Heure, véhicule…" : "Détails"}
                     </button>
+                    <BoutonOuverture entree={e} />
+                    <BoutonRepartir entree={e} toujours />
                     {modifiable && (
                       <button type="button" className="btn-secondary min-h-[44px] !px-3 text-sm text-orange-ink" onClick={() => actions.supprimer(e)}>
                         Supprimer ce jour
@@ -135,7 +143,13 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
         </ul>
       )}
 
-      {suivants.length > 0 && tenue?.driver_id && tenue.status === "planned" && (
+      {fermee && (
+        <p className="mb-3 rounded-xl bg-navy/[0.05] p-3 text-sm" role="status">
+          Cette tournée est fermée : son affectation ne change plus et le chauffeur ne peut pas la démarrer. Rouvrez-la pour la modifier.
+        </p>
+      )}
+
+      {suivants.length > 0 && tenue?.driver_id && estModifiable(tenue) && (
         <div className="mb-3">
           <p className="label">Prolonger {nomCourt(ctx.nomChauffeur(tenue.driver_id))} jusqu&apos;à…</p>
           <div className="flex flex-wrap gap-1.5">
@@ -191,7 +205,7 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
         </div>
       )}
 
-      {donnees.peutModifier && (cible.type === "ligne" ? datesCible.length > 0 : true) && (
+      {donnees.peutModifier && !fermee && (cible.type === "ligne" ? datesCible.length > 0 : true) && (
         <>
           <div className="mb-3">
             <label className="label" htmlFor="heure-depart">

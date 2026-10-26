@@ -24,6 +24,7 @@ export const TYPES_A_TRAITER = [
   "demande",
   "ticpe",
   "tournee_sans_chauffeur",
+  "repartition_a_attribuer",
   "tournee_en_retard",
   "retard_tournee",
   "conge",
@@ -40,6 +41,7 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   demande: { singulier: "Demande", pluriel: "Demandes" },
   ticpe: { singulier: "TICPE", pluriel: "TICPE" },
   tournee_sans_chauffeur: { singulier: "Tournée sans chauffeur", pluriel: "Tournées sans chauffeur" },
+  repartition_a_attribuer: { singulier: "Tournée fusionnée à répartir", pluriel: "Tournées fusionnées à répartir" },
   tournee_en_retard: { singulier: "Tournée non démarrée", pluriel: "Tournées non démarrées" },
   retard_tournee: { singulier: "Tournée en retard", pluriel: "Tournées en retard" },
   conge: { singulier: "Congé", pluriel: "Congés" },
@@ -76,6 +78,8 @@ export const SEUILS_URGENCE: Record<TypeATraiter, { ancienneteHeures: number | n
   demande: { ancienneteHeures: 72, echeanceHeures: 72 },
   ticpe: { ancienneteHeures: null, echeanceHeures: 240 },
   tournee_sans_chauffeur: { ancienneteHeures: null, echeanceHeures: 3 },
+  // Tournée fusionnée du jour dont des villages ou ramasses restent « À attribuer » : urgent à l'approche du départ.
+  repartition_a_attribuer: { ancienneteHeures: null, echeanceHeures: 3 },
   tournee_en_retard: { ancienneteHeures: null, echeanceHeures: null },
   // Tournée en cours : l'urgence est déclarée par la source (retard de 30 min ou plus).
   retard_tournee: { ancienneteHeures: null, echeanceHeures: null },
