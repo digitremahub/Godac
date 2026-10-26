@@ -195,7 +195,7 @@ export async function ClassementConsommation({ className = "" }: { className?: s
 /** Notifications ouvertes de la personne (cinq dernières). */
 export async function NotificationsOuvertes({ appUser, enabledModules, masquerSiVide = false }: { appUser: AppUser; enabledModules: string[]; masquerSiVide?: boolean }) {
   const supabase = await createServerSupabaseClient();
-  const alertes = await chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 });
+  const alertes = await chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5, role: appUser.role });
   if (masquerSiVide && alertes.length === 0) return null;
   return (
     <div>

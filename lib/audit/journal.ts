@@ -60,6 +60,7 @@ export const ACTIONS_AUDIT = {
   pointage_sortie_auto: "Sortie pointée automatiquement (départ du dépôt)",
   pointage_sortie_auto_annulee: "Sortie automatique annulée par le salarié",
   pointage_sortie_derniere_presence: "Sortie pointée à la dernière présence au dépôt (choix du salarié)",
+  export_tournees: "Export des tournées colis (historique ou suivi du jour, CSV ou PDF)",
   traitement_groupe: "Traitement groupé (À traiter aujourd'hui) : nombre d'éléments traités et refusés",
   arret_affectations_liberees: "Affectations du planning libérées (salarié en arrêt)",
   tournee_fermee: "Tournée du planning fermée",
