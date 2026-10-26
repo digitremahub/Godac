@@ -42,6 +42,7 @@ import { OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memori
 import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { confirmer } from "@/lib/ui/confirmation";
 import { afficherPreparation, etapeParcours, etatsEtapes } from "@/lib/colis/parcours";
+import { useSortieGo } from "@/components/colis/useSortieGo";
 import { SortieDepotLivreur } from "@/components/time-clock/SortieDepotLivreur";
 import { RecommanderEmployeur } from "@/components/recommandation/RecommanderEmployeur";
 import { CLE_NAVIGATION_PREFEREE, NAVIGATIONS, libelleNavigation, lireNavigationPreferee, type NavigationPreferee } from "@/lib/colis/navigation-preferee";
@@ -641,6 +642,8 @@ export function AppLivreur({
   const enCarte = !enPreparation && vue === "carte" && run !== null && run.status !== "loading" && stops.length > 0;
   // GO Navigation : seulement tournée démarrée (une tournée clôturée n'a plus rien à suivre).
   const enNavigation = !enPreparation && vue === "navigation" && run !== null && run.status === "in_progress";
+  // Fermer GO (« ‹ », fin de tournée, retour du navigateur ou d'Android) ramène à « Ma tournée colis », jamais au tableau de bord.
+  const fermerGo = useSortieGo(enNavigation, () => changerVue("liste"));
   // Retour de fin de tournée : dépôt de la tournée et/ou siège de l'entreprise.
   const [siege, setSiege] = useState<{ adresse: string; lat: number | null; lng: number | null } | null>(null);
   /** Retour de fin de tournée lancé dans GO (dépôt ou siège). */
@@ -814,7 +817,7 @@ export function AppLivreur({
           horaires={horaires}
           avancement={avancement}
           busy={busy}
-          onFermer={() => changerVue("liste")}
+          onFermer={fermerGo}
           onRecharger={rechargerRun}
           onToast={setToast}
           onTerminer={terminer}

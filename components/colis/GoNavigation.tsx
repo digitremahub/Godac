@@ -61,6 +61,7 @@ import {
   type EtatCamera,
 } from "@/lib/colis/conduite";
 import { enDepassement, kmhDepuisMs } from "@/lib/colis/limitation-vitesse";
+import { elementsConduite, enMouvementApres } from "@/lib/colis/epure-conduite";
 import { CLE_FEUILLE, FEUILLE_PAR_DEFAUT, adresseCourte, decouperTrace, lirePositionFeuille, positionApresGeste, repeteAdresse, type PositionFeuille } from "@/lib/colis/feuille";
 import { etaArret, type EtaArret } from "@/lib/colis/eta";
 import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
@@ -163,14 +164,16 @@ export function GoNavigation(p: GoNavigationProps) {
   const [feuille, setFeuilleBrute] = useState<PositionFeuille>(FEUILLE_PAR_DEFAUT);
   /** Dernière position réduite / moyenne choisie (la liste pleine n'est qu'un passage). */
   const feuilleMemo = useRef<PositionFeuille>(FEUILLE_PAR_DEFAUT);
+  /** Menu « Options » : ajout d'adresse, optimisation (ma position / une adresse / départ et arrivée), vues, mode simple. */
   const [menuVues, setMenuVues] = useState(false);
-  /** Menu « Optimiser » (depuis ma position / depuis une adresse choisie / réglages) et sélecteur d'adresse. */
-  const [menuOptim, setMenuOptim] = useState(false);
+  /** Sélecteur d'adresse de « Optimiser depuis une adresse choisie ». */
   const [choixDepuis, setChoixDepuis] = useState(false);
   const [position, setPosition] = useState<Point | null>(null);
   /** Vitesse réelle (km/h, GPS) et limitation indicative de la route (OpenStreetMap). */
   const [vitesseKmh, setVitesseKmh] = useState<number | null>(null);
   const [limiteKmh, setLimiteKmh] = useState<number | null>(null);
+  /** En mouvement (> 5 km/h) : l'écran ne garde que ce qui sert à conduire (lib/colis/epure-conduite.ts). */
+  const [mouvement, setMouvement] = useState(false);
   const derniereLimite = useRef<{ pos: Point; t: number } | null>(null);
   const [erreurGps, setErreurGps] = useState<string | null>(null);
   const [vue, setVue] = useState<Vue>("ensemble");
@@ -493,6 +496,7 @@ export function GoNavigation(p: GoNavigationProps) {
           capConnu.current = true;
         }
         setVitesseKmh(kmhDepuisMs(vitesse));
+        setMouvement((avant) => enMouvementApres(avant, kmhDepuisMs(vitesse)));
         zoomLisse.current = lisserZoom(zoomLisse.current, zoomSelonVitesse(vitesse));
         const vers: EtatCamera = { lng: pos.lng, lat: pos.lat, cap: capLisse.current ?? 0, zoom: zoomLisse.current };
         const intervalle = dernierPoint.current === null ? null : t - dernierPoint.current;
@@ -798,6 +802,12 @@ export function GoNavigation(p: GoNavigationProps) {
       /* stockage indisponible */
     }
   }
+  // En mouvement : la feuille se replie sur sa ligne (arrêt en cours + « Livré »), les menus se ferment.
+  useEffect(() => {
+    if (!mouvement) return;
+    setMenuVues(false);
+    setFeuilleBrute("reduite");
+  }, [mouvement]);
   // Poignée : tirer vers le haut ou le bas (geste), appui ou clavier pour alterner.
   const glisse = useRef<{ y: number } | null>(null);
   /** Heure du dernier geste traité : le clic qui le suit est ignoré (sinon, double changement). */
@@ -885,6 +895,12 @@ export function GoNavigation(p: GoNavigationProps) {
   }, []);
 
   const faits = stops.length - restants.length;
+  /** Lance l'action d'un menu et le referme. */
+  const lancer = (action: () => void) => {
+    setMenuVues(false);
+    action();
+  };
+  const el = elementsConduite({ mouvement, vue, position, fige, enCours: run.status === "in_progress", traceActive: Boolean(p.traceActive) });
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-paper" aria-label="GO Navigation">
@@ -896,9 +912,11 @@ export function GoNavigation(p: GoNavigationProps) {
       {/* Bandeau de guidage (compact : la carte garde la place) */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-1.5">
-          <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la liste des arrêts">
-            ‹
-          </button>
+          {el.retour && (
+            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la tournée colis">
+              ‹
+            </button>
+          )}
           <div className="min-w-0 flex-1 rounded-2xl bg-marine px-3 py-2 text-white shadow-pop" aria-live="polite">
             {fige ? (
               <p className="py-1 text-sm font-semibold">Tournée clôturée : consultation seulement.</p>
@@ -919,36 +937,40 @@ export function GoNavigation(p: GoNavigationProps) {
                 )}
               </>
             ) : cible ? (
-              <>
-                {arrive ? (
-                  <p className="font-display text-2xl font-bold leading-tight text-teal">Arrivé</p>
-                ) : (
-                  !eta && (
-                    <p className="flex items-baseline gap-2">
-                      <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
-                      {dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
-                      {trajet?.approx && <span className="text-[11px] text-white/60">(estimation)</span>}
-                    </p>
-                  )
-                )}
-                <p className={`truncate text-white/85 ${eta && !arrive ? "text-sm font-semibold" : "text-xs"}`}>
-                  {enRetour ? cible.address : `Arrêt ${numero(cible)} · ${cible.address}`}
-                </p>
-              </>
+              arrive ? (
+                <p className="font-display text-2xl font-bold leading-tight text-teal">Arrivé</p>
+              ) : (
+                !eta && (
+                  <p className="flex items-baseline gap-2">
+                    <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
+                    {dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
+                    {trajet?.approx && <span className="text-[11px] text-white/60">(estimation)</span>}
+                  </p>
+                )
+              )
             ) : (
               <p className="py-1 text-sm font-semibold">Tous les arrêts sont faits 🎉</p>
             )}
             {eta && <BlocEta eta={eta} />}
-            <p className="mt-0.5 truncate text-[11px] leading-tight text-white/65">
-              {!eta && cible && manoeuvre && courante && !arrive && (
-                <>
-                  {formatDistance(distanceAffichee)}
-                  {dureeAffichee !== null && ` · ${formatDuree(dureeAffichee)}`} ·{" "}
-                </>
-              )}
-              {faits}/{stops.length} faits
-              {avancement.finEstimee && ` · fin ≈ ${heureFin(avancement.finEstimee)}`}
-            </p>
+            {(el.ligneEtat || el.indicateurTrace) && (
+              // Une seule ligne d'état : avancement, colis restants, heure de fin, trajet enregistré (RGPD, reste affiché en roulant).
+              <p className="mt-0.5 truncate text-[11px] leading-tight text-white/65">
+                {el.ligneEtat && (
+                  <>
+                    {faits}/{stops.length} faits
+                    {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis restants`}
+                    {avancement.finEstimee && ` · fin ≈ ${heureFin(avancement.finEstimee)}`}
+                  </>
+                )}
+                {el.indicateurTrace && (
+                  <span title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
+                    {el.ligneEtat && " · "}
+                    <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-orange align-middle" aria-hidden="true" />
+                    Trajet enregistré
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
         {erreurGps ? (
@@ -957,144 +979,61 @@ export function GoNavigation(p: GoNavigationProps) {
           !position && <p className="mx-auto mt-1.5 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
         )}
         <div className="pointer-events-auto relative mx-auto mt-1.5 flex max-w-xl items-center justify-end gap-1.5">
-          {p.traceActive && (
-            <span className="mr-auto flex items-center gap-1 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-navy/65 shadow-card" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
-              <span className="h-1.5 w-1.5 rounded-full bg-orange-ink" aria-hidden="true" /> Trajet enregistré
-            </span>
-          )}
-          {!fige && run.status === "in_progress" && (
-            <button type="button" onClick={() => setAjout(true)} className="min-h-[44px] rounded-full bg-teal px-3.5 text-xs font-bold text-on-teal shadow-pop">
-              + Adresse
-            </button>
-          )}
-          {!fige && run.status === "in_progress" && restants.length > 1 && (
+          {el.menuOptions && (
             <>
               <button
                 type="button"
-                onClick={() => setMenuOptim((v) => !v)}
+                onClick={() => setMenuVues((v) => !v)}
                 disabled={p.busy}
-                className="min-h-[44px] rounded-full bg-marine px-3.5 text-xs font-bold text-white shadow-pop disabled:opacity-60"
+                className="min-h-[44px] rounded-full bg-surface px-4 text-xs font-semibold text-navy shadow-pop disabled:opacity-60"
                 aria-haspopup="menu"
-                aria-expanded={menuOptim}
-                aria-controls="go-menu-optim"
+                aria-expanded={menuVues}
+                aria-controls="go-menu-vues"
               >
-                {p.busy ? "Calcul…" : "⚡ Optimiser"}
+                {p.busy ? "Calcul…" : "Options ▾"}
               </button>
-              {menuOptim && (
+              {menuVues && (
                 <>
-                  <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuOptim(false)} />
-                  <div id="go-menu-optim" role="menu" aria-label="Optimiser la tournée" className="absolute right-0 top-full z-10 mt-1.5 flex w-64 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
-                      onClick={() => {
-                        setMenuOptim(false);
-                        void p.onReoptimiser();
-                      }}
-                    >
-                      Depuis ma position
-                      <span className="block text-xs font-normal text-navy/60">Prochaine adresse la plus proche</span>
-                    </button>
-                    {p.onOptimiserDepuisArret && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
-                        onClick={() => {
-                          setMenuOptim(false);
-                          setChoixDepuis(true);
-                        }}
-                      >
-                        Depuis une adresse choisie…
-                        <span className="block text-xs font-normal text-navy/60">L&apos;adresse devient le prochain arrêt</span>
+                  <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuVues(false)} />
+                  <div id="go-menu-vues" role="menu" aria-label="Options de GO" className="absolute right-0 top-full z-10 mt-1.5 flex w-72 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
+                    {!fige && run.status === "in_progress" && (
+                      <button type="button" role="menuitem" className={ITEM_MENU} onClick={() => lancer(() => setAjout(true))}>
+                        Ajouter une adresse
                       </button>
                     )}
-                    {p.onReglagesOptimisation && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="min-h-[48px] rounded-xl px-3 text-left text-sm text-navy/80 hover:bg-navy/5"
-                        onClick={() => {
-                          setMenuOptim(false);
-                          p.onReglagesOptimisation?.();
-                        }}
-                      >
-                        Départ et arrivée…
+                    {!fige && run.status === "in_progress" && restants.length > 1 && (
+                      <div role="group" aria-label="Optimiser la tournée" className="mt-1 border-t border-navy/10 pt-1">
+                        <p className="px-3 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-navy/55">Optimiser la tournée</p>
+                        <button type="button" role="menuitem" className={ITEM_MENU} onClick={() => lancer(() => void p.onReoptimiser())}>
+                          Depuis ma position
+                          <span className="block text-xs font-normal text-navy/60">Prochaine adresse la plus proche</span>
+                        </button>
+                        {p.onOptimiserDepuisArret && (
+                          <button type="button" role="menuitem" className={ITEM_MENU} onClick={() => lancer(() => setChoixDepuis(true))}>
+                            Depuis une adresse choisie…
+                            <span className="block text-xs font-normal text-navy/60">L&apos;adresse devient le prochain arrêt</span>
+                          </button>
+                        )}
+                        {p.onReglagesOptimisation && (
+                          <button type="button" role="menuitem" className={ITEM_MENU} onClick={() => lancer(() => p.onReglagesOptimisation?.())}>
+                            Départ et arrivée…
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="mt-1 border-t border-navy/10 pt-1">
+                      <button type="button" role="menuitem" className={ITEM_MENU} onClick={() => lancer(toutVoir)}>
+                        Toute la tournée sur la carte
                       </button>
+                    </div>
+                    {!fige && (
+                      <div className="mt-1 border-t border-navy/10 pt-1.5">
+                        <InterrupteurMode simple={p.modeSimple} onChange={p.onModeSimple} />
+                      </div>
                     )}
                   </div>
                 </>
               )}
-            </>
-          )}
-          {vue === "ensemble" && (
-            <button
-              type="button"
-              onClick={recentrer}
-              disabled={!position}
-              className="min-h-[44px] rounded-full bg-marine px-3.5 text-xs font-semibold text-white shadow-pop disabled:opacity-50"
-              title={position ? undefined : "En attente de la position GPS"}
-            >
-              Conduite
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setMenuVues((v) => !v)}
-            className="min-h-[44px] rounded-full bg-surface px-3.5 text-xs font-semibold text-navy shadow-pop"
-            aria-haspopup="menu"
-            aria-expanded={menuVues}
-            aria-controls="go-menu-vues"
-          >
-            Options ▾
-          </button>
-          {menuVues && (
-            <>
-              <div className="fixed inset-0 z-0" aria-hidden="true" onClick={() => setMenuVues(false)} />
-              <div id="go-menu-vues" role="menu" aria-label="Options de GO" className="absolute right-0 top-full z-10 mt-1.5 flex w-64 flex-col rounded-2xl bg-surface p-1.5 shadow-pop">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
-                  onClick={() => {
-                    setMenuVues(false);
-                    voirTrajet();
-                  }}
-                >
-                  Vue d&apos;ensemble du trajet
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5"
-                  onClick={() => {
-                    setMenuVues(false);
-                    toutVoir();
-                  }}
-                >
-                  Toute la tournée
-                </button>
-                {vue !== "conduite" && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={!position}
-                    className="min-h-[44px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5 disabled:opacity-50"
-                    onClick={() => {
-                      setMenuVues(false);
-                      recentrer();
-                    }}
-                  >
-                    Conduite (suivre ma position)
-                  </button>
-                )}
-                {!fige && (
-                  <div className="mt-1 border-t border-navy/10 pt-1.5">
-                    <InterrupteurMode simple={p.modeSimple} onChange={p.onModeSimple} />
-                  </div>
-                )}
-              </div>
             </>
           )}
         </div>
@@ -1108,8 +1047,8 @@ export function GoNavigation(p: GoNavigationProps) {
           >
             <IconeHautParleur actif={voix} className="h-5 w-5" />
           </button>
-          {vue !== "ensemble" && (
-            <button type="button" onClick={voirTrajet} className="flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-pop" aria-label="Nord en haut (vue d'ensemble)">
+          {el.boussole && (
+            <button type="button" onClick={voirTrajet} className="flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-pop" aria-label="Nord en haut (vue d'ensemble du trajet)">
               <span ref={boussoleRef} className="flex flex-col items-center leading-none" aria-hidden="true">
                 <svg viewBox="0 0 12 16" className="h-3.5 w-3">
                   <path d="M6 0 L11 9 H1 Z" fill="#FF6B35" />
@@ -1140,8 +1079,8 @@ export function GoNavigation(p: GoNavigationProps) {
         </div>
       )}
 
-      {/* Recentrer (le chauffeur a déplacé la carte) */}
-      {vue === "libre" && position && (
+      {/* Recentrer : seul bouton pour reprendre le suivi (carte déplacée ou vue d'ensemble) */}
+      {el.recentrer && (
         <button
           type="button"
           onClick={recentrer}
@@ -1187,20 +1126,21 @@ export function GoNavigation(p: GoNavigationProps) {
                 </button>
               ) : (
                 <button type="button" className="btn-primary min-h-[52px] shrink-0 !px-3 text-sm" onClick={p.onFermer}>
-                  {fige ? "Retour" : "Clôturer"}
+                  {fige ? "Retour à la tournée" : "Clôturer la tournée"}
                 </button>
               ))
             )}
-            <button
-              type="button"
-              className="flex h-[52px] w-11 shrink-0 items-center justify-center rounded-xl bg-navy/[0.06] text-xl font-bold text-navy"
-              onClick={() => setFeuille("moyenne")}
-              aria-label="Plus d'actions : agrandir la carte de l'arrêt"
-              aria-expanded={false}
-              aria-controls="go-feuille-contenu"
-            >
-              ⋯
-            </button>
+            {el.actionsArret && cible && !enRetour && (
+              <button
+                type="button"
+                className="flex h-[52px] w-11 shrink-0 items-center justify-center rounded-xl bg-navy/[0.06] text-xl font-bold text-navy"
+                onClick={() => setMenuArret(cible)}
+                aria-label="Actions de l'arrêt : appeler, horaires, fiche, modifier, passer, retirer"
+                aria-haspopup="dialog"
+              >
+                ⋯
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -1214,10 +1154,7 @@ export function GoNavigation(p: GoNavigationProps) {
                   <span className="text-sm font-semibold text-navy/70">{eta.distance}</span>
                 </span>
               )}
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-navy/55">
-                {restants.length} restant{restants.length > 1 ? "s" : ""}
-                {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis`} · {feuille === "pleine" ? "réduire ▾" : "tous les arrêts ▴"}
-              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-navy/55">{feuille === "pleine" ? "Réduire ▾" : "Tous les arrêts ▴"}</span>
             </button>
 
             {feuille === "moyenne" ? (
@@ -1250,18 +1187,11 @@ export function GoNavigation(p: GoNavigationProps) {
                       nomListe={multi ? nomListe(s) : null}
                       horaires={horaires}
                       fige={fige}
-                      plusieurs={restants.length > 1}
-                      busy={p.busy}
                       onTerminer={p.onTerminer}
                       onCloture={p.onCloture}
                       onTelephone={p.onTelephone}
-                      onHoraires={p.onHoraires}
-                      onFiche={p.onFiche}
-                      onPasser={p.onPasser}
-                      onCorriger={setCorrection}
+                      onPlus={setMenuArret}
                       modeSimple={p.modeSimple}
-                      onContact={p.onContact}
-                      onRetirer={p.onRetirer}
                       onAppel={p.onAppel}
                     />
                   ))}
@@ -1270,23 +1200,16 @@ export function GoNavigation(p: GoNavigationProps) {
                 <div id="go-feuille-contenu" className="flex flex-col items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 text-center">
                   <p className="font-display text-lg font-bold">Tournée terminée 🎉</p>
                   <button type="button" className="btn-primary !py-3" onClick={p.onFermer}>
-                    {fige ? "Retour à la tournée" : "Retour à la liste pour clôturer"}
+                    {fige ? "Retour à la tournée" : "Clôturer la tournée"}
                   </button>
                 </div>
               )
             ) : (
               <div id="go-feuille-contenu" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <div className="flex gap-2">
-                  <label className="relative block flex-1">
-                    <span className="sr-only">Rechercher dans la tournée</span>
-                    <input className="input" type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Adresse, client, n° de colis…" />
-                  </label>
-                  {!fige && (
-                    <button type="button" className="btn-secondary shrink-0 !px-3 text-xs" disabled={p.busy} onClick={() => void p.onReoptimiser()}>
-                      {p.busy ? "Calcul…" : "Recalculer depuis ma position"}
-                    </button>
-                  )}
-                </div>
+                <label className="relative block">
+                  <span className="sr-only">Rechercher dans la tournée</span>
+                  <input className="input" type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Adresse, client, n° de colis…" />
+                </label>
                 {terme && visibles.length === 0 && <p className="text-center text-sm text-navy/60">Aucun arrêt restant ne correspond.</p>}
                 <ZoneTri ordre={ordreTri} onDeposer={(id, c) => void p.onDeposer(id, c)} actif={triActif}>
                   <ol className="flex flex-col gap-2">
@@ -1345,11 +1268,6 @@ export function GoNavigation(p: GoNavigationProps) {
                     })}
                   </ol>
                 </ZoneTri>
-                {faits > 0 && (
-                  <button type="button" className="btn-ghost justify-center text-sm text-navy/60" onClick={p.onFermer}>
-                    {faits} arrêt{faits > 1 ? "s" : ""} terminé{faits > 1 ? "s" : ""} : voir dans la liste
-                  </button>
-                )}
               </div>
             )}
           </>
@@ -1414,7 +1332,12 @@ export function GoNavigation(p: GoNavigationProps) {
           numero={numero(menuArret)}
           modeSimple={p.modeSimple}
           peutPasser={restants.length > 1}
+          lecture={fige}
+          horaires={horaires}
           onFermer={() => setMenuArret(null)}
+          onAppel={p.onAppel}
+          onTelephone={p.onTelephone}
+          onHoraires={p.onHoraires}
           onLivre={p.onTerminer}
           onNonLivre={(x) => p.onCloture(x, "echec")}
           onCorriger={setCorrection}
@@ -1442,6 +1365,9 @@ export function GoNavigation(p: GoNavigationProps) {
     </div>
   );
 }
+
+/** Ligne d'un menu (Options) : zone tactile de 48 px. */
+const ITEM_MENU = "min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5";
 
 /** Identifiant de la destination « retour » (dépôt ou siège) suivie comme un arrêt. */
 const ID_RETOUR = "retour";
@@ -1540,7 +1466,11 @@ function IconeHautParleur({ actif, className }: { actif: boolean; className?: st
   );
 }
 
-/** Carte d'un arrêt dans la feuille (position moyenne), compacte : adresse, client, livré / échec, puis appel, horaires, fiche et « Plus ». */
+/**
+ * Carte d'un arrêt dans la feuille (position moyenne), épurée : adresse, client,
+ * livré / non livré, puis appel et « ⋯ Plus » (menu de l'arrêt : horaires, fiche,
+ * contacts, modifier, passer, retirer, SMS, Waze, Google Maps).
+ */
 function CarteArret({
   stop: s,
   numero,
@@ -1551,18 +1481,11 @@ function CarteArret({
   nomListe,
   horaires,
   fige,
-  plusieurs,
-  busy,
   onTerminer,
   onCloture,
   onTelephone,
-  onHoraires,
-  onFiche,
-  onPasser,
-  onCorriger,
+  onPlus,
   modeSimple,
-  onContact,
-  onRetirer,
   onAppel,
 }: {
   stop: Stop;
@@ -1575,13 +1498,10 @@ function CarteArret({
   nomListe: string | null;
   horaires: Horaires;
   fige: boolean;
-  plusieurs: boolean;
-  busy: boolean;
-} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "onHoraires" | "onFiche" | "onPasser" | "modeSimple" | "onContact" | "onRetirer" | "onAppel"> & { onCorriger: (s: Stop) => void }) {
+  onPlus: (s: Stop) => void;
+} & Pick<GoNavigationProps, "onTerminer" | "onCloture" | "onTelephone" | "modeSimple" | "onAppel">) {
   const secondaire = [s.business_name, s.recipient].filter((v): v is string => Boolean(v) && !repeteAdresse(v, s.address)).join(" · ");
-  const [plus, setPlus] = useState(false);
   const pastilleBase = "inline-flex min-h-[44px] items-center gap-1 rounded-full px-3 text-xs font-semibold";
-  const pastilleAction = `${pastilleBase} bg-navy/[0.05]`;
   return (
     <section
       className={`relative flex max-h-full w-[88%] max-w-md shrink-0 snap-center flex-col gap-2 overflow-y-auto overscroll-y-contain touch-pan-x touch-pan-y rounded-2xl border-2 bg-surface px-3.5 py-3 shadow-card ${suivi ? bordureArret(s, "border-teal/70") : "border-transparent"}`}
@@ -1608,6 +1528,7 @@ function CarteArret({
         {secondaire && <p className="truncate text-sm text-navy/75">{secondaire}</p>}
         {s.notes && <p className="line-clamp-1 text-xs text-navy/65">{s.notes}</p>}
         {s.lat === null && <p className="text-xs font-semibold text-orange-ink">Adresse non localisée : ouvrez-la dans Waze ou Google Maps.</p>}
+        <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
       </div>
 
       {!fige && (
@@ -1622,59 +1543,19 @@ function CarteArret({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
         {s.phone ? (
           <a href={lienTel(s.phone)} onClick={() => onAppel(s)} className={`${pastilleBase} bg-teal/15 text-teal-ink`} aria-label={`Appeler ${s.recipient ?? s.address}`}>
             <IconPhone className="h-4 w-4" /> Appeler
           </a>
         ) : (
-          <button type="button" className={pastilleAction} disabled={fige} onClick={() => onTelephone(s)}>
+          <button type="button" className={`${pastilleBase} bg-navy/[0.05]`} disabled={fige} onClick={() => onTelephone(s)}>
             <IconPhone className="h-4 w-4" /> Ajouter le n°
           </button>
         )}
-        <PastillesContact stop={s} disabled={fige} onChange={(champ, v) => onContact(s, champ, v)} />
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" className={pastilleAction} onClick={() => onHoraires(s)}>
-          🕘 Horaires
-        </button>
-        <button type="button" className={pastilleAction} onClick={() => onFiche(s)}>
-          Fiche
-        </button>
-        {!fige && (
-          <button type="button" className={pastilleAction} onClick={() => onCorriger(s)}>
-            ✏️ Adresse
-          </button>
-        )}
-        {!fige && plusieurs && (
-          <button type="button" className={pastilleAction} disabled={busy} onClick={() => onPasser(s)}>
-            Passer plus tard
-          </button>
-        )}
-        {!fige && (
-          <button type="button" className={`${pastilleBase} bg-navy/[0.05] text-orange-ink`} onClick={() => onRetirer(s)} aria-label={`Retirer l'adresse ${s.address}`}>
-            Retirer
-          </button>
-        )}
-        <button type="button" className={pastilleAction} onClick={() => setPlus((v) => !v)} aria-expanded={plus} aria-controls={`go-plus-${s.id}`}>
+        <button type="button" className={`${pastilleBase} bg-navy/[0.05]`} onClick={() => onPlus(s)} aria-haspopup="dialog">
           ⋯ Plus
         </button>
       </div>
-      {plus && (
-        <div id={`go-plus-${s.id}`} className="grid grid-cols-2 gap-1.5">
-          {s.phone && (
-            <a href={lienSms(s.phone, SMS_ARRIVEE)} className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
-              <IconMessage className="h-4 w-4" /> SMS « j&apos;arrive »
-            </a>
-          )}
-          <a href={waze(s)} target="_blank" rel="noreferrer" className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
-            <IconNavigation className="h-4 w-4" /> Waze
-          </a>
-          <a href={gmaps(s)} target="_blank" rel="noreferrer" className="btn-secondary min-h-[44px] justify-center !px-2 !py-2 text-sm">
-            <IconMapPin className="h-4 w-4" /> Google Maps
-          </a>
-        </div>
-      )}
     </section>
   );
 }
@@ -1927,7 +1808,12 @@ function MenuRapideArret({
   numero,
   modeSimple,
   peutPasser,
+  lecture,
+  horaires,
   onFermer,
+  onAppel,
+  onTelephone,
+  onHoraires,
   onLivre,
   onNonLivre,
   onCorriger,
@@ -1940,7 +1826,13 @@ function MenuRapideArret({
   numero: number;
   modeSimple: boolean;
   peutPasser: boolean;
+  /** Tournée clôturée : consultation (appel, horaires, fiche, navigation externe). */
+  lecture: boolean;
+  horaires: Horaires;
   onFermer: () => void;
+  onAppel: (s: Stop) => void;
+  onTelephone: (s: Stop) => void;
+  onHoraires: (s: Stop) => void;
   onLivre: (s: Stop) => void;
   onNonLivre: (s: Stop) => void;
   onCorriger: (s: Stop) => void;
@@ -1954,6 +1846,7 @@ function MenuRapideArret({
     f(s);
   };
   const action = "flex min-h-[48px] items-center rounded-xl bg-navy/[0.05] px-4 text-left text-sm font-semibold text-navy";
+  const lien = "btn-secondary min-h-[48px] justify-center !px-2 !py-2 text-sm";
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="menu-arret-titre" onClick={onFermer}>
       <section className="flex max-h-[85dvh] w-full max-w-md flex-col gap-2 overflow-y-auto rounded-t-3xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
@@ -1965,31 +1858,67 @@ function MenuRapideArret({
             ✕
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn-primary min-h-[48px] justify-center" onClick={agir(onLivre)}>
-            <IconCheck className="h-5 w-5" /> {libelleLivre(modeSimple, s)}
-          </button>
-          <button type="button" className="btn-secondary min-h-[48px] justify-center text-orange-ink" onClick={agir(onNonLivre)}>
-            <IconX className="h-5 w-5" /> Non livré
-          </button>
-        </div>
-        <button type="button" className={action} onClick={agir(onCorriger)}>
-          ✏️ Modifier l&apos;adresse
+        {!lecture && (
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="btn-primary min-h-[48px] justify-center" onClick={agir(onLivre)}>
+              <IconCheck className="h-5 w-5" /> {libelleLivre(modeSimple, s)}
+            </button>
+            <button type="button" className="btn-secondary min-h-[48px] justify-center text-orange-ink" onClick={agir(onNonLivre)}>
+              <IconX className="h-5 w-5" /> Non livré
+            </button>
+          </div>
+        )}
+        {s.phone ? (
+          <a href={lienTel(s.phone)} onClick={() => { onFermer(); onAppel(s); }} className={`${action} gap-2 text-teal-ink`}>
+            <IconPhone className="h-4 w-4" /> Appeler {s.recipient ?? ""}
+          </a>
+        ) : (
+          !lecture && (
+            <button type="button" className={`${action} gap-2`} onClick={agir(onTelephone)}>
+              <IconPhone className="h-4 w-4" /> Ajouter le numéro
+            </button>
+          )
+        )}
+        {!lecture && (
+          <div className="flex flex-wrap gap-1.5">
+            <PastillesContact stop={s} onChange={(champ, v) => onContact(s, champ, v)} />
+          </div>
+        )}
+        <button type="button" className={action} onClick={agir(onHoraires)}>
+          🕘 Horaires
+          <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
         </button>
-        {peutPasser && (
+        <button type="button" className={action} onClick={agir(onFiche)}>
+          Fiche de l&apos;arrêt
+        </button>
+        {!lecture && (
+          <button type="button" className={action} onClick={agir(onCorriger)}>
+            ✏️ Modifier l&apos;adresse
+          </button>
+        )}
+        {!lecture && peutPasser && (
           <button type="button" className={action} onClick={agir(onPasser)}>
             Passer à plus tard
           </button>
         )}
-        <div className="flex flex-wrap gap-1.5">
-          <PastillesContact stop={s} onChange={(champ, v) => onContact(s, champ, v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          {s.phone && (
+            <a href={lienSms(s.phone, SMS_ARRIVEE)} className={lien}>
+              <IconMessage className="h-4 w-4" /> SMS « j&apos;arrive »
+            </a>
+          )}
+          <a href={waze(s)} target="_blank" rel="noreferrer" className={lien}>
+            <IconNavigation className="h-4 w-4" /> Waze
+          </a>
+          <a href={gmaps(s)} target="_blank" rel="noreferrer" className={lien}>
+            <IconMapPin className="h-4 w-4" /> Google Maps
+          </a>
         </div>
-        <button type="button" className={action} onClick={agir(onFiche)}>
-          Fiche de l&apos;arrêt
-        </button>
-        <button type="button" className={`${action} text-orange-ink`} onClick={agir(onRetirer)}>
-          Retirer cette adresse
-        </button>
+        {!lecture && (
+          <button type="button" className={`${action} text-orange-ink`} onClick={agir(onRetirer)}>
+            Retirer cette adresse
+          </button>
+        )}
       </section>
     </div>
   );
