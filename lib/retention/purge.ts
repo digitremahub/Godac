@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { cheminsPhotos, enLots } from "@/lib/retention/photos";
 
 /** Retention periods announced in app/confidentialite — keep both in sync. */
 export const RETENTION_DAYS = {
@@ -71,31 +72,63 @@ export async function purgeExpiredData() {
   }
   results.parcelRecipients = anonymises;
 
-  // Photos de livraison des tournées purgées : effacées du stockage d'abord.
-  const limite = daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10);
-  const { data: photos } = await admin
-    .from("delivery_stops")
-    .select("proof_photo_path, delivery_runs!inner(run_date)")
-    .lt("delivery_runs.run_date", limite)
-    .not("proof_photo_path", "is", null);
-  const chemins = (photos ?? []).map((p) => p.proof_photo_path as string);
-  for (let i = 0; i < chemins.length; i += 100) await admin.storage.from("delivery-proofs").remove(chemins.slice(i, i + 100));
-  results.deliveryPhotos = chemins.length;
-
   // Tracé GPS des tournées : points de plus d'un an (les tournées supprimées emportent les leurs en cascade).
   const trace = await admin.from("delivery_run_track_points").delete({ count: "exact" }).lt("recorded_at", daysAgo(RETENTION_DAYS.parcelTrack));
   results.parcelTrack = trace.error ? trace.error.message : (trace.count ?? 0);
 
-  const runs = await admin
-    .from("delivery_runs")
-    .delete({ count: "exact" })
-    .lt("run_date", limite);
-  results.parcelRuns = runs.error ? runs.error.message : (runs.count ?? 0);
+  // Tournées expirées, lot par lot jusqu'à épuisement : les photos de preuve
+  // (les trois photos d'un arrêt) sont effacées du stockage AVANT les lignes ;
+  // si l'effacement échoue, les tournées du lot sont conservées pour un
+  // prochain passage au lieu de laisser des photos orphelines.
+  const limite = daysAgo(RETENTION_DAYS.parcelRuns).slice(0, 10);
+  let photosEffacees = 0;
+  let tourneesSupprimees = 0;
+  let erreurTournees: string | null = null;
+  for (;;) {
+    const { data: lot, error: erreurLot } = await admin.from("delivery_runs").select("id").lt("run_date", limite).order("run_date").limit(100);
+    if (erreurLot) { erreurTournees = erreurLot.message; break; }
+    const ids = (lot ?? []).map((r) => r.id as string);
+    if (ids.length === 0) break;
+
+    const chemins = await photosDesTournees(admin, ids);
+    if (typeof chemins === "string") { erreurTournees = chemins; break; }
+    let echecStockage: string | null = null;
+    for (const morceau of enLots(chemins)) {
+      const { error } = await admin.storage.from("delivery-proofs").remove(morceau);
+      if (error) { echecStockage = error.message; break; }
+    }
+    if (echecStockage) { erreurTournees = `Photos non effacées : ${echecStockage}`; break; }
+    photosEffacees += chemins.length;
+
+    const suppression = await admin.from("delivery_runs").delete({ count: "exact" }).in("id", ids);
+    if (suppression.error) { erreurTournees = suppression.error.message; break; }
+    if (!suppression.count) break;
+    tourneesSupprimees += suppression.count;
+  }
+  results.deliveryPhotos = photosEffacees;
+  results.parcelRuns = erreurTournees ?? tourneesSupprimees;
 
   const access = await admin.from("rental_provider_access_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.providerAccessLog));
   results.providerAccessLog = access.error ? access.error.message : (access.count ?? 0);
 
   return results;
+}
+
+/** Chemins de toutes les photos de preuve des arrêts de ces tournées (pagination), ou le message d'erreur. */
+async function photosDesTournees(admin: ReturnType<typeof createAdminSupabaseClient>, runIds: string[]): Promise<string[] | string> {
+  const PAGE = 1000;
+  const chemins = new Set<string>();
+  for (let debut = 0; ; debut += PAGE) {
+    const { data, error } = await admin
+      .from("delivery_stops")
+      .select("proof_photo_path, proof_photo_paths")
+      .in("run_id", runIds)
+      .order("id")
+      .range(debut, debut + PAGE - 1);
+    if (error) return error.message;
+    for (const c of cheminsPhotos(data ?? [])) chemins.add(c);
+    if ((data ?? []).length < PAGE) return [...chemins];
+  }
 }
 
 /** « Jean-Marc Dupont » → « J.-M. D. » ; déjà réduit ou vide : inchangé. */
