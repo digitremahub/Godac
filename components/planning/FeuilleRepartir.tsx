@@ -225,7 +225,7 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
                 })}
                 {etat.elements.villages.length === 0 && <li className="text-sm text-navy/65">Les tournées regroupées n&apos;ont aucun village. Ajoutez-les dans Tournée colis › Tournées.</li>}
               </ul>
-              <p className="mt-2 text-sm text-navy/60">Une ramasse « À attribuer » suit son village. L&apos;attribution est provisoire : elle se corrige avec les tournées réelles.</p>
+              <p className="mt-2 text-sm text-navy/60">Une ramasse peut être attribuée à un autre chauffeur que celui de son village ; « À attribuer » la laisse suivre son village. L&apos;attribution est provisoire : elle se corrige avec les tournées réelles.</p>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" className="btn-dark min-h-[48px] !px-4 text-sm disabled:opacity-60" disabled={occupe || modifies.length === 0} onClick={() => void enregistrerRepartition()}>

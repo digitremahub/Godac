@@ -202,20 +202,41 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
 /** Colonne « Ouverture » (vue Semaine) : Ouverte, Fermée, ou « 2/5 fermées » si seuls certains jours sont fermés. */
 function ColonneOuverture({ ligne }: { ligne: LigneTournee }) {
   const ctx = useAffectations();
-  const entrees = ctx.jours.flatMap((d) => ctx.parCase.get(cleCaseTournee(ligne.cle, d)) ?? []).filter((e) => e.status !== "cancelled");
+  const entrees = ctx.jours.flatMap((d) => ctx.parCase.get(cleCaseTournee(ligne.cle, d)) ?? []).filter((e) => e.status !== "cancelled" && !e.id.startsWith("tmp:"));
   const fermees = entrees.filter((e) => !estOuverte(e)).length;
+  const peut = ctx.donnees.peutModifier && entrees.some((e) => e.status === "planned" || e.status === "in_progress");
   return (
     <td className="border-b border-r border-navy/10 px-2 py-1 align-middle text-xs">
       {entrees.length === 0 ? (
         <span className="text-navy/40" aria-label="Aucune affectation">
           –
         </span>
-      ) : fermees === 0 ? (
-        <span className="text-navy/65">Ouverte</span>
       ) : (
-        <span className="inline-flex rounded-full px-2 py-0.5 font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }}>
-          {fermees === entrees.length ? "Fermée" : `${fermees}/${entrees.length} fermées`}
-        </span>
+        <div className="flex flex-col items-start gap-1">
+          {fermees === 0 ? (
+            <span className="text-navy/65">Ouverte</span>
+          ) : (
+            <span className="inline-flex rounded-full px-2 py-0.5 font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }}>
+              {fermees === entrees.length ? "Fermée" : `${fermees}/${entrees.length} fermées`}
+            </span>
+          )}
+          {peut && (
+            <button
+              type="button"
+              disabled={ctx.occupe}
+              onClick={() => ctx.basculerOuvertureLigne(entrees, fermees < entrees.length)}
+              className="btn-secondary min-h-[36px] !px-2.5 !py-0 text-xs"
+              aria-label={`${fermees < entrees.length ? "Fermer" : "Rouvrir"} ${ligne.tourNumber} sur la période affichée`}
+            >
+              {fermees < entrees.length ? "Fermer" : "Rouvrir"}
+            </button>
+          )}
+          {peut && (
+            <button type="button" disabled={ctx.occupe} onClick={() => ctx.ouvrirRepartition(entrees[0]!)} className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-teal-ink underline-offset-2 hover:underline">
+              Répartir villages et ramasses
+            </button>
+          )}
+        </div>
       )}
     </td>
   );
@@ -361,6 +382,18 @@ function CaseRemplie({ entree, autres, ligne, date, survol, libelleCase }: { ent
           )}
         </button>
       </Glissable>
+      {!mois && ctx.donnees.peutModifier && !entree.id.startsWith("tmp:") && (entree.status === "planned" || entree.status === "in_progress") && (
+        <button
+          type="button"
+          disabled={ctx.occupe}
+          onClick={() => ctx.basculerOuverture(entree)}
+          className="absolute -right-1 -top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-surface text-xs shadow-pop ring-1 ring-navy/15 hover:bg-orange/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal"
+          aria-label={`${fermee ? "Rouvrir" : "Fermer"} la tournée de ${nomCourt(nom)}`}
+          title={fermee ? "Rouvrir la tournée" : "Fermer la tournée"}
+        >
+          <span aria-hidden="true">{fermee ? "🔒" : "🔓"}</span>
+        </button>
+      )}
       {etirable && (
         <span
           role="presentation"

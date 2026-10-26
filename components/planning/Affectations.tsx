@@ -450,6 +450,11 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     router.refresh();
   }
 
+  /** Ferme ou rouvre d'un coup toutes les tournées d'une ligne de la période affichée (une confirmation par tournée en cours). */
+  async function basculerOuvertureLigne(entrees: EntreeAffectation[], fermer: boolean): Promise<void> {
+    for (const e of entrees.filter((x) => estOuverte(x) === fermer)) await basculerOuverture(e);
+  }
+
   // --- Publier ------------------------------------------------------------
   async function publier() {
     const premier = donnees.jours[0]!;
@@ -530,6 +535,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     filtreOuverture,
     lignesVisibles,
     basculerOuverture: (e) => void basculerOuverture(e),
+    basculerOuvertureLigne: (es, fermer) => void basculerOuvertureLigne(es, fermer),
     ouvrirRepartition: (e) => (e.id.startsWith("tmp:") ? setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" }) : setFenetre({ type: "repartir", entree: e })),
   };
 
