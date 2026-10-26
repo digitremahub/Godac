@@ -133,7 +133,10 @@ export function SemaineMobile({ trous }: { trous: Record<string, number> }) {
         {ctx.jours.map((d) => {
           const r = rangJour(d);
           const n = trous[d] ?? 0;
-          const roule = ctx.lignes.some((l) => etatCase(ctx.parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d)) !== "vide");
+          const roule = ctx.lignes.some((l) => {
+            const etat = etatCase(ctx.parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d));
+            return etat !== "vide" && etat !== "fermee";
+          });
           const actif = d === date;
           const auj = d === ctx.aujourdhui;
           return (

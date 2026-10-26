@@ -25,6 +25,15 @@ export interface EntreeOuverture {
 /** Ouverte, sauf si la base dit explicitement le contraire (colonne absente ou vide = ouverte). */
 export const estOuverte = (e: EntreeOuverture): boolean => e.tour_open !== false;
 
+/**
+ * Tournée FERMÉE SANS CHAUFFEUR (« non affectée ») : l'exploitation sait
+ * qu'elle ne roule pas ce jour-là (férié, pas de volume, tournée supprimée).
+ * C'est une ligne planning_entries sans driver_id avec tour_open = false :
+ * elle ne compte plus comme « à pourvoir » (couverture, « À traiter »,
+ * alertes) et ne peut plus être affectée tant qu'on ne la rouvre pas.
+ */
+export const estFermeeNonAffectee = (e: EntreeOuverture & { driver_id?: string | null }): boolean => !estOuverte(e) && !e.driver_id;
+
 /** Rôles qui ouvrent / ferment une tournée (la direction et l'exploitation partout, le manager sur son service). */
 export const ROLES_OUVERTURE = ["direction", "exploitation", "manager", "manager_chauffeur"] as const;
 
@@ -60,6 +69,22 @@ export function peutChangerOuverture(p: {
   if (entree.driver_id === userId) {
     if (role === "direction" && p.directionCount <= 1) return { ok: true, autoValidee: true };
     return { ok: false, raison: "Vous ne pouvez pas fermer ni rouvrir votre propre tournée : demandez à l'exploitation ou à la direction." };
+  }
+  return { ok: true };
+}
+
+/**
+ * Cette personne peut-elle fermer ou rouvrir une tournée NON AFFECTÉE d'un
+ * service ? Même périmètre que l'ouverture d'une affectation : direction et
+ * exploitation partout, manager sur son service, personne d'autre. Pas de
+ * règle « sa propre tournée » : il n'y a pas de chauffeur.
+ */
+export function peutFermerNonAffectee(p: { role: string; serviceIds: readonly string[]; serviceId: string }): VerdictOuverture {
+  if (!(ROLES_OUVERTURE as readonly string[]).includes(p.role)) {
+    return { ok: false, raison: "Seule la direction, l'exploitation ou le chef d'équipe du service peut fermer ou rouvrir une tournée." };
+  }
+  if ((p.role === "manager" || p.role === "manager_chauffeur") && !p.serviceIds.includes(p.serviceId)) {
+    return { ok: false, raison: "Un chef d'équipe ne ferme ni ne rouvre que les tournées de son service." };
   }
   return { ok: true };
 }

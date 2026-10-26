@@ -317,12 +317,12 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       },
     },
     {
-      // Tournées d'aujourd'hui et de demain sans chauffeur.
+      // Tournées d'aujourd'hui et de demain sans chauffeur (hors tournées fermées : elles ne roulent pas).
       type: "tournee_sans_chauffeur",
       nom: "tournées sans chauffeur",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = (await planning()).filter((t) => t.status === "planned" && !t.driver_id && t.start_at >= debutJour && t.start_at < finDemain).slice(0, PLAFOND_PAR_SOURCE);
+        const rows = (await planning()).filter((t) => t.status === "planned" && !t.driver_id && t.tour_open !== false && t.start_at >= debutJour && t.start_at < finDemain).slice(0, PLAFOND_PAR_SOURCE);
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
           brutes: rows.map((t) => ({

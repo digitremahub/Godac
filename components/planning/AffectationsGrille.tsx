@@ -8,13 +8,14 @@ import {
   etatCase,
   indisponibilite,
   initiales,
+  joursSansChauffeur,
   nomCourt,
   couleurChauffeur,
   trousParJour,
   type LigneTournee,
 } from "@/lib/planning/affectation";
 import { estModifiable, heureDe, jourDe, JOURS_LONGS, rangJour, statutAffectation } from "@/lib/planning/semaine";
-import { estOuverte } from "@/lib/planning/ouverture";
+import { estFermeeNonAffectee, estOuverte, libelleFermeture } from "@/lib/planning/ouverture";
 import { PastilleFermee } from "@/components/planning/OuvertureFusion";
 import { addDays } from "@/lib/planning/dates";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
@@ -199,45 +200,76 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
   );
 }
 
-/** Colonne « Ouverture » (vue Semaine) : Ouverte, Fermée, ou « 2/5 fermées » si seuls certains jours sont fermés. */
+/**
+ * Colonne « Ouverture » (vue Semaine) : Ouverte, Fermée, ou « 2/5 fermées » si seuls certains jours sont fermés.
+ * Action mise en avant : « Fermer les jours sans chauffeur » (la tournée ne roule pas) ; fermer une tournée
+ * AFFECTÉE reste possible, en second plan.
+ */
 function ColonneOuverture({ ligne }: { ligne: LigneTournee }) {
   const ctx = useAffectations();
   const entrees = ctx.jours.flatMap((d) => ctx.parCase.get(cleCaseTournee(ligne.cle, d)) ?? []).filter((e) => e.status !== "cancelled" && !e.id.startsWith("tmp:"));
   const fermees = entrees.filter((e) => !estOuverte(e)).length;
-  const peut = ctx.donnees.peutModifier && entrees.some((e) => e.status === "planned" || e.status === "in_progress");
+  const sansChauffeur = joursSansChauffeur(ligne, ctx.jours, ctx.parCase, ctx.aujourdhui);
+  const fermeesSansChauffeur = entrees.filter(estFermeeNonAffectee);
+  const affectees = entrees.filter((e) => e.driver_id);
+  const fermeesAffectees = affectees.filter((e) => !estOuverte(e)).length;
+  const modifiable = ctx.donnees.peutModifier;
+  const peutAffectees = modifiable && affectees.some((e) => e.status === "planned" || e.status === "in_progress");
+  const cibleRepartition = entrees.find((e) => !estFermeeNonAffectee(e));
   return (
     <td className="border-b border-r border-navy/10 px-2 py-1 align-middle text-xs">
-      {entrees.length === 0 ? (
-        <span className="text-navy/40" aria-label="Aucune affectation">
-          –
-        </span>
-      ) : (
-        <div className="flex flex-col items-start gap-1">
-          {fermees === 0 ? (
-            <span className="text-navy/65">Ouverte</span>
-          ) : (
-            <span className="inline-flex rounded-full px-2 py-0.5 font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }}>
-              {fermees === entrees.length ? "Fermée" : `${fermees}/${entrees.length} fermées`}
-            </span>
-          )}
-          {peut && (
-            <button
-              type="button"
-              disabled={ctx.occupe}
-              onClick={() => ctx.basculerOuvertureLigne(entrees, fermees < entrees.length)}
-              className="btn-secondary min-h-[36px] !px-2.5 !py-0 text-xs"
-              aria-label={`${fermees < entrees.length ? "Fermer" : "Rouvrir"} ${ligne.tourNumber} sur la période affichée`}
-            >
-              {fermees < entrees.length ? "Fermer" : "Rouvrir"}
-            </button>
-          )}
-          {peut && (
-            <button type="button" disabled={ctx.occupe} onClick={() => ctx.ouvrirRepartition(entrees[0]!)} className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-teal-ink underline-offset-2 hover:underline">
-              Répartir villages et ramasses
-            </button>
-          )}
-        </div>
-      )}
+      <div className="flex flex-col items-start gap-1">
+        {entrees.length === 0 ? (
+          <span className="text-navy/40" aria-label="Aucune affectation">
+            –
+          </span>
+        ) : fermees === 0 ? (
+          <span className="text-navy/65">Ouverte</span>
+        ) : (
+          <span className="inline-flex rounded-full px-2 py-0.5 font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }}>
+            {fermees === entrees.length ? "Fermée" : `${fermees}/${entrees.length} fermées`}
+          </span>
+        )}
+        {modifiable && sansChauffeur.length > 0 && (
+          <button
+            type="button"
+            disabled={ctx.occupe}
+            onClick={() => ctx.changerFermeture(ligne, sansChauffeur, true)}
+            className="btn-dark min-h-[44px] !px-2.5 !py-0 text-xs"
+            title="Ces jours-là, la tournée ne roule pas : plus à pourvoir, plus surveillée"
+            aria-label={`Fermer les ${sansChauffeur.length} jour${sansChauffeur.length > 1 ? "s" : ""} sans chauffeur de ${ligne.tourNumber}`}
+          >
+            Fermer les jours sans chauffeur ({sansChauffeur.length})
+          </button>
+        )}
+        {modifiable && fermeesSansChauffeur.length > 0 && (
+          <button
+            type="button"
+            disabled={ctx.occupe}
+            onClick={() => ctx.changerFermeture(ligne, fermeesSansChauffeur.map((e) => jourDe(e.start_at)), false)}
+            className="btn-secondary min-h-[44px] !px-2.5 !py-0 text-xs"
+            aria-label={`Rouvrir les ${fermeesSansChauffeur.length} jour${fermeesSansChauffeur.length > 1 ? "s" : ""} fermé${fermeesSansChauffeur.length > 1 ? "s" : ""} sans chauffeur de ${ligne.tourNumber}`}
+          >
+            Rouvrir les jours fermés ({fermeesSansChauffeur.length})
+          </button>
+        )}
+        {peutAffectees && (
+          <button
+            type="button"
+            disabled={ctx.occupe}
+            onClick={() => ctx.basculerOuvertureLigne(affectees, fermeesAffectees < affectees.length)}
+            className="btn-ghost min-h-[36px] !px-2 !py-0 text-xs"
+            aria-label={`${fermeesAffectees < affectees.length ? "Fermer" : "Rouvrir"} les tournées affectées de ${ligne.tourNumber} sur la période affichée`}
+          >
+            {fermeesAffectees < affectees.length ? "Fermer les affectées" : "Rouvrir les affectées"}
+          </button>
+        )}
+        {modifiable && cibleRepartition && (cibleRepartition.status === "planned" || cibleRepartition.status === "in_progress") && (
+          <button type="button" disabled={ctx.occupe} onClick={() => ctx.ouvrirRepartition(cibleRepartition)} className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-teal-ink underline-offset-2 hover:underline">
+            Répartir villages et ramasses
+          </button>
+        )}
+      </div>
     </td>
   );
 }
@@ -300,30 +332,84 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
             </div>
           ) : etat === "remplie" && premiere ? (
             <CaseRemplie entree={premiere} autres={entrees.length - 1} ligne={ligne} date={date} survol={survol} libelleCase={libelleCase} />
+          ) : etat === "fermee" && premiere ? (
+            <CaseFermee entree={premiere} ligne={ligne} date={date} libelleCase={libelleCase} />
           ) : (
-            <button
-              type="button"
-              disabled={!ctx.donnees.peutModifier || ctx.occupe}
-              onClick={() => ctx.ouvrirCase(ligne.cle, date)}
-              aria-label={`${libelleCase} : ${etat === "a_remplacer" ? "à remplacer" : etat === "vide_prevue" ? "sans chauffeur" : "vide"}${ctx.arme ? `, placer ${ctx.arme.full_name}` : ""}`}
-              className={`flex w-full items-center justify-center rounded-lg border-2 border-dashed text-orange-ink transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${mois ? "h-9 text-sm" : "min-h-[52px] flex-col text-base"} ${
-                survol
-                  ? "border-orange bg-orange/20"
-                  : etat === "a_remplacer"
-                    ? "border-solid border-orange bg-orange/10 font-semibold"
-                    : etat === "vide_prevue"
-                      ? "border-orange/50 bg-orange/[0.05] hover:bg-orange/10"
-                      : // Jour où la tournée ne roule pas d'habitude (samedi…) : même case « disponible », un peu plus discrète.
-                        // Le « + » ne disparaît jamais ; il s'estompe seulement avec une souris précise.
-                        "border-orange/30 bg-orange/[0.02] font-semibold text-orange-ink/80 hover:border-orange/60 hover:bg-orange/10 hover:text-orange-ink [@media(hover:hover)_and_(pointer:fine)]:text-orange-ink/50 [@media(hover:hover)_and_(pointer:fine)]:hover:text-orange-ink"
-              }`}
-            >
-              {etat === "a_remplacer" ? (mois ? "!" : <><span>À remplacer</span><span className="text-[11px] font-normal">absent ou retiré</span></>) : "+"}
-            </button>
+            <div className="flex items-stretch gap-1">
+              <button
+                type="button"
+                disabled={!ctx.donnees.peutModifier || ctx.occupe}
+                onClick={() => ctx.ouvrirCase(ligne.cle, date)}
+                aria-label={`${libelleCase} : ${etat === "a_remplacer" ? "à remplacer" : etat === "vide_prevue" ? "sans chauffeur" : "vide"}${ctx.arme ? `, placer ${ctx.arme.full_name}` : ""}`}
+                className={`flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-dashed text-orange-ink transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${mois ? "h-9 text-sm" : "min-h-[52px] flex-col text-base"} ${
+                  survol
+                    ? "border-orange bg-orange/20"
+                    : etat === "a_remplacer"
+                      ? "border-solid border-orange bg-orange/10 font-semibold"
+                      : etat === "vide_prevue"
+                        ? "border-orange/50 bg-orange/[0.05] hover:bg-orange/10"
+                        : // Jour où la tournée ne roule pas d'habitude (samedi…) : même case « disponible », un peu plus discrète.
+                          // Le « + » ne disparaît jamais ; il s'estompe seulement avec une souris précise.
+                          "border-orange/30 bg-orange/[0.02] font-semibold text-orange-ink/80 hover:border-orange/60 hover:bg-orange/10 hover:text-orange-ink [@media(hover:hover)_and_(pointer:fine)]:text-orange-ink/50 [@media(hover:hover)_and_(pointer:fine)]:hover:text-orange-ink"
+                }`}
+              >
+                {etat === "a_remplacer" ? (mois ? "!" : <><span>À remplacer</span><span className="text-[11px] font-normal">absent ou retiré</span></>) : "+"}
+              </button>
+              {!mois && ctx.donnees.peutModifier && (etat === "vide_prevue" || etat === "a_remplacer") && entrees.every((e) => !e.driver_id) && (
+                <button
+                  type="button"
+                  disabled={ctx.occupe}
+                  onClick={() => ctx.changerFermeture(ligne, [date], true)}
+                  aria-label={`Fermer la tournée ${libelleCase} : elle ne roule pas ce jour-là`}
+                  title="Elle ne roule pas ce jour-là : plus à pourvoir, plus surveillée"
+                  className="btn-dark min-h-[52px] shrink-0 !px-2 text-xs"
+                >
+                  Fermer
+                </button>
+              )}
+            </div>
           )}
         </td>
       )}
     </Depot>
+  );
+}
+
+/** Case d'une tournée fermée sans chauffeur : pastille « Fermée » (auteur et date en infobulle) et « Rouvrir ». Mois : point rouge, la feuille propose « Rouvrir ». */
+function CaseFermee({ entree, ligne, date, libelleCase }: { entree: EntreeAffectation; ligne: LigneTournee; date: string; libelleCase: string }) {
+  const ctx = useAffectations();
+  const mois = ctx.donnees.vue === "mois";
+  const texte = libelleFermeture(ctx.donnees.fermeesPar[entree.id], entree.closed_at);
+  if (mois) {
+    return (
+      <button
+        type="button"
+        onClick={() => ctx.ouvrirCase(ligne.cle, date)}
+        title={texte}
+        aria-label={`${libelleCase} : ${texte.toLowerCase()}. Rouvrir`}
+        className="flex h-9 w-full items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal"
+      >
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }} aria-hidden="true">
+          F
+        </span>
+      </button>
+    );
+  }
+  return (
+    <div className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-navy/15 bg-navy/[0.05] px-1 py-1">
+      <PastilleFermee entree={entree} />
+      {ctx.donnees.peutModifier && (
+        <button
+          type="button"
+          disabled={ctx.occupe}
+          onClick={() => ctx.basculerOuverture(entree)}
+          aria-label={`Rouvrir la tournée ${libelleCase} : ${texte.toLowerCase()}`}
+          className="min-h-[32px] rounded px-2 text-xs font-semibold text-teal-ink underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal"
+        >
+          Rouvrir
+        </button>
+      )}
+    </div>
   );
 }
 

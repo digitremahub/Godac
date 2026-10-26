@@ -22,6 +22,7 @@ import {
   jourParDefaut,
   joursEtires,
   joursPlacesParChauffeur,
+  joursSansChauffeur,
   libelleIndisponibilite,
   lignesTournees,
   nomCourt,
@@ -158,7 +159,7 @@ describe("cases et trous", () => {
       conges,
       arrets,
     });
-    expect(c).toEqual({ tournees: 2, affectees: 1, sansChauffeur: 1, disponibles: 1, absents: 1 });
+    expect(c).toEqual({ tournees: 2, affectees: 1, sansChauffeur: 1, fermees: 0, disponibles: 1, absents: 1 });
   });
 });
 
@@ -405,5 +406,52 @@ describe("calendrier du mois (téléphone)", () => {
     expect(jourParDefaut(semaine, jour(2), {})).toBe(jour(2));
     expect(jourParDefaut(semaine, "2026-12-01", { [jour(3)]: 2, [jour(4)]: 1 })).toBe(jour(3));
     expect(jourParDefaut(semaine, "2026-12-01", {})).toBe(LUNDI);
+  });
+});
+
+describe("tournée fermée sans chauffeur : ni trou, ni tournée", () => {
+  const lignes = lignesTournees({ routes: [{ id: "r1", tourNumber: "106", serviceId: "s1" }, { id: "r2", tourNumber: "T102", serviceId: "s1" }], modeles: [], affectations: [], serviceIds: ["s1"] });
+  const l106 = lignes.find((l) => l.tourNumber === "106")!;
+  // Mardi : 106 fermée sans chauffeur ; T102 placée. Mercredi : 106 ouverte « à remplacer » (sans chauffeur), T102 vide.
+  const fermee = aff({ id: "f", tour_number: "106", driver_id: null, vehicle_id: null, start_at: at(jour(1), "07:00"), tour_open: false });
+  const affectations = [fermee, aff({ id: "b", tour_number: "T102", driver_id: "d1", start_at: at(jour(1), "07:00") }), aff({ id: "c", tour_number: "106", driver_id: null, start_at: at(jour(2), "07:00") })];
+  const parCase = affectationsParTournee(affectations);
+
+  it("état « fermée », hors des trous", () => {
+    expect(etatCase([fermee], true)).toBe("fermee");
+    expect(etatCase([fermee], false)).toBe("fermee");
+    // Même sans chauffeur, une ligne OUVERTE reste à remplacer.
+    expect(etatCase([aff({ id: "o", driver_id: null })], true)).toBe("a_remplacer");
+    // Fermée avec un chauffeur : toujours « remplie » (comme avant).
+    expect(etatCase([aff({ id: "p", tour_open: false })], true)).toBe("remplie");
+    // Une fermeture n'efface pas une autre affectation de la case.
+    expect(etatCase([fermee, aff({ id: "q" })], true)).toBe("remplie");
+  });
+
+  it("trous par jour : la tournée fermée ne compte plus", () => {
+    // Mardi : 106 fermée, T102 placée : 0 trou. Mercredi : 106 à remplacer + T102 vide prévue : 2.
+    expect(trousParJour(lignes, [jour(1), jour(2)], parCase)).toEqual({ [jour(1)]: 0, [jour(2)]: 2 });
+  });
+
+  it("compteurs du jour : fermée à part, pas dans « sans chauffeur » ni dans les tournées", () => {
+    const c = compteursDuJour({ date: jour(1), lignes, parCase, chauffeurs: [{ id: "d1" }], affectations, conges: [], arrets: [] });
+    expect(c).toMatchObject({ tournees: 1, affectees: 1, sansChauffeur: 0, fermees: 1 });
+  });
+
+  it("calendrier du mois : un jour entièrement fermé n'a plus de tournée ni de trou", () => {
+    const fermees = [fermee, aff({ id: "g", tour_number: "T102", driver_id: null, vehicle_id: null, start_at: at(jour(1), "07:00"), tour_open: false })];
+    const semaines = calendrierMois("2026-10", lignes, affectationsParTournee(fermees));
+    const cellule = semaines.flatMap((s) => s.jours).find((c) => c.date === jour(1))!;
+    expect(cellule).toMatchObject({ tournees: 0, trous: 0, couverture: "aucune" });
+  });
+
+  it("jours sans chauffeur d'une ligne : trous sans chauffeur, pas les fermés ni les passés", () => {
+    const jours = [LUNDI, jour(1), jour(2), jour(3)];
+    // 106 : lundi vide prévu, mardi fermée, mercredi à remplacer, jeudi vide prévu.
+    expect(joursSansChauffeur(l106, jours, parCase)).toEqual([LUNDI, jour(2), jour(3)]);
+    expect(joursSansChauffeur(l106, jours, parCase, jour(2))).toEqual([jour(2), jour(3)]);
+    // Une case avec un chauffeur n'est jamais proposée.
+    const mixte = affectationsParTournee([aff({ id: "m1", tour_number: "106", driver_id: "d1", start_at: at(LUNDI, "07:00") }), aff({ id: "m2", tour_number: "106", driver_id: null, start_at: at(LUNDI, "09:00") })]);
+    expect(joursSansChauffeur(l106, [LUNDI], mixte)).toEqual([]);
   });
 });
