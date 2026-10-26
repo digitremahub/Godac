@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { BandeauPointage } from "@/components/time-clock/BandeauPointage";
-import { useSortieDepot } from "@/components/time-clock/useSortieDepot";
+import { useSortieDepot, type FixGps } from "@/components/time-clock/useSortieDepot";
 
 /**
  * Sortie du dépôt dans l'app livreur : tant que l'app est ouverte, que le
@@ -11,11 +12,18 @@ import { useSortieDepot } from "@/components/time-clock/useSortieDepot";
  * bouton « Annuler ». Monté aussi sur l'écran « Tournée terminée / retour
  * dépôt » : la surveillance reprend à la clôture de la tournée. `flottant` :
  * bandeau épinglé en haut de l'écran (navigation, retour au dépôt).
+ * `fix` : dernière position GPS déjà connue de la tournée / de GO Navigation,
+ * transmise au serveur même pendant la tournée (mémorise les passages au
+ * dépôt). `apresCloture` : la tournée vient d'être close dans cette session.
  * Sans module Pointeuse ou sans pointage assisté, l'API répond
  * « désactivé » et la surveillance s'arrête d'elle-même.
  */
-export function SortieDepotLivreur({ actif, flottant = false }: { actif: boolean; flottant?: boolean }) {
-  const sortie = useSortieDepot({ surveiller: actif, immediat: true });
+export function SortieDepotLivreur({ actif, flottant = false, fix = null, apresCloture = false }: { actif: boolean; flottant?: boolean; fix?: FixGps | null; apresCloture?: boolean }) {
+  const sortie = useSortieDepot({ surveiller: actif, immediat: true, presenceExigee: apresCloture });
+  const { signalerPosition } = sortie;
+  useEffect(() => {
+    if (fix) void signalerPosition(fix);
+  }, [fix, signalerPosition]);
   const bandeau = (
     <BandeauPointage
       bandeau={sortie.bandeau}

@@ -21,6 +21,8 @@ const base: EntreeDecision = {
   clockedInAt: arrivee,
   positionPrecise: true,
   auDepot: false,
+  loinDuDepot: true,
+  entreeAuto: false,
   tourneeEnCours: false,
   tourneeCloturee: true,
   lastDepotSeenAt: il_y_a(2),
@@ -34,11 +36,44 @@ describe("decider", () => {
     if (d.action === "sortie_auto") expect(new Date(d.clockedOutAt).getTime()).toBeLessThan(maintenant.getTime());
   });
 
-  it("présence tout juste fraîche (30 min) : sortie automatique ; 31 min : simple offre", () => {
-    expect(decider({ ...base, lastDepotSeenAt: il_y_a(30) }).action).toBe("sortie_auto");
-    const d = decider({ ...base, lastDepotSeenAt: il_y_a(31) });
-    expect(d).toEqual({ action: "offre", lastSeenAt: il_y_a(31) });
-    expect(FRAICHEUR_PRESENCE_MS).toBe(30 * 60_000);
+  it("présence tout juste fraîche (60 min) : sortie automatique ; 61 min : simple offre", () => {
+    expect(decider({ ...base, lastDepotSeenAt: il_y_a(60) }).action).toBe("sortie_auto");
+    const d = decider({ ...base, lastDepotSeenAt: il_y_a(61) });
+    expect(d).toEqual({ action: "offre", lastSeenAt: il_y_a(61) });
+    expect(FRAICHEUR_PRESENCE_MS).toBe(60 * 60_000);
+  });
+
+  it("chargement de 40 min au dépôt, app fermée : la présence d'il y a 45 min suffit pour la sortie automatique", () => {
+    expect(decider({ ...base, lastDepotSeenAt: il_y_a(45) })).toEqual({ action: "sortie_auto", clockedOutAt: il_y_a(45) });
+  });
+
+  it("app ouverte seulement après avoir quitté le dépôt : entrée automatique récente sans présence → sortie à l'arrivée", () => {
+    const arriveeRecente = il_y_a(40);
+    expect(decider({ ...base, clockedInAt: arriveeRecente, entreeAuto: true, lastDepotSeenAt: null })).toEqual({ action: "sortie_auto", clockedOutAt: arriveeRecente });
+  });
+
+  it("entrée automatique ancienne sans présence : offre sans heure (jamais une sortie à l'arrivée du matin)", () => {
+    expect(decider({ ...base, entreeAuto: true, lastDepotSeenAt: null })).toEqual({ action: "offre", lastSeenAt: null });
+  });
+
+  it("entrée manuelle récente sans présence : offre, aucune heure déduite", () => {
+    expect(decider({ ...base, clockedInAt: il_y_a(40), entreeAuto: false, lastDepotSeenAt: null })).toEqual({ action: "offre", lastSeenAt: null });
+  });
+
+  it("zone tampon (au-delà du rayon d'arrivée, en deçà de la marge) : rien, ni sortie ni offre", () => {
+    expect(decider({ ...base, loinDuDepot: false })).toEqual({ action: "rien", raison: "proche_du_depot" });
+  });
+
+  it("démarrage de tournée hors dépôt : tournée en cours, jamais de sortie", () => {
+    expect(decider({ ...base, tourneeEnCours: true, tourneeCloturee: false })).toEqual({ action: "rien", raison: "tournee_en_cours" });
+  });
+
+  it("GPS imprécis (fix réseau) : rien, même tournée close et présence fraîche", () => {
+    expect(decider({ ...base, positionPrecise: false })).toEqual({ action: "rien", raison: "position_imprecise" });
+  });
+
+  it("déjà sorti (plus d'entrée ouverte) : jamais deux sorties", () => {
+    expect(decider({ ...base, entreeOuverte: false, clockedInAt: null })).toEqual({ action: "rien", raison: "pas_d_entree" });
   });
 
   it("jamais de sortie rétroactive de plusieurs heures : présence du matin → offre", () => {

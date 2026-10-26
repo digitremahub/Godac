@@ -142,7 +142,8 @@ export interface GoNavigationProps {
   onRetourSuivant?: () => void;
   /** Suite complète de la tournée (heure de fin estimée de l'app chauffeur). */
   onItineraire: (it: Itineraire | null) => void;
-  onPosition: (p: Point) => void;
+  /** Position GPS remontée toutes les 30 s, avec sa précision en mètres (sert aussi au pointage de présence au dépôt). */
+  onPosition: (p: Point, precision?: number) => void;
   /** Trajet en cours d'enregistrement pour l'historique (indicateur discret, RGPD). */
   traceActive?: boolean;
 }
@@ -527,7 +528,7 @@ export function GoNavigation(p: GoNavigationProps) {
         const maintenant = Date.now();
         if (maintenant - derniereRemontee.current > REMONTEE_POSITION_MS) {
           derniereRemontee.current = maintenant;
-          onPosition(pos);
+          onPosition(pos, g.coords.accuracy);
         }
       },
       (e) => setErreurGps(e.code === e.PERMISSION_DENIED ? "Localisation refusée : autorisez-la pour suivre le trajet. En attendant, le trajet part du dépôt." : "Position GPS indisponible pour le moment."),
