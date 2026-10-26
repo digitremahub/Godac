@@ -76,6 +76,9 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   customer_dispute: (id) => ({ id: "exploitation.contestations", suite: id ? `?fiche=${encodeURIComponent(id)}` : "" }),
   // Tournée en retard (palier à surveiller / en retard) : le suivi en direct, tournée mise en avant.
   tournee_retard: (id) => ({ id: "exploitation.suivi", suite: id ? `?tournee=${encodeURIComponent(id)}` : "" }),
+  // Tournée du planning non démarrée ou sans chauffeur (cron de surveillance) : la tournée ouverte dans le planning.
+  tournee_non_demarree: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
+  tournee_sans_chauffeur: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
   // Arrêt de travail déclaré : à vérifier, tournées à remplacer (encadrement du service).
   work_stoppage: (id) => ({ id: "equipe.arrets", suite: id ? `?arret=${encodeURIComponent(id)}` : "" }),
 };

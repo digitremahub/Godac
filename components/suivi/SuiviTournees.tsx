@@ -29,6 +29,51 @@ function depuis(iso: string | null | undefined): string {
   return min <= 1 ? "à l'instant" : min < 60 ? `il y a ${min} min` : `il y a ${Math.floor(min / 60)} h`;
 }
 
+/** Marqueur de la carte et ses éléments à mettre à jour (chauffeur : texte et pastille). */
+interface MarqueurSuivi {
+  marker: Marker;
+  el: HTMLButtonElement;
+  texte?: Text;
+  pastille?: HTMLElement;
+}
+
+type ArretSuivi = TourneeSuivie["arrets"][number];
+
+/** Contenu de la fiche d'un arrêt (DOM construit à la main : maplibre n'accepte pas du JSX). */
+function contenuArret(t: TourneeSuivie, a: ArretSuivi): HTMLElement {
+  const fait = a.status !== "pending";
+  const contenu = document.createElement("div");
+  contenu.style.cssText = "min-width:210px;max-width:280px;font:13px system-ui,sans-serif;color:#0A0F1E";
+  const titre = document.createElement("strong");
+  titre.textContent = `${a.ordre}. ${a.ramasse ? "Ramasse" : a.relais ? `Point relais${typeof a.relais === "string" ? ` ${a.relais}` : ""}` : "Livraison"} · ${t.chauffeur}`;
+  titre.style.cssText = "display:block;margin-bottom:6px;font-size:14px";
+  const adresse = document.createElement("div");
+  adresse.textContent = a.adresse;
+  adresse.style.cssText = "margin-bottom:5px;white-space:normal";
+  contenu.append(titre, adresse);
+  if (a.preuve) {
+    const preuve = document.createElement("div");
+    preuve.textContent = a.preuve;
+    preuve.style.cssText = "margin-bottom:5px;color:#4B5563";
+    contenu.append(preuve);
+  }
+  if (a.destinataire) {
+    const ligne = document.createElement("div");
+    ligne.textContent = `Destinataire : ${a.destinataire}`;
+    contenu.append(ligne);
+  }
+  if (a.telephone) {
+    const ligne = document.createElement("div");
+    ligne.textContent = `Téléphone : ${a.telephone}`;
+    contenu.append(ligne);
+  }
+  const infos = document.createElement("div");
+  infos.textContent = `${a.colis} colis · ${fait ? "Arrêt effectué" : "À faire"}`;
+  infos.style.cssText = "margin-top:5px;font-weight:600";
+  contenu.append(infos);
+  return contenu;
+}
+
 /**
  * Suivi des tournées colis du jour pour la direction et l'exploitation :
  * dernière position partagée par chaque chauffeur (pendant sa tournée
@@ -36,13 +81,16 @@ function depuis(iso: string | null | undefined): string {
  * service. Bloc « Retards » en tête ; sur la carte, la pastille de chaque
  * chauffeur a la couleur de son état (dans les temps, à surveiller, en
  * retard, hors ligne) et le nombre d'arrêts restants ; un clic ouvre sa
- * fiche. Rafraîchi toutes les 20 secondes, en pause quand l'onglet est caché.
+ * fiche. Rafraîchi toutes les 20 secondes (marqueurs mis à jour sur place, sans rien reconstruire), en pause quand l'onglet est caché.
  */
 export function SuiviTournees({ services, tourneeInitiale }: { services: { id: string; name: string }[]; tourneeInitiale?: string }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<CarteMap | null>(null);
   const lib = useRef<typeof import("maplibre-gl") | null>(null);
-  const marqueurs = useRef<Marker[]>([]);
+  const marqueurs = useRef<Map<string, MarqueurSuivi>>(new Map());
+  const tourneesRef = useRef<TourneeSuivie[]>([]);
+  // Le premier chargement de l'écran sert aussi de filet à la surveillance des retards (cron toutes les 5 minutes).
+  const premierChargement = useRef(true);
   const cadre = useRef(false);
   const [prete, setPrete] = useState(false);
   const [service, setService] = useState("");
@@ -53,13 +101,18 @@ export function SuiviTournees({ services, tourneeInitiale }: { services: { id: s
   // Fiche chauffeur ouverte : rouverte après chaque rafraîchissement des marqueurs.
   const fiche = useRef<Popup | null>(null);
   const ficheId = useRef<string | null>(tourneeInitiale ?? null);
+  // Vrai pendant que le code ferme lui-même la fiche (et non la personne).
   const reconstruction = useRef(false);
   // Tournées terminées : repliées sur une ligne, dépliées au clic.
   const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
 
   const charger = useCallback(async () => {
     try {
-      const res = await fetch(`/api/suivi${service ? `?service=${service}` : ""}`);
+      const parametres = new URLSearchParams();
+      if (service) parametres.set("service", service);
+      if (premierChargement.current) parametres.set("ouverture", "1");
+      premierChargement.current = false;
+      const res = await fetch(`/api/suivi${parametres.size ? `?${parametres}` : ""}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur");
       setTournees(json.tournees);
@@ -115,134 +168,184 @@ export function SuiviTournees({ services, tourneeInitiale }: { services: { id: s
     };
   }, []);
 
+  function fermerFiche() {
+    reconstruction.current = true;
+    fiche.current?.remove();
+    reconstruction.current = false;
+    fiche.current = null;
+    ficheId.current = null;
+  }
+
+  /** Ouvre la fiche d'un chauffeur, ou met à jour sur place celle qui est déjà ouverte. */
+  function ouvrirFiche(t: TourneeSuivie) {
+    const m = carte.current;
+    const maplibregl = lib.current;
+    if (!m || !maplibregl || !t.position) return;
+    if (fiche.current && ficheId.current === t.id) {
+      fiche.current.setLngLat([t.position.lng, t.position.lat]).setDOMContent(ficheChauffeur(t));
+      return;
+    }
+    reconstruction.current = true;
+    fiche.current?.remove();
+    reconstruction.current = false;
+    const popup = new maplibregl.Popup({ offset: 22, closeButton: true, maxWidth: "320px" }).setLngLat([t.position.lng, t.position.lat]).setDOMContent(ficheChauffeur(t));
+    popup.on("close", () => {
+      if (!reconstruction.current && fiche.current === popup) {
+        fiche.current = null;
+        ficheId.current = null;
+      }
+    });
+    popup.addTo(m);
+    fiche.current = popup;
+    ficheId.current = t.id;
+  }
+
   const couleurDe = (id: string) => COULEURS[(tournees ?? []).findIndex((t) => t.id === id) % COULEURS.length] ?? COULEURS[0]!;
 
   // Marqueurs : chauffeurs (position) et arrêts (restants colorés, faits en gris).
+  // Mise à jour différentielle : un marqueur existant est déplacé et restylé,
+  // jamais recréé (le focus clavier et la fiche ouverte sont conservés) ;
+  // seuls les marqueurs apparus ou disparus sont créés ou retirés.
   useEffect(() => {
     const m = carte.current;
     const maplibregl = lib.current;
     if (!m || !maplibregl || !prete || !tournees) return;
-    reconstruction.current = true;
-    fiche.current?.remove();
-    fiche.current = null;
-    marqueurs.current.forEach((mk) => mk.remove());
-    marqueurs.current = [];
+    tourneesRef.current = tournees;
+    const vus = new Set<string>();
     const pts: [number, number][] = [];
+
+    const garder = (cle: string, lng: number, lat: number, creer: () => MarqueurSuivi, maj: (mk: MarqueurSuivi) => void) => {
+      vus.add(cle);
+      let mk = marqueurs.current.get(cle);
+      if (mk) mk.marker.setLngLat([lng, lat]);
+      else {
+        mk = creer();
+        mk.marker.setLngLat([lng, lat]).addTo(m);
+        marqueurs.current.set(cle, mk);
+      }
+      maj(mk);
+    };
+
     tournees.forEach((t) => {
       const couleur = couleurDe(t.id);
       const attenue = focus !== null && focus !== t.id;
       t.arrets.forEach((a) => {
         if (a.lat === null || a.lng === null) return;
-        const el = document.createElement("button");
-        el.type = "button";
-        el.setAttribute("aria-label", `${t.chauffeur} — arrêt ${a.ordre} — ${a.adresse}`);
-        el.style.cursor = "pointer";
-        const fait = a.status !== "pending";
-        // Ramasse : carré à bordure dorée ; point relais : carré à bordure violette (mêmes couleurs que les encoches).
-        Object.assign(el.style, {
-          width: "12px",
-          height: "12px",
-          borderRadius: a.ramasse || a.relais ? "3px" : "999px",
-          background: fait ? "#9AA3B5" : couleur,
-          border: a.ramasse ? "2px solid #F5C842" : a.relais ? "2px solid #A78BFA" : "2px solid #FFFFFF",
-          opacity: attenue ? "0.25" : fait ? "0.7" : "1",
-        });
-        el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : a.relais ? "point relais" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
-        el.addEventListener("click", (event) => {
-          event.stopPropagation();
-          const contenu = document.createElement("div");
-          contenu.style.cssText = "min-width:210px;max-width:280px;font:13px system-ui,sans-serif;color:#0A0F1E";
-          const titre = document.createElement("strong");
-          titre.textContent = `${a.ordre}. ${a.ramasse ? "Ramasse" : a.relais ? `Point relais${typeof a.relais === "string" ? ` ${a.relais}` : ""}` : "Livraison"} · ${t.chauffeur}`;
-          titre.style.cssText = "display:block;margin-bottom:6px;font-size:14px";
-          const adresse = document.createElement("div");
-          adresse.textContent = a.adresse;
-          adresse.style.cssText = "margin-bottom:5px;white-space:normal";
-          contenu.append(titre, adresse);
-          if (a.preuve) {
-            const preuve = document.createElement("div");
-            preuve.textContent = a.preuve;
-            preuve.style.cssText = "margin-bottom:5px;color:#4B5563";
-            contenu.append(preuve);
-          }
-          if (a.destinataire) { const el = document.createElement("div"); el.textContent = `Destinataire : ${a.destinataire}`; contenu.append(el); }
-          if (a.telephone) { const el = document.createElement("div"); el.textContent = `Téléphone : ${a.telephone}`; contenu.append(el); }
-          const infos = document.createElement("div");
-          infos.textContent = `${a.colis} colis · ${fait ? "Arrêt effectué" : "À faire"}`;
-          infos.style.cssText = "margin-top:5px;font-weight:600";
-          contenu.append(infos);
-          new maplibregl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" }).setLngLat([a.lng!, a.lat!]).setDOMContent(contenu).addTo(m);
-          setFocus(t.id);
-        });
-        marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([a.lng, a.lat]).addTo(m));
+        const cle = `arret:${t.id}:${a.ordre}`;
+        garder(
+          cle,
+          a.lng,
+          a.lat,
+          () => {
+            const el = document.createElement("button");
+            el.type = "button";
+            el.style.cursor = "pointer";
+            el.addEventListener("click", (event) => {
+              event.stopPropagation();
+              // Données du dernier rafraîchissement : le marqueur n'est pas recréé.
+              const tn = tourneesRef.current.find((x) => x.id === t.id);
+              const an = tn?.arrets.find((x) => x.ordre === a.ordre);
+              if (!tn || !an || an.lat === null || an.lng === null) return;
+              new maplibregl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" }).setLngLat([an.lng, an.lat]).setDOMContent(contenuArret(tn, an)).addTo(m);
+              setFocus(tn.id);
+            });
+            return { marker: new maplibregl.Marker({ element: el }), el };
+          },
+          ({ el }) => {
+            const fait = a.status !== "pending";
+            el.setAttribute("aria-label", `${t.chauffeur} — arrêt ${a.ordre} — ${a.adresse}`);
+            // Ramasse : carré à bordure dorée ; point relais : carré à bordure violette (mêmes couleurs que les encoches).
+            Object.assign(el.style, {
+              width: "12px",
+              height: "12px",
+              borderRadius: a.ramasse || a.relais ? "3px" : "999px",
+              background: fait ? "#9AA3B5" : couleur,
+              border: a.ramasse ? "2px solid #F5C842" : a.relais ? "2px solid #A78BFA" : "2px solid #FFFFFF",
+              opacity: attenue ? "0.25" : fait ? "0.7" : "1",
+            });
+            el.title = `${t.chauffeur} — ${a.ramasse ? "ramasse" : a.relais ? "point relais" : "arrêt"} ${a.ordre}${fait ? " (fait)" : ""}`;
+          },
+        );
         if (!attenue) pts.push([a.lng, a.lat]);
       });
+
       if (t.position) {
         const etat = t.retard?.etat ?? "dans_les_temps";
         const c = COULEUR_ETAT[t.statut === "in_progress" ? etat : "hors_ligne"];
-        const el = document.createElement("button");
-        el.type = "button";
-        el.textContent = initiales(t.chauffeur);
-        el.setAttribute("aria-label", `${t.chauffeur} — ${LIBELLES_ETAT[etat]} — ${t.adressesRestantes} arrêt${t.adressesRestantes > 1 ? "s" : ""} restant${t.adressesRestantes > 1 ? "s" : ""} — ${depuis(t.position.at)}`);
-        Object.assign(el.style, {
-          position: "relative",
-          width: "36px",
-          height: "36px",
-          borderRadius: "999px",
-          background: c.fond,
-          color: c.texte,
-          border: "3px solid #FFFFFF",
-          boxShadow: "0 2px 8px rgba(10,15,30,.4)",
-          font: "700 12px system-ui, sans-serif",
-          cursor: "pointer",
-          opacity: attenue ? "0.35" : "1",
-          zIndex: "3",
-        });
-        // Pastille : arrêts restants.
-        const pastille = document.createElement("span");
-        pastille.textContent = String(t.adressesRestantes);
-        Object.assign(pastille.style, {
-          position: "absolute",
-          top: "-8px",
-          right: "-8px",
-          minWidth: "18px",
-          height: "18px",
-          padding: "0 4px",
-          borderRadius: "999px",
-          background: "#0A0F1E",
-          color: "#FFFFFF",
-          border: "2px solid #FFFFFF",
-          font: "700 10px/14px system-ui, sans-serif",
-          textAlign: "center",
-          boxSizing: "border-box",
-        });
-        el.append(pastille);
-        const ouvrirFiche = () => {
-          fiche.current?.remove();
-          const popup = new maplibregl.Popup({ offset: 22, closeButton: true, maxWidth: "320px" }).setLngLat([t.position!.lng, t.position!.lat]).setDOMContent(ficheChauffeur(t));
-          popup.on("close", () => {
-            if (!reconstruction.current && fiche.current === popup) ficheId.current = null;
-          });
-          popup.addTo(m);
-          fiche.current = popup;
-          ficheId.current = t.id;
-        };
-        el.addEventListener("click", (event) => {
-          event.stopPropagation();
-          ouvrirFiche();
-          setFocus(t.id);
-        });
-        marqueurs.current.push(new maplibregl.Marker({ element: el }).setLngLat([t.position.lng, t.position.lat]).addTo(m));
-        if (!attenue) pts.push([t.position.lng, t.position.lat]);
-        if (ficheId.current === t.id) ouvrirFiche();
+        const position = t.position;
+        garder(
+          `position:${t.id}`,
+          position.lng,
+          position.lat,
+          () => {
+            const el = document.createElement("button");
+            el.type = "button";
+            Object.assign(el.style, {
+              position: "relative",
+              width: "36px",
+              height: "36px",
+              borderRadius: "999px",
+              border: "3px solid #FFFFFF",
+              boxShadow: "0 2px 8px rgba(10,15,30,.4)",
+              font: "700 12px system-ui, sans-serif",
+              cursor: "pointer",
+              zIndex: "3",
+            });
+            const texte = document.createTextNode("");
+            // Pastille : arrêts restants.
+            const pastille = document.createElement("span");
+            Object.assign(pastille.style, {
+              position: "absolute",
+              top: "-8px",
+              right: "-8px",
+              minWidth: "18px",
+              height: "18px",
+              padding: "0 4px",
+              borderRadius: "999px",
+              background: "#0A0F1E",
+              color: "#FFFFFF",
+              border: "2px solid #FFFFFF",
+              font: "700 10px/14px system-ui, sans-serif",
+              textAlign: "center",
+              boxSizing: "border-box",
+            });
+            el.append(texte, pastille);
+            el.addEventListener("click", (event) => {
+              event.stopPropagation();
+              const tn = tourneesRef.current.find((x) => x.id === t.id);
+              if (tn) ouvrirFiche(tn);
+              setFocus(t.id);
+            });
+            return { marker: new maplibregl.Marker({ element: el }), el, texte, pastille };
+          },
+          ({ el, texte, pastille }) => {
+            if (texte) texte.data = initiales(t.chauffeur);
+            if (pastille) pastille.textContent = String(t.adressesRestantes);
+            el.setAttribute("aria-label", `${t.chauffeur} — ${LIBELLES_ETAT[etat]} — ${t.adressesRestantes} arrêt${t.adressesRestantes > 1 ? "s" : ""} restant${t.adressesRestantes > 1 ? "s" : ""} — ${depuis(position.at)}`);
+            Object.assign(el.style, { background: c.fond, color: c.texte, opacity: attenue ? "0.35" : "1" });
+          },
+        );
+        if (!attenue) pts.push([position.lng, position.lat]);
       }
     });
+
+    // Marqueurs de tournées ou d'arrêts disparus.
+    for (const [cle, mk] of marqueurs.current) {
+      if (vus.has(cle)) continue;
+      mk.marker.remove();
+      marqueurs.current.delete(cle);
+    }
+
+    // Fiche chauffeur ouverte : mise à jour sur place, fermée si la tournée n'a plus de position.
+    const ouverte = ficheId.current ? tournees.find((t) => t.id === ficheId.current && t.position) : undefined;
+    if (ouverte) ouvrirFiche(ouverte);
+    else if (fiche.current) fermerFiche();
+
     if (pts.length && (!cadre.current || focus)) {
       cadre.current = true;
       const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0]!, pts[0]!));
       m.fitBounds(b, { padding: 60, maxZoom: 14, duration: 500 });
     }
-    reconstruction.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournees, prete, focus]);
 

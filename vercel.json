@@ -33,6 +33,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/surveillance-tournees",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/ticpe",
       "schedule": "0 6 * * *"
     }

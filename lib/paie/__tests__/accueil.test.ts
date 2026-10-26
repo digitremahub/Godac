@@ -33,3 +33,20 @@ describe("tuile « Bulletins du mois » du comptable", () => {
     expect(valeurBulletinsMois({ prepares: 3, valides: 3, enAttente: 0, refuses: 0 }, 3)).toBe("3 / 3");
   });
 });
+
+describe("bulletins à valider par mois", () => {
+  it("groupe les bulletins en attente par mois, du plus ancien au plus récent", async () => {
+    const { bulletinsAValiderParMois } = await import("@/lib/paie/accueil");
+    expect(
+      bulletinsAValiderParMois([
+        { period_start: "2026-10-01", validation_status: "en_attente" },
+        { period_start: "2026-09-01", validation_status: "en_attente" },
+        { period_start: "2026-10-01", validation_status: "en_attente" },
+        { period_start: "2026-10-01", validation_status: "valide" },
+      ]),
+    ).toEqual([
+      { mois: "2026-09", nombre: 1 },
+      { mois: "2026-10", nombre: 2 },
+    ]);
+  });
+});

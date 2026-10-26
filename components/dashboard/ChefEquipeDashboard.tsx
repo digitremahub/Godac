@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { ATraiterAttente, ATraiterBloc } from "@/components/dashboard/ATraiterBloc";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, StatTile, Card } from "@/components/ui";
 import { QrCodeBadge } from "@/components/qr/QrCodeBadge";
@@ -123,13 +125,6 @@ export async function ChefEquipeDashboard({ appUser, enabledModules }: { appUser
     afficheDossiers && { libelle: "Amendes et contestations ouvertes", valeur: String(dossiersOuverts), accent: dossiersOuverts > 0 ? ("orange" as const) : ("teal" as const), ancre: "#amendes" },
   ].filter(Boolean) as { libelle: string; valeur: string; accent: "teal" | "orange" | "gold"; ancre: string }[];
 
-  // Une seule mini-ligne : demandes de l'équipe en attente (seulement si leurs écrans s'ouvrent).
-  const demandes = [
-    donnees.congesEnAttente && donnees.congesEnAttente.data > 0 && { n: donnees.congesEnAttente.data, libelle: donnees.congesEnAttente.data > 1 ? "congés" : "congé", href: urlDe("equipe.conges") },
-    donnees.entretiensEnAttente && donnees.entretiensEnAttente.data > 0 && { n: donnees.entretiensEnAttente.data, libelle: "entretien", href: urlDe("flotte.entretien") },
-  ].filter(Boolean) as { n: number; libelle: string; href: string }[];
-  const totalDemandes = demandes.reduce((s, d) => s + d.n, 0);
-
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre équipe et vos services en un coup d'œil." />
@@ -156,21 +151,10 @@ export async function ChefEquipeDashboard({ appUser, enabledModules }: { appUser
             ))}
           </div>
 
-          {totalDemandes > 0 && (
-            <p className="mb-6 text-sm text-navy/70">
-              Demandes de mon équipe en attente : <strong className="text-navy">{totalDemandes}</strong>
-              {" ("}
-              {demandes.map((d, i) => (
-                <span key={d.href}>
-                  {i > 0 && " · "}
-                  <Link href={d.href} className="inline-flex min-h-[44px] items-center text-teal-ink underline">
-                    {d.n} {d.libelle}
-                  </Link>
-                </span>
-              ))}
-              {")"}
-            </p>
-          )}
+          {/* Demandes de l'équipe, retards et tournées à pourvoir : la liste « À traiter », limitée à vos services. */}
+          <Suspense fallback={<ATraiterAttente />}>
+            <ATraiterBloc appUser={appUser} enabledModules={enabledModules} />
+          </Suspense>
 
           <div className="flex flex-col gap-6">
             <Section id="equipe" titre="Mon équipe" resume={equipe.length > 0 ? resumeEquipe(cEquipe) : null} source={donnees.equipe}>

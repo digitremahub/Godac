@@ -13,15 +13,34 @@ export const LIBELLES_GRAVITE: Record<string, string> = {
   critical: "Urgent",
 };
 
-/** Statut partagé d'une alerte, en clair. */
+/**
+ * Statut partagé d'une alerte, en clair. Trois choses distinctes :
+ *  - « lue » : propre à chaque personne (alert_reads), ne dit rien du travail ;
+ *  - « ouverte » : personne ne l'a encore prise en charge ; seule cette
+ *    étape compte dans « Notifications ouvertes » de la direction ;
+ *  - « traitée » : résolue à la main ou clôturée toute seule quand sa
+ *    condition a disparu (lib/alerts/cloture.ts).
+ */
 export const LIBELLES_STATUT_ALERTE: Record<string, string> = {
-  open: "À traiter",
+  open: "Ouverte",
   acknowledged: "Pris en compte",
-  resolved: "Résolu",
+  resolved: "Traitée",
 };
 
 export const libelleGravite = (g: string) => LIBELLES_GRAVITE[g] ?? "Info";
 export const libelleStatutAlerte = (s: string) => LIBELLES_STATUT_ALERTE[s] ?? s;
+
+export type EtatAlerte = "nouvelle" | "lue" | "prise_en_compte" | "traitee";
+
+/** Où en est l'alerte pour cette personne : non lue, lue mais encore ouverte, prise en compte, traitée. */
+export function etatAlerte(statut: string, lu: boolean | undefined): EtatAlerte {
+  if (statut === "resolved") return "traitee";
+  if (statut === "acknowledged") return "prise_en_compte";
+  return lu === false ? "nouvelle" : "lue";
+}
+
+/** Seules les alertes ouvertes restent à traiter (compteur de la direction). */
+export const resteATraiter = (statut: string) => statut === "open";
 
 /**
  * Filtre PostgREST des alertes qu'une personne doit voir : les alertes

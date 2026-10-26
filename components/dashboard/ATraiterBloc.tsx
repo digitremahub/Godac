@@ -3,17 +3,24 @@ import { ATraiter } from "@/components/dashboard/ATraiter";
 import { chargerATraiter } from "@/lib/a-traiter/serveur";
 import type { AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { planningDuJourRequete, tourneesSuiviesRequete } from "@/lib/exploitation/planning-jour";
 
 /**
- * Aperçu « À traiter aujourd'hui » du tableau de bord (exploitation,
- * direction). À monter dans un <Suspense> : la liste se charge sans
+ * Aperçu « À traiter aujourd'hui » du tableau de bord (manager,
+ * exploitation, direction). À monter dans un <Suspense> : la liste se charge sans
  * retarder le reste de l'accueil, et une erreur ne le casse jamais
  * (message discret à la place).
  */
 export async function ATraiterBloc({ appUser, enabledModules, ecartsIds }: { appUser: AppUser; enabledModules: string[]; ecartsIds?: readonly string[] }) {
   try {
     const supabase = await createServerSupabaseClient();
-    const r = await chargerATraiter(supabase, appUser, new Set(enabledModules), { ecartsIds, delaiMs: 5000 });
+    const r = await chargerATraiter(supabase, appUser, new Set(enabledModules), {
+      ecartsIds,
+      delaiMs: 5000,
+      // Mêmes lectures que le reste de l'accueil : une seule par requête.
+      planningDuJour: () => planningDuJourRequete(appUser.organization_id),
+      tourneesSuivies: () => tourneesSuiviesRequete(appUser.id, appUser.role, appUser.organization_id),
+    });
     return <ATraiter presentation="apercu" elements={r.elements} erreurs={r.erreurs} plafonnes={r.plafonnes} maintenantIso={new Date().toISOString()} />;
   } catch (e) {
     console.error("à traiter : aperçu", e instanceof Error ? e.message : e);

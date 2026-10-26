@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole } from "@/lib/types/domain";
 import { boutonsBarreMobile, type IconeBarre } from "@/lib/acces/barre-mobile";
-import { IconCalendar, IconChatBubble, IconFlag, IconMenu, IconNavigation, IconPlusCircle, IconQrCode, IconTruck, IconWrench } from "@/components/layout/icons";
+import { IconCalendar, IconChatBubble, IconFlag, IconMapPin, IconMenu, IconNavigation, IconPlusCircle, IconQrCode, IconTruck, IconWrench } from "@/components/layout/icons";
 
 const ICONES: Record<IconeBarre, (props: { className?: string }) => React.ReactNode> = {
   depart: IconTruck,
@@ -15,6 +15,8 @@ const ICONES: Record<IconeBarre, (props: { className?: string }) => React.ReactN
   messages: IconChatBubble,
   signaler: IconWrench,
   navigation: IconNavigation,
+  atraiter: IconFlag,
+  suivi: IconMapPin,
 };
 
 /**

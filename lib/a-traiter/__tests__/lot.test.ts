@@ -139,3 +139,18 @@ describe("résultat par élément", () => {
     expect(repartitionParType([{ type: "conge" }, { type: "conge" }, { type: "arret" }])).toEqual({ conge: 2, arret: 1 });
   });
 });
+
+describe("litrage cumulé avant validation en lot", () => {
+  it("additionne les litres des écarts carburant et liste les véhicules", async () => {
+    const { resumeLitrage, phraseLitrage } = await import("@/lib/a-traiter/lot");
+    const r = resumeLitrage([
+      { type: "ecart_carburant", litres: 40.25, vehicule: "AB-1" },
+      { type: "ecart_carburant", litres: 10, vehicule: "AB-1" },
+      { type: "ecart_carburant", litres: null, vehicule: "CD-2" },
+      { type: "conge", litres: 99, vehicule: "ZZ" },
+    ]);
+    expect(r).toEqual({ ecarts: 3, litres: 50.3, vehicules: ["AB-1", "CD-2"] });
+    expect(phraseLitrage(r)).toContain("2 véhicules");
+    expect(phraseLitrage(resumeLitrage([]))).toBe("");
+  });
+});

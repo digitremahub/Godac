@@ -37,7 +37,7 @@ function ago(iso: string) {
 /**
  * Bell in the top bar: every planning, maintenance and Messenger event
  * (and any other alert) for the signed-in user, with an unread count —
- * polled every 30 s, the same no-realtime approach as the chat widget.
+ * polled every 30 s while the tab is visible (paused when hidden).
  */
 export function NotificationBell({ lienToutes = true }: { lienToutes?: boolean } = {}) {
   const router = useRouter();
@@ -59,9 +59,29 @@ export function NotificationBell({ lienToutes = true }: { lienToutes?: boolean }
   }, []);
 
   useEffect(() => {
+    // Onglet masqué : plus d'interrogation ; au retour, mise à jour immédiate.
+    let id: ReturnType<typeof setInterval> | null = null;
+    const demarrer = () => {
+      if (!id) id = setInterval(load, POLL_MS);
+    };
+    const arreter = () => {
+      if (id) clearInterval(id);
+      id = null;
+    };
+    const visibilite = () => {
+      if (document.hidden) arreter();
+      else {
+        load();
+        demarrer();
+      }
+    };
     load();
-    const id = setInterval(load, POLL_MS);
-    return () => clearInterval(id);
+    if (!document.hidden) demarrer();
+    document.addEventListener("visibilitychange", visibilite);
+    return () => {
+      arreter();
+      document.removeEventListener("visibilitychange", visibilite);
+    };
   }, [load]);
 
   useEffect(() => {

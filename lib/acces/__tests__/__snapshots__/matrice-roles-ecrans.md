@@ -2,7 +2,7 @@
 |---|---|---|---|---|---|---|---|---|
 | Tableau de bord | Tableau de bord | `/dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Tableau de bord | Faire essayer GO | `/partage-go` | — | — | — | — | — | droit:partage_go |
-| Tableau de bord | À traiter aujourd'hui | `/dashboard/a-traiter` | — | — | 🔒 | — | 🔒 | — |
+| Tableau de bord | À traiter aujourd'hui | `/dashboard/a-traiter` | — | 🔒 | 🔒 | — | 🔒 | — |
 | Tableau de bord | Reporting BI | `/dashboard/reporting` | — | — | ✅ | ✅ | ✅ | bi_reporting |
 | Mon espace | Départ | `/moi/tournee/depart` | ✅ | — | — | — | — | planning |
 | Mon espace | Retour | `/moi/tournee/retour` | 🔒 | — | — | — | — | planning |
@@ -21,7 +21,7 @@
 | Exploitation | Modèles de tournées & villages | `/exploitation/tournees` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
 | Exploitation | Préparation des tournées colis | `/exploitation/colis` | ↪ /livreur | ✅ | ✅ | — | ✅ | route_optimizer |
 | Exploitation | GO Navigation | `/livreur/navigation` | ✅ | — | — | — | — | route_optimizer |
-| Exploitation | Suivi en direct | `/exploitation/suivi` | — | 🔒 | 🔒 | — | 🔒 | route_optimizer |
+| Exploitation | Suivi en direct | `/exploitation/suivi` | — | ✅ | ✅ | — | ✅ | route_optimizer |
 | Exploitation | Historique des tournées | `/exploitation/historique` | ✅ | ✅ | ✅ | ✅ | ✅ | planning |
 | Exploitation | Rapports de tournée | `/exploitation/historique/rapports` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | 🔒 | planning |
 | Exploitation | Photos de tournée | `/exploitation/historique/photos` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | 🔒 | planning |

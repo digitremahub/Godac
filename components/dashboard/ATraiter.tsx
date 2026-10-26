@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { confirmer } from "@/lib/ui/confirmation";
 import {
@@ -25,6 +25,8 @@ import {
   commentaireValide,
   estTypeLot,
   messageResume,
+  phraseLitrage,
+  resumeLitrage,
   type ActionLot,
   type ResultatElement,
   type ResumeLot,
@@ -89,14 +91,14 @@ function Ligne({ e, maintenant, selection }: { e: ElementATraiter; maintenant: D
         (e.groupable ? (
           <input
             type="checkbox"
-            className="mt-1 h-4 w-4 shrink-0 accent-teal"
+            className="h-11 w-11 shrink-0 accent-teal"
             checked={selection.coche}
             disabled={selection.desactive}
             onChange={selection.basculer}
             aria-label={`Sélectionner : ${e.libelle}`}
           />
         ) : (
-          <span className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="h-11 w-11 shrink-0" aria-hidden="true" />
         ))}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -128,6 +130,34 @@ export function ATraiter({ elements, verrouilles = [], erreurs = [], plafonnes =
   const [occupe, setOccupe] = useState(false);
   const [retour, setRetour] = useState<RetourLot | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+
+  // La liste vit : rafraîchie toutes les 60 s et au retour sur l'onglet (jamais onglet masqué, ni pendant un traitement).
+  useEffect(() => {
+    let minuteur: ReturnType<typeof setInterval> | null = null;
+    const rafraichir = () => {
+      if (!document.hidden && !occupe) router.refresh();
+    };
+    const demarrer = () => {
+      if (!minuteur) minuteur = setInterval(rafraichir, 60_000);
+    };
+    const arreter = () => {
+      if (minuteur) clearInterval(minuteur);
+      minuteur = null;
+    };
+    const visibilite = () => {
+      if (document.hidden) arreter();
+      else {
+        rafraichir();
+        demarrer();
+      }
+    };
+    if (!document.hidden) demarrer();
+    document.addEventListener("visibilitychange", visibilite);
+    return () => {
+      arreter();
+      document.removeEventListener("visibilitychange", visibilite);
+    };
+  }, [router, occupe]);
 
   const compteurs = useMemo(() => compter(elements), [elements]);
   const visibles = useMemo(() => filtrerParTypes(elements, presentation === "page" ? types : null), [elements, types, presentation]);
@@ -175,7 +205,7 @@ export function ATraiter({ elements, verrouilles = [], erreurs = [], plafonnes =
       .join(", ");
     const ok = await confirmer({
       titre: `${LIBELLE_ACTION[action].verbe} ${concernes.length} élément${concernes.length > 1 ? "s" : ""} ?`,
-      message: `${detail}.${ignores > 0 ? ` ${ignores} élément${ignores > 1 ? "s" : ""} de la sélection ne se ${action === "valider" ? "valident" : "refusent"} pas en groupe et ne seront pas touchés.` : ""} Chaque élément est contrôlé comme s'il était traité seul : ceux qui ne passent pas sont signalés avec leur motif, les autres sont traités.`,
+      message: `${detail}.${action === "valider" && concernes.some((e) => e.type === "ecart_carburant") ? ` ${phraseLitrage(resumeLitrage(concernes))}` : ""}${ignores > 0 ? ` ${ignores} élément${ignores > 1 ? "s" : ""} de la sélection ne se ${action === "valider" ? "valident" : "refusent"} pas en groupe et ne seront pas touchés.` : ""} Chaque élément est contrôlé comme s'il était traité seul : ceux qui ne passent pas sont signalés avec leur motif, les autres sont traités.`,
       action: LIBELLE_ACTION[action].verbe,
       danger: action === "refuser",
     });
@@ -276,7 +306,7 @@ export function ATraiter({ elements, verrouilles = [], erreurs = [], plafonnes =
       <Card className="mb-6">
         {entete}
         {compteurs.total === 0 ? (
-          <p className="text-sm text-navy/60">Rien n&apos;attend l&apos;exploitation pour le moment.</p>
+          <p className="text-sm text-navy/60">Rien n&apos;attend de décision pour le moment.</p>
         ) : (
           <>
             {filtres}
@@ -309,8 +339,8 @@ export function ATraiter({ elements, verrouilles = [], erreurs = [], plafonnes =
         ) : (
           <>
             {selectionnables.length > 0 && (
-              <label className="mb-1 flex items-center gap-2 text-sm text-navy/70">
-                <input type="checkbox" className="h-4 w-4 accent-teal" checked={toutCoche} onChange={toutBasculer} />
+              <label className="mb-1 flex min-h-[44px] items-center gap-2 text-sm text-navy/70">
+                <input type="checkbox" className="h-11 w-11 shrink-0 accent-teal" checked={toutCoche} onChange={toutBasculer} />
                 Sélectionner les éléments traitables en groupe ({Math.min(selectionnables.length, LOT_MAX)} au plus)
               </label>
             )}
@@ -325,7 +355,7 @@ export function ATraiter({ elements, verrouilles = [], erreurs = [], plafonnes =
       </Card>
 
       {choisis.length > 0 && (
-        <section aria-label="Actions groupées" className="card sticky bottom-3 z-10 mt-4 flex flex-col gap-3 shadow-raised">
+        <section aria-label="Actions groupées" className="card sticky bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 mt-4 lg:bottom-3 flex flex-col gap-3 shadow-raised">
           <p className="text-sm font-semibold text-navy">
             {choisis.length} sélectionné{choisis.length > 1 ? "s" : ""} (au plus {LOT_MAX})
           </p>

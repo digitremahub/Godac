@@ -39,11 +39,11 @@ describe("rôle exploitation : entre le manager et la direction", () => {
     }
   });
 
-  it("ajoute « À traiter aujourd'hui », le reporting et la TICPE (lecture et export)", () => {
+  it("ajoute le reporting et la TICPE (lecture et export)", () => {
     const manager = ouverts("manager");
     const exploitation = ouverts("exploitation");
     const enPlus = [...exploitation].filter((id) => !manager.has(id)).sort();
-    expect(enPlus.filter((id) => !id.startsWith("carburant.ticpe"))).toEqual(["dashboard.a_traiter", "dashboard.reporting"]);
+    expect(enPlus.filter((id) => !id.startsWith("carburant.ticpe"))).toEqual(["dashboard.reporting"]);
     expect(enPlus).toEqual(expect.arrayContaining(["carburant.ticpe", "carburant.ticpe_detail", "carburant.ticpe_vehicules"]));
     // Réglages TICPE (régime de TVA, taux particuliers) : direction et comptable seulement.
     expect(enPlus).not.toContain("carburant.ticpe_reglages");
