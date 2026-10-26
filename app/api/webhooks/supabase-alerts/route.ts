@@ -5,7 +5,7 @@ import { renderAlertEmail } from "@/lib/email/templates/alert-notification";
 import { sendPushToSubscriptions } from "@/lib/push/send";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 import type { UserRole } from "@/lib/types/domain";
-import { rolesDestinatairesEffectifs } from "@/lib/roles/perimetre";
+import { choisirDestinataires, estLimiteAuService, rolesCibles } from "@/lib/alerts/destinataires";
 
 /**
  * Receiver for a Supabase Database Webhook configured on
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     recipient_user_id: string | null;
     related_table: string | null;
     related_id: string | null;
+    service_id?: string | null;
   };
 
   const supabase = createAdminSupabaseClient();
@@ -61,16 +62,27 @@ export async function POST(req: Request) {
           .eq("organization_id", alert.organization_id)
           .eq("active", true)
           // L'exploitation reçoit tout ce qui est destiné aux managers (lib/roles/perimetre.ts).
-          .in("role", alert.recipient_roles.length > 0 ? rolesDestinatairesEffectifs(alert.recipient_roles) : ["direction", "exploitation"]),
+          .in("role", rolesCibles(alert.recipient_roles)),
   ]);
+
+  // Alerte d'un service : le manager ne la reçoit que s'il est de ce service (même périmètre que la RLS) ;
+  // exploitation et direction : toute l'organisation (lib/alerts/destinataires.ts).
+  const candidats = recipients ?? [];
+  const managersConcernes = candidats.filter((r) => estLimiteAuService(r.role, alert.service_id)).map((r) => r.id);
+  const { data: liensServices } = managersConcernes.length
+    ? await supabase.from("user_services").select("user_id, service_id").in("user_id", managersConcernes)
+    : { data: [] as { user_id: string; service_id: string }[] };
+  const servicesDe = new Map<string, string[]>();
+  for (const l of liensServices ?? []) servicesDe.set(l.user_id, [...(servicesDe.get(l.user_id) ?? []), l.service_id]);
+  const destinataires = alert.recipient_user_id ? candidats : choisirDestinataires(candidats, alert, servicesDe);
 
   // Lien calculé PAR RÔLE destinataire (lib/alerts/resolve-url.ts) : une
   // même alerte peut ouvrir la gestion pour l'encadrement et la vue
   // personnelle pour un chauffeur. E-mail et push d'un même destinataire
   // ouvrent toujours la même page.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const parLien = new Map<string, typeof recipients>();
-  for (const r of recipients ?? []) {
+  const parLien = new Map<string, typeof destinataires>();
+  for (const r of destinataires) {
     const lien = resolveAlertUrl(alert.related_table, alert.type, alert.related_id, { recipientUserId: alert.recipient_user_id, role: r.role }) ?? "/communication/alertes";
     parLien.set(lien, [...(parLien.get(lien) ?? []), r]);
   }

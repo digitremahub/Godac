@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
-import { libelleGravite, libelleStatutAlerte } from "@/lib/alerts/lecture";
+import { etatAlerte, libelleGravite, libelleStatutAlerte } from "@/lib/alerts/lecture";
 import type { UserRole } from "@/lib/types/domain";
 
 interface Alert {
@@ -136,6 +136,7 @@ export function AlertList({
                 </>
               )}
               {alert.status !== "open" && <span className="badge-neutral">{libelleStatutAlerte(alert.status)}</span>}
+              {alert.lu === true && etatAlerte(alert.status, alert.lu) === "lue" && <span className="badge-neutral">Lue · {libelleStatutAlerte(alert.status).toLowerCase()}</span>}
             </div>
           </Card>
         );

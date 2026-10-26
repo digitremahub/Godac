@@ -74,7 +74,8 @@ export function DashboardShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
 
-  const showActionBar = conduit;
+  // Conducteurs : barre des gestes de la tournée ; encadrement qui ne conduit pas : À traiter, Suivi, Planning, Messages.
+  const showActionBar = conduit || role === "manager" || role === "exploitation" || role === "direction";
   // Compte d'essai GO Navigation : menu réduit, pas de bandeau « menu
   // réorganisé » (il cite des sections que l'essai n'a pas).
   const goNavigation = enabledModuleKeys.includes(MARQUEUR_GO_NAVIGATION);

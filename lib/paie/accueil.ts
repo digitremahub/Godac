@@ -19,6 +19,17 @@ export function bulletinsAValider(lignes: readonly LigneBulletinAccueil[]): { no
   return { nombre: enAttente.length, mois };
 }
 
+/** Bulletins en attente de validation, par mois (AAAA-MM), du plus ancien au plus récent. */
+export function bulletinsAValiderParMois(lignes: readonly LigneBulletinAccueil[]): { mois: string; nombre: number }[] {
+  const parMois = new Map<string, number>();
+  for (const l of lignes) {
+    if (statutValide(l.validation_status) !== "en_attente") continue;
+    const mois = l.period_start.slice(0, 7);
+    parMois.set(mois, (parMois.get(mois) ?? 0) + 1);
+  }
+  return [...parMois].map(([mois, nombre]) => ({ mois, nombre })).sort((a, b) => a.mois.localeCompare(b.mois));
+}
+
 /** Requête de la page Paie pour ouvrir un mois donné (vide : mois en cours). */
 export function suiteMoisPaie(mois: string | null, moisCourant: string): string {
   return mois && mois !== moisCourant ? `?mois=${mois}` : "";

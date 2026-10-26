@@ -1,12 +1,13 @@
 // Barre d'actions mobile des personnes qui conduisent (chauffeur, manager
-// avec « conduit aussi »),
+// avec « conduit aussi ») et, sans conduite, de l'encadrement (À traiter, Suivi, Planning, Messages),
 // sous `lg` : 4 boutons fixes + « Plus » qui ouvre le tiroir du menu
 // (Mon espace, Communication, Aide…). Section 3.3 du plan. Pur, testé.
 
 import type { UserRole } from "@/lib/types/domain";
 import { MARQUEUR_GO_NAVIGATION, urlDe } from "@/lib/acces/catalogue";
+import { ecranOuvrable } from "@/lib/acces/tuiles-accueil";
 
-export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler" | "navigation";
+export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler" | "navigation" | "atraiter" | "suivi";
 
 export interface BoutonBarre {
   href: string;
@@ -14,8 +15,23 @@ export interface BoutonBarre {
   icone: IconeBarre;
 }
 
+const ENCADREMENT_BARRE: readonly UserRole[] = ["manager", "exploitation", "direction"];
+
+/** Barre rapide de l'encadrement qui ne conduit pas : les écrans de la journée, ceux qui s'ouvrent pour lui. */
+function boutonsEncadrement(role: UserRole, modules: ReadonlySet<string>): BoutonBarre[] {
+  if (!ENCADREMENT_BARRE.includes(role) || modules.has(MARQUEUR_GO_NAVIGATION)) return [];
+  const voulus: { ecran: string; libelle: string; icone: IconeBarre }[] = [
+    { ecran: "dashboard.a_traiter", libelle: "À traiter", icone: "atraiter" },
+    { ecran: "exploitation.suivi", libelle: "Suivi", icone: "suivi" },
+    { ecran: "exploitation.planning", libelle: "Planning", icone: "planning" },
+    { ecran: "communication.messenger", libelle: "Messages", icone: "messages" },
+  ];
+  return voulus.filter((b) => ecranOuvrable(b.ecran, { role, modules, conduit: false })).map((b) => ({ href: urlDe(b.ecran), libelle: b.libelle, icone: b.icone }));
+}
+
 export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>, tourneeEnCours: boolean, conduit: boolean = role === "chauffeur"): BoutonBarre[] {
-  if (!conduit) return [];
+  // Encadrement qui ne conduit pas : À traiter, Suivi en direct, Planning, Messages.
+  if (!conduit) return boutonsEncadrement(role, modules);
   // Essai GO Navigation : Tournée colis et navigation seulement.
   if (modules.has(MARQUEUR_GO_NAVIGATION)) {
     return modules.has("route_optimizer")

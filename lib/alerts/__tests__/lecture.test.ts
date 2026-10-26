@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compterNonLues, filtreDestinataire, libelleGravite, libelleStatutAlerte, marquerLues, trierNonLuesDabord } from "@/lib/alerts/lecture";
+import { compterNonLues, etatAlerte, resteATraiter, filtreDestinataire, libelleGravite, libelleStatutAlerte, marquerLues, trierNonLuesDabord } from "@/lib/alerts/lecture";
 
 describe("notifications lues par personne", () => {
   const alertes = [
@@ -30,6 +30,14 @@ describe("notifications lues par personne", () => {
 
   it("gravité et statut en français", () => {
     expect(["info", "warning", "critical"].map(libelleGravite)).toEqual(["Info", "À surveiller", "Urgent"]);
-    expect(["acknowledged", "resolved"].map(libelleStatutAlerte)).toEqual(["Pris en compte", "Résolu"]);
+    expect(["acknowledged", "resolved"].map(libelleStatutAlerte)).toEqual(["Pris en compte", "Traitée"]);
+  });
+
+  it("lu, ouvert, traité : trois choses distinctes, seul l'ouvert reste à traiter", () => {
+    expect(etatAlerte("open", false)).toBe("nouvelle");
+    expect(etatAlerte("open", true)).toBe("lue");
+    expect(etatAlerte("acknowledged", true)).toBe("prise_en_compte");
+    expect(etatAlerte("resolved", false)).toBe("traitee");
+    expect(["open", "acknowledged", "resolved"].map(resteATraiter)).toEqual([true, false, false]);
   });
 });

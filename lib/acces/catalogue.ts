@@ -263,11 +263,11 @@ export const ECRANS: readonly Ecran[] = [
     libelle: "À traiter aujourd'hui",
     libelleOnglet: "À traiter",
     href: "/dashboard/a-traiter",
-    roles: ["exploitation", "direction"],
+    roles: ["manager", "exploitation", "direction"],
     icone: "flag",
     // Onglet du Tableau de bord (et aperçu sur l'accueil) : pas d'entrée de plus dans le menu latéral.
     menu: "onglet",
-    note: "toute l'entreprise, triée par urgence ; actions groupées ; jamais ses propres demandes (hiérarchie)",
+    note: "exploitation et direction : toute l'entreprise ; manager : ses services (carburant, entretien, congés, tournées) ; triée par urgence ; actions groupées ; jamais ses propres demandes (hiérarchie)",
   }),
   E({ id: "dashboard.reporting", section: "dashboard", libelle: "Reporting BI", href: "/dashboard/reporting", roles: ["direction", "exploitation", "comptable"], modules: ["bi_reporting"], icone: "chart", note: "exploitation et comptable : carburant et tournées, sans paie" }),
 
@@ -449,7 +449,6 @@ export const ECRANS: readonly Ecran[] = [
     roles: ENCADREMENT,
     modules: ["route_optimizer"],
     icone: "qr",
-    aussiActif: ["/exploitation/suivi"],
     alternative: { chauffeur: "/livreur" },
     note: "manager ou exploitation qui conduit : aussi sa propre tournée colis",
   }),
@@ -466,7 +465,7 @@ export const ECRANS: readonly Ecran[] = [
     icone: "navigation",
     note: "avant-première ; tournée colis démarrée",
   }),
-  E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/exploitation/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map", menu: "onglet" }),
+  E({ id: "exploitation.suivi", section: "exploitation", libelle: "Suivi en direct", href: "/exploitation/suivi", roles: ENCADREMENT, modules: ["route_optimizer"], icone: "map" }),
   E({
     id: "exploitation.historique",
     section: "exploitation",

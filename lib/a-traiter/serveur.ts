@@ -10,13 +10,16 @@ import { LIBELLES_CONTROLE, type CodeControle, type PointARegler } from "@/lib/t
 import { prochaineEcheance } from "@/lib/ticpe/echeances";
 import { controlesDeLaPeriode } from "@/lib/ticpe/periode-serveur";
 import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
-import { chargerTourneesSuivies } from "@/lib/exploitation/suivi-serveur";
-import { notifierRetards } from "@/lib/exploitation/retards-serveur";
+import { chargerTourneesSuivies, type TourneeSuivie } from "@/lib/exploitation/suivi-serveur";
+import { lirePlanningDuJour, type LignePlanningJour } from "@/lib/exploitation/planning-jour";
+import { fenetreAujourdhuiDemain } from "@/lib/exploitation/surveillance";
+import { dansLePerimetre } from "@/lib/roles/perimetre";
+import { bulletinsAValiderParMois, suiteMoisPaie } from "@/lib/paie/accueil";
 import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards } from "@/lib/exploitation/retards";
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
-import { nextDay, parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
-import { PLAFOND_PAR_SOURCE, construireListe, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
+import { parisDay } from "@/lib/utils/paris-time";
+import { PLAFOND_PAR_SOURCE, construireListe, typeVisiblePour, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
 
 /**
  * Chargement de « À traiter aujourd'hui » : UNE requête plafonnée par
@@ -36,6 +39,10 @@ export interface OptionsChargement {
   /** Délai maximal par source, en millisecondes. */
   delaiMs?: number;
   maintenant?: Date;
+  /** Planning du jour déjà lu par l'accueil (une seule lecture pour toute la page). */
+  planningDuJour?: () => Promise<LignePlanningJour[]>;
+  /** Tournées colis suivies déjà lues par l'accueil. */
+  tourneesSuivies?: () => Promise<TourneeSuivie[]>;
 }
 
 export interface ResultatATraiter extends ResultatListe {
@@ -112,10 +119,21 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
   const ctx = { role: appUser.role, modules, conduit: appUser.conduit };
   const org = appUser.organization_id;
   const aujourdhui = parisDay(maintenant);
-  const debutJour = parisMidnightIso(aujourdhui);
-  const debutDemain = parisMidnightIso(nextDay(aujourdhui));
+  const { debutJour, debutDemain, finDemain } = fenetreAujourdhuiDemain(maintenant);
   // Une tournée « non démarrée » : l'heure prévue est passée depuis au moins 15 minutes.
   const limiteRetard = new Date(maintenant.getTime() - 15 * 60000).toISOString();
+  // Planning lu une fois pour les quatre sources de tournées ; manager : ses services seulement (en plus de la RLS).
+  let planningPromesse: Promise<LignePlanningJour[]> | null = null;
+  const planning = () => {
+    planningPromesse ??= (async () => {
+      const lignes = await (options.planningDuJour ?? (() => lirePlanningDuJour(supabase, maintenant)))();
+      if (appUser.role !== "manager") return lignes;
+      const { data } = await supabase.from("user_services").select("service_id").eq("user_id", appUser.id);
+      const mes = ((data ?? []) as { service_id: string }[]).map((x) => x.service_id);
+      return lignes.filter((l) => dansLePerimetre(appUser.role, mes, l.service_id));
+    })();
+    return planningPromesse;
+  };
   const lienPlanning = (id: string) => `${urlDe("exploitation.planning")}?entry=${id}`;
 
   const toutes: Source[] = [
@@ -144,6 +162,8 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
             auteurId: p.driver_id,
             personneId: p.driver_id,
             groupable: true,
+            litres: p.liters === null ? null : Number(p.liters),
+            vehicule: immat(p.vehicles),
           })),
         };
       },
@@ -297,28 +317,18 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       },
     },
     {
-      // Tournées du jour sans chauffeur.
+      // Tournées d'aujourd'hui et de demain sans chauffeur.
       type: "tournee_sans_chauffeur",
       nom: "tournées sans chauffeur",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = await lire<any>(
-          supabase
-            .from("planning_entries")
-            .select("id, tour_number, start_at, vehicles(registration)")
-            .eq("status", "planned")
-            .is("driver_id", null)
-            .gte("start_at", debutJour)
-            .lt("start_at", debutDemain)
-            .order("start_at", { ascending: true })
-            .limit(PLAFOND_PAR_SOURCE),
-        );
+        const rows = (await planning()).filter((t) => t.status === "planned" && !t.driver_id && t.start_at >= debutJour && t.start_at < finDemain).slice(0, PLAFOND_PAR_SOURCE);
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
           brutes: rows.map((t) => ({
             type: "tournee_sans_chauffeur" as const,
             id: t.id,
-            libelle: `Tournée ${t.tour_number} sans chauffeur`,
+            libelle: `Tournée ${t.tour_number} sans chauffeur${t.start_at >= debutDemain ? " demain" : ""}`,
             detail: `Départ prévu à ${heure(t.start_at)}${immat(t.vehicles) ? ` · ${immat(t.vehicles)}` : ""}`,
             echeance: t.start_at,
             ecran: "exploitation.planning",
@@ -333,16 +343,7 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       nom: "tournées fusionnées à répartir",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = await lire<any>(
-          supabase
-            .from("planning_entries")
-            .select("id, tour_number, start_at")
-            .in("status", ["planned", "in_progress"])
-            .gte("start_at", debutJour)
-            .lt("start_at", debutDemain)
-            .order("start_at", { ascending: true })
-            .limit(PLAFOND_PAR_SOURCE),
-        );
+        const rows = (await planning()).filter((t) => t.start_at >= debutJour && t.start_at < debutDemain).slice(0, PLAFOND_PAR_SOURCE);
         // Table absente (migration 20261105000001 pas appliquée) : aucune fusion, source vide.
         const fusions = await lireFusions(supabase, org, rows.map((r) => r.id));
         return {
@@ -368,25 +369,15 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
     },
     {
       // Tournées planifiées du jour, avec chauffeur, pas démarrées alors que l'heure prévue est passée.
-      type: "tournee_en_retard",
+      type: "tournee_non_demarree",
       nom: "tournées non démarrées",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = await lire<any>(
-          supabase
-            .from("planning_entries")
-            .select("id, tour_number, start_at, driver_id, vehicles(registration)")
-            .eq("status", "planned")
-            .not("driver_id", "is", null)
-            .gte("start_at", debutJour)
-            .lt("start_at", limiteRetard)
-            .order("start_at", { ascending: true })
-            .limit(PLAFOND_PAR_SOURCE),
-        );
+        const rows = (await planning()).filter((t) => t.status === "planned" && t.driver_id && t.start_at >= debutJour && t.start_at < limiteRetard).slice(0, PLAFOND_PAR_SOURCE);
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
           brutes: rows.map((t) => ({
-            type: "tournee_en_retard" as const,
+            type: "tournee_non_demarree" as const,
             id: t.id,
             libelle: `Tournée ${t.tour_number} non démarrée`,
             detail: `{nom} · prévue à ${heure(t.start_at)}${immat(t.vehicles) ? ` · ${immat(t.vehicles)}` : ""}`,
@@ -403,22 +394,73 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
     {
       // Tournées en cours en retard probable, à surveiller ou dont le chauffeur n'a plus de signal.
       // Périmètre du suivi : un manager ne voit que les chauffeurs de ses services.
-      type: "retard_tournee",
+      type: "tournee_en_retard",
       nom: "retards en cours",
       ecran: "exploitation.suivi",
       lire: async () => {
-        const tournees = await chargerTourneesSuivies(supabase, appUser, { statuts: ["in_progress"], maintenant });
-        await notifierRetards(org, tournees);
+        // Lecture seule : les alertes de retard sont écrites par le cron de surveillance, jamais au rendu d'une page.
+        const tournees = (await (options.tourneesSuivies ?? (() => chargerTourneesSuivies(supabase, appUser, { statuts: ["in_progress"], maintenant })))()).filter((t) => t.statut === "in_progress");
         const retards = trierRetards(tournees.filter((t) => t.retard && aSurveiller(t.retard)).map((t) => ({ ...t.retard!, tournee: t })));
         return {
           brutes: retards.map(({ tournee: t, ...r }) => ({
-            type: "retard_tournee" as const,
+            type: "tournee_en_retard" as const,
             id: t.id,
             libelle: `${t.nom ?? "Tournée"} · ${LIBELLES_ETAT[r.etat].toLowerCase()}`,
             detail: [t.chauffeur, r.retardMin > 0 ? `retard estimé ${libelleRetard(r.retardMin)}` : null, `${r.arretsRestants} arrêt${r.arretsRestants > 1 ? "s" : ""} restant${r.arretsRestants > 1 ? "s" : ""}`, r.horsLigne ? `position ${libelleSignal(r.signal, r.derniereMajMin)}` : null].filter(Boolean).join(" · "),
             critique: r.palier === "en_retard",
             ecran: "exploitation.suivi",
             href: `${urlDe("exploitation.suivi")}?tournee=${t.id}`,
+          })),
+        };
+      },
+    },
+    {
+      // Tickets de carburant à relire (OCR) ou à valider.
+      type: "ticket_ocr",
+      nom: "tickets à vérifier",
+      ecran: "carburant.revue_ocr",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("fuel_entries")
+            .select("id, occurred_at, liters, driver_id, vehicles(registration)")
+            .in("status", ["pending_ocr", "awaiting_validation"])
+            .order("occurred_at", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((p) => ({
+            type: "ticket_ocr" as const,
+            id: p.id,
+            libelle: `Ticket à vérifier${immat(p.vehicles) ? ` · ${immat(p.vehicles)}` : ""}`,
+            detail: `{nom} · plein du ${jourCourt(p.occurred_at)}${p.liters !== null ? ` · ${Number(p.liters).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} L` : ""}`,
+            depuis: p.occurred_at,
+            ecran: "carburant.revue_ocr",
+            href: urlDe("carburant.revue_ocr"),
+            personneId: p.driver_id,
+          })),
+        };
+      },
+    },
+    {
+      // Bulletins de paie en attente de la direction, un élément par mois.
+      type: "bulletin_paie",
+      nom: "bulletins de paie",
+      ecran: "equipe.paie",
+      lire: async () => {
+        const rows = await lire<any>(supabase.from("payslips").select("period_start, validation_status").eq("validation_status", "en_attente").limit(2000));
+        const moisCourant = aujourdhui.slice(0, 7);
+        return {
+          brutes: bulletinsAValiderParMois(rows).map((b) => ({
+            type: "bulletin_paie" as const,
+            id: b.mois,
+            libelle: `Bulletins de paie à valider · ${b.mois.slice(5, 7)}/${b.mois.slice(0, 4)}`,
+            detail: `${b.nombre} bulletin${b.nombre > 1 ? "s" : ""} en attente de la direction`,
+            // Un mois passé qui attend encore est urgent.
+            critique: b.mois < moisCourant,
+            ecran: "equipe.paie",
+            href: urlDe("equipe.paie") + suiteMoisPaie(b.mois, moisCourant),
           })),
         };
       },
@@ -533,7 +575,7 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       },
     },
   ];
-  const sources = toutes.filter((s) => ecranOuvrable(s.ecran, ctx));
+  const sources = toutes.filter((s) => ecranOuvrable(s.ecran, ctx) && typeVisiblePour(s.type, appUser.role));
 
   const erreurs: string[] = [];
   const plafonnes = new Set<TypeATraiter>();

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  LIBELLES_TYPE,
   PLAFOND_PAR_SOURCE,
+  TYPES_MANAGER,
+  typeVisiblePour,
   TYPES_A_TRAITER,
   calculerUrgence,
   compter,
@@ -239,5 +242,19 @@ describe("construireListe", () => {
   it("les éléments sans auteur (tournées, TICPE) sont toujours à traiter", () => {
     const r = liste([brute({ id: "t1", type: "tournee_sans_chauffeur", echeance: dans(1) }), brute({ id: "t2", type: "ticpe" })]);
     expect(r.elements.length).toBe(2);
+  });
+});
+
+describe("types par rôle et vocabulaire", () => {
+  it("manager : seulement les types de ses services ; exploitation et direction : tous", () => {
+    expect(typeVisiblePour("conge", "manager")).toBe(true);
+    expect(typeVisiblePour("amende", "manager")).toBe(false);
+    expect(typeVisiblePour("bulletin_paie", "manager")).toBe(false);
+    expect(TYPES_A_TRAITER.every((t) => typeVisiblePour(t, "exploitation") && typeVisiblePour(t, "direction"))).toBe(true);
+    expect(TYPES_MANAGER.every((t) => (TYPES_A_TRAITER as readonly string[]).includes(t))).toBe(true);
+  });
+  it("libellés non inversés : non démarrée / en retard", () => {
+    expect(LIBELLES_TYPE.tournee_non_demarree.singulier).toBe("Tournée non démarrée");
+    expect(LIBELLES_TYPE.tournee_en_retard.singulier).toBe("Tournée en retard");
   });
 });

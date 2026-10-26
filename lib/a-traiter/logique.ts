@@ -25,8 +25,10 @@ export const TYPES_A_TRAITER = [
   "ticpe",
   "tournee_sans_chauffeur",
   "repartition_a_attribuer",
+  "tournee_non_demarree",
   "tournee_en_retard",
-  "retard_tournee",
+  "ticket_ocr",
+  "bulletin_paie",
   "conge",
   "arret",
   "contestation",
@@ -42,8 +44,10 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   ticpe: { singulier: "TICPE", pluriel: "TICPE" },
   tournee_sans_chauffeur: { singulier: "Tournée sans chauffeur", pluriel: "Tournées sans chauffeur" },
   repartition_a_attribuer: { singulier: "Tournée fusionnée à répartir", pluriel: "Tournées fusionnées à répartir" },
-  tournee_en_retard: { singulier: "Tournée non démarrée", pluriel: "Tournées non démarrées" },
-  retard_tournee: { singulier: "Tournée en retard", pluriel: "Tournées en retard" },
+  tournee_non_demarree: { singulier: "Tournée non démarrée", pluriel: "Tournées non démarrées" },
+  tournee_en_retard: { singulier: "Tournée en retard", pluriel: "Tournées en retard" },
+  ticket_ocr: { singulier: "Ticket à vérifier", pluriel: "Tickets à vérifier" },
+  bulletin_paie: { singulier: "Bulletins à valider", pluriel: "Bulletins à valider" },
   conge: { singulier: "Congé", pluriel: "Congés" },
   arret: { singulier: "Arrêt de travail", pluriel: "Arrêts de travail" },
   contestation: { singulier: "Contestation", pluriel: "Contestations" },
@@ -51,6 +55,30 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
 };
 
 export type Urgence = "haute" | "normale";
+
+/**
+ * Types qu'un manager (chef d'équipe) retrouve dans « À traiter » : ceux
+ * dont la lecture est limitée à ses services par la RLS (carburant,
+ * entretien, congés, planning) ou par le code (retards du suivi). Les
+ * autres (amendes, contestations, demandes, TICPE, inscriptions, paie…)
+ * restent à l'exploitation et à la direction. Exploitation et direction :
+ * tous les types (null).
+ */
+export const TYPES_MANAGER: readonly TypeATraiter[] = [
+  "ecart_carburant",
+  "ticket_ocr",
+  "entretien",
+  "conge",
+  "tournee_sans_chauffeur",
+  "repartition_a_attribuer",
+  "tournee_non_demarree",
+  "tournee_en_retard",
+];
+
+/** L'élément de ce type peut-il figurer dans la liste de ce rôle ? */
+export function typeVisiblePour(type: TypeATraiter, role: string): boolean {
+  return role !== "manager" || TYPES_MANAGER.includes(type);
+}
 
 /** Plafond de lignes lues par source (une requête, jamais de pagination). */
 export const PLAFOND_PAR_SOURCE = 200;
@@ -80,9 +108,13 @@ export const SEUILS_URGENCE: Record<TypeATraiter, { ancienneteHeures: number | n
   tournee_sans_chauffeur: { ancienneteHeures: null, echeanceHeures: 3 },
   // Tournée fusionnée du jour dont des villages ou ramasses restent « À attribuer » : urgent à l'approche du départ.
   repartition_a_attribuer: { ancienneteHeures: null, echeanceHeures: 3 },
-  tournee_en_retard: { ancienneteHeures: null, echeanceHeures: null },
+  tournee_non_demarree: { ancienneteHeures: null, echeanceHeures: null },
   // Tournée en cours : l'urgence est déclarée par la source (retard de 30 min ou plus).
-  retard_tournee: { ancienneteHeures: null, echeanceHeures: null },
+  tournee_en_retard: { ancienneteHeures: null, echeanceHeures: null },
+  // Ticket de carburant à relire (OCR) : une journée d'attente suffit à le dire urgent.
+  ticket_ocr: { ancienneteHeures: 48, echeanceHeures: null },
+  // Bulletins du mois : l'urgence est déclarée par la source (mois passé).
+  bulletin_paie: { ancienneteHeures: null, echeanceHeures: null },
   conge: { ancienneteHeures: 120, echeanceHeures: 72 },
   arret: { ancienneteHeures: 48, echeanceHeures: null },
   contestation: { ancienneteHeures: 120, echeanceHeures: null },
@@ -133,6 +165,9 @@ export interface ElementBrut {
   groupable?: boolean;
   /** Décision de paie que le comptable garde (sans effet pour l'exploitation et la direction). */
   paie?: boolean;
+  /** Litrage et véhicule d'un écart carburant (récapitulatif avant validation en lot). */
+  litres?: number | null;
+  vehicule?: string | null;
 }
 
 /** Ligne affichée (sans identifiant de personne : rien de superflu côté navigateur). */
@@ -153,6 +188,8 @@ export interface ElementATraiter {
   verrou: string | null;
   /** Direction seule qui décide pour elle-même : tracé « auto-validée ». */
   autoValidation: boolean;
+  litres: number | null;
+  vehicule: string | null;
 }
 
 export const cleElement = (type: TypeATraiter, id: string) => `${type}:${id}`;
@@ -228,6 +265,8 @@ export function construireListe(p: {
       groupable: Boolean(b.groupable) && !bloque,
       verrou: etat === "verrouille" ? raison : null,
       autoValidation: etat === "auto",
+      litres: b.litres ?? null,
+      vehicule: b.vehicule ?? null,
     };
     // Choix libre : l'élément reste à traiter, mais pas en lot tant que le responsable proposé est inadmissible.
     if (etat === "verrouille" && b.choixLibre) {

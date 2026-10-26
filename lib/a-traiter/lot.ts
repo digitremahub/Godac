@@ -161,3 +161,22 @@ export function repartitionParType(elements: readonly Pick<ElementLot, "type">[]
   for (const e of elements) r[e.type] = (r[e.type] ?? 0) + 1;
   return r;
 }
+
+/**
+ * Litrage cumulé et véhicules concernés par les écarts carburant d'une
+ * sélection : affiché avant la confirmation d'une validation en lot (une
+ * seule justification commune pour tous, axe TICPE).
+ */
+export function resumeLitrage(elements: readonly { type: string; litres?: number | null; vehicule?: string | null }[]): { ecarts: number; litres: number; vehicules: string[] } {
+  const ecarts = elements.filter((e) => e.type === "ecart_carburant");
+  const litres = Math.round(ecarts.reduce((n, e) => n + (e.litres ?? 0), 0) * 10) / 10;
+  const vehicules = [...new Set(ecarts.map((e) => e.vehicule).filter((v): v is string => Boolean(v)))].sort();
+  return { ecarts: ecarts.length, litres, vehicules };
+}
+
+/** Phrase du récapitulatif (vide sans écart carburant). */
+export function phraseLitrage(r: { ecarts: number; litres: number; vehicules: string[] }): string {
+  if (r.ecarts === 0) return "";
+  const l = r.litres.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  return `Écarts carburant : ${l} L cumulés sur ${r.vehicules.length} véhicule${r.vehicules.length > 1 ? "s" : ""}${r.vehicules.length ? ` (${r.vehicules.slice(0, 8).join(", ")}${r.vehicules.length > 8 ? "…" : ""})` : ""}, une seule justification pour tous.`;
+}

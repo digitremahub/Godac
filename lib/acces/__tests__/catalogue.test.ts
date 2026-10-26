@@ -206,7 +206,7 @@ describe("menu par rôle", () => {
     expect(entreeActive(e, "/equipe/paie/heures")?.id).toBe("equipe.paie");
     expect(entreeActive(e, "/exploitation/historique/rapports")?.id).toBe("exploitation.historique");
     expect(entreeActive(e, "/carburant/approvisionnements")?.id).toBe("carburant.cuves");
-    expect(entreeActive(e, "/exploitation/suivi")?.id).toBe("exploitation.colis");
+    expect(entreeActive(e, "/exploitation/suivi")?.id).toBe("exploitation.suivi");
     const c = menuPour("chauffeur", tout).flatMap((s) => s.ecrans);
     expect(entreeActive(c, urlDe("moi.planning"))?.id).toBe("moi.planning");
   });
