@@ -1,6 +1,6 @@
 # GODAC V2
 
-Gestion et Optimisation Des Assets et Carburant — plateforme SaaS B2B
+Gestion et Optimisation Des Actifs et Charges — plateforme SaaS B2B
 modulaire pour les PME françaises de transport routier de marchandises
 (TRM), flottes mixtes VL/PL/SPL.
 

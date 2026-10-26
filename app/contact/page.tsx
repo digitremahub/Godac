@@ -22,9 +22,9 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   const modules = essaiGo ? ["route_optimizer"] : (p.modules ?? "").split(",").filter(Boolean).slice(0, 40);
   return (
     <div className="min-h-screen">
+      <SiteHeader />
       <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
-        <SiteHeader />
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-8 text-center sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
             {essaiGo ? "Essai GO Navigation · 30 jours · sur invitation" : "Démonstration gratuite · sans engagement"}

@@ -4,6 +4,8 @@ import { getCurrentAppUser } from "@/lib/auth/session";
 import { ImageCarousel } from "@/components/marketing/ImageCarousel";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import { HeroScene3D } from "@/components/marketing/HeroScene3D";
+import { AnimationGodac } from "@/components/marketing/AnimationGodac";
+import { BandeauReassurance, CommentCaMarche, CorpsDeMetier, FaqAccueil } from "@/components/marketing/SectionsAccueil";
 import { ModulesProfondeur } from "@/components/marketing/ModulesProfondeur";
 import { MaquetteGoNavigation } from "@/components/marketing/MaquetteGoNavigation";
 import {
@@ -23,7 +25,6 @@ import {
   IconFlag,
   IconMapPin,
   IconMessage,
-  IconNavigation,
   IconPaperclip,
   IconPlay,
   IconQrCode,
@@ -33,13 +34,6 @@ import {
   IconUsers,
   IconWrench,
 } from "@/components/layout/icons";
-
-const TRUST_STATS = [
-  { icon: IconCoins, label: "TICPE calculée à chaque plein" },
-  { icon: IconDroplet, label: "Chaque litre tracé" },
-  { icon: IconCalendar, label: "Planning, absences et paie" },
-  { icon: IconNavigation, label: "Tournée colis guidée" },
-];
 
 /**
  * TICPE — argument n° 1 de l'accueil. Chaque étape correspond à une
@@ -262,59 +256,65 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
 
   const primaryCta = spaceHref
     ? { href: spaceHref, label: "Accéder à mon espace" }
-    : { href: "/sign-up", label: "Essayer GODAC" };
+    : { href: "/contact", label: "Demander un essai" };
 
   return (
     <div className="min-h-screen">
+      <SiteHeader spaceHref={spaceHref} />
+
       {/* ── Hero (marine, per the brand guide: white on deep navy) ── */}
       <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-20 h-[28rem] w-[28rem] rounded-full bg-teal/15 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-orange/10 blur-3xl" />
 
-        <SiteHeader spaceHref={spaceHref} />
-
         <main>
-          <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-28 lg:pt-16">
+          <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-24 lg:pt-20">
             <div className="flex flex-col gap-7">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
                 Transport routier · Carburant &amp; TICPE
               </p>
               <h1 className="text-[36px] leading-[1.08] tracking-tight sm:text-5xl lg:text-[56px]">
-                Récupérez votre TICPE. <span className="text-teal">Maîtrisez votre gazole.</span>
+                Votre carburant, <span className="text-teal">enfin sous contrôle.</span>
               </h1>
-              <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/75">
-                GODAC calcule à chaque plein le remboursement de TICPE de vos poids lourds, contrôle les justificatifs et prépare
-                les documents pour votre comptable. Chaque litre est tracé, de la cuve au ticket. Et pour le reste de
-                l&apos;entreprise&nbsp;: flotte, planning, paie et tournées colis, dans le même outil.
+              <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/80">
+                GODAC calcule à chaque plein la TICPE à récupérer sur vos poids lourds, contrôle les justificatifs et prépare les
+                documents pour votre comptable. Flotte, planning, paie et tournées colis viennent ensuite, dans le même outil.
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
                   {primaryCta.label}
                   <IconArrowRight className="h-5 w-5" />
                 </Link>
-                <a href="#demo" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/20 hover:bg-white/10">
+                <a href="#demo" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/25 hover:bg-white/10">
                   <IconPlay className="h-4 w-4 text-teal" />
                   Voir la démo
                 </a>
-                <a href="#ticpe" className="inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-teal hover:underline">
-                  Comment ça marche
-                  <IconArrowRight className="h-4 w-4" />
-                </a>
               </div>
-              <ul className="flex flex-wrap gap-x-6 gap-y-2">
-                {TRUST_STATS.map((stat) => (
-                  <li key={stat.label} className="flex items-center gap-2 text-sm text-white/70">
-                    <stat.icon className="h-4 w-4 shrink-0 text-teal" />
-                    {stat.label}
-                  </li>
-                ))}
-              </ul>
+              <a href="#comment-ca-marche" className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-teal hover:underline">
+                Comment ça marche
+                <IconArrowRight className="h-4 w-4" />
+              </a>
             </div>
 
             <HeroScene3D />
           </section>
+
+          {/* ── Le nom, en animation : G·O·D·A·C ── */}
+          <section aria-labelledby="titre-godac" className="relative border-t border-white/10">
+            <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
+              <div className="mx-auto mb-10 max-w-2xl text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Le nom GODAC</p>
+                <h2 id="titre-godac" className="mt-3 text-[28px] leading-tight sm:text-4xl">
+                  Ce que veut dire GODAC.
+                </h2>
+              </div>
+              <AnimationGodac />
+            </div>
+          </section>
         </main>
       </div>
+
+      <BandeauReassurance />
 
       {/* ── What GODAC replaces ── */}
       <section className="border-b border-navy/[0.08] bg-surface">
@@ -332,11 +332,11 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Les modules en un coup d'œil (3D décorative, ordre de la vitrine) ── */}
-      <section id="modules" className="scroll-mt-6 bg-paper py-20 lg:py-24">
+      <section id="modules" className="scroll-mt-20 bg-paper py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <p className="kicker !text-teal-ink">Les modules</p>
-            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Votre carburant, enfin sous contrôle.</h2>
+            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Un module à la fois, dans l&apos;ordre qui vous convient.</h2>
             <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
               On commence par la TICPE et le gazole, puis on ajoute la flotte, le planning et la paie, la tournée colis quand vous le décidez.
             </p>
@@ -345,8 +345,11 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </div>
       </section>
 
+      <CommentCaMarche />
+      <CorpsDeMetier />
+
       {/* ── TICPE : l'argument n° 1 ── */}
-      <section id="ticpe" className="scroll-mt-6 bg-paper py-20 lg:py-24">
+      <section id="ticpe" className="scroll-mt-20 bg-paper py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <p className="kicker !text-teal-ink">TICPE</p>
@@ -404,7 +407,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Carburant au quotidien ── */}
-      <section id="carburant" className="scroll-mt-6 border-t border-navy/[0.08] bg-surface py-20 lg:py-24">
+      <section id="carburant" className="scroll-mt-20 border-t border-navy/[0.08] bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <p className="kicker !text-teal-ink">Carburant</p>
@@ -429,7 +432,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Flotte ── */}
-      <section id="flotte" className="scroll-mt-6 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
+      <section id="flotte" className="scroll-mt-20 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 max-w-2xl">
             <p className="kicker !text-teal-ink">Flotte</p>
@@ -450,7 +453,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Planning, absences, paie ── */}
-      <section id="planning-paie" className="scroll-mt-6 border-t border-navy/[0.08] bg-surface py-20 lg:py-24">
+      <section id="planning-paie" className="scroll-mt-20 border-t border-navy/[0.08] bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 max-w-2xl">
             <p className="kicker !text-teal-ink">Planning, RH &amp; paie</p>
@@ -503,7 +506,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── How it works ── */}
-      <section id="comment-ca-marche" className="mx-auto max-w-6xl scroll-mt-6 px-5 py-20 sm:px-6 lg:py-28">
+      <section id="en-images" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-6 lg:py-28">
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <p className="kicker !text-teal-ink">En images</p>
           <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
@@ -515,7 +518,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Demo ── */}
-      <section id="demo" className="scroll-mt-6 bg-paper">
+      <section id="demo" className="scroll-mt-20 bg-paper">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
           <div className="mx-auto mb-10 max-w-2xl text-center">
             <p className="kicker !text-teal-ink">Démo en accès libre</p>
@@ -554,7 +557,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Tournée colis ── */}
-      <section id="tournee-colis" className="scroll-mt-6 bg-surface py-20 lg:py-24">
+      <section id="tournee-colis" className="scroll-mt-20 bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 max-w-2xl">
             <p className="kicker !text-teal-ink">Tournée colis</p>
@@ -587,7 +590,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── GO Navigation : en dernier, pour éveiller la curiosité ── */}
-      <section id="go-navigation" className="scroll-mt-6 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
+      <section id="go-navigation" className="scroll-mt-20 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <div>
             <p className="kicker !text-teal-ink">En avant-première · GO Navigation</p>
@@ -619,19 +622,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </div>
       </section>
 
-      {/* ── Voice / proof ── */}
-      <section className="mx-auto max-w-6xl px-5 py-12 sm:px-6 lg:py-16">
-        <figure className="mx-auto max-w-3xl text-center">
-          <figcaption className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-navy/65">
-            {["TICPE préparée pour votre comptable", "Planning publié aux chauffeurs", "Connexion Face ID sans e-mail", "Données hébergées en France"].map((t) => (
-              <span key={t} className="flex items-center gap-2">
-                <IconCheck className="h-4 w-4 text-teal-ink" />
-                {t}
-              </span>
-            ))}
-          </figcaption>
-        </figure>
-      </section>
+      <FaqAccueil />
 
       {/* ── Final CTA ── */}
       <section className="px-5 pb-20 sm:px-6">
@@ -641,10 +632,16 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <h2 className="text-[28px] leading-tight sm:text-4xl">Votre TICPE ne devrait pas dormir dans un tableur.</h2>
             <p className="mt-3 text-white/70">Commencez par le carburant, ajoutez la flotte, le planning et la paie quand vous voulez.</p>
           </div>
-          <Link href={primaryCta.href} className="btn-primary relative shrink-0 !px-7 !py-3.5 text-base">
-            {primaryCta.label}
-            <IconArrowRight className="h-5 w-5" />
-          </Link>
+          <div className="relative flex shrink-0 flex-col items-center gap-3 sm:flex-row">
+            <Link href={primaryCta.href} className="btn-primary !px-7 !py-3.5 text-base">
+              {primaryCta.label}
+              <IconArrowRight className="h-5 w-5" />
+            </Link>
+            <a href="#demo" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/25 hover:bg-white/10">
+              <IconPlay className="h-4 w-4 text-teal" />
+              Voir la démo
+            </a>
+          </div>
         </div>
       </section>
 

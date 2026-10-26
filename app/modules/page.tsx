@@ -63,9 +63,9 @@ export default async function ModulesPage() {
 
   return (
     <div className="min-h-screen">
+      <SiteHeader />
       <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
-        <SiteHeader />
         <div className="relative mx-auto max-w-3xl px-5 pb-20 pt-10 text-center sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Carburant inclus dans tous les plans · modules à la carte</p>
           <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Contrôlez le carburant, ajoutez le reste quand vous voulez</h1>

@@ -2,7 +2,7 @@
   "name": "godac-v2",
   "version": "0.1.0",
   "private": true,
-  "description": "GODAC - Gestion et Optimisation Des Assets et Carburant (V2 full-stack)",
+  "description": "GODAC - Gestion et Optimisation Des Actifs et Charges (V2 full-stack)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
