@@ -371,3 +371,188 @@
 :root[data-theme="orange-dark"] .brand-white {
   display: inline;
 }
+
+/* ── Vitrine : 3D décorative (accueil) ─────────────────────────────────
+   CSS 3D pur, sans bibliothèque. Le rendu par défaut (serveur, mouvement
+   réduit, appareil modeste) est statique : tracé complet, aucune
+   animation. Le composant ajoute data-autorise="oui" quand l'animation est
+   permise, et data-anime="oui" tant que la scène est à l'écran. */
+.vitrine-scene {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  container-type: inline-size;
+  perspective: 90cqw;
+  perspective-origin: 50% 30%;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(60% 55% at 30% 78%, rgb(var(--c-teal) / 0.16), transparent 70%),
+    radial-gradient(45% 45% at 85% 12%, rgb(var(--c-orange) / 0.14), transparent 70%),
+    linear-gradient(160deg, #101a33, #0a0f1e);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1), 0 24px 48px -12px rgba(10, 15, 30, 0.25);
+}
+.vitrine-monde {
+  position: absolute;
+  inset: 0;
+  /* 1em = 1cqw de la scène (cqw se résout sur l'ancêtre conteneur). */
+  font-size: 1cqw;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.4s ease-out;
+}
+.vitrine-plan {
+  position: absolute;
+  left: 6%;
+  top: 30%;
+  width: 88%;
+  height: 64%;
+  transform-style: preserve-3d;
+  transform: rotateX(58deg) rotateZ(-24deg);
+  border-radius: 1.2em;
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 0 0 0 0.15em rgb(255 255 255 / 0.12);
+}
+.vitrine-plan > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.vitrine-ecran {
+  position: absolute;
+  right: 4%;
+  top: 5%;
+  width: 50%;
+  aspect-ratio: 16 / 10;
+  transform: translateZ(4em) rotateY(-8deg);
+  border-radius: 1em;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18), 0 2em 3em -1em rgba(0, 0, 0, 0.55);
+}
+.vitrine-puce {
+  position: absolute;
+  right: 4%;
+  bottom: 6%;
+  transform: translateZ(2em);
+}
+.vitrine-route-fond {
+  stroke: rgb(255 255 255 / 0.16);
+}
+.vitrine-route {
+  stroke: rgb(var(--c-teal));
+  filter: drop-shadow(0 0 6px rgb(var(--c-teal) / 0.7));
+}
+.vitrine-arret {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.vitrine-arret-anneau {
+  fill: none;
+  stroke: rgb(var(--c-teal));
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.6;
+}
+
+/* Pavés (camion, colis) : six faces, hauteur en em d'un conteneur 1cqw. */
+.pave {
+  position: absolute;
+  transform-style: preserve-3d;
+  width: calc(var(--l) * 1em);
+  height: calc(var(--p) * 1em);
+  left: var(--x);
+  top: var(--y);
+  transform: translateZ(calc(var(--z, 0) * 1em));
+}
+.pave > i {
+  position: absolute;
+  display: block;
+  background: var(--couleur);
+  backface-visibility: hidden;
+}
+.pave .f-haut { inset: 0; transform: translateZ(calc(var(--h) * 1em)); }
+.pave .f-avant { left: 0; top: 100%; width: 100%; height: calc(var(--h) * 1em); transform-origin: top; transform: rotateX(90deg); filter: brightness(0.8); }
+.pave .f-arriere { left: 0; top: calc(var(--h) * -1em); width: 100%; height: calc(var(--h) * 1em); transform-origin: bottom; transform: rotateX(-90deg); filter: brightness(0.7); }
+.pave .f-gauche { left: calc(var(--h) * -1em); top: 0; width: calc(var(--h) * 1em); height: 100%; transform-origin: right; transform: rotateY(90deg); filter: brightness(0.62); }
+.pave .f-droite { left: 100%; top: 0; width: calc(var(--h) * 1em); height: 100%; transform-origin: left; transform: rotateY(-90deg); filter: brightness(0.62); }
+.pave--blanc { --couleur: #f0f4ff; }
+.pave--teal { --couleur: rgb(var(--c-teal)); }
+.pave--orange { --couleur: rgb(var(--c-orange)); }
+.pave--ardoise { --couleur: #26314f; }
+.vitrine-flotte { transform-style: preserve-3d; }
+
+/* Cartes de modules : empilement de couches, inclinaison, profondeur. */
+.vitrine-carte {
+  perspective: 900px;
+  transform: translate3d(0, var(--dy, 0px), 0);
+}
+.vitrine-carte-face {
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.25s ease-out, border-color 0.2s, box-shadow 0.2s;
+  will-change: auto;
+}
+.vitrine-illu {
+  position: relative;
+  height: 7.5rem;
+  transform-style: preserve-3d;
+}
+.vitrine-couche {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: translateZ(calc(var(--n, 0) * 14px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vitrine-scene[data-autorise="oui"] .vitrine-route {
+    stroke-dasharray: 1;
+    animation: vitrine-trace 7s ease-in-out infinite;
+    animation-play-state: paused;
+  }
+  .vitrine-scene[data-autorise="oui"] .vitrine-arret {
+    animation: vitrine-arret 7s ease-out infinite;
+    animation-delay: calc(var(--t, 0) * 3.6s);
+    animation-play-state: paused;
+  }
+  .vitrine-scene[data-autorise="oui"] .vitrine-arret-anneau {
+    animation: vitrine-pouls 2.4s ease-out infinite;
+    animation-delay: calc(var(--t, 0) * 3.6s);
+    animation-play-state: paused;
+  }
+  .vitrine-scene[data-autorise="oui"] .vitrine-flotte {
+    animation: vitrine-vol 5s ease-in-out infinite;
+    animation-delay: calc(var(--d, 0) * 1s);
+    animation-play-state: paused;
+  }
+  .vitrine-scene[data-autorise="oui"][data-anime="oui"] :is(.vitrine-route, .vitrine-arret, .vitrine-arret-anneau, .vitrine-flotte) {
+    animation-play-state: running;
+  }
+}
+@keyframes vitrine-trace {
+  0% { stroke-dashoffset: 1; opacity: 1; }
+  52%, 88% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes vitrine-arret {
+  0%, 2% { opacity: 0; transform: scale(0.4); }
+  8%, 88% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes vitrine-pouls {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes vitrine-vol {
+  0%, 100% { transform: translateZ(0); }
+  50% { transform: translateZ(1.4em); }
+}
+
+/* Sans CSS 3D : carte à plat, sans les volumes. */
+@supports not (transform-style: preserve-3d) {
+  .pave { display: none; }
+  .vitrine-plan { transform: none; }
+}
