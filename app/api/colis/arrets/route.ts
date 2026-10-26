@@ -1,4 +1,5 @@
 import { garderApi } from "@/lib/acces/garde-api";
+import type { AppUser } from "@/lib/auth/session";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ import { listePourAdresse } from "@/lib/colis/villages-serveur";
 import { detecterProfessionnel } from "@/lib/colis/professionnel";
 import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
 import { colonnesCreneau, schemaCreneau } from "@/lib/colis/creneau";
+import { avecIdempotence } from "@/lib/offline/idempotence-serveur";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -59,7 +61,11 @@ const bodySchema = z.object({
 export async function POST(req: Request) {
   const g = await garderApi({ modules: ["route_optimizer"] });
   if (!g.ok) return g.reponse;
-  const appUser = g.appUser;
+  // Rejeu de la file hors ligne : une action déjà enregistrée n'incrémente pas deux fois le compteur de colis.
+  return avecIdempotence(req, g.appUser.organization_id, () => ajouterArret(req, g.appUser));
+}
+
+async function ajouterArret(req: Request, appUser: AppUser) {
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });
   const parsed = bodySchema.safeParse(await req.json());

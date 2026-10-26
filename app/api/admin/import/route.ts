@@ -5,6 +5,7 @@ import { controlerAjoutVehicules } from "@/lib/acces/limites-serveur";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { bulkImportVehiclesAndDrivers } from "@/lib/organization/bulk-import";
+import { rolesImportRefuses } from "@/lib/organization/roles-import";
 import { vehicleCsvRowSchema, driverCsvRowSchema } from "@/lib/utils/csv";
 
 const bodySchema = z.object({
@@ -30,6 +31,9 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+
+  const interdits = rolesImportRefuses(appUser.role, parsed.data.drivers);
+  if (interdits.length > 0) return refus("ROLE_REFUSE", `Vous ne pouvez pas inviter ce rôle : ${interdits.join(", ")}.`);
 
   const limite = await controlerAjoutVehicules(
     appUser.organization_id,
