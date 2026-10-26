@@ -14,6 +14,21 @@ export function BadgeSansTelephone({ className = "" }: { className?: string }) {
   );
 }
 
+/**
+ * Étiquette « Hors tournée » d'une liste (ou d'un arrêt) dont la commune n'est
+ * pas un village de la tournée, avec cette commune ; l'arrêt reste livrable normalement.
+ */
+export function BadgeHorsTournee({ commune, className = "" }: { commune?: string | null; className?: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md bg-orange/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-orange-ink ${className}`}
+      title={commune ? `${commune} : commune hors de votre tournée (arrêt à livrer normalement)` : "Adresse hors de votre tournée (à livrer normalement)"}
+    >
+      Hors tournée{commune ? ` · ${commune}` : ""}
+    </span>
+  );
+}
+
 /** Avertissement dans la fiche d'ajout d'un colis sans numéro (n'empêche pas l'ajout). */
 export function AlerteSansTelephone() {
   return (

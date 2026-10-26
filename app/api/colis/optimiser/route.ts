@@ -12,6 +12,7 @@ import { memePoint, type Point } from "@/lib/colis/optimisation";
 import { rechercherEtEnregistrerHoraires } from "@/lib/colis/horaires-internet";
 import { matriceRoutiere } from "@/lib/colis/matrice";
 import { ordonnerListesGlobalement } from "@/lib/colis/tournee-globale";
+import { estListeReportee } from "@/lib/colis/villages";
 
 export const maxDuration = 60;
 
@@ -69,7 +70,11 @@ export async function POST(req: Request) {
     listesDeTournee(supabase, run.id),
     lireExtremitesRun(supabase, run.id),
   ]);
-  const arrets = (stops ?? []) as { id: string; list_id: string | null; lat: number | null; lng: number | null; status: string; position: number; address: string; window_start: string | null; window_end: string | null }[];
+  const tous = (stops ?? []) as { id: string; list_id: string | null; lat: number | null; lng: number | null; status: string; position: number; address: string; window_start: string | null; window_end: string | null }[];
+  // Adresses reportées au lancement (villages décochés) : hors optimisation, numérotées à la fin.
+  const idsReportees = new Set(listes.filter(estListeReportee).map((l) => l.id));
+  const arrets = tous.filter((s) => !(s.list_id && idsReportees.has(s.list_id)));
+  const reportes = tous.filter((s) => s.list_id && idsReportees.has(s.list_id));
   // Dépôt de la tournée, sinon dépôt du service du chauffeur / de l'organisation.
   let depot: Point | null = run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null;
   if (!depot) {
@@ -153,7 +158,7 @@ export async function POST(req: Request) {
   }, undefined, extremites);
 
   // Positions globales et contiguës (0, 1, 2…) dans l'ordre calculé.
-  const ecritures = await Promise.all(r.sequence.map((id, position) => supabase.from("delivery_stops").update({ position }).eq("id", id)));
+  const ecritures = await Promise.all([...r.sequence, ...reportes.map((s) => s.id)].map((id, position) => supabase.from("delivery_stops").update({ position }).eq("id", id)));
   const echec = ecritures.find((w) => w.error)?.error;
   if (echec) return NextResponse.json({ error: "Le nouvel ordre n'a pas pu être enregistré : réessayez." }, { status: 500 });
   await supabase.from("delivery_runs").update({ optimized_at: new Date().toISOString() }).eq("id", run.id);
