@@ -14,12 +14,20 @@ const bodySchema = z.object({
         name: z.string().trim().min(1).max(120),
         postal_code: z.string().trim().max(10).nullable().optional(),
         notes: z.string().trim().max(2000).nullable().optional(),
+        /** Coordonnées déjà connues (suggestion de commune) : évitent un géocodage ultérieur. */
+        lat: z.number().min(-90).max(90).nullable().optional(),
+        lng: z.number().min(-180).max(180).nullable().optional(),
+        insee_code: z.string().trim().max(10).nullable().optional(),
         pickup_addresses: z.array(z.string().trim().min(1).max(300)).max(100).optional(),
         planned_stops: z.array(z.object({
           id: z.string().optional(),
           type: z.enum(["ramasse", "point_relais"]),
           name: z.string().trim().max(200).optional(),
           address: z.string().trim().max(300),
+          postal_code: z.string().trim().max(10).optional(),
+          city: z.string().trim().max(120).optional(),
+          lat: z.number().min(-90).max(90).optional(),
+          lng: z.number().min(-180).max(180).optional(),
           time_window: z.string().trim().max(40).optional(),
           notes: z.string().trim().max(1000).optional(),
         })).max(200).optional(),
@@ -70,12 +78,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const updates: { id: string; patch: Record<string, unknown> }[] = [];
   parsed.data.villages.forEach((v, i) => {
     const base = { position: i, name: v.name, postal_code: v.postal_code || null, notes: v.notes || null, pickup_addresses: v.pickup_addresses ?? [], planned_stops: v.planned_stops ?? [] };
-    const geo = known.get(geoKey(v.name, v.postal_code));
+    const fournie = geoReady && typeof v.lat === "number" && typeof v.lng === "number"
+      ? { lat: v.lat, lng: v.lng, insee_code: v.insee_code || null, geocode_status: "ok", geocoded_at: new Date().toISOString() }
+      : null;
+    const geo = fournie ?? known.get(geoKey(v.name, v.postal_code));
     const old = v.id ? previousById.get(v.id) : undefined;
     if (old && !kept.has(old.id)) {
       kept.add(old.id);
       const sameCommune = geoKey(old.name, old.postal_code) === geoKey(v.name, v.postal_code);
-      updates.push({ id: old.id, patch: { ...base, ...(sameCommune || !geoReady ? {} : (geo ?? NO_GEO)) } });
+      updates.push({ id: old.id, patch: { ...base, ...(!geoReady || (sameCommune && !fournie) ? {} : (geo ?? NO_GEO)) } });
     } else {
       inserts.push({ organization_id: appUser.organization_id, route_id: id, ...base, ...(geo ?? {}) });
     }
