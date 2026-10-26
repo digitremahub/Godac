@@ -12,6 +12,8 @@ import {
   compteursDuJour,
   decisionsAffectation,
   estAbsent,
+  estJourPrevu,
+  etatCase,
   etapesDeplacement,
   joursAffichesSemaine,
   joursDeLaLigne,
@@ -25,6 +27,7 @@ import {
 } from "@/lib/planning/affectation";
 import { chauffeursAffiches, heureDe, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
 import { compterFermees, estOuverte, ligneCorrespond, type FiltreOuverture } from "@/lib/planning/ouverture";
+import { texteFermeture, texteReouverture } from "@/lib/planning/fermeture-tournee";
 import { textePublication } from "@/lib/planning/publication";
 import { confirmer } from "@/lib/ui/confirmation";
 import { Avatar, Contexte, type ContexteAffectations, type DonneesAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
@@ -256,6 +259,11 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
 
   function placer(ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }, heure?: { valeur: string; imposee?: boolean }) {
     if (!dates.length) return setMessage({ texte: "Aucun jour à remplir.", ton: "attention" });
+    // Tournée fermée sans chauffeur : pas d'affectation tant qu'elle n'est pas rouverte (les jours mêlés sont triés par le serveur).
+    const fermees = dates.filter((d) => etatCase(parCase.get(cleCaseTournee(ligne.cle, d)) ?? [], estJourPrevu(ligne, d)) === "fermee");
+    if (fermees.length === dates.length) {
+      return setMessage({ texte: `${ligne.tourNumber} est fermée ${fermees.length === 1 ? `le ${libelleJour(fermees[0]!)}` : "ces jours-là"} : rouvrez-la pour l'affecter.`, ton: "attention" });
+    }
     // Un dimanche rempli doit se voir tout de suite.
     if (dates.some((d) => rangJour(d) === 6)) setDimancheDemande(true);
     const libelle = dates.length === 1 ? `${ligne.tourNumber} du ${libelleJour(dates[0]!)} → ${nomCourt(chauffeur.full_name)}` : `${ligne.tourNumber} → ${nomCourt(chauffeur.full_name)} (${dates.length} jours)`;
@@ -425,6 +433,11 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   async function basculerOuverture(entree: EntreeAffectation, confirmee = false): Promise<void> {
     if (entree.id.startsWith("tmp:")) return setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" });
     const fermer = estOuverte(entree);
+    // Sans chauffeur : fermeture « non affectée » (rouvrir supprime la ligne vide, voir /api/planning/fermetures).
+    if (!entree.driver_id && entree.status === "planned") {
+      const ligne = ligneDe(cleLigne(entree.service_id, entree.tour_number));
+      if (ligne) return changerFermeture(ligne, [jourDe(entree.start_at)], fermer);
+    }
     const avant = localRef.current;
     const nom = `${entree.tour_number} du ${libelleJour(jourDe(entree.start_at))}`;
     setOccupe(true);
@@ -447,6 +460,31 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     }
     if (!res.ok) return setMessage({ texte: `${fermer ? "Fermeture" : "Réouverture"} de ${nom} : impossible. ${lireRefus(res.status, corps).message}`, ton: "erreur" });
     setMessage({ texte: fermer ? `${nom} fermée : plus de changement d'affectation, le chauffeur ne peut plus la démarrer.` : `${nom} rouverte.`, ton: "ok" });
+    router.refresh();
+  }
+
+  /**
+   * Ferme (fermer) ou rouvre une tournée NON AFFECTÉE les jours donnés : elle ne roule pas ce
+   * jour-là, n'est plus « à pourvoir » ni surveillée, et ne s'affecte plus tant qu'elle est fermée.
+   */
+  async function changerFermeture(ligne: LigneTournee, dates: string[], fermer: boolean): Promise<void> {
+    if (!dates.length) return setMessage({ texte: `Aucun jour sans chauffeur à ${fermer ? "fermer" : "rouvrir"} pour ${ligne.tourNumber}.`, ton: "attention" });
+    const nom = dates.length === 1 ? `${ligne.tourNumber} du ${libelleJour(dates[0]!)}` : `${ligne.tourNumber} (${dates.length} jours)`;
+    setOccupe(true);
+    const r = await fetchGodac<{ fermees?: number; deja?: number; refusees?: string[]; rouvertes?: number }>("/api/planning/fermetures", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ouverte: !fermer, service_id: ligne.serviceId, tour_number: ligne.tourNumber, dates, heure: ligne.heure }),
+    });
+    setOccupe(false);
+    if (!r.ok) return setMessage({ texte: `${fermer ? "Fermeture" : "Réouverture"} de ${nom} : impossible. ${r.refus.message}`, ton: "erreur" });
+    const refusees = r.data.refusees ?? [];
+    setMessage({
+      texte: fermer
+        ? `${nom} : ${texteFermeture({ fermees: r.data.fermees ?? 0, deja: r.data.deja ?? 0, refusees }, libelleJour)}. Fermée, elle n'est plus à pourvoir ni surveillée.`
+        : `${nom} : ${texteReouverture(r.data.rouvertes ?? 0)}.`,
+      ton: refusees.length ? "attention" : "ok",
+    });
     router.refresh();
   }
 
@@ -536,6 +574,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     lignesVisibles,
     basculerOuverture: (e) => void basculerOuverture(e),
     basculerOuvertureLigne: (es, fermer) => void basculerOuvertureLigne(es, fermer),
+    changerFermeture: (ligne, dates, fermer) => void changerFermeture(ligne, dates, fermer),
     ouvrirRepartition: (e) => (e.id.startsWith("tmp:") ? setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" }) : setFenetre({ type: "repartir", entree: e })),
   };
 
@@ -632,6 +671,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
             <Compteur n={compteurs.tournees} libelle={`tournée${compteurs.tournees > 1 ? "s" : ""}`} />
             <Compteur n={compteurs.affectees} libelle={`affectée${compteurs.affectees > 1 ? "s" : ""}`} />
             <Compteur n={compteurs.sansChauffeur} libelle="sans chauffeur" alerte={compteurs.sansChauffeur > 0} />
+            {compteurs.fermees > 0 && <Compteur n={compteurs.fermees} libelle={`fermée${compteurs.fermees > 1 ? "s" : ""}`} />}
             <Compteur n={compteurs.disponibles} libelle={`chauffeur${compteurs.disponibles > 1 ? "s" : ""} disponible${compteurs.disponibles > 1 ? "s" : ""}`} />
             <Compteur n={compteurs.absents} libelle="en congé ou arrêt" />
           </ul>
