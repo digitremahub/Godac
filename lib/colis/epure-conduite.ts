@@ -23,6 +23,16 @@ export function enMouvementApres(precedent: boolean, vitesseKmh: number | null |
   return precedent ? vitesseKmh >= SEUIL_ARRET_KMH : vitesseKmh > SEUIL_MOUVEMENT_KMH;
 }
 
+/**
+ * Bandeau de guidage : compact en conduite (pictogramme, distance, rue, une
+ * ligne d'arrivée). Les détails (« puis… », avancement, fin estimée) se
+ * déplient à l'arrêt ou au toucher du bandeau. `choix` : dernier toucher
+ * (null : automatique, remis à null quand le véhicule démarre ou s'arrête).
+ */
+export function bandeauDeplie(mouvement: boolean, choix: boolean | null): boolean {
+  return choix ?? !mouvement;
+}
+
 export type VueCarte = "conduite" | "ensemble" | "libre";
 
 export interface EntreeEpure {
@@ -36,6 +46,8 @@ export interface EntreeEpure {
   enCours: boolean;
   /** Trajet enregistré pour l'historique (indicateur RGPD). */
   traceActive: boolean;
+  /** Toucher du bandeau (null : automatique, voir `bandeauDeplie`). */
+  choixBandeau?: boolean | null;
 }
 
 export interface ElementsConduite {
@@ -47,7 +59,7 @@ export interface ElementsConduite {
   boussole: boolean;
   /** Bouton unique « Recentrer » (carte déplacée ou vue d'ensemble). */
   recentrer: boolean;
-  /** Ligne d'état : « 12/40 faits · colis · fin ≈ 17:30 » et trajet enregistré. */
+  /** Détails du bandeau : « puis… », « 12/40 faits · colis · fin ≈ 17:30 » (dépliés à l'arrêt ou au toucher). */
   ligneEtat: boolean;
   /** Indicateur « trajet enregistré » dans la ligne d'état (obligation de transparence : reste visible). */
   indicateurTrace: boolean;
@@ -65,7 +77,7 @@ export function elementsConduite(e: EntreeEpure): ElementsConduite {
     menuOptions: arrete,
     boussole: arrete && e.vue !== "ensemble",
     recentrer: e.position !== null && e.vue !== "conduite",
-    ligneEtat: arrete && !e.fige,
+    ligneEtat: bandeauDeplie(e.mouvement, e.choixBandeau ?? null) && !e.fige,
     indicateurTrace: e.traceActive,
     actionsArret: arrete,
     replierFeuille: e.mouvement,

@@ -41,7 +41,6 @@ import {
   distanceM,
   doitRecalculer,
   formatDistance,
-  formatDuree,
   longueursCumulees,
   meilleureInsertion,
   projeterSurTrace,
@@ -61,7 +60,8 @@ import {
   type EtatCamera,
 } from "@/lib/colis/conduite";
 import { enDepassement, kmhDepuisMs } from "@/lib/colis/limitation-vitesse";
-import { elementsConduite, enMouvementApres } from "@/lib/colis/epure-conduite";
+import { bandeauDeplie, elementsConduite, enMouvementApres } from "@/lib/colis/epure-conduite";
+import { arretAAfficher, correspondA, termeRecherche } from "@/lib/colis/recherche-arret";
 import { CLE_FEUILLE, FEUILLE_PAR_DEFAUT, adresseCourte, decouperTrace, lirePositionFeuille, positionApresGeste, repeteAdresse, type PositionFeuille } from "@/lib/colis/feuille";
 import { etaArret, type EtaArret } from "@/lib/colis/eta";
 import { formatDistanceManoeuvre, manoeuvreCourante, palierAnnonce, phraseAnnonce, pictogramme, placerManoeuvres, texteManoeuvre, type Palier, type Pictogramme } from "@/lib/colis/manoeuvres";
@@ -186,6 +186,8 @@ export function GoNavigation(p: GoNavigationProps) {
   /** Arrêt dont l'adresse est en cours de correction (erreur de saisie à la base). */
   const [correction, setCorrection] = useState<Stop | null>(null);
   const [recherche, setRecherche] = useState("");
+  /** Toucher du bandeau de guidage : détails dépliés ou repliés (null : automatique, dépliés à l'arrêt). */
+  const [choixBandeau, setChoixBandeau] = useState<boolean | null>(null);
 
   const restants = useMemo(() => stops.filter((s) => s.status === "pending"), [stops]);
   const cibleArret = arretSuivi(stops, selection);
@@ -335,6 +337,15 @@ export function GoNavigation(p: GoNavigationProps) {
     const el = feuilleRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => setHauteur(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Hauteur du bandeau de guidage (replié / déplié) : les marges de la caméra la suivent.
+  const [hauteurBandeau, setHauteurBandeau] = useState(0);
+  useEffect(() => {
+    const el = bandeauRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setHauteurBandeau(Math.round(el.offsetHeight)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -656,7 +667,7 @@ export function GoNavigation(p: GoNavigationProps) {
     margesCache.current = margesC();
     m.easeTo({ center: [e.lng, e.lat], padding: margesCache.current, duration: d });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hauteur]);
+  }, [hauteur, hauteurBandeau]);
 
   // Taille de la carte quand la feuille change de hauteur.
   useEffect(() => {
@@ -803,6 +814,8 @@ export function GoNavigation(p: GoNavigationProps) {
       /* stockage indisponible */
     }
   }
+  // Le véhicule démarre ou s'arrête : le bandeau reprend son affichage automatique (compact en roulant, détaillé à l'arrêt).
+  useEffect(() => setChoixBandeau(null), [mouvement]);
   // En mouvement : la feuille se replie sur sa ligne (arrêt en cours + « Livré »), les menus se ferment.
   useEffect(() => {
     if (!mouvement) return;
@@ -849,12 +862,11 @@ export function GoNavigation(p: GoNavigationProps) {
   const libellePoignee = feuille === "reduite" ? "Agrandir la feuille de la tournée" : feuille === "moyenne" ? "Feuille de la tournée : tirer vers le haut pour tous les arrêts, vers le bas pour réduire" : "Réduire la liste des arrêts";
 
   // ——— Liste complète (recherche, glisser-déposer) ———
-  const terme = recherche.trim().toLocaleLowerCase("fr-FR");
+  const terme = termeRecherche(recherche);
   const correspond = (st: Stop) =>
-    [st.address, st.recipient ?? "", st.phone ?? "", st.parcel_code ?? "", st.relay_name ?? "", st.business_name ?? "", lists.find((l) => l.id === st.list_id)?.name ?? ""].some((v) =>
-      v.toLocaleLowerCase("fr-FR").includes(terme),
-    );
+    correspondA([st.address, st.recipient, st.phone, st.parcel_code, st.relay_name, st.business_name, lists.find((l) => l.id === st.list_id)?.name], terme);
   const visibles = terme ? restants.filter(correspond) : restants;
+  const idsVisibles = visibles.map((s) => s.id);
   const triActif = !fige && !terme && restants.length > 1;
   const ordreTri = restants.map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const groupes = grouperParListe(stops, lists);
@@ -869,10 +881,39 @@ export function GoNavigation(p: GoNavigationProps) {
     return g?.liste?.is_hors_tournee ? nomGroupe(g) : null;
   };
 
-  function choisirDansListe(s: Stop) {
+  /** Affiche l'arrêt : carte d'arrêt ouverte (feuille moyenne), carte centrée dessus (avec son numéro) et guidage vers lui. */
+  function afficherArret(s: Stop) {
+    setRecherche("");
     setSelection(s.id);
     setFeuille("moyenne");
+    if (s.lat === null || s.lng === null) return;
+    // La vue conduite suit le véhicule : un arrêt choisi dans la liste se regarde en vue libre (« Recentrer » revient au suivi).
+    derniereCible.current = s.id;
+    conduiteAuto.current = true;
+    const pts: [number, number][] = [[Number(s.lng), Number(s.lat)]];
+    if (position) pts.push([position.lng, position.lat]);
+    vueEnsemble(pts, 16, vueRef.current === "conduite" ? "libre" : vueRef.current);
   }
+  const choisirDansListe = afficherArret;
+  // Recherche : un seul résultat s'affiche tout seul (le temps de finir de taper), Entrée prend le premier.
+  const cleVisibles = idsVisibles.join(",");
+  useEffect(() => {
+    const id = arretAAfficher(idsVisibles, terme);
+    const s = id ? restants.find((x) => x.id === id) : undefined;
+    if (!s || feuille !== "pleine") return;
+    const t = setTimeout(() => afficherArret(s), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terme, cleVisibles, feuille]);
+  // Adresse ajoutée : dès que la tournée est rechargée, elle s'affiche.
+  const arretAjoute = useRef<string | null>(null);
+  useEffect(() => {
+    const s = arretAjoute.current ? stops.find((x) => x.id === arretAjoute.current) : undefined;
+    if (!s) return;
+    arretAjoute.current = null;
+    afficherArret(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops]);
 
   // Plein écran sur iPhone (Safari) : pas de zoom de la page au pincement (la carte zoome seule),
   // pas de défilement de la page derrière, retour au coin haut-gauche si la page avait glissé.
@@ -906,7 +947,8 @@ export function GoNavigation(p: GoNavigationProps) {
     setMenuVues(false);
     action();
   };
-  const el = elementsConduite({ mouvement, vue, position, fige, enCours: run.status === "in_progress", traceActive: Boolean(p.traceActive) });
+  const el = elementsConduite({ mouvement, vue, position, fige, enCours: run.status === "in_progress", traceActive: Boolean(p.traceActive), choixBandeau });
+  const deplie = bandeauDeplie(mouvement, choixBandeau);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-paper" aria-label="GO Navigation">
@@ -915,67 +957,74 @@ export function GoNavigation(p: GoNavigationProps) {
         <div ref={conteneur} className="h-full w-full" role="region" aria-label="Carte de navigation" />
       </div>
 
-      {/* Bandeau de guidage (compact : la carte garde la place) */}
+      {/* Bandeau de guidage : compact par défaut (manœuvre, distance, rue, une ligne d'arrivée) ; les détails se déplient à l'arrêt ou au toucher */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-1.5">
           {el.retour && (
-            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine text-2xl text-white shadow-pop" aria-label="Retour à la tournée colis">
+            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine/85 text-2xl text-white shadow-pop backdrop-blur-sm" aria-label="Retour à la préparation de la tournée colis">
               ‹
             </button>
           )}
-          <div className="min-w-0 flex-1 rounded-2xl bg-marine px-3 py-2 text-white shadow-pop" aria-live="polite">
+          <div className="min-w-0 flex-1 rounded-2xl bg-marine/85 px-3 py-1.5 text-white shadow-pop backdrop-blur-sm" aria-live="polite">
             {fige ? (
               <p className="py-1 text-sm font-semibold">Tournée clôturée : consultation seulement.</p>
-            ) : cible && manoeuvre && courante && !arrive ? (
-              <>
-                <div className="flex items-center gap-2.5">
-                  <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-10 w-10 shrink-0 text-teal" />
-                  <div className="min-w-0">
-                    <p className="font-display text-2xl font-bold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</p>
-                    <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug">{texteManoeuvre(manoeuvre)}</p>
-                  </div>
-                </div>
-                {suivante && (
-                  <p className="mt-1 flex items-center gap-1 border-t border-white/15 pt-1 text-[11px] leading-tight text-white/75">
+            ) : cible ? (
+              <button
+                type="button"
+                onClick={() => setChoixBandeau(!deplie)}
+                aria-expanded={deplie}
+                aria-label={deplie ? "Réduire les détails du guidage" : "Afficher les détails du guidage"}
+                className="block min-h-[44px] w-full text-left"
+              >
+                {manoeuvre && courante && !arrive ? (
+                  <span className="flex items-center gap-2.5">
+                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-9 w-9 shrink-0 text-teal" />
+                    <span className="shrink-0 font-display text-2xl font-bold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={texteManoeuvre(manoeuvre)}>
+                      {texteManoeuvre(manoeuvre)}
+                    </span>
+                  </span>
+                ) : arrive ? (
+                  <span className="block font-display text-xl font-bold leading-tight text-teal">Arrivé</span>
+                ) : (
+                  <span className="flex items-baseline gap-2">
+                    <span className="shrink-0 font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{cible.address}</span>
+                  </span>
+                )}
+                {(eta || el.indicateurTrace) && (
+                  // Une seule ligne fine : arrivée estimée (et trajet enregistré, RGPD, qui reste affiché en roulant).
+                  <span className="mt-0.5 flex items-center gap-2 text-[11px] leading-tight text-white/80">
+                    {eta && (
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="uppercase tracking-wide text-white/65">Arrivée</span> <strong className="font-bold tabular-nums text-white">{eta.heure}</strong> · <span className="font-semibold tabular-nums text-teal">{eta.dans}</span> · {eta.distance}
+                        {eta.estimee && " (est.)"}
+                      </span>
+                    )}
+                    {el.indicateurTrace && (
+                      <span className="ml-auto shrink-0 text-white/65" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
+                        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-orange align-middle" aria-hidden="true" />
+                        Trajet enregistré
+                      </span>
+                    )}
+                  </span>
+                )}
+                {deplie && suivante && manoeuvre && !arrive && (
+                  <span className="mt-0.5 flex items-center gap-1 text-[11px] leading-tight text-white/75">
                     <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-3.5 w-3.5 shrink-0 text-white/75" />
                     <span className="truncate">Puis : {texteManoeuvre(suivante)}</span>
-                  </p>
+                  </span>
                 )}
-              </>
-            ) : cible ? (
-              arrive ? (
-                <p className="font-display text-2xl font-bold leading-tight text-teal">Arrivé</p>
-              ) : (
-                !eta && (
-                  <p className="flex items-baseline gap-2">
-                    <span className="font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
-                    {dureeAffichee !== null && <span className="text-sm text-white/80">· {formatDuree(dureeAffichee)}</span>}
-                    {trajet?.approx && <span className="text-[11px] text-white/60">(estimation)</span>}
-                  </p>
-                )
-              )
-            ) : (
-              <p className="py-1 text-sm font-semibold">Tous les arrêts sont faits 🎉</p>
-            )}
-            {eta && <BlocEta eta={eta} />}
-            {(el.ligneEtat || el.indicateurTrace) && (
-              // Une seule ligne d'état : avancement, colis restants, heure de fin, trajet enregistré (RGPD, reste affiché en roulant).
-              <p className="mt-0.5 truncate text-[11px] leading-tight text-white/65">
                 {el.ligneEtat && (
-                  <>
+                  <span className="mt-0.5 block truncate text-[11px] leading-tight text-white/65">
                     {faits}/{stops.length} faits
                     {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis restants`}
                     {avancement.finEstimee && ` · fin ≈ ${heureFin(avancement.finEstimee)}`}
-                  </>
-                )}
-                {el.indicateurTrace && (
-                  <span title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
-                    {el.ligneEtat && " · "}
-                    <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-orange align-middle" aria-hidden="true" />
-                    Trajet enregistré
                   </span>
                 )}
-              </p>
+              </button>
+            ) : (
+              <p className="py-1 text-sm font-semibold">Tous les arrêts sont faits 🎉</p>
             )}
           </div>
         </div>
@@ -1215,7 +1264,20 @@ export function GoNavigation(p: GoNavigationProps) {
               <div id="go-feuille-contenu" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <label className="relative block">
                   <span className="sr-only">Rechercher dans la tournée</span>
-                  <input className="input" type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Adresse, client, n° de colis…" />
+                  <input
+                    className="input"
+                    type="search"
+                    value={recherche}
+                    onChange={(e) => setRecherche(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Entrée : le premier résultat s'affiche directement.
+                      const id = e.key === "Enter" ? arretAAfficher(idsVisibles, terme, true) : null;
+                      const s = id ? restants.find((x) => x.id === id) : undefined;
+                      if (s) (e.preventDefault(), afficherArret(s));
+                    }}
+                    enterKeyHint="go"
+                    placeholder="Adresse, client, n° de colis…"
+                  />
                 </label>
                 {terme && visibles.length === 0 && <p className="text-center text-sm text-navy/60">Aucun arrêt restant ne correspond.</p>}
                 <ZoneTri ordre={ordreTri} onDeposer={(id, c) => void p.onDeposer(id, c)} actif={triActif}>
@@ -1362,8 +1424,9 @@ export function GoNavigation(p: GoNavigationProps) {
           stops={stops}
           position={position}
           onFermer={() => setAjout(false)}
-          onAjoute={async (texte, ok) => {
+          onAjoute={async (texte, ok, arretId) => {
             setAjout(false);
+            arretAjoute.current = arretId ?? null;
             await p.onRecharger();
             p.onToast({ ok, text: texte });
           }}
@@ -1389,25 +1452,6 @@ const ANGLES: Partial<Record<Pictogramme, number>> = {
   "serree-droite": 135,
   "serree-gauche": -135,
 };
-
-/**
- * Heure d'arrivée au prochain arrêt, en gros dans le bandeau (lisible en
- * conduite et en plein soleil : blanc et accent sur marine, quel que soit
- * le thème). Pas d'annonce au lecteur d'écran à chaque point GPS.
- */
-function BlocEta({ eta }: { eta: EtaArret }) {
-  return (
-    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-white/15 pt-1.5" aria-live="off">
-      <p className="flex items-baseline gap-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Arrivée</span>
-        <span className="font-display text-[2rem] font-bold tabular-nums leading-none text-white">{eta.heure}</span>
-      </p>
-      <span className="font-display text-xl font-bold tabular-nums leading-none text-teal">{eta.dans}</span>
-      <span className="text-lg font-semibold tabular-nums leading-none text-white/90">{eta.distance}</span>
-      {eta.estimee && <span className="text-[11px] text-white/60">(estimation)</span>}
-    </div>
-  );
-}
 
 /** Flèche de la manœuvre (tout droit, gauche, droite, légère, serrée, demi-tour, rond-point avec numéro de sortie, arrivée). */
 function FlecheManoeuvre({ picto, sortie, className }: { picto: Pictogramme; sortie?: number; className?: string }) {
@@ -1664,7 +1708,8 @@ function AjoutAdresse({
   stops: Stop[];
   position: Point | null;
   onFermer: () => void;
-  onAjoute: (texte: string, ok: boolean) => Promise<void>;
+  /** `arretId` : arrêt créé, affiché dès le rechargement de la tournée. */
+  onAjoute: (texte: string, ok: boolean, arretId?: string) => Promise<void>;
   onReoptimiser: () => Promise<void>;
 }) {
   const [adresse, setAdresse] = useState("");
@@ -1714,7 +1759,7 @@ function AjoutAdresse({
       let texte = `Adresse ajoutée${village}`;
       if (placement === "optimiser") {
         await onReoptimiser();
-        return void (await onAjoute(`${texte} ; ordre des arrêts restants recalculé.`, true));
+        return void (await onAjoute(`${texte} ; ordre des arrêts restants recalculé.`, true, r.stop.id));
       }
       if (placement === "meilleur") {
         const ins = meilleureInsertion(stops, r.stop, position);
@@ -1723,7 +1768,7 @@ function AjoutAdresse({
           texte += ins.rang === 0 ? " : c'est votre prochain arrêt." : ` : placée au meilleur endroit (≈ ${ins.detourKm.toLocaleString("fr-FR")} km de détour).`;
         } else texte += " en fin de tournée (adresse non localisée).";
       } else texte += " en fin de tournée.";
-      await onAjoute(texte, true);
+      await onAjoute(texte, true, r.stop.id);
     } catch (e) {
       setErreur(networkErrorMessage(e));
     } finally {

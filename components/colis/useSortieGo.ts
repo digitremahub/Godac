@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef } from "react";
 import { MARQUE_HISTORIQUE_GO, estEntreeGo, retourFermeGo, routeApresSortie } from "@/lib/colis/sortie-go";
 
 /**
- * Sortie de GO Navigation vers « Ma tournée colis » (lib/colis/sortie-go.ts).
+ * Sortie de GO Navigation vers « Ma tournée colis », étape Préparer (lib/colis/sortie-go.ts).
  * À l'ouverture de GO, une entrée est ajoutée à l'historique : le bouton
  * Retour du navigateur ou d'Android la retire et ferme GO, au lieu de quitter
  * la page (et d'arriver sur le tableau de bord). Retourne la fonction qui
  * ferme GO depuis un bouton (même chemin que le retour du navigateur).
- * `onSortie` affiche l'écran de la tournée.
+ * `onSortie` affiche l'écran PRÉPARER de la tournée (ECRAN_APRES_GO).
  */
 export function useSortieGo(ouvert: boolean, onSortie: () => void): () => void {
   const entreePosee = useRef(false);
