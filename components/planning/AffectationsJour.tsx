@@ -153,7 +153,7 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
                   <BoutonOuverture key={e.id} entree={e} />
                 ))}
                 {entrees.slice(0, 1).map((e) => (
-                  <BoutonRepartir key={e.id} entree={e} />
+                  <BoutonRepartir key={e.id} entree={e} toujours />
                 ))}
               </div>
             )}
