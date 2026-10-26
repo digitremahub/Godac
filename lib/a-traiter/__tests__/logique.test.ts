@@ -39,6 +39,11 @@ describe("calculerUrgence", () => {
     expect(calculerUrgence("ticpe", { echeance: "2026-10-28" }, MAINTENANT)).toBe("haute");
   });
 
+  it("tournée fusionnée à répartir : urgente à l'approche du départ", () => {
+    expect(calculerUrgence("repartition_a_attribuer", { echeance: dans(5) }, MAINTENANT)).toBe("normale");
+    expect(calculerUrgence("repartition_a_attribuer", { echeance: dans(2) }, MAINTENANT)).toBe("haute");
+  });
+
   it("ignore une date illisible", () => {
     expect(calculerUrgence("conge", { depuis: "pas une date", echeance: "" }, MAINTENANT)).toBe("normale");
   });

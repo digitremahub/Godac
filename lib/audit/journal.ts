@@ -61,6 +61,11 @@ export const ACTIONS_AUDIT = {
   pointage_sortie_derniere_presence: "Sortie pointée à la dernière présence au dépôt (choix du salarié)",
   traitement_groupe: "Traitement groupé (À traiter aujourd'hui) : nombre d'éléments traités et refusés",
   arret_affectations_liberees: "Affectations du planning libérées (salarié en arrêt)",
+  tournee_fermee: "Tournée du planning fermée",
+  tournee_rouverte: "Tournée du planning rouverte",
+  tournee_fusion_modifiee: "Tournée fusionnée (lundi) : tournées d'origine modifiées",
+  tournee_repartition_modifiee: "Tournée fusionnée : villages et ramasses répartis (provisoire)",
+  tournee_repartition_reconciliee: "Tournée fusionnée : répartition alignée sur les tournées réelles",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

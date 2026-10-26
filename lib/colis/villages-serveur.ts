@@ -4,6 +4,8 @@ import type { AppUser } from "@/lib/auth/session";
 import { coverageForEntries } from "@/lib/tours/renfort";
 import { LISTE_HORS_TOURNEE, cleCommune, communeDepuisAdresse, villagePourAdresse, type VillageRef } from "@/lib/colis/villages";
 import type { Point } from "@/lib/colis/optimisation";
+import { fusionDeLEntree, type FusionChargee } from "@/lib/planning/fusion-serveur";
+import { elementDuVillage, visiblesPour, type VisibleDuChauffeur } from "@/lib/planning/fusion";
 
 /**
  * Tournée colis ↔ planning : tournées du jour du chauffeur, leurs villages
@@ -117,11 +119,39 @@ export async function planningEtVillages(supabase: SupabaseClient, organizationI
     villages.push({ ...v, tour_number: tour, renfort });
   };
 
+  // Tournées fusionnées (lundi, migration 20261105000001) : villages répartis entre les chauffeurs.
+  // Le chauffeur ne voit que les siens et ceux encore « À attribuer » (lib/planning/fusion.ts › visiblesPour).
+  const fusions = new Map<string, { fusion: FusionChargee; visibles: VisibleDuChauffeur }>();
+  for (const p of passages) {
+    const fusion = await fusionDeLEntree(organizationId, { id: p.planning_entry_id, service_id: p.service_id, tour_number: p.tour_number, start_at: p.start_at });
+    if (fusion) fusions.set(p.planning_entry_id, { fusion, visibles: visiblesPour(driverId, fusion.elements, fusion.lignes) });
+  }
+
   // Villages propres aux tournées planifiées.
   const propres = passages.filter((p) => p.route_id && !p.is_renfort).map((p) => p.route_id!);
   if (propres.length) {
     const { data } = await supabase.from("tour_route_villages").select(VILLAGE_FIELDS).in("route_id", propres).order("position");
-    for (const p of passages.filter((x) => x.route_id && !x.is_renfort)) for (const v of ((data ?? []) as any[]).filter((v) => v.route_id === p.route_id)) ajouter(v, p.tour_number, false);
+    for (const p of passages.filter((x) => x.route_id && !x.is_renfort)) {
+      const f = fusions.get(p.planning_entry_id);
+      for (const v of ((data ?? []) as any[]).filter((v) => v.route_id === p.route_id)) {
+        const element = f ? elementDuVillage(v, f.fusion.elements.villages) : null;
+        if (f && element && !f.visibles.villageIds.has(element.cle)) continue;
+        ajouter(v, p.tour_number, false);
+      }
+    }
+  }
+
+  // Villages des tournées d'origine d'une fusion qui lui reviennent (hors ceux de sa propre tournée, déjà vus par nom).
+  const nomsVus = new Set(villages.map((v) => cleCommune(v.name)));
+  for (const p of passages) {
+    const f = fusions.get(p.planning_entry_id);
+    if (!f || !f.visibles.villageIds.size) continue;
+    const { data } = await supabase.from("tour_route_villages").select(VILLAGE_FIELDS).in("id", [...f.visibles.villageIds]).order("position");
+    for (const v of (data ?? []) as any[]) {
+      if (nomsVus.has(cleCommune(v.name))) continue;
+      nomsVus.add(cleCommune(v.name));
+      ajouter(v, p.tour_number, false);
+    }
   }
 
   // Villages empruntés par un renfort ce jour-là (couverture du jour, sinon par défaut).

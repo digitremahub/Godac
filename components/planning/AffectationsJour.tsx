@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { cleCaseTournee, cleLigne, estJourPrevu, etatCase, nomCourt, type LigneTournee } from "@/lib/planning/affectation";
-import { heureDe, jourDe, statutAffectation } from "@/lib/planning/semaine";
+import { estModifiable, heureDe, jourDe, statutAffectation } from "@/lib/planning/semaine";
+import { ligneCorrespond } from "@/lib/planning/ouverture";
+import { BoutonOuverture, BoutonRepartir, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, Vehicule, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
 type Tri = "heure" | "numero" | "trous";
@@ -33,8 +35,10 @@ export function AffectationsJour({ date: dateDonnee }: { date?: string } = {}) {
       }
       return heureCarte(a) - heureCarte(b) || a.ligne.tourNumber.localeCompare(b.ligne.tourNumber, "fr", { numeric: true });
     });
-    return { roulent: tries.filter((c) => c.etat !== "vide"), autres: tries.filter((c) => c.etat === "vide") };
-  }, [ctx.lignes, ctx.parCase, date, tri]);
+    // Filtre Ouvertes / Fermées / Toutes : les cartes sans affectation comptent comme ouvertes.
+    const montrees = tries.filter((c) => ligneCorrespond(ctx.filtreOuverture, c.entrees));
+    return { roulent: montrees.filter((c) => c.etat !== "vide"), autres: montrees.filter((c) => c.etat === "vide") };
+  }, [ctx.lignes, ctx.parCase, ctx.filtreOuverture, date, tri]);
 
   return (
     <section aria-labelledby="titre-tournees" className="min-w-0">
@@ -54,7 +58,8 @@ export function AffectationsJour({ date: dateDonnee }: { date?: string } = {}) {
 
       {cartes.roulent.length === 0 && (
         <p className="rounded-xl border border-dashed border-navy/20 bg-surface p-4 text-sm text-navy/70">
-          Aucune tournée prévue ce jour-là.{cartes.autres.length ? " Affichez les autres tournées ci-dessous pour en ajouter une." : " Créez vos tournées-modèles dans Tournée colis › Tournées."}
+          {ctx.filtreOuverture === "fermees" ? "Aucune tournée fermée ce jour-là." : ctx.filtreOuverture === "ouvertes" && cartes.autres.length === 0 ? "Aucune tournée ouverte ce jour-là." : "Aucune tournée prévue ce jour-là."}
+          {ctx.filtreOuverture === "toutes" && cartes.autres.length ? " Affichez les autres tournées ci-dessous pour en ajouter une." : ctx.filtreOuverture === "toutes" ? " Créez vos tournées-modèles dans Tournée colis › Tournées." : ""}
         </p>
       )}
 
@@ -104,7 +109,15 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
           >
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-display text-xl font-extrabold leading-none">{ligne.tourNumber}</h3>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
+              <span className="flex flex-wrap items-center justify-end gap-1.5">
+                {entrees.map((e) => (
+                  <PastilleFermee key={e.id} entree={e} />
+                ))}
+                {entrees.slice(0, 1).map((e) => (
+                  <PastilleFusion key={e.id} entree={e} />
+                ))}
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
+              </span>
             </div>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65 max-md:text-sm">
               <BoutonHeure ligne={ligne} date={date} heure={heure} />
@@ -134,6 +147,16 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
                 </button>
               )}
             </div>
+            {entrees.length > 0 && ctx.donnees.peutModifier && (
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {entrees.map((e) => (
+                  <BoutonOuverture key={e.id} entree={e} />
+                ))}
+                {entrees.slice(0, 1).map((e) => (
+                  <BoutonRepartir key={e.id} entree={e} />
+                ))}
+              </div>
+            )}
             {ctx.petitEcran && ctx.donnees.vue === "semaine" && ctx.donnees.peutModifier && (
               <button
                 type="button"
@@ -154,7 +177,7 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
 function ChauffeurPlace({ entree, date }: { entree: EntreeAffectation; date: string }) {
   const ctx = useAffectations();
   const nom = ctx.nomChauffeur(entree.driver_id);
-  const modifiable = entree.status === "planned";
+  const modifiable = estModifiable(entree);
   const statut = statutAffectation(entree.status);
   // 2ᵉ tournée du jour du même chauffeur : « liée » si la même fiche colis les porte.
   const memeJour = ctx.affectations
@@ -164,7 +187,7 @@ function ChauffeurPlace({ entree, date }: { entree: EntreeAffectation; date: str
   const fiche = ctx.donnees.fiches[entree.id];
   const liee = Boolean(fiche) && memeJour.some((a) => a.id !== entree.id && ctx.donnees.fiches[a.id] === fiche);
   const fin = entree.end_at ? heureDe(entree.end_at) : null;
-  const libelle = `${nom}, tournée ${entree.tour_number} à ${heureDe(entree.start_at)}${entree.vehicles ? `, ${entree.vehicles.registration}` : ""}${modifiable ? "" : `, ${statut.libelle.toLowerCase()}`}`;
+  const libelle = `${nom}, tournée ${entree.tour_number} à ${heureDe(entree.start_at)}${entree.vehicles ? `, ${entree.vehicles.registration}` : ""}${modifiable ? "" : entree.status === "planned" ? ", fermée" : `, ${statut.libelle.toLowerCase()}`}`;
 
   return (
     <Glissable id={`af:${entree.id}`} actif={ctx.glisser && modifiable} className="rounded-xl">
@@ -179,7 +202,7 @@ function ChauffeurPlace({ entree, date }: { entree: EntreeAffectation; date: str
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-bold">{nomCourt(nom)}</span>
             {rang > 0 && <span className="rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-on-teal max-md:text-sm">2ᵉ tournée{liee ? " · liée" : ""}</span>}
-            {!modifiable && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] max-md:text-sm">{statut.libelle}</span>}
+            {!modifiable && entree.status !== "planned" && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] max-md:text-sm">{statut.libelle}</span>}
           </span>
           <span className="block text-xs tabular-nums text-white/70 max-md:text-sm">
             {heureDe(entree.start_at)}

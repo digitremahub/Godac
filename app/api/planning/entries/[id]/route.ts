@@ -6,6 +6,7 @@ import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { parisCalendarDate } from "@/lib/planning/dates";
 import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation";
 import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
+import { refusSiFermee } from "@/lib/planning/ouverture-serveur";
 
 const patchSchema = z.object({
   start_at: z.string().datetime().optional(),
@@ -40,6 +41,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const { regroupement, ...champs } = parsed.data;
+
+  // Tournée fermée (migration 20261105000001) : plus de changement d'affectation tant qu'elle n'est pas rouverte.
+  const fermee = await refusSiFermee(appUser.organization_id, id, "encadrement");
+  if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
 
   const supabase = await createServerSupabaseClient();
   const colis = g.modules.has("route_optimizer");
@@ -99,6 +104,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const g2 = await garderApi({ modules: ["planning"] });
   if (!g2.ok) return g2.reponse;
+  const fermee = await refusSiFermee(g2.appUser.organization_id, id, "encadrement");
+  if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
   const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase

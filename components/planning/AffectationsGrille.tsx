@@ -13,7 +13,9 @@ import {
   trousParJour,
   type LigneTournee,
 } from "@/lib/planning/affectation";
-import { heureDe, jourDe, JOURS_LONGS, rangJour, statutAffectation } from "@/lib/planning/semaine";
+import { estModifiable, heureDe, jourDe, JOURS_LONGS, rangJour, statutAffectation } from "@/lib/planning/semaine";
+import { estOuverte } from "@/lib/planning/ouverture";
+import { PastilleFermee } from "@/components/planning/OuvertureFusion";
 import { addDays } from "@/lib/planning/dates";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
@@ -111,9 +113,13 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
     return <p className="rounded-xl border border-dashed border-navy/20 bg-surface p-4 text-sm text-navy/70">Aucune tournée pour ce service. Créez vos tournées-modèles dans Tournée colis › Tournées, ou générez la semaine depuis les modèles.</p>;
   }
 
+  if (ctx.lignesVisibles.length === 0) {
+    return <p className="rounded-xl border border-dashed border-navy/20 bg-surface p-4 text-sm text-navy/70">{ctx.filtreOuverture === "fermees" ? "Aucune tournée fermée sur cette période." : "Aucune tournée ouverte sur cette période."}</p>;
+  }
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-navy/10 bg-surface shadow-card">
-      <table className="border-separate border-spacing-0 text-sm" style={{ minWidth: mois ? 160 + ctx.jours.length * 40 : 760, width: mois ? undefined : "100%" }}>
+      <table className="border-separate border-spacing-0 text-sm" style={{ minWidth: mois ? 160 + ctx.jours.length * 40 : 850, width: mois ? undefined : "100%" }}>
         <caption className="sr-only">
           Une ligne par tournée, une colonne par jour. Glissez un chauffeur sur une case, ou touchez une case pour choisir.
         </caption>
@@ -134,6 +140,11 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
             <th scope="col" className={`sticky left-0 z-20 border-b border-r border-navy/10 bg-surface px-3 py-2 text-left text-xs font-semibold text-navy/60 ${mois ? "w-36 min-w-[9rem]" : "w-44 min-w-[11rem]"}`}>
               Tournée
             </th>
+            {!mois && (
+              <th scope="col" className="border-b border-r border-navy/10 bg-surface px-2 py-2 text-left text-xs font-semibold text-navy/60">
+                Ouverture
+              </th>
+            )}
             {ctx.jours.map((d) => {
               const r = rangJour(d);
               const auj = d === ctx.aujourdhui;
@@ -160,9 +171,10 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
           </tr>
         </thead>
         <tbody>
-          {ctx.lignes.map((l) => (
+          {ctx.lignesVisibles.map((l) => (
             <tr key={l.cle}>
               <EnteteLigne ligne={l} />
+              {!mois && <ColonneOuverture ligne={l} />}
               {ctx.jours.map((d) => (
                 <Case key={d} ligne={l} date={d} />
               ))}
@@ -184,6 +196,28 @@ function GrilleTournees({ trous }: { trous: Record<string, number> }) {
         </tfoot>
       </table>
     </div>
+  );
+}
+
+/** Colonne « Ouverture » (vue Semaine) : Ouverte, Fermée, ou « 2/5 fermées » si seuls certains jours sont fermés. */
+function ColonneOuverture({ ligne }: { ligne: LigneTournee }) {
+  const ctx = useAffectations();
+  const entrees = ctx.jours.flatMap((d) => ctx.parCase.get(cleCaseTournee(ligne.cle, d)) ?? []).filter((e) => e.status !== "cancelled");
+  const fermees = entrees.filter((e) => !estOuverte(e)).length;
+  return (
+    <td className="border-b border-r border-navy/10 px-2 py-1 align-middle text-xs">
+      {entrees.length === 0 ? (
+        <span className="text-navy/40" aria-label="Aucune affectation">
+          –
+        </span>
+      ) : fermees === 0 ? (
+        <span className="text-navy/65">Ouverte</span>
+      ) : (
+        <span className="inline-flex rounded-full px-2 py-0.5 font-bold" style={{ backgroundColor: "#d62718", color: "#FFFFFF" }}>
+          {fermees === entrees.length ? "Fermée" : `${fermees}/${entrees.length} fermées`}
+        </span>
+      )}
+    </td>
   );
 }
 
@@ -276,14 +310,15 @@ function CaseRemplie({ entree, autres, ligne, date, survol, libelleCase }: { ent
   const ctx = useAffectations();
   const mois = ctx.donnees.vue === "mois";
   const nom = ctx.nomChauffeur(entree.driver_id);
-  const modifiable = entree.status === "planned";
+  const modifiable = estModifiable(entree);
+  const fermee = !estOuverte(entree);
   const statut = statutAffectation(entree.status);
   const memeJour = ctx.affectations.filter((a) => a.driver_id === entree.driver_id && a.status !== "cancelled" && jourDe(a.start_at) === date).sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at));
   const deuxieme = memeJour.findIndex((a) => a.id === entree.id) > 0;
   const fiche = ctx.donnees.fiches[entree.id];
   const liee = Boolean(fiche) && memeJour.some((a) => a.id !== entree.id && ctx.donnees.fiches[a.id] === fiche);
   const etirable = ctx.glisser && modifiable && Boolean(entree.driver_id);
-  const libelle = `${libelleCase} : ${nom}${heureDe(entree.start_at) !== ligne.heure ? ` à ${heureDe(entree.start_at)}` : ""}${modifiable ? "" : `, ${statut.libelle.toLowerCase()}`}${autres > 0 ? `, et ${autres} autre${autres > 1 ? "s" : ""}` : ""}`;
+  const libelle = `${libelleCase} : ${nom}${heureDe(entree.start_at) !== ligne.heure ? ` à ${heureDe(entree.start_at)}` : ""}${modifiable ? "" : fermee ? ", tournée fermée" : `, ${statut.libelle.toLowerCase()}`}${autres > 0 ? `, et ${autres} autre${autres > 1 ? "s" : ""}` : ""}`;
   const couleur = couleurChauffeur(entree.driver_id ?? "");
 
   return (
@@ -302,18 +337,25 @@ function CaseRemplie({ entree, autres, ligne, date, survol, libelleCase }: { ent
         >
           {mois ? (
             <span
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${modifiable ? "" : "ring-2 ring-navy/40"}`}
+              className={`relative inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${modifiable || fermee ? "" : "ring-2 ring-navy/40"}`}
               style={{ backgroundColor: couleur.fond, color: couleur.texte }}
               aria-hidden="true"
             >
               {initiales(nom)}
+              {fermee && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface" style={{ backgroundColor: "#d62718" }} aria-hidden="true" />}
             </span>
           ) : (
             <>
               <Avatar id={entree.driver_id!} nom={nom} taille="sm" />
               <span className="min-w-0 flex-1 truncate font-semibold">{nomCourt(nom)}</span>
               {deuxieme && <span className="rounded-full bg-teal px-1.5 text-[10px] font-bold text-on-teal">{liee ? "liée" : "2ᵉ"}</span>}
-              {!modifiable && <span className={`h-2 w-2 shrink-0 rounded-full ${statut.point}`} aria-hidden="true" />}
+              {fermee && <PastilleFermee entree={entree} court />}
+              {!modifiable && !fermee && <span className={`h-2 w-2 shrink-0 rounded-full ${statut.point}`} aria-hidden="true" />}
+              {ctx.donnees.fusions[entree.id] && (
+                <span className="rounded-full bg-white/15 px-1.5 text-[10px] font-bold" title="Tournée fusionnée">
+                  Fus.
+                </span>
+              )}
               {autres > 0 && <span className="text-[10px] text-white/70">+{autres}</span>}
             </>
           )}

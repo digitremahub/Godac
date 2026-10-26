@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { calendrierMois, cleCaseTournee, estJourPrevu, etatCase, jourParDefaut, type CelluleMois } from "@/lib/planning/affectation";
-import { JOURS_COURTS, JOURS_LONGS, rangJour } from "@/lib/planning/semaine";
+import { JOURS_COURTS, JOURS_LONGS, jourDe, rangJour } from "@/lib/planning/semaine";
+import { estOuverte } from "@/lib/planning/ouverture";
 import { AffectationsJour } from "@/components/planning/AffectationsJour";
 import { useAffectations } from "@/components/planning/AffectationElements";
 
@@ -50,6 +51,12 @@ function etatJour(c: Pick<CelluleMois, "couverture" | "trous" | "tournees">): st
 export function CalendrierMois() {
   const ctx = useAffectations();
   const semaines = useMemo(() => calendrierMois(ctx.donnees.mois, ctx.lignes, ctx.parCase), [ctx.donnees.mois, ctx.lignes, ctx.parCase]);
+  // Tournées fermées par jour : point rouge sur le jour.
+  const fermeesParJour = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of ctx.affectations) if (!estOuverte(a) && a.status !== "cancelled") m.set(jourDe(a.start_at), (m.get(jourDe(a.start_at)) ?? 0) + 1);
+    return m;
+  }, [ctx.affectations]);
 
   if (ctx.lignes.length === 0) {
     return <p className="rounded-xl border border-dashed border-navy/20 bg-surface p-4 text-[15px] text-navy/70">Aucune tournée pour ce service. Créez vos tournées-modèles dans Tournée colis › Tournées.</p>;
@@ -75,7 +82,7 @@ export function CalendrierMois() {
                     <button
                       type="button"
                       onClick={() => ctx.allerJour(c.date)}
-                      aria-label={`${texteJour(c.date)}${auj ? ", aujourd'hui" : ""} : ${etatJour(c)}. Ouvrir la journée`}
+                      aria-label={`${texteJour(c.date)}${auj ? ", aujourd'hui" : ""} : ${etatJour(c)}${fermeesParJour.get(c.date) ? `, ${fermeesParJour.get(c.date)} fermée${fermeesParJour.get(c.date)! > 1 ? "s" : ""}` : ""}. Ouvrir la journée`}
                       aria-current={auj ? "date" : undefined}
                       className={`flex min-h-[60px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border px-0 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal ${
                         auj ? "border-teal bg-teal/10" : c.couverture === "trous" ? "border-orange/30 bg-orange/[0.04]" : "border-navy/10 bg-surface"
@@ -83,6 +90,7 @@ export function CalendrierMois() {
                     >
                       <span className={`text-base leading-none tabular-nums ${auj ? "font-extrabold text-teal-ink" : "font-semibold"}`}>{Number(c.date.slice(8, 10))}</span>
                       <Indicateur cellule={c} />
+                      {fermeesParJour.get(c.date) ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#d62718" }} aria-hidden="true" /> : null}
                     </button>
                   </li>
                 );
@@ -100,6 +108,9 @@ export function CalendrierMois() {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="text-navy/40">–</span>aucune tournée
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#d62718" }} aria-hidden="true" />tournée fermée
         </span>
       </p>
     </section>

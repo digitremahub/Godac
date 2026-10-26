@@ -24,6 +24,7 @@ import {
   type LigneTournee,
 } from "@/lib/planning/affectation";
 import { chauffeursAffiches, heureDe, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
+import { compterFermees, estOuverte, ligneCorrespond, type FiltreOuverture } from "@/lib/planning/ouverture";
 import { textePublication } from "@/lib/planning/publication";
 import { confirmer } from "@/lib/ui/confirmation";
 import { Avatar, Contexte, type ContexteAffectations, type DonneesAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
@@ -32,6 +33,8 @@ import { AffectationsGrille } from "@/components/planning/AffectationsGrille";
 import { CalendrierMois, SemaineMobile } from "@/components/planning/AffectationsMobile";
 import { ColonneChauffeurs } from "@/components/planning/ColonneChauffeurs";
 import { FeuilleAffecter, type CibleFeuille } from "@/components/planning/FeuilleAffecter";
+import { FeuilleRepartir } from "@/components/planning/FeuilleRepartir";
+import { FiltreOuvertureBarre } from "@/components/planning/OuvertureFusion";
 import { FeuilleHeure, type CibleHeure, type PorteeHeure } from "@/components/planning/FeuilleHeure";
 import { texteChangementHeure } from "@/lib/planning/heure";
 import { RecopieSemaines } from "@/components/planning/RecopieSemaines";
@@ -48,13 +51,14 @@ type Etape =
   | { type: "retirer"; entree: EntreeAffectation }
   | { type: "supprimer"; entree: EntreeAffectation };
 
-type ReponseAffecter = { places: number; absents: string[]; figees: number; deja: number; warning?: string | null };
+type ReponseAffecter = { places: number; absents: string[]; figees: number; fermees?: number; deja: number; warning?: string | null };
 type Resultat = { ok: true; texte: string | null; warning: string | null; absents: number } | { ok: false; choix: ChoixRegroupementData } | { ok: false; erreur: string };
 
 type Fenetre =
   | { type: "feuille"; cible: CibleFeuille }
   | { type: "heure"; cible: CibleHeure }
   | { type: "edition"; entree: EntreeAffectation }
+  | { type: "repartir"; entree: EntreeAffectation }
   | { type: "choix"; question: ChoixRegroupementData; reprendre: (r: Regroupement) => void; annuler: () => void }
   | { type: "dupliquer" }
   | { type: "recopie"; mode: "precedente" | "mois" }
@@ -92,6 +96,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   const [modelesOuverts, setModelesOuverts] = useState(false);
   const [chauffeursOuverts, setChauffeursOuverts] = useState(false);
   const [publication, setPublication] = useState(false);
+  const [filtreOuverture, setFiltreOuverture] = useState<FiltreOuverture>("toutes");
   const maj = useRef(false);
 
   // Jours affichés. Le dimanche : s'il sert (le serveur l'a mis dans la période),
@@ -112,6 +117,12 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     [donnees.routes, donnees.modeles, affichees, donnees.serviceIds, donnees.selectedService],
   );
   const parCase = useMemo(() => affectationsParTournee(affichees), [affichees]);
+  // Filtre Ouvertes / Fermées : une ligne reste si une de ses affectations de la période correspond (la vue Jour filtre ses cartes elle-même).
+  const lignesVisibles = useMemo(
+    () => (filtreOuverture === "toutes" ? lignes : lignes.filter((l) => ligneCorrespond(filtreOuverture, jours.flatMap((d) => parCase.get(cleCaseTournee(l.cle, d)) ?? [])))),
+    [filtreOuverture, lignes, jours, parCase],
+  );
+  const nbFermees = useMemo(() => compterFermees(affichees), [affichees]);
   const noms = useMemo(() => new Map(donnees.chauffeurs.map((c) => [c.id, c.full_name])), [donnees.chauffeurs]);
   const nomChauffeur = useCallback((id: string | null) => (id ? (noms.get(id) ?? "Chauffeur") : "Sans chauffeur"), [noms]);
   const glisser = !petitEcran && donnees.peutModifier && !occupe;
@@ -181,7 +192,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
       if (question) return { ok: false, choix: question };
       if (!res.ok) return { ok: false, erreur: lireRefus(res.status, corps).message };
       const r = corps as ReponseAffecter;
-      return { ok: true, texte: texteAffectation({ places: r.places, absents: r.absents ?? [], figees: r.figees ?? 0, deja: r.deja ?? 0 }, libelleJour), warning: r.warning ?? null, absents: (r.absents ?? []).length };
+      return { ok: true, texte: texteAffectation({ places: r.places, absents: r.absents ?? [], figees: r.figees ?? 0, fermees: r.fermees ?? 0, deja: r.deja ?? 0 }, libelleJour), warning: r.warning ?? null, absents: (r.absents ?? []).length };
     }
     if (e.entree.id.startsWith("tmp:")) return { ok: false, erreur: "Enregistrement en cours : réessayez dans un instant." };
     if (e.type === "retirer") {
@@ -410,6 +421,35 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     router.refresh();
   }
 
+  // --- Ouvrir / fermer une tournée ----------------------------------------
+  async function basculerOuverture(entree: EntreeAffectation, confirmee = false): Promise<void> {
+    if (entree.id.startsWith("tmp:")) return setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" });
+    const fermer = estOuverte(entree);
+    const avant = localRef.current;
+    const nom = `${entree.tour_number} du ${libelleJour(jourDe(entree.start_at))}`;
+    setOccupe(true);
+    setLocal(avant.map((a) => (a.id === entree.id ? { ...a, tour_open: !fermer, closed_at: fermer ? new Date().toISOString() : null, closed_by: null } : a)));
+    let res: Response;
+    try {
+      res = await fetch(`/api/planning/entries/${entree.id}/ouverture`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ouverte: !fermer, ...(confirmee ? { confirmer_en_cours: true } : {}) }) });
+    } catch {
+      setLocal(avant);
+      setOccupe(false);
+      return setMessage({ texte: "Connexion impossible. Vérifiez le réseau puis réessayez.", ton: "erreur" });
+    }
+    const corps: any = await res.json().catch(() => null);
+    setOccupe(false);
+    if (!res.ok) setLocal(avant);
+    // La tournée colis liée est en cours : on demande avant de fermer (rien n'est supprimé).
+    if (res.status === 409 && corps?.confirmation_requise) {
+      if (await confirmer({ titre: `Fermer ${nom} ?`, message: String(corps.message ?? ""), action: "Fermer quand même", danger: true })) return basculerOuverture(entree, true);
+      return;
+    }
+    if (!res.ok) return setMessage({ texte: `${fermer ? "Fermeture" : "Réouverture"} de ${nom} : impossible. ${lireRefus(res.status, corps).message}`, ton: "erreur" });
+    setMessage({ texte: fermer ? `${nom} fermée : plus de changement d'affectation, le chauffeur ne peut plus la démarrer.` : `${nom} rouverte.`, ton: "ok" });
+    router.refresh();
+  }
+
   // --- Publier ------------------------------------------------------------
   async function publier() {
     const premier = donnees.jours[0]!;
@@ -487,6 +527,10 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     ouvrirHeure,
     commencerEtirement,
     nomChauffeur,
+    filtreOuverture,
+    lignesVisibles,
+    basculerOuverture: (e) => void basculerOuverture(e),
+    ouvrirRepartition: (e) => (e.id.startsWith("tmp:") ? setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" }) : setFenetre({ type: "repartir", entree: e })),
   };
 
   const donneesFenetres: DonneesPlanning = {
@@ -574,6 +618,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
             </button>
           </p>
         )}
+
+        <FiltreOuvertureBarre valeur={filtreOuverture} onChange={setFiltreOuverture} fermees={nbFermees} />
 
         {compteurs && (
           <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Résumé du jour">
@@ -664,6 +710,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
           }}
         />
       )}
+      {fenetre?.type === "repartir" && <FeuilleRepartir entree={fenetre.entree} onFermer={() => setFenetre(null)} onResultat={resultat} />}
       {fenetre?.type === "heure" && <FeuilleHeure cible={fenetre.cible} onValider={(c, h, p) => void changerHeure(c, h, p)} onFermer={() => setFenetre(null)} />}
       {fenetre?.type === "edition" && <EditionAffectation entree={fenetre.entree} peutModifier={donnees.peutModifier} donnees={donneesFenetres} onFermer={() => setFenetre(null)} onResultat={resultat} />}
       {fenetre?.type === "choix" && (

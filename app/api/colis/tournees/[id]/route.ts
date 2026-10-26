@@ -7,6 +7,7 @@ import { avecContacts, avecHoraires, avecProfessionnel, ecrireExtremitesRun, ecr
 import { schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
 import { ecrireHeure, lireHeure } from "@/lib/colis/horaires";
 import { ordonnerParListe } from "@/lib/colis/listes";
+import { refusDemarrageFiche } from "@/lib/planning/ouverture-serveur";
 
 async function contexte(id: string) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -61,6 +62,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   const { heure_depart, optim_depart, optim_arrivee, mode_simple, ...champs } = parsed.data;
   if (mode_simple !== undefined && ctx.run.status === "done") return NextResponse.json({ error: "Tournée clôturée : son mode ne peut plus changer." }, { status: 409 });
+  // Démarrage d'une tournée du planning fermée par l'encadrement : refusé (rien n'est supprimé, elle reprend à la réouverture).
+  if (parsed.data.status === "in_progress" && ctx.run.status !== "in_progress") {
+    const fermee = await refusDemarrageFiche(ctx.appUser.organization_id, ctx.run.id);
+    if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
+  }
   const update: Record<string, unknown> = { ...champs };
   if (heure_depart !== undefined) update.planned_start = heure_depart === null ? null : ecrireHeure(lireHeure(heure_depart)!);
   // Début réel de la livraison (estimation de fin) ; à la clôture, la
