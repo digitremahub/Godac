@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppUser } from "@/lib/auth/session";
 import { coverageForEntries } from "@/lib/tours/renfort";
-import { LISTE_HORS_TOURNEE, cleCommune, communeDepuisAdresse, villagePourAdresse, type VillageRef } from "@/lib/colis/villages";
+import { LISTE_HORS_TOURNEE, LISTE_REPORTES, cleCommune, communeDepuisAdresse, estListeReportee, rangerAdresse, type VillageRef } from "@/lib/colis/villages";
 import type { Point } from "@/lib/colis/optimisation";
 
 /**
@@ -155,7 +155,7 @@ export async function villagesDeRoute(supabase: SupabaseClient, routeId: string)
   return ((data ?? []) as any[]).map((v) => ({ ...v, tour_number: route?.tour_number ?? "", renfort: false }));
 }
 
-interface ListeVillage {
+export interface ListeVillage {
   id: string;
   name: string;
   position: number;
@@ -202,10 +202,43 @@ export async function assurerListesVillages(supabase: SupabaseClient, appUser: P
 }
 
 /**
+ * Liste existante de ce nom parmi celles de la tournée (hors « Reportés »,
+ * hors listes-villages), sinon créée à la fin. `horsTournee` : liste signalée hors tournée.
+ */
+async function assurerListeNommee(
+  supabase: SupabaseClient,
+  appUser: Pick<AppUser, "organization_id">,
+  runId: string,
+  ctx: { listes: ListeVillage[]; migration: boolean },
+  nom: string,
+  horsTournee: boolean,
+): Promise<ListeVillage | null> {
+  const cle = cleCommune(nom);
+  const existante = ctx.listes.find((l) => !l.village_id && cleCommune(l.name) === cle && (horsTournee ? !estListeReportee(l) : true));
+  if (existante) return existante;
+  const position = ctx.listes.reduce((m, l) => Math.max(m, l.position), -1) + 1;
+  const { data, error } = await supabase
+    .from("delivery_lists")
+    .insert({ organization_id: appUser.organization_id, run_id: runId, name: nom.slice(0, 60), position, ...(ctx.migration && horsTournee ? { is_hors_tournee: true } : {}) })
+    .select("id, name, position")
+    .single();
+  if (error) return null;
+  const creee = { ...(data as { id: string; name: string; position: number }), village_id: null, is_hors_tournee: horsTournee };
+  ctx.listes.push(creee);
+  return creee;
+}
+
+/** Liste « Reportés » de la tournée (créée au besoin, à la fin) : les adresses des villages décochés y sont mises de côté. */
+export function assurerListeReportes(supabase: SupabaseClient, appUser: Pick<AppUser, "organization_id">, runId: string, ctx: { listes: ListeVillage[]; migration: boolean }) {
+  return assurerListeNommee(supabase, appUser, runId, ctx, LISTE_REPORTES, false);
+}
+
+/**
  * Liste où ranger une adresse ajoutée à la tournée (scan, photo, saisie,
  * import) :
- * - tournée avec des listes-villages : village par commune ou proximité,
- *   sinon « Hors tournée » (créée au besoin) ;
+ * - tournée avec des listes-villages : village par commune ou proximité ;
+ *   sinon la liste hors tournée de SA commune (une par commune, créée au
+ *   besoin) ; sans commune lisible, « Hors tournée » ;
  * - tournée sans villages (créée à la main) : liste de la commune, créée au
  *   besoin (comportement historique) ; null si la commune est inconnue.
  * `cache` : listes déjà lues (import en série), mis à jour en place.
@@ -216,46 +249,35 @@ export async function listePourAdresse(
   runId: string,
   adresse: { texte: string; commune?: string | null; codePostal?: string | null; point?: Point | null },
   cache?: { listes: ListeVillage[]; villages: VillageRef[]; migration: boolean },
-): Promise<{ listId: string | null; raison: "commune" | "proximite" | "hors_tournee" | "commune_libre" | null; nom: string | null }> {
+): Promise<{ listId: string | null; raison: "commune" | "proximite" | "hors_tournee" | "commune_libre" | null; nom: string | null; horsTournee: boolean }> {
   const ctx = cache ?? (await chargerContexteRangement(supabase, runId));
   const lu = communeDepuisAdresse(adresse.texte);
   const commune = adresse.commune || lu.commune;
-  const codePostal = adresse.codePostal || lu.codePostal;
 
   if (ctx.villages.length) {
-    const r = villagePourAdresse({ commune, codePostal, point: adresse.point ?? null }, ctx.villages);
-    if (r.village) {
-      const l = ctx.listes.find((x) => x.village_id === r.village!.id);
-      if (l) return { listId: l.id, raison: r.raison, nom: l.name };
+    const r = rangerAdresse({ texte: adresse.texte, commune: adresse.commune, codePostal: adresse.codePostal, point: adresse.point ?? null }, ctx.villages);
+    if (r.type === "village") {
+      const l = ctx.listes.find((x) => x.village_id === r.village.id);
+      if (l) return { listId: l.id, raison: r.raison, nom: l.name, horsTournee: false };
     }
-    let hors = ctx.listes.find((l) => l.is_hors_tournee) ?? ctx.listes.find((l) => cleCommune(l.name) === cleCommune(LISTE_HORS_TOURNEE));
-    if (!hors) {
-      const position = ctx.listes.reduce((m, l) => Math.max(m, l.position), -1) + 1;
-      const { data, error } = await supabase
-        .from("delivery_lists")
-        .insert({ organization_id: appUser.organization_id, run_id: runId, name: LISTE_HORS_TOURNEE, position, ...(ctx.migration ? { is_hors_tournee: true } : {}) })
-        .select("id, name, position")
-        .single();
-      if (error) return { listId: null, raison: null, nom: null };
-      hors = { ...(data as { id: string; name: string; position: number }), village_id: null, is_hors_tournee: true };
-      ctx.listes.push(hors);
-    }
-    return { listId: hors.id, raison: "hors_tournee", nom: hors.name };
+    const hors = await assurerListeNommee(supabase, appUser, runId, ctx, r.type === "commune" ? r.nom : LISTE_HORS_TOURNEE, true);
+    if (!hors) return { listId: null, raison: null, nom: null, horsTournee: false };
+    return { listId: hors.id, raison: "hors_tournee", nom: hors.name, horsTournee: true };
   }
 
-  if (!commune) return { listId: null, raison: null, nom: null };
+  if (!commune) return { listId: null, raison: null, nom: null, horsTournee: false };
   const existante = ctx.listes.find((l) => cleCommune(l.name) === cleCommune(commune));
-  if (existante) return { listId: existante.id, raison: "commune_libre", nom: existante.name };
+  if (existante) return { listId: existante.id, raison: "commune_libre", nom: existante.name, horsTournee: false };
   const position = ctx.listes.reduce((m, l) => Math.max(m, l.position), -1) + 1;
   const { data, error } = await supabase
     .from("delivery_lists")
     .insert({ organization_id: appUser.organization_id, run_id: runId, name: commune.slice(0, 60), position })
     .select("id, name, position")
     .single();
-  if (error) return { listId: null, raison: null, nom: null };
+  if (error) return { listId: null, raison: null, nom: null, horsTournee: false };
   const creee = { ...(data as { id: string; name: string; position: number }), village_id: null, is_hors_tournee: false };
   ctx.listes.push(creee);
-  return { listId: creee.id, raison: "commune_libre", nom: creee.name };
+  return { listId: creee.id, raison: "commune_libre", nom: creee.name, horsTournee: false };
 }
 
 /** Listes et villages (avec coordonnées) d'une tournée, pour ranger une série d'adresses. */

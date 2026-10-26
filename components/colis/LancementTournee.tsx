@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/components/colis/commun";
+import { basculerTout, type ElementLancement } from "@/lib/colis/villages";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 
 interface DonneesLancement {
   run: { id: string; name: string | null; run_date: string; vehicle: string | null; service: string | null };
   planning: { tour_number: string; start_at: string; vehicle: string | null; service: string | null; renfort: boolean }[];
-  villages: { id: string; name: string; postal_code: string | null; tour_number: string; renfort: boolean; liste_id: string | null; arrets: number; colis: number }[];
-  autres: { id: string; name: string; hors_tournee: boolean; arrets: number; colis: number }[];
+  /** Villages de la tournée, puis communes / listes hors tournée de la fiche. */
+  elements: (ElementLancement & { postal_code: string | null; tour_number: string | null; renfort: boolean })[];
+  /** Cases cochées par défaut (tout, sauf les adresses déjà reportées). */
+  coches: string[];
   modeles: { id: string; tour_number: string; service_name: string | null; villages: number }[];
 }
 
@@ -18,12 +21,14 @@ const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZ
  * Lancement de la tournée par le chauffeur, en deux temps :
  * 1. il confirme que c'est bien sa tournée (celle du planning du jour :
  *    numéro, véhicule, service ; sans planning, il la choisit) ;
- * 2. il coche chacun de ses villages (ceux de la tournée, plus ceux d'un
- *    renfort du jour) pour confirmer qu'il les prend tous.
+ * 2. il coche les villages qu'il dessert (ceux de la tournée, d'un renfort du
+ *    jour, et les communes hors tournée de la fiche) : tout est coché par
+ *    défaut ; les cases décochées sont mises de côté (« Reportés »), sans
+ *    suppression, et l'on ne démarre qu'avec au moins une case cochée.
  * La confirmation crée les listes manquantes ; l'appelant optimise ensuite
- * l'ordre (tous villages enchaînés) et démarre la tournée.
+ * l'ordre (cases cochées enchaînées) et démarre la tournée.
  */
-export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId: string; busy: boolean; onAnnuler: () => void; onConfirme: () => Promise<void> }) {
+export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId: string; busy: boolean; onAnnuler: () => void; onConfirme: (modifie: boolean) => Promise<void> }) {
   const [donnees, setDonnees] = useState<DonneesLancement | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [etape, setEtape] = useState<"tournee" | "villages" | "pas_la_mienne">("tournee");
@@ -43,13 +48,9 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
     };
   }, [runId, modele]);
 
-  const elements = donnees
-    ? [
-        ...donnees.villages.map((v) => ({ id: v.id, nom: v.name, detail: `${v.arrets} adresse(s) · ${v.colis} colis${v.renfort ? ` · renfort tournée ${v.tour_number}` : ""}`, renfort: v.renfort, village: true })),
-        ...donnees.autres.map((l) => ({ id: `liste:${l.id}`, nom: l.name, detail: `${l.arrets} adresse(s) · ${l.colis} colis${l.hors_tournee ? " · adresses hors des villages de la tournée" : ""}`, renfort: false, village: false })),
-      ]
-    : [];
+  const elements = donnees?.elements ?? [];
   const tousCoches = elements.length > 0 && elements.every((e) => coches.includes(e.id));
+  const nbCoches = elements.filter((e) => coches.includes(e.id)).length;
   const sansPlanning = donnees !== null && donnees.planning.length === 0;
 
   async function confirmer() {
@@ -57,11 +58,11 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
     setEnvoi(true);
     setErreur(null);
     try {
-      await api("/api/colis/lancement", {
+      const r = await api<{ modifie?: boolean }>("/api/colis/lancement", {
         method: "POST",
-        body: JSON.stringify({ run_id: runId, village_ids: donnees.villages.map((v) => v.id).filter((id) => coches.includes(id)), route_id: modele || null }),
+        body: JSON.stringify({ run_id: runId, element_ids: elements.map((e) => e.id).filter((id) => coches.includes(id)), route_id: modele || null }),
       });
-      await onConfirme();
+      await onConfirme(r.modifie === true);
     } catch (e) {
       setErreur(networkErrorMessage(e));
     } finally {
@@ -128,7 +129,7 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
                 type="button"
                 className="btn-primary flex-1"
                 onClick={() => {
-                  setCoches([]);
+                  setCoches(donnees.coches);
                   setEtape("villages");
                 }}
               >
@@ -151,14 +152,16 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
 
         {donnees && etape === "villages" && (
           <>
-            <p className="text-sm text-navy/65">Cochez chaque village pour confirmer que vous prenez bien tous ses colis. L&apos;ordre de passage sera calculé sur l&apos;ensemble de la tournée.</p>
+            <p className="text-sm text-navy/65">
+              Cochez les villages que vous desservez. Décochez ceux que vous ne prenez pas : leurs adresses sont mises de côté dans « Reportés » (rien n&apos;est supprimé) et ne comptent pas dans la tournée. L&apos;ordre de passage est calculé sur les villages cochés.
+            </p>
             {elements.length === 0 ? (
               <p className="rounded-xl bg-navy/5 p-3 text-sm text-navy/70">Aucun village ni colis à confirmer.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 px-1 text-sm font-semibold">
-                  <input type="checkbox" className="h-4 w-4 accent-teal" checked={tousCoches} onChange={(e) => setCoches(e.target.checked ? elements.map((x) => x.id) : [])} />
-                  Tout cocher
+                  <input type="checkbox" className="h-4 w-4 accent-teal" checked={tousCoches} onChange={() => setCoches(basculerTout(elements, coches))} />
+                  {tousCoches ? "Tout décocher" : "Tout cocher"}
                 </label>
                 {elements.map((x) => {
                   const ok = coches.includes(x.id);
@@ -168,19 +171,25 @@ export function LancementTournee({ runId, busy, onAnnuler, onConfirme }: { runId
                       <span className="flex-1">
                         <strong>{x.nom}</strong>
                         {x.renfort && <span className="ml-2 rounded-md bg-gold/20 px-1.5 py-0.5 text-[11px] font-bold uppercase text-gold-ink">Renfort</span>}
-                        <span className="block text-xs text-navy/60">{x.detail}</span>
+                        {x.horsTournee && <span className="ml-2 rounded-md bg-orange/10 px-1.5 py-0.5 text-[11px] font-bold uppercase text-orange-ink">Hors tournée</span>}
+                        <span className="block text-xs text-navy/60">
+                          {x.arrets} adresse(s) · {x.colis} colis
+                          {x.renfort && x.tour_number ? ` · renfort tournée ${x.tour_number}` : ""}
+                          {x.reporte ? " · reporté lors d'un lancement précédent" : ""}
+                        </span>
                       </span>
                     </label>
                   );
                 })}
               </div>
             )}
+            {elements.length > 0 && nbCoches === 0 && <p role="alert" className="text-sm font-semibold text-orange-ink">Cochez au moins un village pour démarrer la tournée.</p>}
             <div className="flex gap-2">
               <button type="button" className="btn-secondary flex-1" disabled={busy || envoi} onClick={() => setEtape("tournee")}>
                 Retour
               </button>
-              <button type="button" className="btn-primary flex-1" disabled={busy || envoi || (elements.length > 0 && !tousCoches)} onClick={confirmer}>
-                {busy || envoi ? "Optimisation…" : "Je confirme et je démarre"}
+              <button type="button" className="btn-primary flex-1" disabled={busy || envoi || (elements.length > 0 && nbCoches === 0)} onClick={confirmer}>
+                {busy || envoi ? "Optimisation…" : elements.length > 0 && !tousCoches ? `Je démarre avec ${nbCoches} sur ${elements.length}` : "Je confirme et je démarre"}
               </button>
             </div>
           </>

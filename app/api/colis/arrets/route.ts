@@ -93,7 +93,7 @@ async function ajouterArret(req: Request, appUser: AppUser) {
 
   // Rangement automatique (aucune liste choisie) : une adresse déjà présente
   // garde sa liste ; sinon village de la tournée par commune ou proximité,
-  // « Hors tournée » sinon (tournée sans villages : liste de la commune).
+  // liste hors tournée de sa commune sinon (tournée sans villages : liste de la commune).
   let geo: GeocodeDetail | null | undefined;
   let rangement: Awaited<ReturnType<typeof listePourAdresse>> | null = null;
   if (!listId) {
@@ -110,7 +110,7 @@ async function ajouterArret(req: Request, appUser: AppUser) {
       listId = rangement.listId;
     }
   }
-  const village = rangement?.nom ? { nom: rangement.nom, horsTournee: rangement.raison === "hors_tournee" } : null;
+  const village = rangement?.nom ? { nom: rangement.nom, horsTournee: rangement.horsTournee } : null;
 
   const telephone = normaliserTelephone(parsed.data.telephone, pays);
   // window_start / window_end posés dès la création : l'optimisation les respecte.

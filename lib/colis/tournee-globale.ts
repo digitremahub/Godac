@@ -13,6 +13,11 @@
  * 2. Ordre dans chaque village : sequenceParListes, avec les horaires des
  *    adresses pro (lib/colis/horaires.ts) lors du calcul final.
  *
+ * Les listes hors tournée (une par commune, hors des villages de la tournée)
+ * passent après les villages, mais restent groupées par commune : elles
+ * s'enchaînent de proche en proche depuis le dernier village. La liste
+ * « Reportés » (villages décochés au lancement) reste en dernier, hors calcul.
+ *
  * Extrémités (premier / dernier arrêt, point d'arrivée : lib/colis/extremites.ts) :
  * la liste du premier arrêt ouvre la tournée, celle du dernier la ferme,
  * seuls les villages du milieu sont ordonnés entre les deux.
@@ -22,6 +27,7 @@
  * lib/colis/__tests__/tournee-globale.test.ts).
  */
 import { distanceEstimee, memePoint, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
+import { estListeHorsTournee, estListeReportee } from "@/lib/colis/villages";
 import { sequenceParListes, type ArretOptimisable, type ExtremitesSequence, type Liste } from "@/lib/colis/listes";
 
 /** Garde-fou (ms) de la recherche locale sur l'ordre des villages. */
@@ -69,11 +75,12 @@ export function ordonnerListesGlobalement(
   extremites?: ExtremitesSequence,
 ): OrdreGlobal {
   const triees = [...listes].sort((a, b) => a.position - b.position);
-  const pendants = arrets.filter((s) => s.status === "pending" && pointDe(s));
+  const reportees = new Set(triees.filter(estListeReportee).map((l) => l.id));
+  const pendants = arrets.filter((s) => s.status === "pending" && pointDe(s) && !(s.list_id && reportees.has(s.list_id)));
   const parListe = new Map<string, Point[]>();
   for (const s of pendants) if (s.list_id) parListe.set(s.list_id, [...(parListe.get(s.list_id) ?? []), pointDe(s)!]);
   const actives = triees.filter((l) => parListe.has(l.id));
-  const vides = triees.filter((l) => !parListe.has(l.id));
+  const vides = [...triees.filter((l) => !parListe.has(l.id) && !reportees.has(l.id)), ...triees.filter((l) => reportees.has(l.id))];
   const kmActuel = sequenceParListes(arrets, triees, depart, retour, undefined, distance, extremites).kmApres;
   if (actives.length <= 1) return { listes: [...actives, ...vides].map((l, i) => ({ ...l, position: i })), km: kmActuel, kmOrdreActuel: kmActuel };
 
@@ -82,7 +89,14 @@ export function ordonnerListesGlobalement(
   const premiere = actives.find((l) => l.id === listeDe(extremites?.premierId)) ?? null;
   const derniere = actives.find((l) => l.id === listeDe(extremites?.dernierId) && l !== premiere) ?? null;
   const milieu = actives.filter((l) => l !== premiere && l !== derniere);
-  const assembler = (ordre: Liste[]) => [...(premiere ? [premiere] : []), ...ordre, ...(derniere ? [derniere] : [])];
+  const milieuH = milieu.filter(estListeHorsTournee);
+  const villages = milieu.filter((l) => !estListeHorsTournee(l));
+  const centre = (l: Liste | null | undefined) => (l ? medoide(parListe.get(l.id)!, distance) : null);
+  const representantsH = milieuH.map((l) => centre(l)!);
+  // Communes hors tournée : de proche en proche depuis le dernier village (ou le départ).
+  const ordreHors = (apresVillages: Liste[]) =>
+    milieuH.length <= 1 ? milieuH : plusProcheVoisin(centre(apresVillages[apresVillages.length - 1]) ?? centre(premiere) ?? depart, representantsH, distance).map((k) => milieuH[k]!);
+  const assembler = (ordre: Liste[]) => [...(premiere ? [premiere] : []), ...ordre, ...ordreHors(ordre), ...(derniere ? [derniere] : [])];
 
   // Évaluation avec la distance de l'appelant (matrice routière).
   const kmDe = (ordre: Liste[]) =>
@@ -96,19 +110,19 @@ export function ordonnerListesGlobalement(
       extremites,
     ).kmApres;
 
-  if (milieu.length <= 1) {
-    const ordre = assembler(milieu);
-    return { listes: [...ordre, ...vides].map((l, i) => ({ ...l, position: i })), km: kmDe(milieu), kmOrdreActuel: kmActuel };
+  if (villages.length <= 1) {
+    const ordre = assembler(villages);
+    return { listes: [...ordre, ...vides].map((l, i) => ({ ...l, position: i })), km: kmDe(villages), kmOrdreActuel: kmActuel };
   }
 
-  const representants = milieu.map((l) => medoide(parListe.get(l.id)!, distance)!);
+  const representants = villages.map((l) => medoide(parListe.get(l.id)!, distance)!);
   const fin = extremites?.fin !== undefined ? extremites.fin : retour ? depart : null;
   const debutTsp = premiere ? medoide(parListe.get(premiere.id)!, distance) : depart;
   const finTsp = derniere ? medoide(parListe.get(derniere.id)!, distance) : fin;
   const boucle = !premiere && !derniere && memePoint(fin, depart);
   const proche = extremites?.strategie === "proche";
-  const tsp = (proche ? plusProcheVoisin(debutTsp, representants, distance) : optimiserOrdre(debutTsp, representants, boucle, boucle ? null : finTsp, distance)).map((k) => milieu[k]!);
-  const candidats = proche ? [tsp] : [tsp, [...tsp].reverse(), milieu];
+  const tsp = (proche ? plusProcheVoisin(debutTsp, representants, distance) : optimiserOrdre(debutTsp, representants, boucle, boucle ? null : finTsp, distance)).map((k) => villages[k]!);
+  const candidats = proche ? [tsp] : [tsp, [...tsp].reverse(), villages];
   let meilleur = candidats[0]!;
   let meilleurKm = Infinity;
   for (const c of candidats) {
@@ -141,5 +155,5 @@ export function ordonnerListesGlobalement(
     }
   }
 
-  return { listes: [...assembler(meilleur), ...vides].map((l, i) => ({ ...l, position: i })), km: meilleurKm, kmOrdreActuel: kmDe(milieu) };
+  return { listes: [...assembler(meilleur), ...vides].map((l, i) => ({ ...l, position: i })), km: meilleurKm, kmOrdreActuel: kmDe(villages) };
 }

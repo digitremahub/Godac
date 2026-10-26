@@ -15,6 +15,8 @@ export interface Liste {
   id: string;
   name: string;
   position: number;
+  /** Liste d'adresses hors tournée (une par commune) ; absent avant la migration 190. */
+  is_hors_tournee?: boolean | null;
 }
 
 export interface ArretListe {

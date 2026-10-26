@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
-import { depotMatch, MAX_ACCURACY_M } from "@/lib/time-clock/assisted";
+import { depotMatch, distanceDepotProcheM, loinDuDepot, MAX_ACCURACY_M } from "@/lib/time-clock/assisted";
 import { decider, heureSortieDernierePresence, refusAnnulationSortie } from "@/lib/time-clock/sortie-depot";
 import { etatTourneesChauffeur } from "@/lib/time-clock/tournees-chauffeur";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
@@ -21,7 +21,7 @@ const UNDO_WINDOW_MS = 15 * 60 * 1000;
 /** Pas besoin de ré-écrire la présence au dépôt plus d'une fois toutes les 20 s. */
 const PAS_MAJ_PRESENCE_MS = 20 * 1000;
 
-type EntreeOuverte = { id: string; clocked_in_at: string; last_depot_seen_at: string | null };
+type EntreeOuverte = { id: string; clocked_in_at: string; clock_in_source: string | null; last_depot_seen_at: string | null };
 
 /**
  * Entrée ouverte du salarié, avec sa dernière présence au dépôt. Tolère
@@ -29,12 +29,12 @@ type EntreeOuverte = { id: string; clocked_in_at: string; last_depot_seen_at: st
  * relit alors sans elle et la sortie automatique reste simplement inactive.
  */
 async function lireEntreeOuverte(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, userId: string): Promise<{ entree: EntreeOuverte | null; colonnes: boolean; erreur?: string }> {
-  const complet = await supabase.from("time_clock_entries").select("id, clocked_in_at, last_depot_seen_at").eq("user_id", userId).is("clocked_out_at", null).maybeSingle();
+  const complet = await supabase.from("time_clock_entries").select("id, clocked_in_at, clock_in_source, last_depot_seen_at").eq("user_id", userId).is("clocked_out_at", null).maybeSingle();
   if (!complet.error) return { entree: (complet.data as EntreeOuverte | null) ?? null, colonnes: true };
   if (!estSchemaManquant(complet.error)) return { entree: null, colonnes: true, erreur: complet.error.message };
-  const simple = await supabase.from("time_clock_entries").select("id, clocked_in_at").eq("user_id", userId).is("clocked_out_at", null).maybeSingle();
+  const simple = await supabase.from("time_clock_entries").select("id, clocked_in_at, clock_in_source").eq("user_id", userId).is("clocked_out_at", null).maybeSingle();
   if (simple.error) return { entree: null, colonnes: false, erreur: simple.error.message };
-  return { entree: simple.data ? { ...(simple.data as { id: string; clocked_in_at: string }), last_depot_seen_at: null } : null, colonnes: false };
+  return { entree: simple.data ? { ...(simple.data as { id: string; clocked_in_at: string; clock_in_source: string | null }), last_depot_seen_at: null } : null, colonnes: false };
 }
 
 /**
@@ -49,8 +49,9 @@ async function lireEntreeOuverte(supabase: Awaited<ReturnType<typeof createServe
  * - Pas pointé et à un dépôt du salarié → entrée (clock_in_source =
  *   'auto'), annulable 15 minutes via DELETE.
  * - Pointé et au dépôt → mémorise la présence (last_depot_seen_at).
- * - Pointé, position précise hors dépôt, plus de tournée en cours, une
- *   tournée clôturée, présence au dépôt vue il y a moins de 30 minutes →
+ * - Pointé, position précise franchement hors dépôt (rayon + marge), plus
+ *   de tournée en cours, une tournée clôturée, présence au dépôt vue il y
+ *   a moins de 60 minutes (ou entrée automatique aussi récente) →
  *   sortie automatique À L'HEURE DE LA DERNIÈRE PRÉSENCE (jamais
  *   « maintenant »), annulable via DELETE.
  * - Mêmes conditions mais présence absente ou ancienne → aucune
@@ -74,7 +75,8 @@ export async function POST(req: Request) {
 
   const { depotsFor } = await buildDriverDepotsMap(supabase, appUser.organization_id);
   const point = { lat: parsed.data.latitude, lng: parsed.data.longitude };
-  const match = depotMatch(point, parsed.data.accuracy, depotsFor(appUser.id));
+  const depots = depotsFor(appUser.id);
+  const match = depotMatch(point, parsed.data.accuracy, depots);
 
   const lecture = await lireEntreeOuverte(supabase, appUser.id);
   if (lecture.erreur) return NextResponse.json({ error: lecture.erreur }, { status: 500 });
@@ -94,6 +96,8 @@ export async function POST(req: Request) {
       clockedInAt: open.clocked_in_at,
       positionPrecise,
       auDepot: Boolean(match),
+      loinDuDepot: loinDuDepot(distanceDepotProcheM(point, depots)),
+      entreeAuto: open.clock_in_source === "auto",
       tourneeEnCours: tournees.enCours,
       tourneeCloturee: tournees.cloturee,
       // Sans la colonne (migration absente) pas de sortie automatique : on ne propose que « maintenant ».
@@ -152,20 +156,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "not_at_depot" });
   }
 
-  const { data: entry, error } = await supabase
-    .from("time_clock_entries")
-    .insert({
-      organization_id: appUser.organization_id,
-      user_id: appUser.id,
-      clock_in_lat: point.lat,
-      clock_in_lng: point.lng,
-      clock_in_source: "auto",
-    })
-    .select("id, clocked_in_at")
-    .single();
+  // L'arrivée vaut première présence au dépôt (last_depot_seen_at) ; sans la colonne (migration absente) on réessaie sans elle.
+  const nouvelle = { organization_id: appUser.organization_id, user_id: appUser.id, clock_in_lat: point.lat, clock_in_lng: point.lng, clock_in_source: "auto" };
+  let { data: entry, error } = await supabase.from("time_clock_entries").insert({ ...nouvelle, last_depot_seen_at: new Date().toISOString() }).select("id, clocked_in_at").single();
+  if (error && estSchemaManquant(error)) {
+    ({ data: entry, error } = await supabase.from("time_clock_entries").insert(nouvelle).select("id, clocked_in_at").single());
+  }
   // Pointage déjà ouvert entre-temps (index unique, audit M1).
   if (error?.code === "23505") return NextResponse.json({ status: "clocked_in", atDepot: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !entry) return NextResponse.json({ error: error?.message ?? "Pointage impossible." }, { status: 500 });
 
   return NextResponse.json({ status: "auto_clocked_in", entryId: entry.id, clockedInAt: entry.clocked_in_at, distanceM: match.distanceM });
 }
