@@ -2,7 +2,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
+import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { minuitParis } from "@/lib/ticpe/export";
 import { cleCreneau } from "@/lib/planning/cle-creneau";
 
@@ -63,6 +63,18 @@ export async function POST(req: Request) {
   if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
 
   const occupied = new Set((existing ?? []).map((e) => cleCreneau(e.service_id, e.tour_number, e.start_at)));
+  // Tournées fermées sans chauffeur (ne roulent pas ce jour-là) : jamais régénérées, même si l'heure du modèle a changé.
+  // Lecture tolérante : sans la colonne tour_open (migration 20261105000002), aucune fermeture.
+  const { data: fermees } = await supabase
+    .from("planning_entries")
+    .select("tour_number, start_at")
+    .eq("organization_id", appUser.organization_id)
+    .eq("service_id", service_id)
+    .eq("tour_open", false)
+    .is("driver_id", null)
+    .gte("start_at", minuitParis(week_start))
+    .lt("start_at", minuitParis(addDays(week_start, 7)));
+  const joursFermes = new Set((fermees ?? []).map((e) => `${e.tour_number}|${parisCalendarDate(e.start_at)}`));
   const rows: any[] = [];
   let skipped = 0;
 
@@ -76,7 +88,7 @@ export async function POST(req: Request) {
       if (!route?.tour_number) continue;
       const start_at = parisWallTimeToUtcISOString(day, String(template.departure_time).slice(0, 5));
       const key = cleCreneau(service_id, route.tour_number, start_at);
-      if (occupied.has(key)) {
+      if (occupied.has(key) || joursFermes.has(`${route.tour_number}|${day}`)) {
         skipped++;
         continue;
       }

@@ -11,6 +11,7 @@
  */
 import { addDays, monthCalendarDays } from "@/lib/planning/dates";
 import { heureDe, jourDe, rangJour, type AffectationPlanning, type CongePlanning, type ModelePlanning } from "@/lib/planning/semaine";
+import { estFermeeNonAffectee } from "@/lib/planning/ouverture";
 
 // ---------------------------------------------------------------------------
 // Absences : congés validés, arrêts de travail.
@@ -202,20 +203,38 @@ export function affectationsParTournee<T extends AffectationPlanning>(affectatio
   return m;
 }
 
-export type EtatCase = "remplie" | "a_remplacer" | "vide_prevue" | "vide";
+export type EtatCase = "remplie" | "a_remplacer" | "vide_prevue" | "vide" | "fermee";
 
 /**
  * État d'une case : remplie si toutes ses affectations ont un chauffeur,
  * « à remplacer » si l'une n'en a pas, « vide prévue » si la tournée roule
- * ce jour-là sans affectation (un trou), « vide » sinon.
+ * ce jour-là sans affectation (un trou), « vide » sinon. « Fermée » : la
+ * tournée a été fermée sans chauffeur (elle ne roule pas ce jour-là) ; ce
+ * n'est pas un trou. Une fermeture n'efface pas une autre affectation de la
+ * case (combiné) : seules les lignes restantes décident.
  */
-export function etatCase(entrees: readonly Pick<AffectationPlanning, "driver_id">[], prevue: boolean): EtatCase {
-  if (entrees.length) return entrees.some((e) => !e.driver_id) ? "a_remplacer" : "remplie";
+export function etatCase(entrees: readonly Pick<AffectationPlanning, "driver_id" | "tour_open">[], prevue: boolean): EtatCase {
+  const actives = entrees.filter((e) => !estFermeeNonAffectee(e));
+  if (actives.length) return actives.some((e) => !e.driver_id) ? "a_remplacer" : "remplie";
+  if (entrees.length) return "fermee";
   return prevue ? "vide_prevue" : "vide";
 }
 
 /** Une case à pourvoir : « à remplacer » ou prévue et vide. */
 export const estUnTrou = (etat: EtatCase) => etat === "a_remplacer" || etat === "vide_prevue";
+
+/**
+ * Jours d'une ligne où la tournée est sans chauffeur et peut être fermée
+ * (« Fermer les jours sans chauffeur de cette ligne ») : trous sans aucun
+ * chauffeur placé, pas avant `depuis`.
+ */
+export function joursSansChauffeur<T extends AffectationPlanning>(ligne: LigneTournee, jours: readonly string[], parCase: Map<string, T[]>, depuis?: string): string[] {
+  return jours.filter((d) => {
+    if (depuis && d < depuis) return false;
+    const entrees = parCase.get(cleCaseTournee(ligne.cle, d)) ?? [];
+    return estUnTrou(etatCase(entrees, estJourPrevu(ligne, d))) && entrees.every((e) => !e.driver_id);
+  });
+}
 
 /** Nombre de trous par jour (ligne de synthèse du mois, compteurs du jour). */
 export function trousParJour<T extends AffectationPlanning>(lignes: readonly LigneTournee[], jours: readonly string[], parCase: Map<string, T[]>): Record<string, number> {
@@ -319,7 +338,7 @@ export function calendrierMois<T extends AffectationPlanning>(mois: string, lign
     if (dansMois) {
       for (const l of lignes) {
         const etat = etatCase(parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date));
-        if (etat !== "vide") tournees++;
+        if (etat !== "vide" && etat !== "fermee") tournees++;
         if (estUnTrou(etat)) trous++;
       }
     }
@@ -431,6 +450,8 @@ export interface CompteursJour {
   tournees: number;
   affectees: number;
   sansChauffeur: number;
+  /** Tournées fermées sans chauffeur ce jour-là : hors des autres compteurs. */
+  fermees: number;
   disponibles: number;
   absents: number;
 }
@@ -450,7 +471,8 @@ export function compteursDuJour<T extends AffectationPlanning>(params: {
     .filter((e) => e !== "vide");
   const chauffeurs = params.chauffeurs.map((c) => etatChauffeurDuJour(c.id, date, params.affectations, params.conges, params.arrets ?? []).etat);
   return {
-    tournees: etats.length,
+    tournees: etats.filter((e) => e !== "fermee").length,
+    fermees: etats.filter((e) => e === "fermee").length,
     affectees: etats.filter((e) => e === "remplie").length,
     sansChauffeur: etats.filter(estUnTrou).length,
     disponibles: chauffeurs.filter((e) => e === "disponible").length,

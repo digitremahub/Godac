@@ -105,6 +105,8 @@ export interface ContexteAffectations {
   basculerOuverture: (entree: EntreeAffectation) => void;
   /** Ferme (true) ou rouvre (false) toutes les tournées données (une ligne sur la période affichée). */
   basculerOuvertureLigne: (entrees: EntreeAffectation[], fermer: boolean) => void;
+  /** Ferme (true) ou rouvre (false) une tournée NON AFFECTÉE les jours donnés (« ne roule pas ce jour-là »). */
+  changerFermeture: (ligne: LigneTournee, dates: string[], fermer: boolean) => void;
   /** Ouvre la feuille « Répartir » (tournée fusionnée) de cette affectation. */
   ouvrirRepartition: (entree: EntreeAffectation) => void;
 }

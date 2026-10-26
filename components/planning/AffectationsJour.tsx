@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { cleCaseTournee, cleLigne, estJourPrevu, etatCase, nomCourt, type LigneTournee } from "@/lib/planning/affectation";
 import { estModifiable, heureDe, jourDe, statutAffectation } from "@/lib/planning/semaine";
-import { ligneCorrespond } from "@/lib/planning/ouverture";
-import { BoutonOuverture, BoutonRepartir, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
+import { estOuverte, ligneCorrespond } from "@/lib/planning/ouverture";
+import { BoutonFermerNonAffectee, BoutonOuverture, BoutonRepartir, EncartFermee, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, Vehicule, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
 type Tri = "heure" | "numero" | "trous";
@@ -93,6 +93,9 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
   const colis = entrees.reduce((n, e) => n + (ctx.donnees.colis[e.id] ?? 0), 0);
   const secteur = ligne.villages.slice(0, 2).join(", ");
   const idDepot = `case:${cleCaseTournee(ligne.cle, date)}`;
+  const fermee = etat === "fermee";
+  // Fermer sans chauffeur : seulement si aucun chauffeur n'est placé sur la carte.
+  const fermable = !fermee && entrees.every((e) => !e.driver_id) && (etat === "vide_prevue" || etat === "a_remplacer" || horsJour);
   const libelleEtat = etat === "remplie" ? "Affectée" : etat === "a_remplacer" ? "À remplacer" : "Sans chauffeur";
   const arme = ctx.arme;
 
@@ -116,7 +119,7 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
                 {entrees.slice(0, 1).map((e) => (
                   <PastilleFusion key={e.id} entree={e} />
                 ))}
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>
+                {!fermee && <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold max-md:text-sm ${trou ? "bg-orange/15 text-orange-ink" : "bg-success/15 text-success-ink"}`}>{libelleEtat}</span>}
               </span>
             </div>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65 max-md:text-sm">
@@ -134,7 +137,8 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
 
             <div className="mt-2.5 flex flex-col gap-2">
               {entrees.map((e) => (e.driver_id ? <ChauffeurPlace key={e.id} entree={e} date={date} /> : null))}
-              {(entrees.length === 0 || entrees.some((e) => !e.driver_id)) && (
+              {fermee && entrees.slice(0, 1).map((e) => <EncartFermee key={e.id} entree={e} />)}
+              {!fermee && (entrees.length === 0 || entrees.some((e) => !e.driver_id)) && (
                 <button
                   type="button"
                   disabled={!ctx.donnees.peutModifier || ctx.occupe}
@@ -147,10 +151,16 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
                 </button>
               )}
             </div>
+            {fermable && ctx.donnees.peutModifier && (
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <BoutonFermerNonAffectee ligne={ligne} date={date} />
+              </div>
+            )}
             {entrees.length > 0 && ctx.donnees.peutModifier && (
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {entrees.map((e) => (
-                  <BoutonOuverture key={e.id} entree={e} />
+                  // Fermer une tournée AFFECTÉE reste possible, en second plan (discret) ; sans chauffeur, « Fermer cette tournée » est au-dessus.
+                  <BoutonOuverture key={e.id} entree={e} className={e.driver_id && estOuverte(e) ? "!border-transparent !bg-transparent !shadow-none text-navy/65 underline-offset-2 hover:underline" : ""} />
                 ))}
                 {entrees.slice(0, 1).map((e) => (
                   <BoutonRepartir key={e.id} entree={e} toujours />

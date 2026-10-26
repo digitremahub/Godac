@@ -10,6 +10,7 @@ import {
   etatChauffeurDuJour,
   joursChoisis,
   joursDuMois,
+  joursSansChauffeur,
   libelleIndisponibilite,
   nomCourt,
   RANGS_LUNDI_SAMEDI,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/planning/affectation";
 import { HEURE_VALIDE } from "@/lib/planning/heure";
 import { basculerRang, chauffeursAffiches, estModifiable, heureDe, joursDeLaSemaine, JOURS_COURTS, JOURS_LONGS, libelleJour, rangJour, statutAffectation } from "@/lib/planning/semaine";
-import { estOuverte } from "@/lib/planning/ouverture";
+import { estOuverte, libelleFermeture } from "@/lib/planning/ouverture";
 import { BoutonOuverture, BoutonRepartir, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
 
 export type CibleFeuille = { type: "case"; cle: string; date: string } | { type: "ligne"; cle: string };
@@ -61,6 +62,17 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
   const tenue = entrees.find((e) => e.driver_id);
   // Tournée fermée : on ne change plus son chauffeur tant qu'elle n'est pas rouverte.
   const fermee = cible.type === "case" && entrees.length > 0 && entrees.every((e) => !estOuverte(e));
+  // Fermée SANS chauffeur : la tournée ne roule pas ce jour-là ; sinon, fermée avec un chauffeur.
+  const fermeeSansChauffeur = fermee && entrees.every((e) => !e.driver_id);
+  // « Fermer cette tournée » : case sans aucun chauffeur placé.
+  const fermable = cible.type === "case" && !fermee && donnees.peutModifier && entrees.every((e) => !e.driver_id);
+  // « Fermer les jours sans chauffeur de cette ligne » (⇥ semaine / mois).
+  const joursAFermer = useMemo(() => (cible.type === "ligne" && ligne ? joursSansChauffeur(ligne, periode, ctx.parCase, ctx.aujourdhui) : []), [cible.type, ligne, periode, ctx.parCase, ctx.aujourdhui]);
+  const fermerEtQuitter = (dates: string[], fermer: boolean) => {
+    if (!ligne) return;
+    onFermer();
+    ctx.changerFermeture(ligne, dates, fermer);
+  };
   // Heure de départ : celle de la case (ou habituelle de la tournée), modifiable ici.
   const heureInitiale = entrees[0] ? heureDe(entrees[0].start_at) : (ligne?.heure ?? "07:00");
   const [heure, setHeure] = useState(heureInitiale);
@@ -145,8 +157,30 @@ export function FeuilleAffecter({ cible, actions, onFermer }: { cible: CibleFeui
 
       {fermee && (
         <p className="mb-3 rounded-xl bg-navy/[0.05] p-3 text-sm" role="status">
-          Cette tournée est fermée : son affectation ne change plus et le chauffeur ne peut pas la démarrer. Rouvrez-la pour la modifier.
+          {fermeeSansChauffeur
+            ? `${libelleFermeture(ctx.donnees.fermeesPar[entrees[0]!.id], entrees[0]!.closed_at)}. Elle ne roule pas ce jour-là : plus à pourvoir, plus surveillée. Rouvrez-la pour l'affecter.`
+            : "Cette tournée est fermée : son affectation ne change plus et le chauffeur ne peut pas la démarrer. Rouvrez-la pour la modifier."}
         </p>
+      )}
+
+      {fermable && cible.type === "case" && (
+        <div className="mb-3 rounded-xl border border-navy/10 p-2.5">
+          <p className="mb-2 text-sm text-navy/75">Cette tournée ne roule pas ce jour-là (férié, pas de volume, tournée supprimée) ?</p>
+          <button type="button" className="btn-dark min-h-[44px] !px-3 text-sm max-md:min-h-[48px] max-md:text-base" onClick={() => fermerEtQuitter([cible.date], true)}>
+            Fermer cette tournée
+          </button>
+        </div>
+      )}
+
+      {cible.type === "ligne" && donnees.peutModifier && joursAFermer.length > 0 && (
+        <div className="mb-3 rounded-xl border border-navy/10 p-2.5">
+          <p className="mb-2 text-sm text-navy/75">
+            {joursAFermer.length} jour{joursAFermer.length > 1 ? "s" : ""} sans chauffeur ({joursAFermer.map((d) => libelleJour(d)).join(", ")}). Ne roule pas ces jours-là ?
+          </p>
+          <button type="button" className="btn-dark min-h-[44px] !px-3 text-sm max-md:min-h-[48px] max-md:text-base" onClick={() => fermerEtQuitter(joursAFermer, true)}>
+            Fermer les jours sans chauffeur de cette ligne
+          </button>
+        </div>
       )}
 
       {suivants.length > 0 && tenue?.driver_id && estModifiable(tenue) && (

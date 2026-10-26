@@ -1,6 +1,7 @@
 "use client";
 
 import { useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
+import type { LigneTournee } from "@/lib/planning/affectation";
 import { estOuverte, FILTRES_OUVERTURE, libelleFermeture, type FiltreOuverture } from "@/lib/planning/ouverture";
 import { texteAAttribuer } from "@/lib/planning/fusion";
 import { jourDe, rangJour } from "@/lib/planning/semaine";
@@ -17,6 +18,40 @@ export function PastilleFermee({ entree, court = false }: { entree: EntreeAffect
     <span className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold max-md:text-sm" style={ROUGE} title={texte} aria-label={texte}>
       {court ? "F" : "Fermée"}
     </span>
+  );
+}
+
+/**
+ * « Fermer cette tournée » sur une case sans chauffeur : elle ne roule pas ce
+ * jour-là (férié, pas de volume…), elle n'est plus « à pourvoir » ni surveillée.
+ * Marine GODAC, 44 px. Rien si la personne ne peut pas modifier le planning.
+ */
+export function BoutonFermerNonAffectee({ ligne, date, className = "" }: { ligne: LigneTournee; date: string; className?: string }) {
+  const ctx = useAffectations();
+  if (!ctx.donnees.peutModifier) return null;
+  return (
+    <button
+      type="button"
+      disabled={ctx.occupe}
+      onClick={() => ctx.changerFermeture(ligne, [date], true)}
+      aria-label={`Fermer la tournée ${ligne.tourNumber} du ${date.slice(8, 10)}/${date.slice(5, 7)} : elle ne roule pas ce jour-là`}
+      title="Elle ne roule pas ce jour-là : elle n'est plus à pourvoir ni surveillée, et ne s'affecte plus tant qu'elle est fermée"
+      className={`btn-dark min-h-[44px] !px-3 text-sm max-md:min-h-[48px] max-md:text-base ${className}`}
+    >
+      Fermer cette tournée
+    </button>
+  );
+}
+
+/** Encart d'une tournée fermée sans chauffeur : qui l'a fermée et quand (le bouton « Rouvrir » est à côté). */
+export function EncartFermee({ entree }: { entree: EntreeAffectation }) {
+  const ctx = useAffectations();
+  return (
+    <p className="flex min-h-[52px] items-center rounded-xl border-2 border-navy/15 bg-navy/[0.05] px-3 py-2 text-sm max-md:text-base" role="status">
+      <span>
+        <strong>{libelleFermeture(ctx.donnees.fermeesPar[entree.id], entree.closed_at)}.</strong> Elle ne roule pas ce jour-là : plus à pourvoir, plus surveillée, non affectable.
+      </span>
+    </p>
   );
 }
 
@@ -41,6 +76,8 @@ export function BoutonOuverture({ entree, className = "" }: { entree: EntreeAffe
   const ctx = useAffectations();
   if (!ctx.donnees.peutModifier || entree.id.startsWith("tmp:") || (entree.status !== "planned" && entree.status !== "in_progress")) return null;
   const fermee = !estOuverte(entree);
+  // Sans chauffeur et ouverte : « Fermer cette tournée » (BoutonFermerNonAffectee) est l'action mise en avant.
+  if (!fermee && !entree.driver_id) return null;
   return (
     <button
       type="button"

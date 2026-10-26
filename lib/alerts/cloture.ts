@@ -1,7 +1,8 @@
 /**
  * Clôture automatique des alertes dont la condition a disparu : tournée
  * terminée ou retard résorbé (tournee_retard), chauffeur affecté ou tournée
- * démarrée (tournee_sans_chauffeur, tournee_non_demarree). Le statut passe à
+ * démarrée ou tournée fermée (tournee_sans_chauffeur, tournee_non_demarree ;
+ * fermeture : lib/planning/fermeture-serveur.ts clôt tout de suite). Le statut passe à
  * « resolved » (même statut que le traitement d'un écart carburant) : elles
  * ne comptent plus dans « Notifications ouvertes ».
  *
