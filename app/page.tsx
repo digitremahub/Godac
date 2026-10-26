@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
-import Image from "next/image";
 import { ImageCarousel } from "@/components/marketing/ImageCarousel";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
+import { HeroScene3D } from "@/components/marketing/HeroScene3D";
+import { ModulesProfondeur } from "@/components/marketing/ModulesProfondeur";
 import { MaquetteGoNavigation } from "@/components/marketing/MaquetteGoNavigation";
 import {
   IconArrowRight,
@@ -310,27 +311,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               </ul>
             </div>
 
-            <div className="relative">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-pop ring-1 ring-white/10">
-                <Image
-                  src="/home/scene-carburant.png"
-                  alt="Tableau de bord carburant de GODAC : dépenses, prix moyen pondéré et suivi des pleins"
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 560px, 100vw"
-                  className="object-cover object-center"
-                />
-              </div>
-              <div aria-hidden="true" className="absolute -bottom-6 left-4 hidden items-center gap-3 rounded-2xl bg-surface p-4 pr-5 text-navy shadow-pop sm:flex lg:-left-8">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-marine">
-                  <IconCoins className="h-5 w-5" />
-                </span>
-                <span>
-                  <span className="block text-sm font-bold">Plein éligible · TICPE calculée</span>
-                  <span className="block text-xs text-navy/60">Justificatif rangé, prêt pour la déclaration</span>
-                </span>
-              </div>
-            </div>
+            <HeroScene3D />
           </section>
         </main>
       </div>
@@ -347,6 +328,20 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      {/* ── Les modules en un coup d'œil (3D décorative, ordre de la vitrine) ── */}
+      <section id="modules" className="scroll-mt-6 bg-paper py-20 lg:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-6">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <p className="kicker !text-teal-ink">Les modules</p>
+            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Votre carburant, enfin sous contrôle.</h2>
+            <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+              On commence par la TICPE et le gazole, puis on ajoute la flotte, le planning et la paie, la tournée colis quand vous le décidez.
+            </p>
+          </div>
+          <ModulesProfondeur />
         </div>
       </section>
 
