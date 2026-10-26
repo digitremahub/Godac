@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/cron/surveillance-tournees",
-      "schedule": "*/5 * * * *"
+      "schedule": "30 5 * * *"
     },
     {
       "path": "/api/cron/ticpe",

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Cron toutes les 5 minutes (vercel.json), même contrôle CRON_SECRET que
+ * Cron quotidien (vercel.json : le plan Hobby n'autorise qu'une exécution par jour ; une fréquence plus fine demande le plan Pro ou un déclencheur externe), même contrôle CRON_SECRET que
  * les autres crons. Surveille les tournées sans que personne n'ouvre un
  * écran, pour chaque organisation qui a le module Tournée colis ou le
  * module Planning :

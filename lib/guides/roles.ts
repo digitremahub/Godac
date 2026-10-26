@@ -200,7 +200,7 @@ const ENCADREMENT: SectionGuide[] = [
       {
         titre: "Suivre les tournées en direct",
         texte:
-          "« Suivi en direct » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 20 secondes. Les retards et les tournées non démarrées ou sans chauffeur sont surveillés toutes les 5 minutes, même sans connexion, et vous sont signalés par notification. Le bouton « Saisir un départ ou un retour » en haut de la page enregistre le départ ou le retour d'un chauffeur à sa place (badge et code).",
+          "« Suivi en direct » : carte de tous les chauffeurs en livraison (dernière position), arrêts restants, adresses et colis restants et heure de fin estimée, avec un filtre par service. Actualisation toutes les 20 secondes. Les retards et les tournées non démarrées ou sans chauffeur sont surveillés chaque matin même sans connexion, puis à chaque ouverture du suivi, et vous sont signalés par notification. Le bouton « Saisir un départ ou un retour » en haut de la page enregistre le départ ou le retour d'un chauffeur à sa place (badge et code).",
         lien: { href: "/exploitation/suivi", label: "Suivi en direct" },
         module: "route_optimizer",
       },
