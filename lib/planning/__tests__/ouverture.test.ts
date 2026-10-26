@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   compterFermees,
   confirmationFermeture,
+  estFermeeNonAffectee,
   estOuverte,
   filtrerParOuverture,
   libelleFermeture,
   ligneCorrespond,
   messageTourneeFermee,
   peutChangerOuverture,
+  peutFermerNonAffectee,
 } from "@/lib/planning/ouverture";
 import { decisionsAffectation } from "@/lib/planning/affectation";
 import { estModifiable, type AffectationPlanning } from "@/lib/planning/semaine";
@@ -121,5 +123,35 @@ describe("tournée fermée = affectation figée", () => {
 
   it("rouvrir rétablit le changement", () => {
     expect(decisionsAffectation({ ...base, existantes: [existante({ tour_open: true })] })[0]!.type).toBe("changer");
+  });
+});
+
+describe("tournée fermée sans chauffeur (non affectée)", () => {
+  it("reconnue : fermée ET sans chauffeur", () => {
+    expect(estFermeeNonAffectee({ tour_open: false, driver_id: null })).toBe(true);
+    expect(estFermeeNonAffectee({ tour_open: false })).toBe(true);
+    expect(estFermeeNonAffectee({ tour_open: false, driver_id: "d" })).toBe(false);
+    expect(estFermeeNonAffectee({ tour_open: true, driver_id: null })).toBe(false);
+    expect(estFermeeNonAffectee({ driver_id: null })).toBe(false);
+  });
+
+  it("droits : direction et exploitation partout, manager sur son service, personne d'autre", () => {
+    const droit = (role: string, serviceIds: string[] = [SERVICE]) => peutFermerNonAffectee({ role, serviceIds, serviceId: SERVICE });
+    expect(droit("direction", []).ok).toBe(true);
+    expect(droit("exploitation", []).ok).toBe(true);
+    expect(droit("manager").ok).toBe(true);
+    expect(droit("manager_chauffeur").ok).toBe(true);
+    const horsService = droit("manager", ["autre"]);
+    expect(horsService.ok).toBe(false);
+    expect(horsService.ok ? "" : horsService.raison).toContain("son service");
+    expect(droit("manager_chauffeur", []).ok).toBe(false);
+    for (const role of ["chauffeur", "comptable", "", "inconnu"]) expect(droit(role).ok, role).toBe(false);
+  });
+
+  it("n'est pas modifiable, et glisser un chauffeur dessus est ignoré (figée)", () => {
+    const at = (d: string, h: string) => parisWallTimeToUtcISOString(d, h);
+    const fermee: AffectationPlanning = { id: "f1", service_id: SERVICE, tour_number: "106", driver_id: null, vehicle_id: null, start_at: at("2026-11-11", "07:00"), status: "planned", tour_open: false };
+    expect(estModifiable(fermee)).toBe(false);
+    expect(decisionsAffectation({ dates: ["2026-11-11"], driverId: "b", heure: "07:00", absent: () => false, versUtc: at, existantes: [fermee] })).toEqual([{ type: "rien", date: "2026-11-11", raison: "figee" }]);
   });
 });
