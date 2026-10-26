@@ -54,15 +54,40 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   inscription: { singulier: "Inscription", pluriel: "Inscriptions" },
 };
 
+/**
+ * Écran(s) du catalogue qui traitent chaque type (celui de la source de
+ * lib/a-traiter/serveur.ts). Sert à verrouiller la matrice des rôles par
+ * test : un type n'est lu que si l'un de ces écrans s'ouvre pour le rôle.
+ */
+export const ECRANS_PAR_TYPE: Record<TypeATraiter, readonly string[]> = {
+  ecart_carburant: ["carburant.pleins"],
+  amende: ["flotte.amendes"],
+  entretien: ["flotte.entretien"],
+  demande: ["communication.intranet", "communication.assistance"],
+  ticpe: ["carburant.ticpe_controles"],
+  tournee_sans_chauffeur: ["exploitation.planning"],
+  repartition_a_attribuer: ["exploitation.planning"],
+  tournee_non_demarree: ["exploitation.planning"],
+  tournee_en_retard: ["exploitation.suivi"],
+  ticket_ocr: ["carburant.revue_ocr"],
+  bulletin_paie: ["equipe.paie"],
+  conge: ["equipe.conges"],
+  arret: ["equipe.arrets"],
+  contestation: ["exploitation.contestations"],
+  inscription: ["equipe.inscriptions"],
+};
+
 export type Urgence = "haute" | "normale";
 
 /**
  * Types qu'un manager (chef d'équipe) retrouve dans « À traiter » : ceux
- * dont la lecture est limitée à ses services par la RLS (carburant,
- * entretien, congés, planning) ou par le code (retards du suivi). Les
- * autres (amendes, contestations, demandes, TICPE, inscriptions, paie…)
- * restent à l'exploitation et à la direction. Exploitation et direction :
- * tous les types (null).
+ * dont la lecture est limitée à ses services par la RLS (carburant, congés,
+ * planning), par le code (retards du suivi, et demandes d'entretien : la
+ * lecture des interventions est ouverte à toute l'organisation en base, le
+ * filtre par service du véhicule se fait dans lib/a-traiter/serveur.ts). Les
+ * autres (amendes, contestations, demandes, TICPE, inscriptions, arrêts de
+ * travail, paie…) restent à l'exploitation et à la direction. Exploitation
+ * et direction : tous les types, sauf la paie qui reste à la direction.
  */
 export const TYPES_MANAGER: readonly TypeATraiter[] = [
   "ecart_carburant",
@@ -75,9 +100,31 @@ export const TYPES_MANAGER: readonly TypeATraiter[] = [
   "tournee_en_retard",
 ];
 
-/** L'élément de ce type peut-il figurer dans la liste de ce rôle ? */
+/**
+ * Rôles qui ont « À traiter » (écran dashboard.a_traiter du catalogue) :
+ * jamais le chauffeur ni le comptable, qui n'ont pas de liste de décisions.
+ */
+export const ROLES_A_TRAITER: readonly string[] = ["manager", "exploitation", "direction"];
+
+/**
+ * Types réservés à la direction : la validation des bulletins de paie ne
+ * revient ni au manager ni à l'exploitation (le catalogue ne leur ouvre pas
+ * « Paie & salaires » : lib/roles/perimetre.ts, « jamais la paie »). Le
+ * comptable prépare la paie mais n'a pas la liste « À traiter ».
+ */
+export const TYPES_DIRECTION: readonly TypeATraiter[] = ["bulletin_paie"];
+
+/** L'élément de ce type peut-il figurer dans la liste de ce rôle ? Garde de défense, en plus de l'écran du catalogue. */
 export function typeVisiblePour(type: TypeATraiter, role: string): boolean {
-  return role !== "manager" || TYPES_MANAGER.includes(type);
+  if (role === "direction") return true;
+  if (role === "exploitation") return !TYPES_DIRECTION.includes(type);
+  if (role === "manager") return TYPES_MANAGER.includes(type);
+  return false;
+}
+
+/** Types visibles de ce rôle, dans l'ordre du catalogue. */
+export function typesVisiblesPour(role: string): TypeATraiter[] {
+  return TYPES_A_TRAITER.filter((t) => typeVisiblePour(t, role));
 }
 
 /** Plafond de lignes lues par source (une requête, jamais de pagination). */

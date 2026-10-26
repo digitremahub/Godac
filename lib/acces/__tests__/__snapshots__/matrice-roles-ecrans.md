@@ -21,6 +21,8 @@
 | Exploitation | Modèles de tournées & villages | `/exploitation/tournees` | ✅ | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
 | Exploitation | Préparation des tournées colis | `/exploitation/colis` | ↪ /livreur | ✅ | ✅ | — | ✅ | route_optimizer |
 | Exploitation | GO Navigation | `/livreur/navigation` | ✅ | — | — | — | — | route_optimizer |
+| Exploitation | Tournées en cours | `/exploitation/en-cours` | — | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
+| Exploitation | Clôture de la journée | `/exploitation/cloture` | — | ✅ | ✅ | — | ✅ | planning?, route_optimizer? |
 | Exploitation | Suivi en direct | `/exploitation/suivi` | — | ✅ | ✅ | — | ✅ | route_optimizer |
 | Exploitation | Historique des tournées | `/exploitation/historique` | ✅ | ✅ | ✅ | ✅ | ✅ | planning |
 | Exploitation | Rapports de tournée | `/exploitation/historique/rapports` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | 🔒 | planning |

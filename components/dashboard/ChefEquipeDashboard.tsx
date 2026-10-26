@@ -82,7 +82,7 @@ export async function ChefEquipeDashboard({ appUser, enabledModules }: { appUser
   const [donnees, alertesLues, tourneeOuverte, autoClock] = await Promise.all([
     chargerAccueilChefEquipe(supabase, appUser, { amendes: amendesOuvertes, contestations: contestationsOuvertes, conges: congesOuverts, entretiens: entretienOuvert }),
     // Diffusées et personnelles (exploitation, direction), jamais le rappel d'un collègue.
-    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }).then(
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5, role: appUser.role }).then(
       (alertes) => ({ alertes, erreur: false }),
       (e) => {
         console.warn("[accueil manager] notifications : lecture impossible", e instanceof Error ? e.message : e);

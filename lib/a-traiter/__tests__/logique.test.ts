@@ -250,7 +250,9 @@ describe("types par rôle et vocabulaire", () => {
     expect(typeVisiblePour("conge", "manager")).toBe(true);
     expect(typeVisiblePour("amende", "manager")).toBe(false);
     expect(typeVisiblePour("bulletin_paie", "manager")).toBe(false);
-    expect(TYPES_A_TRAITER.every((t) => typeVisiblePour(t, "exploitation") && typeVisiblePour(t, "direction"))).toBe(true);
+    expect(TYPES_A_TRAITER.every((t) => typeVisiblePour(t, "direction"))).toBe(true);
+    // La paie reste à la direction : jamais l'exploitation.
+    expect(TYPES_A_TRAITER.filter((t) => !typeVisiblePour(t, "exploitation"))).toEqual(["bulletin_paie"]);
     expect(TYPES_MANAGER.every((t) => (TYPES_A_TRAITER as readonly string[]).includes(t))).toBe(true);
   });
   it("libellés non inversés : non démarrée / en retard", () => {

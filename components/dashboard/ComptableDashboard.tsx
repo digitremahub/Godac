@@ -75,7 +75,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
     ticpeEnabled
       ? supabase.from("ticpe_exports").select("id").lte("period_start", quarterEnd).gte("period_end", quarterStart).maybeSingle()
       : Promise.resolve({ data: null }),
-    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5 }),
+    chargerAlertes(supabase, appUser.id, { ouvertes: true, limite: 5, role: appUser.role }),
     // Bulletins du mois (préparés, validés, refusés à corriger) et salariés actifs.
     payslipsEnabled ? supabase.from("payslips").select("period_start, validation_status").eq("period_start", `${moisCourant}-01`) : Promise.resolve({ data: null }),
     payslipsEnabled ? supabase.from("users").select("id", { count: "exact", head: true }).eq("organization_id", appUser.organization_id).eq("active", true) : Promise.resolve({ count: null }),

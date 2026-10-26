@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { garderApi } from "@/lib/acces/garde-api";
-import { ACTIONS_LOT, COMMENTAIRE_LOT_MAX, LOT_MAX, TYPES_LOT, actionPossible, commentaireRequis, commentaireValide, dedoublonner } from "@/lib/a-traiter/lot";
+import { ACTIONS_LOT, COMMENTAIRE_LOT_MAX, LOT_MAX, TYPES_LOT, actionPossible, commentaireRequis, commentaireValide, dedoublonner, MOTIF_TYPE_NON_AUTORISE, typeLotAutorise } from "@/lib/a-traiter/lot";
 import { traiterLot } from "@/lib/a-traiter/lot-serveur";
+import { modulesActifs } from "@/lib/acces/modules-requete";
 
 const bodySchema = z.object({
   action: z.enum(ACTIONS_LOT),
@@ -15,7 +16,7 @@ const bodySchema = z.object({
 });
 
 /**
- * Traitement groupé de « À traiter aujourd'hui » (exploitation, direction).
+ * Traitement groupé de « À traiter aujourd'hui » (manager : carburant, entretien, congés de ses services ; exploitation, direction).
  * Chaque élément passe par la route individuelle existante : mêmes
  * contrôles de rôle, de module et de hiérarchie (jamais sa propre demande,
  * sauf direction seule, tracée). Réponse 200 avec un résultat par élément
@@ -38,6 +39,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Un commentaire (3 caractères au moins) est obligatoire pour cette action." }, { status: 422 });
   }
 
-  const { resultats, resume } = await traiterLot({ supabase, utilisateur: appUser, action, commentaire: commentaire || null, elements });
+  // Périmètre du rôle revérifié côté serveur, élément par élément (jamais la seule liste affichée).
+  const ctx = { role: appUser.role, modules: await modulesActifs(appUser.organization_id), conduit: appUser.conduit };
+  const autorise = new Map<string, boolean>();
+  const refus = (el: { type: (typeof TYPES_LOT)[number] }) => {
+    if (!autorise.has(el.type)) autorise.set(el.type, typeLotAutorise(el.type, ctx));
+    return autorise.get(el.type) ? null : MOTIF_TYPE_NON_AUTORISE;
+  };
+  if (elements.every((e) => refus(e))) return NextResponse.json({ error: MOTIF_TYPE_NON_AUTORISE }, { status: 403 });
+
+  const { resultats, resume } = await traiterLot({ supabase, utilisateur: appUser, action, commentaire: commentaire || null, elements, refus });
   return NextResponse.json({ resultats, resume });
 }

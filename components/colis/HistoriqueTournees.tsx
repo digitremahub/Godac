@@ -1,8 +1,9 @@
 import Link from "next/link";
 import HistoriqueCarte from "@/components/colis/HistoriqueCarteDynamique";
 import { Card, EmptyState } from "@/components/ui";
+import { ExportTournees } from "@/components/exploitation/ExportTournees";
 import { HistoriqueFiltres, LigneCliquable } from "@/components/colis/HistoriqueFiltres";
-import { versParams, type Historique, type detailTournee, type LigneColis, type RechercheColis, type rechercherColis } from "@/lib/colis/historique";
+import { HISTORIQUE_MAX, versParams, type Historique, type detailTournee, type LigneColis, type RechercheColis, type rechercherColis } from "@/lib/colis/historique";
 import { SupprimerTourneeDirection } from "@/components/colis/SupprimerTourneeDirection";
 import { estMarque, libellePreuve, libelleStatut } from "@/lib/colis/livraison";
 import { BadgeArret, EncocheArret } from "@/components/colis/Ramasse";
@@ -48,7 +49,14 @@ export function HistoriqueTournees({
       <HistoriqueFiltres du={filtres.du} au={filtres.au} services={encadrement ? historique.services : null} chauffeurs={historique.chauffeurs} camions={historique.camions} />
       <p className="-mt-2 text-xs text-navy/55">Tournées conservées 12 mois (adresses, initiales et photos pour les contestations) ; noms complets, téléphones et consignes effacés après 30 jours.</p>
 
+      <ExportTournees type="historique" requete={versParams({ ...filtres, page: 1 }, aujourdhui).toString()} total={total} />
+
       {historique.erreur && <Card className="text-orange-ink">{historique.erreur}</Card>}
+      {historique.tronque && (
+        <p role="status" className="rounded-lg border border-orange/40 bg-orange/10 px-3 py-2 text-sm text-orange-ink">
+          Plus de {HISTORIQUE_MAX.toLocaleString("fr-FR")} tournées sur cette période : seules les plus récentes sont affichées. Réduisez la période ou filtrez par chauffeur, service ou camion pour voir les autres.
+        </p>
+      )}
 
       {resultats && <ResultatsColis resultats={resultats} lienTournee={(id) => lien({ tournee: id })} encadrement={encadrement} />}
 

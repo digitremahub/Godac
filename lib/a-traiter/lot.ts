@@ -6,7 +6,8 @@
  * contrôles serveur, mêmes notifications, même journal.
  */
 
-import type { TypeATraiter } from "@/lib/a-traiter/logique";
+import { typeVisiblePour, type TypeATraiter } from "@/lib/a-traiter/logique";
+import { ecranOuvrable, type ContexteAccueil } from "@/lib/acces/tuiles-accueil";
 
 /** Taille maximale d'un lot. */
 export const LOT_MAX = 50;
@@ -43,6 +44,28 @@ export const SENS_ACTION: Record<TypeLot, { valider: string | null; refuser: str
   conge: { valider: "approuvé", refuser: "refusé" },
   arret: { valider: "validé", refuser: "refusé" },
 };
+
+/** Écran du catalogue qui traite chaque type (même écran que la source de « À traiter »). */
+export const ECRAN_PAR_TYPE_LOT: Record<TypeLot, string> = {
+  ecart_carburant: "carburant.pleins",
+  amende: "flotte.amendes",
+  entretien: "flotte.entretien",
+  conge: "equipe.conges",
+  arret: "equipe.arrets",
+};
+
+/**
+ * Le rôle peut-il traiter ce type en groupe ? Même périmètre que la liste
+ * « À traiter » : un manager ne traite en lot que carburant, entretien et
+ * congés (jamais amendes ni arrêts de travail, qui restent à l'exploitation
+ * et à la direction), et l'écran du type doit s'ouvrir pour lui (rôle,
+ * modules). La route individuelle reste l'autorité (rôle, hiérarchie, RLS).
+ */
+export function typeLotAutorise(type: TypeLot, ctx: ContexteAccueil): boolean {
+  return typeVisiblePour(type, ctx.role) && ecranOuvrable(ECRAN_PAR_TYPE_LOT[type], ctx);
+}
+
+export const MOTIF_TYPE_NON_AUTORISE = "Ce type d'élément n'est pas dans votre périmètre.";
 
 export function actionPossible(type: TypeATraiter | string, action: ActionLot): boolean {
   return estTypeLot(type) && SENS_ACTION[type][action] !== null;

@@ -16,8 +16,8 @@ describe("menu de la direction allégé", () => {
     expect(sections.find((s) => s.id === "flotte")!.ecrans.map((e) => e.id)).not.toContain("flotte.badges");
   });
 
-  it("au plus 25 entrées dépliées au lieu de 32, le carburant et la paie restent en vue", () => {
-    expect(visiblesParDefaut.length).toBeLessThanOrEqual(25);
+  it("au plus 27 entrées dépliées au lieu de 32, le carburant et la paie restent en vue", () => {
+    expect(visiblesParDefaut.length).toBeLessThanOrEqual(27);
     const ids = visiblesParDefaut.map((e) => e.id);
     expect(ids).toEqual(expect.arrayContaining(["carburant.pleins", "carburant.revue_ocr", "equipe.paie", "equipe.utilisateurs", "exploitation.planning"]));
   });

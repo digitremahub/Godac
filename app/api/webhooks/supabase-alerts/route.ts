@@ -5,7 +5,7 @@ import { renderAlertEmail } from "@/lib/email/templates/alert-notification";
 import { sendPushToSubscriptions } from "@/lib/push/send";
 import { resolveAlertUrl } from "@/lib/alerts/resolve-url";
 import type { UserRole } from "@/lib/types/domain";
-import { choisirDestinataires, estLimiteAuService, rolesCibles } from "@/lib/alerts/destinataires";
+import { choisirDestinataires, rolesCibles, serviceAVerifier } from "@/lib/alerts/destinataires";
 
 /**
  * Receiver for a Supabase Database Webhook configured on
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   // Alerte d'un service : le manager ne la reçoit que s'il est de ce service (même périmètre que la RLS) ;
   // exploitation et direction : toute l'organisation (lib/alerts/destinataires.ts).
   const candidats = recipients ?? [];
-  const managersConcernes = candidats.filter((r) => estLimiteAuService(r.role, alert.service_id)).map((r) => r.id);
+  const managersConcernes = candidats.filter((r) => serviceAVerifier(r.role, alert.type, alert.service_id)).map((r) => r.id);
   const { data: liensServices } = managersConcernes.length
     ? await supabase.from("user_services").select("user_id, service_id").in("user_id", managersConcernes)
     : { data: [] as { user_id: string; service_id: string }[] };
