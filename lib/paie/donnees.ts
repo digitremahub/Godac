@@ -11,6 +11,10 @@ import { acomptesJusquAu } from "@/lib/paie/acomptes-serveur";
 import { debutPeriode, natureAbsenceConges, periodesDuMois, soldeConges, type Reprise, type SoldeConges } from "@/lib/paie/conges";
 import { estConducteur } from "@/lib/roles/conducteurs";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { paysOrganisation } from "@/lib/pays/serveur";
+import { reglesTempsTravail } from "@/lib/pays/temps-travail";
+import { controlerTempsTravail, type AvertissementRepos } from "@/lib/time-clock/repos";
+import { reprendrePrimes } from "@/lib/paie/primes";
 import { heuresDuMois, sourceHeures, type AbsenceJours, type EntreePlanning, type HeuresDuMois, type Pointage } from "@/lib/paie/heures";
 import type { ArretTravail, ElementsSortie, MotifSortie, ParametresEntreprise, ParametresLegaux, ParametresMaintien, ProfilSalarie, RegimeTransport, TypeArret, VariablesMois } from "@/lib/paie/types";
 
@@ -88,6 +92,12 @@ export interface ContextePaie {
    * prévu, retour de tournée) et alertes de contrôle — lib/paie/heures.ts.
    */
   controleHeures: HeuresDuMois;
+  /**
+   * Avertissements de repos et de durée du travail (repos quotidien, amplitude,
+   * 48 h hebdomadaires, jours consécutifs), non bloquants, « à valider avec
+   * votre expert paie / convention collective ». Vide si le pays n'a pas de règles.
+   */
+  avertissementsRepos: AvertissementRepos[];
   /** Arrêts refusés par l'encadrement : retirés d'un bulletin déjà généré. */
   arretsRefuses: string[];
   cumuls: { brut: number; netImposable: number; heuresSupExonerees: number };
@@ -244,11 +254,19 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       .gte("period_start", depuis)
       .lt("period_start", debut)
       .order("period_start"),
-    // Pointages du mois (direction, comptable : RLS « time_clock »).
-    supabase.from("time_clock_entries").select("clocked_in_at, clocked_out_at").eq("user_id", userId).gte("clocked_in_at", avant).lt("clocked_in_at", apres),
+    // Pointages du mois (direction, comptable : RLS « time_clock »). needs_regularization (migration 20261109000002) : repli sans la colonne.
+    (async () => {
+      const lire = (colonnes: string) => supabase.from("time_clock_entries").select(colonnes).eq("user_id", userId).gte("clocked_in_at", avant).lt("clocked_in_at", apres);
+      const r = await lire("clocked_in_at, clocked_out_at, needs_regularization");
+      return r.error && estSchemaManquant(r.error) ? lire("clocked_in_at, clocked_out_at") : r;
+    })(),
     supabase.from("users").select("role, can_drive").eq("id", userId).maybeSingle(),
   ]);
-  const pointages: Pointage[] = ((pointagesBruts ?? []) as { clocked_in_at: string; clocked_out_at: string | null }[]).map((p) => ({ entree: p.clocked_in_at, sortie: p.clocked_out_at }));
+  const pointages: Pointage[] = ((pointagesBruts ?? []) as unknown as { clocked_in_at: string; clocked_out_at: string | null; needs_regularization?: boolean }[]).map((p) => ({
+    entree: p.clocked_in_at,
+    sortie: p.clocked_out_at,
+    aRegulariser: Boolean(p.needs_regularization),
+  }));
   // Arrêts refusés par l'encadrement (migration 20261030000001) : ni paie, ni heures.
   const lignesArrets = (arretsLignes.error ? [] : (arretsLignes.data ?? [])) as Record<string, unknown>[];
   const arretsRefuses = lignesArrets.filter((l) => l.status === "refuse").map((l) => String(l.id));
@@ -300,6 +318,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
     source: entreprise.sourceHeures,
   });
   const joursTravailles = controleHeures.joursTravailles;
+  const regles = reglesTempsTravail((await paysOrganisation(supabase, organizationId)).code);
+  const avertissementsRepos = regles ? controlerTempsTravail(controleHeures.jours, regles) : [];
 
   const d0 = new Date(`${debut}T00:00:00Z`);
   const d1 = new Date(`${fin}T00:00:00Z`);
@@ -425,7 +445,8 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       joursCongesPris: joursConges,
       // Reprises du mois précédent (bulletin validé), à vérifier : primes
       // et taux du panier. Les heures sup. et les congés sont propres au mois.
-      primes: ((precedent?.variables as VariablesMois | null)?.primes ?? []).filter((p) => p.montant),
+      // Les primes « ponctuelles » du mois précédent ne sont pas reprises ; les autres le sont, marquées (lib/paie/primes.ts).
+      primes: reprendrePrimes((precedent?.variables as VariablesMois | null)?.primes),
       tauxRepas: (precedent?.variables as VariablesMois | null)?.tauxRepas ?? null,
       // Paiement : dernier jour du mois, par virement ; mode et type de
       // taux PAS repris du dernier bulletin validé.
@@ -451,6 +472,7 @@ export async function contextePaie(supabase: SupabaseClient, organizationId: str
       joursTravailles,
     },
     controleHeures,
+    avertissementsRepos,
     arretsRefuses,
     cumuls,
     acomptes,

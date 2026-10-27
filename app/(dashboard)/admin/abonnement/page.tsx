@@ -2,6 +2,8 @@ import { garderPage } from "@/lib/acces/garde-page";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { BillingPanel } from "@/components/admin/BillingPanel";
+import { BandeauImpaye } from "@/components/admin/BandeauImpaye";
+import { impayeAffiche } from "@/lib/stripe/impaye";
 import { UsagePanel, type HistoriqueMois } from "@/components/admin/UsagePanel";
 import { ModulesPanel, type LigneModuleAffichee } from "@/components/admin/ModulesPanel";
 import { JaugeQuota } from "@/components/acces/JaugeQuota";
@@ -27,6 +29,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     .select("plan, subscription_status, stripe_customer_id, stripe_subscription_id, country")
     .eq("id", appUser.organization_id)
     .single();
+
+  // État d'impayé (migration 20261109000002) lu à part : colonne absente = seul le statut d'abonnement joue.
+  const { data: impaye } = await supabase.from("organizations").select("payment_failed_at").eq("id", appUser.organization_id).maybeSingle();
+  const bandeauImpaye = impayeAffiche({ payment_failed_at: (impaye as { payment_failed_at?: string | null } | null)?.payment_failed_at ?? null, subscription_status: organization?.subscription_status ?? null }) ? (
+    <BandeauImpaye depuisLe={(impaye as { payment_failed_at?: string | null } | null)?.payment_failed_at ?? null} peutRegulariser={Boolean(organization?.stripe_customer_id)} />
+  ) : null;
 
   const onglets = (
     <nav aria-label="Abonnement" className="mb-5 flex gap-1 overflow-x-auto border-b border-navy/10">
@@ -76,6 +84,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     return (
       <div>
         <PageHeader title="Abonnement & modules" description="Activez les modules de votre espace GODAC." />
+        {bandeauImpaye}
         {onglets}
         <ModulesPanel
           modules={lignes}
@@ -97,6 +106,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     <div className="flex flex-col gap-6">
       <div>
         <PageHeader title="Abonnement & modules" description="Formule, factures et consommation." />
+        {bandeauImpaye}
         {onglets}
         <BillingPanel
           plan={organization?.plan ?? "starter"}

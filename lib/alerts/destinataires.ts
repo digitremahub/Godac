@@ -29,8 +29,20 @@ export const TYPES_ALERTE_TOURNEE: readonly string[] = ["tournee_retard", "tourn
  */
 export const TYPES_ALERTE_ECHEANCE: readonly string[] = ["echeance_vehicule"];
 
-/** Alertes réservées à l'encadrement et bornées au service : tournées et échéances de la flotte. */
-const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE];
+/**
+ * Alertes RH (lot 3) : échéances du personnel (permis, visite médicale, fin de
+ * contrat, documents) et pointages à régulariser. Même périmètre : un manager
+ * ne reçoit que celles de son service ; les genres sensibles (visite médicale,
+ * fin de contrat, titre de séjour) sont créés sans service et ne lui arrivent
+ * jamais (lib/alerts/echeances-rh.ts) ; jamais le comptable ni le chauffeur.
+ */
+export const TYPES_ALERTE_RH: readonly string[] = ["echeance_rh", "pointage_a_regulariser"];
+
+/** Alertes de facturation (paiement échoué) : la direction seule. */
+export const TYPES_ALERTE_DIRECTION: readonly string[] = ["paiement_echoue"];
+
+/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte et alertes RH. */
+const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH];
 
 export interface DestinatairePossible {
   id: string;
@@ -58,6 +70,7 @@ export function estLimiteAuService(role: string, serviceId: string | null | unde
  * tournée sont encadrées ici ; le reste suit la RLS d'origine.
  */
 export function alerteVisiblePour(role: string, type: string, serviceId: string | null | undefined, mesServices: readonly string[] = []): boolean {
+  if (TYPES_ALERTE_DIRECTION.includes(type)) return role === "direction";
   if (!TYPES_ALERTE_ENCADREMENT_SERVICE.includes(type)) return true;
   if (role === "comptable" || role === "chauffeur") return false;
   if (ROLES_PAR_SERVICE.includes(role)) return Boolean(serviceId) && mesServices.includes(serviceId!);

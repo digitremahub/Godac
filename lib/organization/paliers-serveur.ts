@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStripeClient } from "@/lib/stripe/client";
 import { MODULES_PAR_PALIER, prixPalier, type PalierUtilisateurs } from "@/lib/organization/paliers";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { journaliser } from "@/lib/audit/journal";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 /**
  * Utilisateurs de l'app Livreur : chauffeurs actifs et validés.
@@ -33,6 +35,8 @@ export interface ChangementPalier {
   moduleKey: string;
   utilisateurs: number;
   prix: number;
+  /** Mise à jour Stripe en échec : la base n'a PAS été modifiée, le prochain passage du cron réessaie. */
+  echecStripe?: string;
 }
 
 /**
@@ -40,9 +44,17 @@ export interface ChangementPalier {
  * (ou toutes) et répercute un changement sur l'abonnement Stripe à la
  * prochaine échéance (sans prorata). Appelé chaque nuit et à la commande.
  *
- * En cas d'erreur de lecture (grille, modules, comptage) ou d'écriture,
- * rien n'est écrit ni poussé vers Stripe pour la ligne concernée ; les
- * erreurs de lecture globales sont levées.
+ * Stripe d'abord, la base ensuite : si l'appel Stripe échoue, le prix de la
+ * base n'est pas modifié, donc l'écart persiste et la nuit suivante le cron
+ * réessaie tout seul (avant, la base était écrite d'abord et l'échec Stripe
+ * n'était plus jamais repris). L'échec est marqué sur la ligne
+ * (stripe_sync_pending, migration 20261109000002) et tracé au journal d'audit,
+ * visible de la direction. Si l'écriture de la base échoue après Stripe, le
+ * passage suivant repousse le même prix : sans effet.
+ *
+ * En cas d'erreur de lecture (grille, modules, comptage), rien n'est écrit ni
+ * poussé vers Stripe pour la ligne concernée ; les erreurs de lecture globales
+ * sont levées.
  */
 export async function synchroniserPaliers(admin: SupabaseClient, organizationId?: string): Promise<ChangementPalier[]> {
   const paliers = await getPaliers(admin);
@@ -71,23 +83,54 @@ export async function synchroniserPaliers(admin: SupabaseClient, organizationId?
     if (utilisateurs === null || utilisateurs === undefined) continue;
     const prix = prixPalier(paliers, l.module_key, utilisateurs);
     if (prix === null) continue;
-    if (prix === Number(l.effective_monthly_price) && l.billed_users === utilisateurs) continue;
-    const { error: majError } = await admin
+    const prixChange = prix !== Number(l.effective_monthly_price);
+    if (!prixChange && l.billed_users === utilisateurs) continue;
+    const org = (Array.isArray(l.organizations) ? l.organizations[0] : l.organizations) as { stripe_subscription_id: string | null } | null;
+    if (prixChange && org?.stripe_subscription_id) {
+      try {
+        await majAbonnement(org.stripe_subscription_id, l.module_key, prix);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.error("palier stripe", l.organization_id, l.module_key, message);
+        await signalerEchecStripe(admin, { organizationId: l.organization_id, moduleKey: l.module_key, utilisateurs, prix, message });
+        changes.push({ organizationId: l.organization_id, moduleKey: l.module_key, utilisateurs, prix, echecStripe: message });
+        continue;
+      }
+    }
+    const miseAJour = { effective_monthly_price: prix, billed_users: utilisateurs };
+    let { error: majError } = await admin
       .from("organization_modules")
-      .update({ effective_monthly_price: prix, billed_users: utilisateurs })
+      .update({ ...miseAJour, stripe_sync_pending: false, stripe_sync_error: null })
       .eq("organization_id", l.organization_id)
       .eq("module_key", l.module_key);
+    // Colonnes de suivi absentes (migration 20261109000002 pas appliquée) : on n'écrit que le prix.
+    if (majError && estSchemaManquant(majError)) {
+      ({ error: majError } = await admin.from("organization_modules").update(miseAJour).eq("organization_id", l.organization_id).eq("module_key", l.module_key));
+    }
     if (majError) {
       console.error("palier : mise à jour", l.organization_id, l.module_key, majError.message);
       continue;
     }
-    const org = (Array.isArray(l.organizations) ? l.organizations[0] : l.organizations) as { stripe_subscription_id: string | null } | null;
-    if (prix !== Number(l.effective_monthly_price) && org?.stripe_subscription_id) {
-      await majAbonnement(org.stripe_subscription_id, l.module_key, prix).catch((e) => console.error("palier stripe", e));
-    }
     changes.push({ organizationId: l.organization_id, moduleKey: l.module_key, utilisateurs, prix });
   }
   return changes;
+}
+
+/** Marque la ligne (reprise au prochain passage) et laisse une trace visible de la direction dans le journal d'audit. */
+async function signalerEchecStripe(admin: SupabaseClient, e: { organizationId: string; moduleKey: string; utilisateurs: number; prix: number; message: string }) {
+  const { error } = await admin
+    .from("organization_modules")
+    .update({ stripe_sync_pending: true, stripe_sync_error: e.message.slice(0, 500), stripe_sync_failed_at: new Date().toISOString() })
+    .eq("organization_id", e.organizationId)
+    .eq("module_key", e.moduleKey);
+  if (error && !estSchemaManquant(error)) console.error("palier : marquage de l'échec Stripe", error.message);
+  await journaliser({
+    organizationId: e.organizationId,
+    userId: null,
+    action: "palier_stripe_echec",
+    targetTable: "organization_modules",
+    details: { module: e.moduleKey, utilisateurs: e.utilisateurs, prix: e.prix, erreur: e.message.slice(0, 300) },
+  });
 }
 
 async function majAbonnement(subscriptionId: string, moduleKey: string, prix: number) {

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { IconPaperclip } from "@/components/layout/icons";
+import { GENRE_PAR_TYPE_DOCUMENT } from "@/lib/alerts/echeances-rh";
 
 const DOC_TYPES = [
   "Contrat de travail",
@@ -22,6 +23,8 @@ export interface EmployeeDocument {
   docType: string;
   uploadedAt: string;
   downloadUrl: string | null;
+  /** Date d'expiration (AAAA-MM-JJ) : permis, visite médicale, titre de séjour, diplôme. */
+  expiresAt?: string | null;
 }
 
 /**
@@ -35,8 +38,12 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
   const [docType, setDocType] = useState<(typeof DOC_TYPES)[number]>(DOC_TYPES[0]);
+  const [expiresAt, setExpiresAt] = useState("");
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Types dont l'échéance est suivie (alertes J-60, J-30, J-7, J0 : lib/alerts/echeances-rh.ts).
+  const suivi = Boolean(GENRE_PAR_TYPE_DOCUMENT[docType]);
 
   async function handleFile(file: File) {
     setStatus("uploading");
@@ -59,12 +66,13 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
       const confirmRes = await fetch(`/api/admin/users/${userId}/employee-documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeFileId, docType, filePath: storagePath }),
+        body: JSON.stringify({ employeeFileId, docType, filePath: storagePath, expiresAt: suivi && expiresAt ? expiresAt : null }),
       });
       const confirmJson = await confirmRes.json();
       if (!confirmRes.ok) throw new Error(typeof confirmJson.error === "string" ? confirmJson.error : "Erreur");
 
       setStatus("idle");
+      setExpiresAt("");
       router.refresh();
     } catch (e) {
       setStatus("error");
@@ -85,6 +93,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
             <li key={doc.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{doc.docType}</span>
               <span className="flex items-center gap-2 text-xs text-navy/60">
+                {doc.expiresAt && <span>expire le {new Date(`${doc.expiresAt}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "UTC" })} ·</span>}
                 {new Date(doc.uploadedAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}
                 {doc.downloadUrl && (
                   <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="text-teal-ink underline">
@@ -97,6 +106,7 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
         </ul>
       )}
 
+      {suivi && <p className="text-xs text-navy/60">Avec une date d&apos;expiration, la direction et l&apos;exploitation sont prévenues à J-60, J-30, J-7 et le jour J ; l&apos;alerte se clôt dès qu&apos;un nouveau document est déposé.</p>}
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label="Type de document"
           className="input !w-auto !py-1.5 text-sm"
@@ -109,6 +119,12 @@ export function EmployeeDocumentsPanel({ userId, documents }: { userId: string; 
             </option>
           ))}
         </select>
+        {suivi && (
+          <label className="flex items-center gap-2 text-xs text-navy/70">
+            Expire le
+            <input type="date" aria-label="Date d'expiration du document" className="input !w-auto !py-1.5 text-sm" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+          </label>
+        )}
         <label className="btn-secondary cursor-pointer !px-3 !py-1.5 text-xs">
           {status === "uploading" ? "Envoi…" : <><IconPaperclip className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> Ajouter un document</>}
           <input

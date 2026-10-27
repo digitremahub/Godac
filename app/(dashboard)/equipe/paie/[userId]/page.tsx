@@ -77,7 +77,7 @@ export default async function PaieSalariePage({ params, searchParams }: { params
           {direction && ctx.bulletinExistant.validation !== "valide" && <ValidationBulletins ids={[ctx.bulletinExistant.id]} compact />}
         </Card>
       )}
-      <ControleHeures controle={ctx.controleHeures} />
+      <ControleHeures controle={ctx.controleHeures} repos={ctx.avertissementsRepos} />
       <PaieEditor
         peutModifierProfil={direction}
         key={`${userId}-${mois}`}

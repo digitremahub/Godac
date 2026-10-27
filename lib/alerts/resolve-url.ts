@@ -80,6 +80,12 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   // Tournée du planning non démarrée ou sans chauffeur (cron de surveillance) : la tournée ouverte dans le planning.
   tournee_non_demarree: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
   tournee_sans_chauffeur: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
+  // Échéance RH (permis, visite médicale, fin de contrat, document) : la fiche du salarié.
+  echeance_rh: (id) => (id ? { id: "equipe.utilisateur_fiche", params: { id } } : { id: "equipe.utilisateurs" }),
+  // Sortie oubliée, pointage clos avec une heure estimée : la liste « Pointages à régulariser ».
+  pointage_a_regulariser: () => ({ id: "equipe.pointage" }),
+  // Facture impayée : les réglages de facturation (direction).
+  paiement_echoue: () => ({ id: "admin.abonnement" }),
   // Arrêt de travail déclaré : à vérifier, tournées à remplacer (encadrement du service).
   work_stoppage: (id) => ({ id: "equipe.arrets", suite: id ? `?arret=${encodeURIComponent(id)}` : "" }),
 };

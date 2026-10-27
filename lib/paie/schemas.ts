@@ -108,7 +108,18 @@ export const variablesSchema = z.object({
   heuresTravaillees: z.coerce.number().min(0).max(400).nullable(),
   heuresAbsenceNonPayee: z.coerce.number().min(0).max(400),
   joursCongesPris: z.coerce.number().min(0).max(31),
-  primes: z.array(z.object({ libelle: z.string().trim().max(80), montant: z.coerce.number().min(-100000).max(100000), soumise: z.boolean() })).max(20),
+  primes: z
+    .array(
+      z.object({
+        libelle: z.string().trim().max(80),
+        montant: z.coerce.number().min(-100000).max(100000),
+        soumise: z.boolean(),
+        // Marqueur récurrente / ponctuelle et prime recopiée du mois précédent (lib/paie/primes.ts).
+        nature: z.enum(["recurrente", "ponctuelle"]).optional(),
+        recopiee: z.boolean().optional(),
+      }),
+    )
+    .max(20),
   nbRepas: z.coerce.number().int().min(0).max(62),
   nbRepasUnique: z.coerce.number().int().min(0).max(62),
   nbCasseCroute: z.coerce.number().int().min(0).max(62),
