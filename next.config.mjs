@@ -71,14 +71,6 @@ const nextConfig = {
       "/api/ticpe/export-lines/[id]": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
     },
   },
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-      },
-    ],
-  },
   async redirects() {
     return REDIRECTIONS.map((r) => ({ source: r.source, destination: r.destination, permanent: false, ...(r.has ? { has: r.has } : {}) }));
   },

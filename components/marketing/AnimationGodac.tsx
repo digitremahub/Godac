@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type RefO
 import { IconRefresh } from "@/components/layout/icons";
 import { useScene3D } from "@/components/marketing/useScene3D";
 import { ACRONYME, phraseAcronyme } from "@/lib/vitrine/acronyme";
+import { GLYPHES_GODAC, HAUTEUR_GLYPHE, ORIGINE_Y_GLYPHE, type GlypheGodac } from "@/lib/vitrine/glyphes-godac";
 import { etatGodac, peutRejouer, sequenceGodac, type EtatGodac } from "@/lib/vitrine/sequence-godac";
 
 const LETTRES = ACRONYME.lettres;
-const SEQUENCE = sequenceGodac(LETTRES.length);
+const SEQUENCE = sequenceGodac(GLYPHES_GODAC.length);
 /** « GO » en teal, « DAC » en orange : les deux couleurs du logo. */
 const NB_LETTRES_TEAL = 2;
 
@@ -43,12 +44,35 @@ function useSequenceGodac(ref: RefObject<Element>) {
   return { autorise, anime, etat, rejeu, relancer, relancerSiTerminee };
 }
 
+/** Une lettre du logo, en vectoriel (couleur = `currentColor`, posée par la classe). */
+function Glyphe({ g, className, style }: { g: GlypheGodac; className: string; style?: CSSProperties }) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox={`${g.x} ${ORIGINE_Y_GLYPHE} ${g.largeur} ${HAUTEUR_GLYPHE}`}
+      className={className}
+      style={{ ...style, "--w": g.largeur } as CSSProperties}
+    >
+      <path d={g.d} fill="currentColor" fillRule="evenodd" />
+    </svg>
+  );
+}
+
+const classeLettre = (i: number) => (i < NB_LETTRES_TEAL ? "godac-lettre godac-lettre--teal" : "godac-lettre godac-lettre--orange");
+/** Écart entre les centres de deux lettres voisines (repère du logo). */
+const suite = (i: number) => {
+  const g = GLYPHES_GODAC[i]!;
+  const n = GLYPHES_GODAC[i + 1];
+  return n ? g.largeur / 2 + n.ecart + n.largeur / 2 : 0;
+};
+
 /**
- * Les cinq lettres s'assemblent en profondeur, puis se déploient une à une
- * en « Gestion · Optimisation · Des · Actifs · Charges », reliées par le trait
- * lumineux d'une tournée. Les mots sont du vrai texte (liste ordonnée) ; les
- * lettres et le tracé sont décoratifs. Sans animation (mouvement réduit,
- * appareil modeste, JS absent), la phrase s'affiche complète et immobile.
+ * Les cinq lettres du logo (tracés vectoriels du wordmark) s'assemblent en
+ * profondeur, puis le trait lumineux d'une tournée les relie par des points.
+ * Aucun mot affiché : la phrase officielle reste en texte masqué visuellement.
+ * Sans animation (mouvement réduit, appareil modeste, JS absent), les lettres
+ * et le tracé s'affichent complets et immobiles.
  */
 export function AnimationGodac() {
   const ref = useRef<HTMLDivElement>(null);
@@ -63,28 +87,30 @@ export function AnimationGodac() {
       onPointerEnter={(e) => e.pointerType === "mouse" && relancerSiTerminee()}
       onPointerDown={(e) => e.pointerType !== "mouse" && relancerSiTerminee()}
     >
-      <ol key={rejeu} className="godac-liste" aria-label={phraseAcronyme()}>
-        {LETTRES.map((l, i) => {
+      <p className="sr-only">{phraseAcronyme()}</p>
+      <div key={rejeu} aria-hidden="true" className="godac-rangee">
+        {GLYPHES_GODAC.map((g, i) => {
           const e = SEQUENCE.etapes[i]!;
-          const style = { "--dl": `${e.delaiLettreMs}ms`, "--dm": `${e.delaiMotMs}ms`, "--dt": `${e.delaiTraitMs ?? 0}ms` } as CSSProperties;
+          const style = {
+            "--dl": `${e.delaiLettreMs}ms`,
+            "--dn": `${e.delaiNoeudMs}ms`,
+            "--dt": `${e.delaiTraitMs ?? 0}ms`,
+            "--ecart": g.ecart,
+            "--w": g.largeur,
+            "--suite": suite(i),
+          } as CSSProperties;
           return (
-            <li key={l.lettre + i} className="godac-etape" style={style}>
-              <span aria-hidden="true" className={i < NB_LETTRES_TEAL ? "godac-lettre godac-lettre--teal" : "godac-lettre godac-lettre--orange"}>
-                {l.lettre}
-              </span>
-              <span aria-hidden="true" className="godac-voie">
+            <div key={g.lettre + i} className="godac-etape" style={style}>
+              <Glyphe g={g} className={classeLettre(i)} />
+              <span className="godac-voie">
                 {e.delaiTraitMs !== null && <span className="godac-trait" />}
-                <span className={i === LETTRES.length - 1 ? "godac-noeud godac-noeud--arrivee" : "godac-noeud"} />
+                <span className={i === GLYPHES_GODAC.length - 1 ? "godac-noeud godac-noeud--arrivee" : "godac-noeud"} />
               </span>
-              <span className="godac-mot">
-                {l.liaison && <span className="godac-et">{l.liaison} </span>}
-                {l.mot}
-              </span>
-            </li>
+            </div>
           );
         })}
-      </ol>
-      <div className="mt-8 flex min-h-11 justify-center">
+      </div>
+      <div className="mt-10 flex min-h-11 justify-center">
         <button
           type="button"
           onClick={relancer}
@@ -101,8 +127,9 @@ export function AnimationGodac() {
 }
 
 /**
- * Logo animé compact (pied de page) : les cinq lettres s'assemblent, le trait
- * se dessine dessous, la phrase complète reste affichée en texte.
+ * Logo animé compact (pied de page) : les cinq lettres du logo s'assemblent,
+ * le trait se dessine dessous. Aucun texte visible ; la phrase officielle est
+ * portée par l'étiquette d'accessibilité.
  */
 export function LogoGodacAnime() {
   const ref = useRef<HTMLDivElement>(null);
@@ -112,24 +139,24 @@ export function LogoGodacAnime() {
     <div
       ref={ref}
       className="godac-compact"
+      role="img"
+      aria-label={`GODAC : ${phraseAcronyme()}`}
       data-etat={etat}
       data-anime={anime ? "oui" : "non"}
       onPointerEnter={(e) => e.pointerType === "mouse" && relancerSiTerminee()}
       onPointerDown={(e) => e.pointerType !== "mouse" && relancerSiTerminee()}
     >
       <div key={rejeu} aria-hidden="true" className="godac-compact-lettres">
-        {LETTRES.map((l, i) => (
-          <span
-            key={l.lettre + i}
-            className={i < NB_LETTRES_TEAL ? "godac-lettre godac-lettre--teal" : "godac-lettre godac-lettre--orange"}
-            style={{ "--dl": `${SEQUENCE.etapes[i]!.delaiLettreMs}ms` } as CSSProperties}
-          >
-            {l.lettre}
-          </span>
+        {GLYPHES_GODAC.map((g, i) => (
+          <Glyphe
+            key={g.lettre + i}
+            g={g}
+            className={classeLettre(i)}
+            style={{ "--dl": `${SEQUENCE.etapes[i]!.delaiLettreMs}ms`, "--ecart": g.ecart } as CSSProperties}
+          />
         ))}
         <span className="godac-compact-trait" />
       </div>
-      <p className="godac-compact-phrase">{phraseAcronyme()}</p>
     </div>
   );
 }
