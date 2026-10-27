@@ -259,24 +259,24 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-orange/10 blur-3xl" />
 
         <main>
-          <section className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-24 lg:pt-20">
-            <div className="flex flex-col gap-7">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
-                Transport routier · Carburant &amp; TICPE
-              </p>
-              <h1 className="text-[36px] leading-[1.08] tracking-tight sm:text-5xl lg:text-[56px]">
+          {/* ── Héros : les lettres du logo s'assemblent, puis la promesse et les appels à l'action ── */}
+          <section className="relative mx-auto flex max-w-[88rem] flex-col justify-center gap-8 px-4 pb-12 pt-12 sm:min-h-[calc(100svh-4.5rem)] sm:px-6 sm:pt-8 lg:min-h-[80svh] lg:gap-10 lg:pb-14 lg:pt-10">
+            <AnimationGodac />
+
+            <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 text-center lg:gap-5">
+              <h1 className="text-balance text-[30px] leading-[1.1] tracking-tight sm:text-4xl lg:text-5xl">
                 Votre carburant, <span className="text-teal">enfin sous contrôle.</span>
               </h1>
-              <p className="max-w-xl text-pretty text-lg font-light leading-relaxed text-white/80">
+              <p className="max-w-2xl text-pretty text-base font-light leading-relaxed text-white/80 sm:text-lg">
                 GODAC calcule à chaque plein la TICPE à récupérer sur vos poids lourds, contrôle les justificatifs et prépare les
                 documents pour votre comptable. Flotte, planning, paie et tournées colis viennent ensuite, dans le même outil.
               </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link href={primaryCta.href} className="btn-primary !px-6 !py-3.5 text-base">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link href={primaryCta.href} className="btn-primary !px-6 !py-3 text-base">
                   {primaryCta.label}
                   <IconArrowRight className="h-5 w-5" />
                 </Link>
-                <a href="#demo" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/25 hover:bg-white/10">
+                <a href="#demo" className="btn !px-5 !py-3 text-base text-white ring-1 ring-inset ring-white/25 hover:bg-white/10">
                   <IconPlay className="h-4 w-4 text-teal" />
                   Voir la démo
                 </a>
@@ -286,17 +286,22 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 <IconArrowRight className="h-4 w-4" />
               </a>
             </div>
-
-            <HeroScene3D />
           </section>
 
-          {/* ── Le nom, en animation : G·O·D·A·C (lettres du logo, sans mots) ── */}
-          <section aria-labelledby="titre-godac" className="relative border-t border-white/10">
-            <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:py-28">
-              <h2 id="titre-godac" className="sr-only">
-                GODAC : Gestion et Optimisation Des Actifs et Charges
-              </h2>
-              <AnimationGodac />
+          {/* ── La scène 3D (carte, camion, tournée), après le héros ── */}
+          <section aria-labelledby="titre-tournee" className="relative border-t border-white/10">
+            <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12 lg:py-24">
+              <div className="flex flex-col gap-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Transport routier · Carburant &amp; TICPE</p>
+                <h2 id="titre-tournee" className="text-3xl leading-tight tracking-tight sm:text-4xl">
+                  Une tournée, de bout en bout.
+                </h2>
+                <p className="max-w-xl text-pretty text-base font-light leading-relaxed text-white/80 sm:text-lg">
+                  Du départ du dépôt au dernier arrêt : le plein est rattaché au bon camion, le kilométrage est justifié et la TICPE
+                  se calcule d&apos;elle-même.
+                </p>
+              </div>
+              <HeroScene3D />
             </div>
           </section>
         </main>

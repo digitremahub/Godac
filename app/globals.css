@@ -574,7 +574,8 @@
 }
 
 .godac-scene {
-  --u: min(calc((100vw - 2.5rem) / 3320), 0.33px);
+  --u: min(calc((100vw - 3rem) / 3320), 0.4px);
+  position: relative;
   --pas: calc(var(--u) * 6.5);
   perspective: 1100px;
   perspective-origin: 50% 20%;
@@ -631,19 +632,24 @@
   transform-origin: left;
 }
 .godac-rejouer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0 1rem;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #f0f4ff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-  transition: background-color 0.15s;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  color: rgba(240, 244, 255, 0.55);
+  transition: background-color 0.15s, color 0.15s;
+}
+/* Téléphone : un toucher sur les lettres rejoue déjà, et le bouton gênerait le tracé. */
+@media (max-width: 639px) {
+  .godac-rejouer { display: none; }
 }
 .godac-rejouer:hover {
+  color: #f0f4ff;
   background: rgba(255, 255, 255, 0.1);
 }
 .godac-rejouer:focus-visible {
