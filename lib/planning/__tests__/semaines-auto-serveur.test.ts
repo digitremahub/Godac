@@ -198,6 +198,142 @@ describe("genererSemaine : le jeudi, pour chaque service", () => {
   });
 });
 
+describe("genererSemaine : à la demande, n'importe quelle semaine à venir", () => {
+  // Mardi 3 novembre 2026 (Paris) : N+1 = 9 novembre ; la dernière semaine renseignée est celle du 2 novembre.
+  const MARDI = new Date("2026-11-03T10:00:00Z");
+  const N2 = "2026-11-16";
+  const N3 = "2026-11-23";
+  const entreesDe = (db: FakeDb, lundi: string) => db.ligne("planning_entries").filter((e) => e.start_at >= at(lundi, "00:00") && e.start_at < at(addJours(lundi, 7), "00:00"));
+  const addJours = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+  it("N+2 sans N+1 : copie la semaine du 2 novembre, ligne « manuel », non publiée, audit « manuel », aucune alerte", async () => {
+    const db = base();
+    const bilan = await genererSemaine(db as any, ORG, { lundi: N2, serviceId: S1, manuel: true, userId: "dir", maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "generee", creees: 3, source: "2026-11-02" });
+    expect(entreesDe(db, N2).map((e) => [e.tour_number, e.driver_id, e.start_at]).sort()).toEqual([
+      ["12", "d1", at("2026-11-16", "07:00")],
+      ["12", "d1", at("2026-11-17", "07:00")],
+      ["14", "d2", at("2026-11-16", "08:30")],
+    ]);
+    expect(suivi(db)[0]).toMatchObject({ service_id: S1, semaine_debut: N2, genere_par: "manuel", publie_at: null, confirme_at: null });
+    expect(db.ligne("planning_validations")).toEqual([]);
+    // Personne n'est notifié (ni chauffeur, ni encadrement) : la semaine n'est pas la prochaine.
+    expect(db.ligne("alerts")).toEqual([]);
+    expect(bilan.services[0]!.alerte).toBeUndefined();
+    expect(journal).toHaveBeenCalledWith(expect.objectContaining({ action: "planning_semaine_generee", userId: "dir", details: expect.objectContaining({ mode: "manuel", semaine: N2, source: "2026-11-02" }) }));
+  });
+
+  it("source plus proche : une semaine préparée avant (N+1) sert de source à N+2", async () => {
+    const db = base();
+    await genererSemaine(db as any, ORG, { lundi: "2026-11-09", serviceId: S1, manuel: true, maintenant: MARDI });
+    const bilan = await genererSemaine(db as any, ORG, { lundi: N2, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "generee", source: "2026-11-09", creees: 3 });
+  });
+
+  it("semaine suivante (N+1) : l'alerte d'encadrement habituelle part, car elle sera envoyée le vendredi", async () => {
+    const db = base();
+    const bilan = await genererSemaine(db as any, ORG, { lundi: LUNDI, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "generee", alerte: "creee" });
+    expect(db.ligne("alerts").filter((a) => a.type === "planning_a_confirmer")).toHaveLength(1);
+    expect(suivi(db)[0]!.genere_par).toBe("manuel");
+  });
+
+  it("idempotent : une seconde demande ne refait rien ; le jeudi, le cron laisse la semaine déjà préparée", async () => {
+    const db = base();
+    await genererSemaine(db as any, ORG, { lundi: N3, serviceId: S1, manuel: true, maintenant: MARDI });
+    const avant = entreesDe(db, N3).length;
+    const encore = await genererSemaine(db as any, ORG, { lundi: N3, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(encore.services[0]).toMatchObject({ statut: "deja" });
+    expect(entreesDe(db, N3)).toHaveLength(avant);
+    expect(suivi(db)).toHaveLength(1);
+    expect(journal).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'écrase rien : une case déjà remplie à la main reste, la semaine est notée modifiée", async () => {
+    const db = base({
+      planning_entries: [
+        ...base().ligne("planning_entries"),
+        { id: "m1", organization_id: ORG, service_id: S1, tour_number: "14", driver_id: "d1", vehicle_id: "v9", start_at: at("2026-11-16", "08:30"), status: "planned", tour_open: true },
+      ],
+    });
+    const bilan = await genererSemaine(db as any, ORG, { lundi: N2, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "generee", creees: 2 });
+    expect(entreesDe(db, N2).find((e) => e.id === "m1")).toMatchObject({ driver_id: "d1", vehicle_id: "v9" });
+    expect(suivi(db)[0]!.modifie_at).not.toBeNull();
+  });
+
+  it("tournées fermées non recopiées ; chauffeur en congé : case « à remplacer » sans motif", async () => {
+    const db = base();
+    db.tables.planning_entries!.find((e) => e.id === "a3")!.tour_open = false;
+    db.tables.leave_requests!.push({ id: "c1", organization_id: ORG, driver_id: "d1", start_date: "2026-11-16", end_date: "2026-11-16", status: "approved" });
+    const bilan = await genererSemaine(db as any, ORG, { lundi: N2, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]!.resume).toMatchObject({ fermees: 1, a_remplacer: 1 });
+    const cible = entreesDe(db, N2);
+    expect(cible.some((e) => e.tour_number === "14")).toBe(false);
+    expect(cible.find((e) => e.start_at === at("2026-11-16", "07:00"))!.driver_id).toBeNull();
+  });
+
+  it("aucune semaine à recopier (rien sur les 4 semaines précédentes) : message clair, aucune ligne de suivi", async () => {
+    const db = base();
+    // 5 semaines après la dernière semaine renseignée : trop loin.
+    const bilan = await genererSemaine(db as any, ORG, { lundi: "2026-12-07", serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "rien", message: "Aucune semaine à recopier : créez d'abord vos tournées ou dupliquez une semaine." });
+    expect(suivi(db)).toEqual([]);
+    expect(journal).not.toHaveBeenCalled();
+  });
+
+  it("semaine déjà publiée (planning_validations) : rien n'est généré", async () => {
+    const db = base({ planning_validations: [{ id: "v1", organization_id: ORG, service_id: S1, week_start: N2 }] });
+    const bilan = await genererSemaine(db as any, ORG, { lundi: N2, serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(bilan.services[0]).toMatchObject({ statut: "publiee" });
+    expect(entreesDe(db, N2)).toEqual([]);
+  });
+
+  it("le cron du jeudi ne change pas : source = semaine précédente même vide, jamais de repli plus ancien", async () => {
+    const db = base();
+    // Le jeudi, la semaine du 9 est copiée depuis celle du 2 (comme avant) ; celle du 16 n'a pas de source (9 est vide) : rien.
+    const jeudi = await genererSemaine(db as any, ORG, { lundi: N2 });
+    expect(jeudi.services[0]).toMatchObject({ statut: "rien" });
+    expect(suivi(db)).toEqual([]);
+    const ok = await genererSemaine(db as any, ORG, { lundi: LUNDI });
+    expect(ok.services[0]).toMatchObject({ statut: "generee", alerte: "creee", source: "2026-11-02" });
+    expect(suivi(db)[0]!.genere_par).toBe("auto");
+  });
+});
+
+describe("envoyerSemainesAuto : les semaines préparées à l'avance ne partent pas toutes seules", () => {
+  const MARDI = new Date("2026-11-03T10:00:00Z");
+  const VENDREDI_17H30 = new Date("2026-11-06T16:30:00Z");
+
+  it("N+1 et N+2 préparées, intactes : seule N+1 est envoyée vendredi 17 h, N+2 reste en attente de confirmation", async () => {
+    const db = base();
+    await genererSemaine(db as any, ORG, { lundi: LUNDI, serviceId: S1, manuel: true, maintenant: MARDI });
+    await genererSemaine(db as any, ORG, { lundi: "2026-11-16", serviceId: S1, manuel: true, maintenant: MARDI });
+    const bilan = await envoyerSemainesAuto(db as any, ORG, VENDREDI_17H30);
+    expect(bilan).toMatchObject({ lundi: LUNDI, envoyees: 1, rappels: 0, erreurs: [] });
+    const lignes = suivi(db);
+    expect(lignes.find((l) => l.semaine_debut === LUNDI)!.publie_at).not.toBeNull();
+    expect(lignes.find((l) => l.semaine_debut === "2026-11-16")).toMatchObject({ publie_at: null, confirme_at: null, rappel_envoye_at: null });
+    expect(db.ligne("planning_validations").map((v) => v.week_start)).toEqual([LUNDI]);
+    // Les chauffeurs de N+2 n'ont reçu aucune notification ; elle reste masquée.
+    expect(estMasquee(await semainesMasqueesDe(db as any, ORG), { service_id: S1, start_at: at("2026-11-17", "07:00") })).toBe(true);
+    // Une semaine suivante du cron ne l'envoie pas non plus.
+    const seconde = await envoyerSemainesAuto(db as any, ORG, new Date("2026-11-06T16:50:00Z"));
+    expect(seconde.envoyees).toBe(0);
+    expect(suivi(db).find((l) => l.semaine_debut === "2026-11-16")!.publie_at).toBeNull();
+  });
+
+  it("N+2 seule : aucun envoi, aucun rappel, elle se confirme à la main", async () => {
+    const db = base();
+    await genererSemaine(db as any, ORG, { lundi: "2026-11-16", serviceId: S1, manuel: true, maintenant: MARDI });
+    expect(await envoyerSemainesAuto(db as any, ORG, VENDREDI_17H30)).toMatchObject({ envoyees: 0, rappels: 0 });
+    const ligne = suivi(db)[0] as unknown as LigneSuivi;
+    const r = await confirmerSemaine({ db: db as any, admin: db as any, organizationId: ORG, userId: "dir", ligne, envoyerQuandMeme: false });
+    expect(r).toMatchObject({ ok: true });
+    expect(suivi(db)[0]!.publie_mode).toBe("manuel");
+  });
+});
+
 describe("modification manuelle d'une semaine générée (point d'entrée unique)", () => {
   it("renseigne modifie_at une seule fois, seulement tant que la semaine n'est pas publiée", async () => {
     const db = base();

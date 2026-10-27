@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { BandeauSemaine } from "@/lib/planning/bandeau-semaine";
+import type { BandeauSemaine, SemaineAPreparer } from "@/lib/planning/bandeau-semaine";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { confirmer } from "@/lib/ui/confirmation";
 import { textePublication } from "@/lib/planning/publication";
@@ -20,8 +20,14 @@ const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? pl
  * - l'édition habituelle (affecter, remplacer, fermer, glisser-déposer) reste possible :
  *   la semaine est alors notée « modifiée » et ne part pas toute seule le vendredi.
  * Les absents sont nommés sans motif (« en congé du … au … », « absent »).
+ * Les deux boutons restent là tant que la semaine n'est pas publiée, pour la semaine
+ * suivante comme pour une semaine préparée plus tôt (qui n'est envoyée qu'à la
+ * confirmation). Publiée : « Semaine publiée aux chauffeurs le … », sans bouton.
+ * Semaine à venir sans suivi : « Cette semaine n'est pas encore préparée » et le
+ * bouton « Générer le planning de la semaine du … à partir de la semaine du … »
+ * (POST /api/planning/semaine-suivante/generer).
  */
-export function BandeauSemaineAuto({ bandeaux }: { bandeaux: BandeauSemaine[] }) {
+export function BandeauSemaineAuto({ bandeaux, aPreparer = [] }: { bandeaux: BandeauSemaine[]; aPreparer?: SemaineAPreparer[] }) {
   const router = useRouter();
   const [occupe, setOccupe] = useState<string | null>(null);
   const [message, setMessage] = useState<{ texte: string; ton: "ok" | "erreur" } | null>(null);
@@ -54,8 +60,24 @@ export function BandeauSemaineAuto({ bandeaux }: { bandeaux: BandeauSemaine[] })
     }
   }
 
+  async function generer(a: SemaineAPreparer) {
+    setOccupe(a.serviceId);
+    setMessage(null);
+    try {
+      const { res, json } = await appeler("/api/planning/semaine-suivante/generer", { service_id: a.serviceId, semaine_debut: a.lundi });
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Génération impossible");
+      const n = Number(json.cases_creees ?? 0);
+      setMessage({ texte: `${pluriel(n, "case créée", "cases créées")}. Les chauffeurs ne voient rien tant que vous n'avez pas confirmé.`, ton: "ok" });
+      router.refresh();
+    } catch (e) {
+      setMessage({ texte: `Génération impossible : ${networkErrorMessage(e)}`, ton: "erreur" });
+    } finally {
+      setOccupe(null);
+    }
+  }
+
   async function regenerer(b: BandeauSemaine) {
-    if (!(await confirmer({ titre: "Régénérer les cases vides ?", message: "Les cases encore vides sont remplies d'après la semaine précédente et les modèles. Rien de ce qui existe n'est modifié. La semaine ne sera plus envoyée toute seule vendredi : vous la confirmerez.", action: "Régénérer" }))) return;
+    if (!(await confirmer({ titre: "Régénérer les cases vides ?", message: `Les cases encore vides sont remplies d'après la semaine précédente et les modèles. Rien de ce qui existe n'est modifié. ${b.envoiAuto ? "La semaine ne sera plus envoyée toute seule vendredi : vous la confirmerez." : "Les chauffeurs ne verront rien tant que vous n'aurez pas confirmé."}`, action: "Régénérer" }))) return;
     setOccupe(b.serviceId);
     setMessage(null);
     try {
@@ -72,10 +94,33 @@ export function BandeauSemaineAuto({ bandeaux }: { bandeaux: BandeauSemaine[] })
   }
 
   // Le message de confirmation reste affiché après l'envoi, quand le bandeau a disparu.
-  if (!bandeaux.length && !message) return null;
+  if (!bandeaux.length && !aPreparer.length && !message) return null;
   return (
     <div className="mb-4 flex flex-col gap-3">
-      {bandeaux.map((b) => (
+      {aPreparer.map((a) => (
+        <section key={`preparer-${a.serviceId}`} aria-label={`Semaine à préparer : ${a.service}`} className="rounded-2xl border border-navy/15 bg-surface p-4">
+          <h2 className="text-base">{a.titre}</h2>
+          <p className="mt-0.5 text-sm text-navy/65">
+            Service {a.service} · {a.bouton ? "Les chauffeurs ne verront rien tant que vous n'aurez pas confirmé. Rien de ce qui existe n'est écrasé." : a.message}
+          </p>
+          {a.bouton && (
+            <div className="mt-3">
+              <button type="button" className="btn-dark min-h-[44px] w-full !px-4 text-sm sm:w-auto" disabled={occupe !== null} onClick={() => generer(a)}>
+                {occupe === a.serviceId ? "Génération…" : a.bouton}
+              </button>
+            </div>
+          )}
+        </section>
+      ))}
+      {bandeaux.map((b) =>
+        b.etat === "publiee" ? (
+          <section key={b.serviceId} aria-label={`Semaine publiée : ${b.service}`} className="rounded-2xl border border-success/30 bg-success/10 p-4">
+            <p className="text-sm font-semibold text-success-ink">
+              Service {b.service} · {b.titre}
+              {b.publieAuto ? " (envoi automatique)" : ""}.
+            </p>
+          </section>
+        ) : (
         <section key={b.serviceId} aria-label={`Planning à confirmer : ${b.service}`} className="rounded-2xl border border-teal/30 bg-teal/[0.06] p-4">
           <h2 className="text-base">{b.titre}</h2>
           <p className="mt-0.5 text-sm text-navy/65">
@@ -83,9 +128,11 @@ export function BandeauSemaineAuto({ bandeaux }: { bandeaux: BandeauSemaine[] })
             {pluriel(b.compteurs.aRemplacer, "case à remplacer", "cases à remplacer")}, {pluriel(b.compteurs.fermees, "tournée fermée", "tournées fermées")}, {pluriel(b.compteurs.conflits, "conflit", "conflits")}.
           </p>
           <p className="mt-1 text-sm text-navy/65">
-            {b.etat === "modifiee"
-              ? "Modifié depuis la génération : il ne partira pas tout seul. Confirmez-le pour l'envoyer aux chauffeurs."
-              : "Les chauffeurs ne voient rien pour l'instant. Sans changement de votre part, il leur est envoyé automatiquement vendredi à 17 h."}
+            {!b.envoiAuto
+              ? "Les chauffeurs ne voient rien pour l'instant. Cette semaine sera envoyée quand vous la confirmerez."
+              : b.etat === "modifiee"
+                ? "Modifié depuis la génération : il ne partira pas tout seul. Confirmez-le pour l'envoyer aux chauffeurs."
+                : "Les chauffeurs ne voient rien pour l'instant. Sans changement de votre part, il leur est envoyé automatiquement vendredi à 17 h."}
           </p>
 
           {b.aRemplacer.length > 0 && (
@@ -128,7 +175,8 @@ export function BandeauSemaineAuto({ bandeaux }: { bandeaux: BandeauSemaine[] })
             </div>
           )}
         </section>
-      ))}
+        ),
+      )}
       {message && (
         <p role={message.ton === "erreur" ? "alert" : "status"} className={`rounded-xl px-3.5 py-2.5 text-sm font-semibold ${message.ton === "erreur" ? "bg-orange/15 text-orange-ink" : "bg-success/10 text-success-ink"}`}>
           {message.texte}

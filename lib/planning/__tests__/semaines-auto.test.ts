@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { estAbsentOuInactif, type ContexteAbsences } from "@/lib/planning/semaines-auto-absences";
-import { construireBandeau } from "@/lib/planning/bandeau-semaine";
+import { construireBandeau, semaineAPreparer } from "@/lib/planning/bandeau-semaine";
 import type { AffectationPlanning } from "@/lib/planning/semaine";
 import {
+  MESSAGE_SANS_SOURCE,
   PUBLICATION_AUTO_SI_MODIFIE,
+  SEMAINES_A_L_AVANCE,
   casesSansChauffeur,
+  choisirSemaineSource,
+  envoiAutomatiquePrevu,
+  estSemainePreparable,
+  lundisAvecAffectations,
+  semainesPreparables,
   cleAlerteGeneration,
   compterConflitsVehicule,
   cumulerResumes,
@@ -393,8 +400,121 @@ describe("bandeau de la vue Semaine", () => {
     expect(b.peutConfirmer).toBe(false);
   });
 
+  it("semaine plus lointaine : titre « préparé à l'avance », envoi seulement à la confirmation, boutons toujours proposés", () => {
+    const b = construireBandeau({ ligne: suivi({ semaine_debut: "2026-11-23" }), service: "Colis", lignes: [], contexte: vide, peutConfirmer: true, aujourdhui: "2026-11-03" })!;
+    expect(b.envoiAuto).toBe(false);
+    expect(b.titre).toContain("préparé à l'avance");
+    expect(b.etat).toBe("a_confirmer");
+    expect(b.peutConfirmer).toBe(true);
+    // La semaine suivante garde le titre du jeudi.
+    const n1 = construireBandeau({ ligne: suivi(), service: "Colis", lignes: [], contexte: vide, peutConfirmer: true, aujourdhui: "2026-11-03" })!;
+    expect(n1.envoiAuto).toBe(true);
+    expect(n1.titre).toContain("à confirmer avant vendredi 17 h");
+  });
+
+  it("semaine publiée : mention « publiée aux chauffeurs le … » sans bouton, tant que la semaine n'a pas commencé", () => {
+    const publiee = suivi({ semaine_debut: "2026-11-23", publie_at: "2026-11-06T16:12:00Z", publie_mode: "auto" });
+    const b = construireBandeau({ ligne: publiee, service: "Colis", lignes: [], contexte: vide, peutConfirmer: true, aujourdhui: "2026-11-03" })!;
+    expect(b).toMatchObject({ etat: "publiee", peutConfirmer: false, publieAuto: true });
+    expect(b.titre).toBe("Semaine publiée aux chauffeurs le vendredi 6 novembre à 17:12");
+    // Semaine commencée : plus de mention.
+    expect(construireBandeau({ ligne: publiee, service: "Colis", lignes: [], contexte: vide, peutConfirmer: true, aujourdhui: "2026-11-23" })).toBeNull();
+  });
+
   it("aucun bandeau une fois la semaine publiée ; tournée fermée sans chauffeur n'est pas une case à remplacer", () => {
     expect(construireBandeau({ ligne: suivi({ publie_at: "2026-11-06T16:00:00Z" }), service: "Colis", lignes: [], contexte: vide, peutConfirmer: true })).toBeNull();
     expect(casesSansChauffeur([ligne("e3", { driver_id: null, tour_open: false })])).toEqual([]);
+  });
+});
+
+describe("génération à la demande : fenêtre, source, envoi automatique", () => {
+  // Mardi 3 novembre 2026 : la semaine suivante commence le lundi 9.
+  const MARDI = "2026-11-03";
+
+  it("fenêtre : de la semaine suivante à 8 semaines plus loin, jamais la semaine en cours ni le passé", () => {
+    const lundis = semainesPreparables(MARDI);
+    expect(lundis).toHaveLength(SEMAINES_A_L_AVANCE);
+    expect(lundis[0]).toBe("2026-11-09");
+    expect(lundis.at(-1)).toBe("2026-12-28");
+    expect(estSemainePreparable("2026-11-09", MARDI)).toBe(true);
+    expect(estSemainePreparable("2026-12-28", MARDI)).toBe(true);
+    expect(estSemainePreparable("2027-01-04", MARDI)).toBe(false);
+    expect(estSemainePreparable("2026-11-02", MARDI)).toBe(false);
+    expect(estSemainePreparable("2026-10-26", MARDI)).toBe(false);
+    // Pas un lundi : refusé.
+    expect(estSemainePreparable("2026-11-10", MARDI)).toBe(false);
+    // Dimanche soir à Paris : la semaine suivante est déjà celle du lendemain.
+    expect(semainesPreparables("2026-11-08")[0]).toBe("2026-11-09");
+    expect(semainesPreparables("2026-11-09")[0]).toBe("2026-11-16");
+  });
+
+  it("source : la plus proche semaine AVANT la cible qui a des affectations, 4 semaines au plus", () => {
+    const avec = new Set(["2026-11-02", "2026-10-19"]);
+    expect(choisirSemaineSource("2026-11-09", avec)).toBe("2026-11-02");
+    expect(choisirSemaineSource("2026-11-16", avec)).toBe("2026-11-02");
+    expect(choisirSemaineSource("2026-11-23", avec)).toBe("2026-11-02");
+    expect(choisirSemaineSource("2026-11-30", avec)).toBe("2026-11-02");
+    // 5 semaines d'écart : trop loin.
+    expect(choisirSemaineSource("2026-12-07", avec)).toBeNull();
+    expect(choisirSemaineSource("2026-11-09", new Set())).toBeNull();
+    // Une semaine à venir préparée (N+1) devient la source de N+2.
+    expect(choisirSemaineSource("2026-11-16", new Set(["2026-11-09", "2026-11-02"]))).toBe("2026-11-09");
+  });
+
+  it("une semaine « a des affectations » si elle compte une ligne recopiable (chauffeur, véhicule, tournée ouverte)", () => {
+    const lignes = [
+      aff({ id: "a", start_at: at("2026-11-02", "07:00") }),
+      aff({ id: "b", start_at: at("2026-11-10", "07:00"), driver_id: null }),
+      aff({ id: "c", start_at: at("2026-11-17", "07:00"), tour_open: false }),
+      aff({ id: "d", start_at: at("2026-11-24", "07:00"), status: "cancelled" }),
+    ];
+    expect([...lundisAvecAffectations(lignes)]).toEqual(["2026-11-02"]);
+  });
+
+  it("seule la semaine suivante part toute seule : N+2 et plus restent en attente de confirmation", () => {
+    expect(envoiAutomatiquePrevu("2026-11-09", MARDI)).toBe(true);
+    expect(envoiAutomatiquePrevu("2026-11-16", MARDI)).toBe(false);
+    expect(envoiAutomatiquePrevu("2026-11-23", MARDI)).toBe(false);
+    const vendredi17h = new Date("2026-11-06T16:30:00Z");
+    const ligne = (semaine_debut: string) => ({ semaine_debut, modifie_at: null, confirme_at: null, publie_at: null, rappel_envoye_at: null });
+    expect(decisionEnvoiAuto({ ligne: ligne("2026-11-09"), maintenant: vendredi17h })).toEqual({ action: "publier" });
+    expect(decisionEnvoiAuto({ ligne: ligne("2026-11-16"), maintenant: vendredi17h })).toEqual({ action: "rien", raison: "mauvaise_semaine" });
+    expect(decisionEnvoiAuto({ ligne: ligne("2026-12-07"), maintenant: vendredi17h })).toEqual({ action: "rien", raison: "mauvaise_semaine" });
+  });
+
+  it("copie depuis une semaine plus ancienne : jours décalés de 14 jours, tournées fermées comprises", () => {
+    const plan = planifierSemaineSuivante({
+      lundiSource: "2026-11-02",
+      lundiCible: "2026-11-16",
+      sources: [
+        aff({ id: "a1", tour_number: "12", start_at: at("2026-11-02", "07:00") }),
+        aff({ id: "a2", tour_number: "14", driver_id: "d2", vehicle_id: "v2", start_at: at("2026-11-03", "08:30") }),
+        aff({ id: "a3", tour_number: "20", driver_id: "d3", vehicle_id: "v3", start_at: at("2026-11-04", "08:00"), tour_open: false }),
+      ],
+      existantes: [],
+      modeles: [{ service_id: "s1", tour_number: "20", departure_time: "08:00:00", weekdays: [3], default_vehicle_id: null }],
+      contexte: vide,
+      nomDe,
+    });
+    expect(plan.lignes.map((l) => [l.tour_number, l.start_at])).toEqual([
+      ["12", at("2026-11-16", "07:00")],
+      ["14", at("2026-11-17", "08:30")],
+    ]);
+    // La tournée 20 fermée le mercredi 4 est aussi fermée le mercredi 18 : pas comblée par le modèle.
+    expect(plan.resume.fermees).toBe(1);
+  });
+
+  it("bandeau « pas encore préparée » : bouton explicite, ou message s'il n'y a rien à recopier", () => {
+    const lignes = [aff({ id: "a", start_at: at("2026-11-02", "07:00") })];
+    const a = semaineAPreparer({ serviceId: "s1", service: "Colis", lundi: "2026-11-23", aujourdhui: MARDI, dejaSuivie: false, lignesSources: lignes })!;
+    expect(a.titre).toBe("Cette semaine n'est pas encore préparée");
+    expect(a.source).toBe("2026-11-02");
+    expect(a.bouton).toBe("Générer le planning de la semaine du lundi 23 novembre à partir de la semaine du lundi 2 novembre");
+    const sans = semaineAPreparer({ serviceId: "s1", service: "Colis", lundi: "2026-11-23", aujourdhui: MARDI, dejaSuivie: false, lignesSources: [] })!;
+    expect(sans).toMatchObject({ bouton: null, message: MESSAGE_SANS_SOURCE });
+    // Déjà suivie, hors fenêtre ou semaine en cours : rien à proposer.
+    expect(semaineAPreparer({ serviceId: "s1", service: "Colis", lundi: "2026-11-23", aujourdhui: MARDI, dejaSuivie: true, lignesSources: lignes })).toBeNull();
+    expect(semaineAPreparer({ serviceId: "s1", service: "Colis", lundi: "2026-11-02", aujourdhui: MARDI, dejaSuivie: false, lignesSources: lignes })).toBeNull();
+    expect(semaineAPreparer({ serviceId: "s1", service: "Colis", lundi: "2027-03-01", aujourdhui: MARDI, dejaSuivie: false, lignesSources: lignes })).toBeNull();
   });
 });
