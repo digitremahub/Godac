@@ -77,7 +77,7 @@ export const ACTIONS_AUDIT = {
   pointage_ajoute: "Pointage manquant ajouté par l'encadrement (avec motif)",
   planning_affectation: "Planning : chauffeur affecté, remplacé ou retiré d'une tournée",
   planning_tournee_retiree: "Planning : tournée ou présence supprimée",
-  planning_semaine_generee: "Planning de la semaine suivante généré automatiquement (à confirmer)",
+  planning_semaine_generee: "Planning d'une semaine généré (automatiquement ou à la demande, à confirmer)",
   planning_semaine_regeneree: "Planning de la semaine suivante : cases vides régénérées",
   planning_semaine_confirmee: "Planning de la semaine suivante confirmé et envoyé aux chauffeurs",
   planning_semaine_envoyee_auto: "Planning de la semaine suivante envoyé automatiquement aux chauffeurs (vendredi 17 h)",

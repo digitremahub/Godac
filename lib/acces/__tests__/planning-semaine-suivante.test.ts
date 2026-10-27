@@ -35,9 +35,9 @@ function optionsGarde(fichier: string): { roles?: UserRole[]; modules?: string[]
   return new Function(`return (${m![1]})`)();
 }
 
-const ROUTES_ENCADREMENT = ["app/api/planning/semaine-suivante/confirmer/route.ts", "app/api/planning/semaine-suivante/regenerer/route.ts"];
+const ROUTES_ENCADREMENT = ["app/api/planning/semaine-suivante/confirmer/route.ts", "app/api/planning/semaine-suivante/regenerer/route.ts", "app/api/planning/semaine-suivante/generer/route.ts"];
 
-describe("matrice rôle × route : confirmer et régénérer", () => {
+describe("matrice rôle × route : confirmer, régénérer et générer à la demande", () => {
   it.each(ROUTES_ENCADREMENT)("%s : direction, exploitation et manager ; jamais chauffeur ni comptable", (fichier) => {
     const opts = optionsGarde(fichier);
     expect(opts.modules).toEqual(["planning"]);
@@ -67,6 +67,30 @@ describe("matrice rôle × route : confirmer et régénérer", () => {
     expect(route).toContain("envoyer_quand_meme");
     // Une seule fonction publie : l'envoi automatique et la confirmation l'appellent.
     expect((lire("lib/planning/semaines-auto-serveur.ts").match(/publierSemaines\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("générer à la demande : fenêtre de semaines validée avant tout accès, génération « manuel » sans notification d'office", () => {
+    const route = lire("app/api/planning/semaine-suivante/generer/route.ts");
+    expect(route).toContain("estSemainePreparable(semaine_debut");
+    expect(route).toContain("manuel: true");
+    expect(route).toContain("z.string().uuid()");
+    expect(route).toContain("rangJour(d) === 0");
+    // Fenêtre et périmètre contrôlés avant le client service role.
+    expect(route.indexOf("estSemainePreparable(")).toBeLessThan(route.indexOf("createAdminSupabaseClient()"));
+    // Sans le consentement du chauffeur ni notification : la route n'appelle ni publication ni alerte.
+    expect(route).not.toContain("publierSemaines");
+    const serveur = lire("lib/planning/semaines-auto-serveur.ts");
+    expect(serveur).toContain("envoiAutomatiquePrevu(lundi");
+    expect(serveur).toContain('p.manuel ? "manuel" : "auto"');
+  });
+
+  it("migration 20261111000004 : genere_par accepte 'manuel', additive et rejouable, code tolérant sans elle", () => {
+    const sql = lire("supabase/migrations/20261111000004_planning_semaines_auto_genere_manuel.sql");
+    expect(sql).toContain("drop constraint if exists planning_semaines_auto_genere_par_check");
+    expect(sql).toContain("check (genere_par in ('auto', 'manuel'))");
+    expect(sql).toContain("to_regclass('public.planning_semaines_auto') is not null");
+    expect(sql).not.toMatch(/drop (table|column|policy)/i);
+    expect(lire("lib/planning/semaines-auto-serveur.ts")).toContain('erreurCreation?.code === "23514"');
   });
 
   it("la publication est tracée au journal d'audit", () => {

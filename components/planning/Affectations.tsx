@@ -41,6 +41,7 @@ import { FiltreOuvertureBarre } from "@/components/planning/OuvertureFusion";
 import { FeuilleHeure, type CibleHeure, type PorteeHeure } from "@/components/planning/FeuilleHeure";
 import { texteChangementHeure } from "@/lib/planning/heure";
 import { RecopieSemaines } from "@/components/planning/RecopieSemaines";
+import { PreparerSemaine } from "@/components/planning/PreparerSemaine";
 import { DupliquerSemaine, EditionAffectation, type DonneesPlanning, type Ton } from "@/components/planning/FenetresPlanning";
 import { PlanningTemplatesPanel } from "@/components/planning/PlanningTemplatesPanel";
 import { Fenetre } from "@/components/planning/Fenetre";
@@ -65,6 +66,7 @@ type Fenetre =
   | { type: "choix"; question: ChoixRegroupementData; reprendre: (r: Regroupement) => void; annuler: () => void }
   | { type: "dupliquer" }
   | { type: "recopie"; mode: "precedente" | "mois" }
+  | { type: "preparer" }
   | null;
 
 /**
@@ -628,6 +630,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
                     <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} onClick={() => setFenetre({ type: "recopie", mode: "precedente" })}>
                       Copier depuis la semaine précédente
                     </button>
+                    <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} onClick={() => setFenetre({ type: "preparer" })}>
+                      Préparer une semaine…
+                    </button>
                     <button type="button" className={`btn-secondary min-h-[44px] !px-3 text-sm ${BTN_MOBILE}`} aria-expanded={modelesOuverts} onClick={() => setModelesOuverts((v) => !v)}>
                       Modèles
                     </button>
@@ -765,6 +770,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         </Fenetre>
       )}
       {fenetre?.type === "dupliquer" && <DupliquerSemaine lundi={donnees.lundi} serviceId={donnees.selectedService} nomService={nomService} onFermer={() => setFenetre(null)} onResultat={resultat} />}
+      {fenetre?.type === "preparer" && (
+        <PreparerSemaine services={donnees.services.filter((s) => services.has(s.id))} serviceId={donnees.selectedService} lundiAffiche={donnees.lundi} onAller={(lundi) => aller({ view: "week", week: lundi })} onFermer={() => setFenetre(null)} />
+      )}
       {fenetre?.type === "recopie" && (
         <RecopieSemaines mode={fenetre.mode} lundi={donnees.lundi} lundisDuMois={lundisDuMois} serviceId={donnees.selectedService} nomService={nomService} onFermer={() => setFenetre(null)} onResultat={resultat} />
       )}

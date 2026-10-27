@@ -18,13 +18,18 @@ import {
   cleAlerteGeneration,
   cleAlerteRappel,
   cleLigne,
+  choisirSemaineSource,
   cumulerResumes,
   decisionEnvoiAuto,
+  envoiAutomatiquePrevu,
   instantParis,
   lireResume,
+  lundisAvecAffectations,
   messageEnvoiAuto,
   messageGeneration,
   messageRappelModifie,
+  MESSAGE_SANS_SOURCE,
+  SEMAINES_SOURCE_MAX,
   planifierSemaineSuivante,
   resumeDesLignes,
   semaineSuivante,
@@ -160,6 +165,8 @@ export interface BilanService {
   service: string;
   statut: "generee" | "regeneree" | "deja" | "publiee" | "rien" | "erreur";
   resume?: ResumeSemaine;
+  /** Lundi de la semaine recopiée. */
+  source?: string;
   /** Lignes créées par cette exécution. */
   creees?: number;
   message?: string;
@@ -175,7 +182,10 @@ export interface BilanGeneration {
 
 /**
  * Génère la semaine commençant `lundi` pour les services d'une organisation (ou
- * un seul), à partir de la semaine précédente, SANS rien écraser :
+ * un seul), SANS rien écraser. Le jeudi (cron), la source est la semaine
+ * précédente. À la demande (`manuel`, ou `regenerer`), c'est la semaine la plus
+ * proche avant la cible qui a des affectations, au plus SEMAINES_SOURCE_MAX
+ * semaines en arrière (lib/planning/semaines-auto.ts › choisirSemaineSource) :
  *  - une ligne planning_semaines_auto par service bloque une seconde génération
  *    (sauf `regenerer` : « Régénérer les cases vides », qui ne crée que ce qui manque) ;
  *  - semaine déjà publiée pour le service : rien ;
@@ -185,9 +195,23 @@ export interface BilanGeneration {
  * 20261111000001) et sans notification pour eux (trigger muet tant que la semaine
  * n'est pas dans planning_validations).
  */
-export async function genererSemaine(admin: Db, organizationId: string, p: { lundi: string; serviceId?: string; regenerer?: boolean; userId?: string | null }): Promise<BilanGeneration> {
+export async function genererSemaine(
+  admin: Db,
+  organizationId: string,
+  p: {
+    lundi: string;
+    serviceId?: string;
+    regenerer?: boolean;
+    userId?: string | null;
+    /** Génération à la demande (« Générer le planning de la semaine du … ») : genere_par = 'manuel', source cherchée en arrière. */
+    manuel?: boolean;
+    /** Horloge injectable pour les tests. */
+    maintenant?: Date;
+  },
+): Promise<BilanGeneration> {
   const lundi = p.lundi;
-  const lundiSource = addDays(lundi, -7);
+  const chercherSource = Boolean(p.manuel || p.regenerer);
+  const lundiPrecedent = addDays(lundi, -7);
   const bilan: BilanGeneration = { lundi, migrationManquante: false, services: [] };
 
   const suivi = await lireSuivi(admin, organizationId, { lundi });
@@ -206,7 +230,7 @@ export async function genererSemaine(admin: Db, organizationId: string, p: { lun
   const publiees = new Set(((validations ?? []) as { service_id: string; week_start: string }[]).map((v) => cleSemaine(v.service_id, v.week_start)));
 
   const [sources, cibleLues, modeles] = await Promise.all([
-    lireLignesPlanning(admin, organizationId, minuitParis(lundiSource), minuitParis(lundi)),
+    lireLignesPlanning(admin, organizationId, minuitParis(chercherSource ? addDays(lundi, -7 * SEMAINES_SOURCE_MAX) : lundiPrecedent), minuitParis(lundi), p.serviceId),
     lireLignesPlanning(admin, organizationId, minuitParis(lundi), minuitParis(addDays(lundi, 7))),
     lireModeles(admin, organizationId),
   ]);
@@ -225,10 +249,17 @@ export async function genererSemaine(admin: Db, organizationId: string, p: { lun
         continue;
       }
       const existantes = cibleLues.filter((e) => e.service_id === s.id);
+      const sourcesDuService = sources.filter((x) => x.service_id === s.id);
+      const trouvee = chercherSource ? choisirSemaineSource(lundi, lundisAvecAffectations(sourcesDuService)) : lundiPrecedent;
+      if (!trouvee && p.manuel && !ligne) {
+        bilan.services.push({ ...base, statut: "rien", message: MESSAGE_SANS_SOURCE });
+        continue;
+      }
+      const lundiSource = trouvee ?? lundiPrecedent;
       const plan = planifierSemaineSuivante({
         lundiSource,
         lundiCible: lundi,
-        sources: sources.filter((x) => x.service_id === s.id),
+        sources: sourcesDuService,
         existantes,
         modeles: modeles.filter((m) => m.service_id === s.id),
         contexte,
@@ -244,11 +275,15 @@ export async function genererSemaine(admin: Db, organizationId: string, p: { lun
       let creeeIci = false;
       if (!courante) {
         const maintenant = new Date().toISOString();
-        const { data: cree, error: erreurCreation } = await admin
-          .from("planning_semaines_auto")
-          .insert({ organization_id: organizationId, service_id: s.id, semaine_debut: lundi, genere_par: "auto", modifie_at: existantes.length ? maintenant : null, resume: plan.resume })
-          .select(CHAMPS_SUIVI)
-          .single();
+        const creer = (genere_par: "auto" | "manuel") =>
+          admin
+            .from("planning_semaines_auto")
+            .insert({ organization_id: organizationId, service_id: s.id, semaine_debut: lundi, genere_par, modifie_at: existantes.length ? maintenant : null, resume: plan.resume })
+            .select(CHAMPS_SUIVI)
+            .single();
+        let { data: cree, error: erreurCreation } = await creer(p.manuel ? "manuel" : "auto");
+        // Contrainte d'origine (genere_par in ('auto')) : migration 20261111000004 pas encore appliquée, on note « auto ».
+        if (p.manuel && erreurCreation?.code === "23514") ({ data: cree, error: erreurCreation } = await creer("auto"));
         if (erreurCreation) {
           if (erreurCreation.code === "23505") {
             bilan.services.push({ ...base, statut: "deja", message: "Semaine générée par une autre exécution." });
@@ -296,14 +331,16 @@ export async function genererSemaine(admin: Db, organizationId: string, p: { lun
         action: ligne ? "planning_semaine_regeneree" : "planning_semaine_generee",
         targetTable: "planning_semaines_auto",
         targetId: courante.id,
-        details: { service: s.id, semaine: lundi, creees: lignesCreees.length, chauffeurs: final.chauffeurs, a_remplacer: final.a_remplacer, fermees: final.fermees, conflits: final.conflits, deja_presentes: final.deja_presentes, mode: ligne ? "cases_vides" : "auto" },
+        details: { service: s.id, semaine: lundi, creees: lignesCreees.length, chauffeurs: final.chauffeurs, a_remplacer: final.a_remplacer, fermees: final.fermees, conflits: final.conflits, deja_presentes: final.deja_presentes, mode: ligne ? "cases_vides" : p.manuel ? "manuel" : "auto", source: lundiSource },
       });
 
+      // Génération à la demande : la personne qui a cliqué est prévenue par l'écran, personne d'autre.
+      // Sauf pour la semaine suivante (N+1), qui partira toute seule le vendredi 17 h : l'encadrement doit le savoir.
       let alerte: ResultatAlerte | undefined;
-      if (!ligne) {
+      if (!ligne && (!p.manuel || envoiAutomatiquePrevu(lundi, instantParis(p.maintenant ?? new Date()).jour))) {
         alerte = await creerAlerte(admin, { organizationId, serviceId: s.id, ligneId: courante.id, severity: final.a_remplacer > 0 ? "warning" : "info", message: messageGeneration(lundi, resume, s.name), cle: cleAlerteGeneration(s.id, lundi) });
       }
-      bilan.services.push({ ...base, statut: ligne ? "regeneree" : "generee", resume, creees: lignesCreees.length, alerte });
+      bilan.services.push({ ...base, statut: ligne ? "regeneree" : "generee", resume, creees: lignesCreees.length, source: lundiSource, alerte });
     } catch (e) {
       console.error("[planning/auto] Génération en erreur", s.name, e);
       bilan.services.push({ ...base, statut: "erreur", message: e instanceof Error ? e.message : String(e) });
@@ -386,8 +423,10 @@ async function auteurPublicationAuto(admin: Db, organizationId: string): Promise
 }
 
 /**
- * Cron du vendredi, pour une organisation : pour chaque service dont la semaine
- * suivante a été générée et n'est ni confirmée ni publiée (decisionEnvoiAuto) :
+ * Cron du vendredi, pour une organisation : SEULE la semaine suivante (N+1) est
+ * envoyée automatiquement. Les semaines plus lointaines préparées à l'avance
+ * (génération à la demande) ne sont jamais lues ici : elles attendent la
+ * confirmation manuelle. Pour chaque service dont la semaine suivante a été générée et n'est ni confirmée ni publiée (decisionEnvoiAuto) :
  *  - intacte : publication automatique, même fonction que « Confirmer » ;
  *  - modifiée : rappel critique à l'encadrement, une seule fois ;
  *  - déjà publiée, ou avant 17:00 à Paris : rien. Idempotent.

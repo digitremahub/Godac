@@ -1,6 +1,6 @@
 # Planning de la semaine suivante : génération du jeudi, envoi du vendredi 17 h
 
-Document interne. Migrations (additives, rejouables, NON appliquées à la création) : `20261111000001_planning_semaines_auto.sql` (table de suivi et masquage côté chauffeur), `20261111000002_alerte_planning_a_confirmer_type.sql` (valeur d'enum, seule dans son fichier), `20261111000003_alerte_planning_a_confirmer_unique.sql` (dédoublonnage et lecture des alertes). Sans elles, la génération est sautée avec un message et rien ne casse.
+Document interne. Migrations (additives, rejouables, NON appliquées à la création) : `20261111000001_planning_semaines_auto.sql` (table de suivi et masquage côté chauffeur), `20261111000002_alerte_planning_a_confirmer_type.sql` (valeur d'enum, seule dans son fichier), `20261111000003_alerte_planning_a_confirmer_unique.sql` (dédoublonnage et lecture des alertes), `20261111000004_planning_semaines_auto_genere_manuel.sql` (la contrainte `genere_par` accepte `'manuel'` ; sans elle, la génération à la demande est notée `'auto'`). Sans elles, la génération est sautée avec un message et rien ne casse.
 
 ## Le flux en 10 lignes
 
@@ -21,3 +21,21 @@ Document interne. Migrations (additives, rejouables, NON appliquées à la créa
 - Le déclenchement n'est garanti que **dans l'heure** prévue : l'envoi du vendredi a lieu en pratique entre 17:00 et 17:59 (Paris), pas à la minute.
 - Pour 17:00 pile : **Supabase `pg_cron`** (appel HTTP de la route avec `Authorization: Bearer <CRON_SECRET>` à 15:00 et 16:00 UTC le vendredi, la route filtre l'heure de Paris) ou le **plan Vercel Pro** (déclenchement à la minute). Le handler n'a pas à changer.
 - Les deux entrées du vendredi portent un paramètre (`?creneau=`) qui ne sert qu'à les distinguer.
+
+## Préparer une semaine à l'avance (génération à la demande)
+
+Un manager (son service), l'exploitation ou la direction n'ont pas à attendre le jeudi : toute semaine **qui commence après aujourd'hui (Paris)**, de la semaine suivante jusqu'à **8 semaines** plus loin (`SEMAINES_A_L_AVANCE`), peut être générée à la demande. La semaine en cours et le passé ne sont jamais concernés.
+
+- **Où** : vue Semaine du Planning. (1) Pour une semaine à venir sans suivi, un bandeau « Cette semaine n'est pas encore préparée » avec le bouton « Générer le planning de la semaine du lundi … à partir de la semaine du lundi … » (un par service). (2) Dans la barre d'actions, « Préparer une semaine… » : on choisit la semaine (et le service si aucun n'est filtré), la génération part, puis la vue s'ouvre sur la semaine préparée. Mobile compris (boutons pleine largeur, 44 px au moins).
+- **Route** : `POST /api/planning/semaine-suivante/generer` `{ service_id, semaine_debut }`. Garde serveur `garderApi` (direction, exploitation, manager ; module planning), manager borné à son service (`dansLePerimetre`), `semaine_debut` = un lundi dans la fenêtre ci-dessus. Réponses : 200 généré ; 400 hors fenêtre ; 403 hors périmètre ; 409 déjà préparée / déjà publiée ; 422 rien à recopier ; 503 migration de suivi absente.
+- **Source** : la plus proche semaine **avant** la cible qui a des affectations recopiables (chauffeur et véhicule, tournée ouverte), **4 semaines en arrière au plus** (`choisirSemaineSource`). Une semaine à venir déjà préparée (N+1) sert donc de source à N+2. Aucune source : « Aucune semaine à recopier : créez d'abord vos tournées ou dupliquez une semaine. » (aucune ligne créée, même si des modèles existent). Le jeudi, le cron garde la règle d'origine : source = la semaine précédente, sans repli.
+- **Mêmes règles que le jeudi** (`genererSemaine`, `planifierSemaineSuivante` généralisée à un décalage quelconque) : rien n'est écrasé, seules les cases vides sont remplies, tournées fermées non recopiées, absents/congés/arrêts/inactifs en « à remplacer » sans motif, lignes **non publiées** (invisibles des chauffeurs jusqu'au lundi de leur semaine, aucune notification pour eux).
+- **Suivi et audit** : une ligne `planning_semaines_auto` avec `genere_par = 'manuel'` (idempotent : une seconde demande répond « déjà préparée ») ; audit `planning_semaine_generee`, `details.mode = 'manuel'` et `details.source` (lundi recopié).
+- **Notifications** : la génération à la demande **ne notifie personne**, car la personne qui a cliqué voit le résultat à l'écran. Une seule exception : la semaine suivante (N+1), qui part toute seule le vendredi 17 h. L'alerte habituelle « à confirmer avant vendredi 17 h » part alors à l'encadrement du service. « À traiter » liste dans tous les cas les semaines préparées et non publiées (urgentes à partir du vendredi qui précède la semaine).
+
+### Bandeau et envoi
+
+- Tant que la semaine n'est pas publiée, « Régénérer les cases vides » et « Confirmer et envoyer aux chauffeurs » restent visibles pour toute semaine suivie (N+1, N+2, N+3…). Publiée : « Semaine publiée aux chauffeurs le … (envoi automatique) », sans bouton, jusqu'au début de la semaine.
+- **Envoi automatique du vendredi 17 h : la semaine suivante (N+1) seulement.** `envoyerSemainesAuto` ne lit que le suivi de N+1 (et `decisionEnvoiAuto` refuse toute autre semaine, `mauvaise_semaine`). Une semaine plus lointaine préparée à l'avance reste en attente : le bandeau indique « Cette semaine sera envoyée quand vous la confirmerez. » Pas de rappel automatique pour elle.
+- Une semaine N+1 préparée à la demande reste soumise à la règle du vendredi : envoyée toute seule si elle n'a pas été modifiée, rappel sinon.
+- Conséquence à connaître : dès qu'une semaine est suivie, ses lignes déjà saisies à la main deviennent invisibles des chauffeurs jusqu'à sa publication (ou à son lundi).

@@ -44,6 +44,14 @@ export const DELAI_SANS_RESUME_HEURES = 20;
 
 export const LIMITE_CONFIRMATION = "vendredi 17 h";
 
+/** Génération à la demande : on peut préparer jusqu'à ce nombre de semaines à venir (la semaine suivante comprise). */
+export const SEMAINES_A_L_AVANCE = 8;
+
+/** Génération à la demande : la semaine recopiée est la plus proche avant la cible, au plus ce nombre de semaines en arrière. */
+export const SEMAINES_SOURCE_MAX = 4;
+
+export const MESSAGE_SANS_SOURCE = "Aucune semaine à recopier : créez d'abord vos tournées ou dupliquez une semaine.";
+
 // ---------------------------------------------------------------------------
 // Calendrier (Europe/Paris).
 // ---------------------------------------------------------------------------
@@ -82,6 +90,47 @@ export function semaineSuivante(jourParis: string): SemaineSuivante {
   return { lundiSource, lundi: addDays(lundiSource, 7), dimanche: addDays(lundiSource, 13) };
 }
 
+/**
+ * Lundis des semaines qu'on peut préparer à la demande : de la semaine suivante
+ * (N+1) jusqu'à SEMAINES_A_L_AVANCE semaines plus loin. La semaine en cours et
+ * le passé n'en font pas partie : seule une semaine qui commence après aujourd'hui.
+ */
+export function semainesPreparables(jourParis: string): string[] {
+  const premier = semaineSuivante(jourParis).lundi;
+  return Array.from({ length: SEMAINES_A_L_AVANCE }, (_, i) => addDays(premier, 7 * i));
+}
+
+/** Ce lundi est-il dans la fenêtre des semaines préparables ? */
+export const estSemainePreparable = (lundi: string, jourParis: string) => semainesPreparables(jourParis).includes(lundi);
+
+/** Seule la semaine suivante (N+1) part toute seule le vendredi 17 h ; les plus lointaines attendent la confirmation. */
+export const envoiAutomatiquePrevu = (lundi: string, jourParis: string) => lundi === semaineSuivante(jourParis).lundi;
+
+/** Lundis (jour de Paris) des semaines qui comptent au moins une affectation recopiable (chauffeur et véhicule, tournée ouverte). */
+export function lundisAvecAffectations(lignes: readonly AffectationPlanning[]): Set<string> {
+  return new Set(lignes.filter((l) => l.tour_open !== false && estCopiable(l)).map((l) => lundiDe(jourDe(l.start_at))));
+}
+
+/**
+ * Semaine à recopier pour une semaine cible quelconque : la plus proche AVANT
+ * la cible qui a des affectations, au plus SEMAINES_SOURCE_MAX semaines en arrière.
+ * Null s'il n'y en a aucune (message MESSAGE_SANS_SOURCE).
+ */
+export function choisirSemaineSource(lundiCible: string, lundisAvecAffectation: ReadonlySet<string>): string | null {
+  for (let i = 1; i <= SEMAINES_SOURCE_MAX; i++) {
+    const lundi = addDays(lundiCible, -7 * i);
+    if (lundisAvecAffectation.has(lundi)) return lundi;
+  }
+  return null;
+}
+
+/** « vendredi 6 novembre à 17:12 » (heure de Paris). */
+export function libelleDateHeureParis(iso: string): string {
+  const date = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
+  const heure = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+  return `${date} à ${heure}`;
+}
+
 /** Le cron du jeudi n'agit que le jeudi (Paris) ; sinon la raison est renvoyée. */
 export function generationDuJour(maintenant: Date): { ok: true; semaine: SemaineSuivante } | { ok: false; raison: string } {
   const t = instantParis(maintenant);
@@ -115,6 +164,12 @@ export function libelleSemaine(lundi: string): string {
   if (a1 !== a2) return `du lundi ${numeroJour(String(Number(j1)))} ${mois1} ${a1} au dimanche ${numeroJour(String(Number(j2)))} ${mois2} ${a2}`;
   if (m1 !== m2) return `du lundi ${numeroJour(String(Number(j1)))} ${mois1} au dimanche ${numeroJour(String(Number(j2)))} ${mois2}`;
   return `du lundi ${numeroJour(String(Number(j1)))} au dimanche ${numeroJour(String(Number(j2)))} ${mois2}`;
+}
+
+/** « lundi 9 novembre », « lundi 1er décembre ». */
+export function libelleLundi(lundi: string): string {
+  const [, m, j] = lundi.split("-") as [string, string, string];
+  return `lundi ${numeroJour(String(Number(j)))} ${MOIS[Number(m) - 1]!}`;
 }
 
 /** Vendredi précédant la semaine : à partir de ce jour, le planning à confirmer est urgent. */
@@ -369,8 +424,10 @@ export interface PlanSemaine {
 const cleCase = (tournee: string, jour: string) => `${tournee}|${jour}`;
 
 /**
- * Plan de la semaine suivante d'UN service, sans rien écraser :
- *  - source : affectations de la semaine en cours, recopiées jour pour jour
+ * Plan de la semaine cible d'UN service (la suivante le jeudi, n'importe quelle
+ * semaine à venir à la demande), sans rien écraser :
+ *  - source : affectations de la semaine `lundiSource` (la semaine précédente le
+ *    jeudi, plus ancienne si besoin à la demande), recopiées jour pour jour
  *    (lib/planning/semaine.ts › planifierCopies : même heure de Paris, changement
  *    d'heure compris), SAUF tournées fermées (non recopiées) ;
  *  - une case (tournée × jour) déjà présente dans la semaine cible n'est pas
@@ -395,7 +452,8 @@ export function planifierSemaineSuivante(p: {
   const existantes = p.existantes.filter((e) => e.status !== "cancelled");
   // Tournées fermées de la semaine en cours : ni recopiées, ni comblées par un modèle.
   // Clés exprimées en jours de la semaine CIBLE (même jour de la semaine).
-  const fermeesSource = new Set(dansSource.filter((s) => s.tour_open === false).map((s) => cleCase(s.tour_number, addDays(jourDe(s.start_at), 7))));
+  const decalage = Math.round((Date.parse(`${p.lundiCible}T00:00:00Z`) - Date.parse(`${p.lundiSource}T00:00:00Z`)) / 86_400_000);
+  const fermeesSource = new Set(dansSource.filter((s) => s.tour_open === false).map((s) => cleCase(s.tour_number, addDays(jourDe(s.start_at), decalage))));
 
   // Cases déjà présentes dans la semaine cible (une tournée par jour, quelle que soit l'heure).
   const occupees = new Set(existantes.map((e) => cleCase(e.tour_number, jourDe(e.start_at))));
@@ -404,7 +462,7 @@ export function planifierSemaineSuivante(p: {
   const demandes: CopieDemandee[] = [];
   let dejaPresentes = 0;
   for (const source of copiables) {
-    const date = addDays(jourDe(source.start_at), 7);
+    const date = addDays(jourDe(source.start_at), decalage);
     if (occupees.has(cleCase(source.tour_number, date))) {
       dejaPresentes++;
       continue;
