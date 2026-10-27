@@ -2,6 +2,7 @@ import "server-only";
 import path from "node:path";
 import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer, type Styles as ReactPdfStyles } from "@react-pdf/renderer";
 import type { Bulletin, LigneBulletin, Section } from "@/lib/paie/types";
+import { telechargerImageSure } from "@/lib/http/fetch-image-sure";
 
 // Même police embarquée que lib/payslips/generate-pdf.tsx (voir son
 // commentaire : les polices standard de pdfkit ne passent pas sur Vercel).
@@ -466,15 +467,10 @@ function BulletinDoc({ d, logo }: { d: BulletinPdfData; logo: LogoPdf | null }) 
  * bulletin affiche le nom de l'entreprise.
  */
 export async function chargerLogo(url: string | null | undefined): Promise<LogoPdf | null> {
-  if (!url || !/^https:\/\//.test(url)) return null;
+  if (!url) return null;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
-    const data = Buffer.from(await res.arrayBuffer());
-    if (data.length > 2_000_000) return null;
-    if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47) return { data, format: "png" };
-    if (data[0] === 0xff && data[1] === 0xd8) return { data, format: "jpg" };
-    return null;
+    // Téléchargement protégé contre la SSRF : https, adresses publiques, redirections contrôlées, taille et délai bornés.
+    return await telechargerImageSure(url);
   } catch {
     return null;
   }

@@ -4,6 +4,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { assignDriverCodeFromBirthDate } from "@/lib/users/driver-code-serveur";
 import { dateNaissanceValide } from "@/lib/users/date-naissance";
 import { createPinDriver } from "@/lib/auth/driver-pin";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { organisationParJeton } from "@/lib/organization/lien-inscription";
 
 const bodySchema = z.object({
@@ -37,6 +39,8 @@ function normalizeCompanyName(value: string): string {
  * the driver actually knows (not just read back) who owns this link.
  */
 export async function POST(req: Request) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.inscriptionChauffeur);
+  if (limite) return limite;
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

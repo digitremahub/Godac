@@ -95,6 +95,62 @@ describe("extractTourReportFromImage", () => {
   });
 });
 
+describe("extractTourReportFromImage : erreurs, délai, nouvel essai", () => {
+  const reponseOk = () => new Response(JSON.stringify({ content: [{ type: "tool_use", name: "tour_report", input: validFields() }], usage: { input_tokens: 1200, output_tokens: 300 } }), { status: 200 });
+
+  it("ne renvoie jamais le corps brut de l'erreur de l'API au client", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    const journal = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('{"type":"error","error":{"message":"credit balance too low, org_12345"}}', { status: 400 })));
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).not.toMatch(/credit|org_12345|Anthropic|400/);
+    // Le détail reste au journal serveur.
+    expect(journal.mock.calls.flat().join(" ")).toContain("credit balance too low");
+  });
+
+  it("un appel borné par un délai, et un seul nouvel essai sur une erreur passagère", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () => new Response("surcharge", { status: 529 }));
+    fetchMock.mockImplementationOnce(async () => new Response("surcharge", { status: 529 }));
+    fetchMock.mockImplementationOnce(async () => reponseOk());
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls as unknown as [string, RequestInit][]) expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("n'insiste pas au-delà d'un nouvel essai", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () => new Response("surcharge", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
+    expect(result.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("un délai dépassé est retenté une fois puis donne un message générique", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () => { throw new DOMException("délai", "TimeoutError"); });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).not.toMatch(/Timeout|délai dépassé/);
+  });
+
+  it("renvoie les jetons consommés pour la journalisation", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    vi.stubGlobal("fetch", vi.fn(async () => reponseOk()));
+    const result = await extractTourReportFromImage(Buffer.from("fake"), "photo.jpg");
+    expect(result.ok && result.jetons).toEqual({ entree: 1200, sortie: 300 });
+  });
+});
+
 describe("lecture du scan", () => {
   it("déduit les stops de ramasse du total imprimé", () => {
     const { stops_total: _t, ...brut } = validFields({ pickups: 4 });

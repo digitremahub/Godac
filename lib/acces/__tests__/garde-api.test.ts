@@ -6,14 +6,21 @@ vi.mock("@/lib/auth/session", () => ({ getCurrentAppUser: () => utilisateur() })
 vi.mock("@/lib/supabase/server", () => ({ createServerSupabaseClient: async () => ({}) }));
 const modules = vi.fn();
 vi.mock("@/lib/organization/modules", () => ({ getEnabledModuleKeys: () => modules() }));
+const offre = vi.fn();
+vi.mock("@/lib/go-navigation/etat", () => ({ lireEtatOffre: () => offre() }));
+const OFFRE_CLASSIQUE = { goNavigation: false, essaiTermine: false, trialEndsAt: null, country: "FR" };
 
 import { garderApi, regleEffective, refusPour } from "@/lib/acces/garde-api";
+import { moduleDejaVerifie, viderModulesVerifies } from "@/lib/organization/modules-verifies";
 
 const u = (role: string, conduit = role === "chauffeur") => ({ id: "u1", organization_id: "o1", role, full_name: "X", email: "x@y", active: true, pending_approval: false, can_drive: conduit, conduit });
 
 beforeEach(() => {
   utilisateur.mockReset();
   modules.mockReset();
+  offre.mockReset();
+  offre.mockResolvedValue(OFFRE_CLASSIQUE);
+  viderModulesVerifies();
 });
 
 describe("garderApi", () => {
@@ -25,6 +32,25 @@ describe("garderApi", () => {
       expect(r.reponse.status).toBe(401);
       expect(await r.reponse.json()).toMatchObject({ code: "NON_CONNECTE" });
     }
+  });
+
+  it("offre illisible (incident base) et module refusé : 503 passager, pas « module désactivé »", async () => {
+    utilisateur.mockResolvedValue(u("direction"));
+    modules.mockResolvedValue([]);
+    offre.mockResolvedValue({ ...OFFRE_CLASSIQUE, indetermine: true });
+    const r = await garderApi({ roles: ["direction"], modules: ["planning"] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reponse.status).toBe(503);
+  });
+
+  it("mémorise les modules vérifiés pour le second contrôle de la même requête (moduleActif)", async () => {
+    utilisateur.mockResolvedValue(u("direction"));
+    modules.mockResolvedValue(["route_optimizer"]);
+    const r = await garderApi({ modules: ["route_optimizer", "planning"] });
+    expect(r.ok).toBe(false);
+    expect(moduleDejaVerifie("o1", "route_optimizer")).toBe(true);
+    expect(moduleDejaVerifie("o1", "planning")).toBe(false);
+    expect(moduleDejaVerifie("o2", "route_optimizer")).toBeNull();
   });
 
   it("403 ROLE_REFUSE avec la liste des rôles, message en chaîne", async () => {

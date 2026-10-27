@@ -30,6 +30,8 @@ const PUBLIC_PREFIXES = [
   "/api/cron",
   // Rapports CSP envoyés par le navigateur, connecté ou non.
   "/api/csp-report",
+  // Erreurs d'affichage (error.tsx) : peuvent survenir avant la connexion ; limitées par IP, sans donnée personnelle.
+  "/api/client-errors",
   // Lot 7: a chauffeur's QR badge is their login for a `pin`-auth
   // account — both must work signed out. Scoped to exactly these two
   // prefixes (not all of /scan or /api/auth) so vehicle/tank badges

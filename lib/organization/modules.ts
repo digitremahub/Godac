@@ -25,7 +25,7 @@ export async function getEtatModules(supabase: SupabaseClient, organizationId: s
     lireEtatOffre(supabase, organizationId),
   ]);
   if (error) throw error;
-  if (offre.essaiTermine) return { cles: [], offre };
+  if (offre.essaiTermine || offre.indetermine) return { cles: [], offre };
   const keys = (data ?? []).map((r) => r.module_key as string);
   // Modules propres au droit français (TICPE…) : masqués hors de France.
   return { cles: keys.filter((k) => moduleDisponible(offre.country, k)), offre };
@@ -42,6 +42,6 @@ export async function isModuleEnabled(
     lireEtatOffre(supabase, organizationId),
   ]);
   if (error) throw error;
-  if (!data?.enabled || offre.essaiTermine) return false;
+  if (!data?.enabled || offre.essaiTermine || offre.indetermine) return false;
   return moduleDisponible(offre.country, moduleKey);
 }

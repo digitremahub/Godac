@@ -331,6 +331,8 @@ hébergeur, contact) et idéalement relu par un professionnel du droit.
 
 ---
 
+Garde-fous transverses (limiteur de débit, verrou PIN, journal d'erreurs, idempotence, délais) : voir [docs/garde-fous-techniques.md](docs/garde-fous-techniques.md).
+
 ## Intégrations non branchées (à faire avant la prod)
 
 Documenté explicitement, comme demandé — rien n'est masqué derrière un

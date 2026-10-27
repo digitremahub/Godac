@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { verifierPin } from "@/lib/auth/pin-securise";
 
 const bodySchema = z.object({ pin: z.string().regex(/^\d{4,6}$/) });
@@ -12,6 +14,8 @@ const bodySchema = z.object({ pin: z.string().regex(/^\d{4,6}$/) });
  * Publique par nécessité (aucune session avant la connexion).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.connexionPin);
+  if (limite) return limite;
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Code PIN incorrect." }, { status: 400 });
