@@ -110,18 +110,17 @@ export function AnimationGodac() {
           );
         })}
       </div>
-      <div className="mt-10 flex min-h-11 justify-center">
-        <button
-          type="button"
-          onClick={relancer}
-          tabIndex={autorise ? 0 : -1}
-          aria-hidden={autorise ? undefined : true}
-          className={`godac-rejouer ${autorise ? "" : "invisible"}`}
-        >
-          <IconRefresh className="h-4 w-4" />
-          Rejouer l&apos;animation
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={relancer}
+        tabIndex={autorise ? 0 : -1}
+        aria-hidden={autorise ? undefined : true}
+        aria-label="Rejouer l'animation"
+        title="Rejouer l'animation"
+        className={`godac-rejouer ${autorise ? "" : "invisible"}`}
+      >
+        <IconRefresh className="h-4 w-4" />
+      </button>
     </div>
   );
 }
