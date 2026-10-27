@@ -4,8 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentAppUser, type AppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getEnabledModuleKeys } from "@/lib/organization/modules";
+import { memoriserModule } from "@/lib/organization/modules-verifies";
 import { lireEtatOffre } from "@/lib/go-navigation/etat";
-import { MESSAGE_ESSAI_TERMINE } from "@/lib/go-navigation/offre";
+import { MESSAGE_ESSAI_TERMINE, MESSAGE_OFFRE_INDETERMINEE } from "@/lib/go-navigation/offre";
 import { TOUS_LES_ROLES, deciderAcces, ecran as ecranDe, libelleModule, libelleRoles, type CleModule, type Ecran } from "@/lib/acces/catalogue";
 import type { UserRole } from "@/lib/types/domain";
 
@@ -96,11 +97,15 @@ export async function garderApi(opts: OptionsGarde = {}): Promise<ResultatGardeA
   const supabase = await createServerSupabaseClient();
   const besoinModules = (regle.modules?.length ?? 0) > 0 || (regle.modulesAuMoinsUn?.length ?? 0) > 0;
   const modules: ReadonlySet<string> = besoinModules ? new Set(await getEnabledModuleKeys(supabase, appUser.organization_id)) : new Set();
+  if (besoinModules) for (const m of new Set([...(regle.modules ?? []), ...(regle.modulesAuMoinsUn ?? [])])) memoriserModule(appUser.organization_id, m, modules.has(m));
   const r = refusPour(regle, appUser.role, modules, appUser.conduit);
   if (r) {
     // Module refusé parce que l'essai GO Navigation est terminé : message dédié.
-    if (r.status === 403 && (await lireEtatOffre(supabase, appUser.organization_id)).essaiTermine) {
-      return { ok: false, reponse: refus("MODULE_INACTIF", MESSAGE_ESSAI_TERMINE) };
+    if (r.status === 403) {
+      const offre = await lireEtatOffre(supabase, appUser.organization_id);
+      if (offre.essaiTermine) return { ok: false, reponse: refus("MODULE_INACTIF", MESSAGE_ESSAI_TERMINE) };
+      // Offre illisible (incident base) : refus passager, pas un module désactivé.
+      if (offre.indetermine) return { ok: false, reponse: NextResponse.json({ error: MESSAGE_OFFRE_INDETERMINEE, code: "ERREUR" }, { status: 503 }) as unknown as NextResponse<CorpsRefus> };
     }
     return { ok: false, reponse: r };
   }

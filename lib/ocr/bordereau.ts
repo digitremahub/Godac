@@ -31,7 +31,7 @@ export const DELAI_LECTURE_MS = 270_000;
  */
 const MAX_TOKENS = 16_000;
 
-export type LectureBordereau = { ok: true; page: PageLue } | { ok: false; raison: "illisible" | "delai" | "dense" | "ia"; detail: string };
+export type LectureBordereau = { ok: true; page: PageLue; jetons: { entree: number | null; sortie: number | null } } | { ok: false; raison: "illisible" | "delai" | "dense" | "ia"; detail: string };
 
 const SYSTEM_PROMPT = `Tu lis la photo d'une page de bordereau de tournée : toute liste imprimée des colis ou des arrêts d'une tournée de livraison ou d'enlèvement (feuille de route, bordereau de départ, liste de chargement, manifeste), quel que soit le transporteur (DPD, GLS, Chronopost, Colissimo/La Poste, Colis Privé, UPS, DHL, TNT, FedEx, Geodis, Ciblex, Heppner, Relais Colis, Mondial Relay, Amazon…) ou une liste sans marque.
 
@@ -277,5 +277,5 @@ export async function lireBordereau(imageBase64: string, mediaType: string): Pro
   if (!parsed.success) return { ok: false, raison: "ia", detail: `sortie non conforme (${usage}) : ${parsed.error.message.slice(0, 300)}` };
   // Une page sans arrêt n'est gardée que si son en-tête est lu (page de garde, récapitulatif).
   if (!parsed.data.blocs.length && (!parsed.data.lisible || !parsed.data.entete.numero)) return { ok: false, raison: "illisible", detail: "page illisible" };
-  return { ok: true, page: parsed.data };
+  return { ok: true, page: parsed.data, jetons: { entree: reponse.entree, sortie: reponse.sortie } };
 }

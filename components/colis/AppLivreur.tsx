@@ -38,7 +38,6 @@ import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } fr
 import { useTraceGps } from "@/components/colis/useTraceGps";
 import { ArretTriable, BoutonPoignee, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, cibleDepuisSurvol, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
-import { TourneeColis } from "@/components/colis/TourneeColis";
 import { OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memoriserChoix } from "@/components/colis/OptimiserSheet";
 import { pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { confirmer } from "@/lib/ui/confirmation";
@@ -60,6 +59,10 @@ const CarteTournee = dynamic(() => import("@/components/colis/CarteTournee").the
 const GoNavigation = dynamic(() => import("@/components/colis/GoNavigation").then((m) => m.GoNavigation), {
   ssr: false,
   loading: () => <p className="fixed inset-0 z-40 grid place-items-center bg-paper text-sm text-navy/60">Chargement de GO Navigation…</p>,
+});
+// Préparation de la tournée (scanner, import de bordereau…) : chargée seulement à cette étape.
+const TourneeColis = dynamic(() => import("@/components/colis/TourneeColis").then((m) => m.TourneeColis), {
+  loading: () => <p className="p-6 text-center text-sm text-navy/60">Chargement de la préparation…</p>,
 });
 type Vue = "liste" | "carte" | "navigation";
 const MEMO_VUE = "godac-livreur-vue";
@@ -153,7 +156,7 @@ export function AppLivreur({
   }, []);
 
   // Pendant la tournée en cours : dernière position envoyée à l'exploitation
-  // (au plus une fois par minute, écran ouvert), jamais en dehors.
+  // avec le lot de trace GPS (toutes les 30 s environ, écran ouvert), jamais en dehors.
   const runEnCours = run?.status === "in_progress" ? run.id : null;
   if (runEnCours) tourneeVueEnCours.current = true;
   // Trajet réellement emprunté (historique), même règle : tournée en cours, partage non mis en pause.
@@ -167,7 +170,7 @@ export function AppLivreur({
         if (maintenant - dernierEnvoi.current < ENVOI_POSITION_MS) return;
         dernierEnvoi.current = maintenant;
         memoriserFix(pos, p.coords.accuracy);
-        fetch("/api/colis/position", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ run_id: runEnCours, ...pos }) }).catch(() => undefined);
+        // La position part avec le lot de la trace GPS (useTraceGps) : plus d'appel séparé.
       },
       () => undefined,
       { enableHighAccuracy: true, maximumAge: 30_000 },

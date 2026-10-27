@@ -2,11 +2,11 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import { AffecterTournee } from "@/components/colis/AffecterTournee";
 import { IconPointRelais, IconCamera, IconCheck, IconMapPin, IconMessage, IconNavigation, IconPhone, IconQrCode, IconRamasse, IconX } from "@/components/layout/icons";
-import { ParcelScanner } from "@/components/colis/ParcelScanner";
 import { prechargerDetecteur } from "@/lib/colis/detecteur";
 import { analyserCode } from "@/lib/colis/etiquette";
 import { networkErrorMessage } from "@/lib/utils/network-error";
@@ -37,10 +37,9 @@ import { api, gmaps, imageEnBase64, waze, SMS_ARRIVEE, type Liste, type Run, typ
 import { ArretTriable, BoutonPoignee, ZoneFinListe, ZoneTri, type Poignee } from "@/components/colis/Triable";
 import { appliquerChangements, reordonner, type CibleDepot } from "@/lib/colis/reordonner";
 import { AdresseInput } from "@/components/colis/AdresseInput";
-import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
+import { compteurs, grouperParListe, nomGroupe, ordonnerParListe } from "@/lib/colis/listes";
 import { separerReportes } from "@/lib/colis/villages";
 import { ImportTournee } from "@/components/colis/ImportTournee";
-import { ImportBordereau } from "@/components/colis/ImportBordereau";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
 import { HistoriqueArret } from "@/components/colis/HistoriqueArret";
 import { ExportTournee } from "@/components/colis/ExportTournee";
@@ -51,6 +50,10 @@ import { BadgeHoraires, HeureDepartChamp, HorairesSheet, ResumeOptimisationCarte
 import { confirmer } from "@/lib/ui/confirmation";
 import { BadgeEpingle, LigneExtremite, OptimiserSheet, choixDeRun, libellesExtremites, lirePositionGps, memoriserChoix } from "@/components/colis/OptimiserSheet";
 import { epingler, epingleDe, pointFinTournee, type Arrivee, type Depart } from "@/lib/colis/extremites";
+
+// Chargés à la demande : le scanner (caméra, jsQR) et l'import de bordereau ne servent qu'une fois ouverts.
+const ParcelScanner = dynamic(() => import("@/components/colis/ParcelScanner").then((m) => m.ParcelScanner), { ssr: false });
+const ImportBordereau = dynamic(() => import("@/components/colis/ImportBordereau").then((m) => m.ImportBordereau));
 
 interface Draft {
   adresse: string;
@@ -364,6 +367,30 @@ export function TourneeColis({
     };
   }, []);
 
+  /**
+   * Intègre l'arrêt renvoyé par POST /api/colis/arrets à l'état local, au bon
+   * rang de sa liste, au lieu de recharger toute la tournée (et sa liste).
+   * Renvoie false quand l'état local ne suffit pas (liste inconnue : village
+   * créé à l'instant) : l'appelant recharge alors comme avant.
+   */
+  function integrerArretAjoute(r: { grouped?: boolean; village?: { nom: string; horsTournee: boolean } | null; stop?: Stop | null }): boolean {
+    const stop = r.stop;
+    if (!stop || !run) return false;
+    if (r.village?.horsTournee) {
+      if (!r.grouped) setNbReportes((n) => n + 1);
+      return true;
+    }
+    if (stop.list_id && !lists.some((l) => l.id === stop.list_id)) return false;
+    const ancien = stops.find((x) => x.id === stop.id);
+    if (r.grouped && !ancien) return false;
+    setStops((all) => ordonnerParListe(ancien ? all.map((x) => (x.id === stop.id ? { ...x, ...stop } : x)) : [...all, stop], lists));
+    // Un arrêt ajouté avant le départ rend l'ordre à recalculer (fait au lancement).
+    if (run.status === "loading") setRun({ ...run, optimized_at: null });
+    const colis = (stop.parcel_count ?? 0) - (ancien?.parcel_count ?? 0);
+    setRuns((rs) => rs && rs.map((t) => (t.id === run.id ? { ...t, nbArrets: t.nbArrets + (ancien ? 0 : 1), nbRestants: t.nbRestants + (ancien ? 0 : 1), nbColis: t.nbColis + colis } : t)));
+    return true;
+  }
+
   async function ajouter(d: Draft) {
     const creneau = validerChoix(d.creneau ?? CRENEAU_AUCUN);
     if (!creneau.ok) return setToast({ ok: false, text: creneau.erreur });
@@ -419,7 +446,7 @@ export function TourneeColis({
                 },
       );
       setDraft(null);
-      await recharger(run?.id);
+      if (!r.duplicate && !integrerArretAjoute(r)) await recharger(run?.id);
       // Adresse pro : horaires cherchés sur internet en arrière-plan, sans bloquer le chargement.
       if (r.stop?.id && !r.grouped && !r.duplicate) {
         void chercherHoraires([r.stop.id]);

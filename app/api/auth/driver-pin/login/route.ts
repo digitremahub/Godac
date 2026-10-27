@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { verifierPin } from "@/lib/auth/pin-securise";
 import { choisirCompte, connexionEmailPinSchema, motifIlikeExact, type CompteCandidat } from "@/lib/auth/connexion-email-pin";
 
@@ -16,6 +18,8 @@ const MESSAGE_GENERIQUE = "Identifiants incorrects. Vérifiez votre e-mail et vo
  * parcours QR.
  */
 export async function POST(req: Request) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.connexionPin);
+  if (limite) return limite;
   const parsed = connexionEmailPinSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "Saisissez un e-mail valide et votre PIN." }, { status: 400 });

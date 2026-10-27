@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/lib/organization/modules";
+import { memoriserModule, moduleDejaVerifie } from "@/lib/organization/modules-verifies";
 import { LISTE_PRINCIPALE, type Liste } from "@/lib/colis/listes";
 import { normaliserSemaine, type FicheHoraires } from "@/lib/colis/horaires";
 import { lireArrivee, lireDepart, type Arrivee, type Depart } from "@/lib/colis/extremites";
@@ -15,8 +16,17 @@ export function aujourdhuiParis(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
 }
 
+/**
+ * Module Tournée colis actif. Réutilise le résultat que garderApi vient de
+ * calculer pour cette organisation (lib/organization/modules-verifies.ts) au
+ * lieu de relire deux tables ; relit la base sinon.
+ */
 export async function moduleActif(supabase: SupabaseClient, organizationId: string) {
-  return isModuleEnabled(supabase, organizationId, "route_optimizer");
+  const dejaVerifie = moduleDejaVerifie(organizationId, "route_optimizer");
+  if (dejaVerifie !== null) return dejaVerifie;
+  const actif = await isModuleEnabled(supabase, organizationId, "route_optimizer");
+  memoriserModule(organizationId, "route_optimizer", actif);
+  return actif;
 }
 
 /** Point de départ par défaut : dépôt du premier service du chauffeur, sinon celui de l'entreprise. */

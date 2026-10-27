@@ -32,8 +32,10 @@ export const INTERVALLE_MIN_MS = 3_000;
 export const INTERVALLE_ARRET_MS = 30_000;
 /** Envoi par lots : dès 10 points en attente… */
 export const LOT_POINTS = 10;
-/** … ou toutes les 20 s s'il y a au moins un point. */
-export const LOT_DELAI_MS = 20_000;
+/** … ou toutes les 30 s s'il y a au moins un point (la dernière position de la tournée voyage dans le même appel). */
+export const LOT_DELAI_MS = 30_000;
+/** Aucun point gardé (précision insuffisante) : la position seule est envoyée toutes les 60 s. */
+export const POSITION_SEULE_DELAI_MS = 60_000;
 /** Plafond de points par requête (côté client et côté serveur). */
 export const MAX_POINTS_REQUETE = 200;
 /** Plafond de la file locale (≈ 1 h 30 de conduite sans réseau) : au-delà, les plus anciens sont perdus. */
@@ -73,6 +75,11 @@ export function ajouterAFile(file: readonly PointTrace[], p: PointTrace, plafond
 export function doitEnvoyer(enAttente: number, dernierEnvoi: number, maintenant: number): boolean {
   if (enAttente <= 0) return false;
   return enAttente >= LOT_POINTS || maintenant - dernierEnvoi >= LOT_DELAI_MS;
+}
+
+/** Faut-il envoyer la position seule (aucun point en attente, fix GPS connu) ? */
+export function doitEnvoyerPosition(fixConnu: boolean, enAttente: number, dernierEnvoi: number, maintenant: number): boolean {
+  return fixConnu && enAttente <= 0 && maintenant - dernierEnvoi >= POSITION_SEULE_DELAI_MS;
 }
 
 /** File relue depuis le stockage local : seulement des points valides, dans l'ordre, plafonnée. */

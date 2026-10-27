@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
 import { motDePassePin } from "@/lib/auth/pin-securise";
@@ -16,6 +18,8 @@ const bodySchema = z.object({ pin: z.string(), confirmPin: z.string(), activatio
  * du badge ne suffit plus à prendre le compte.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.recuperationPin);
+  if (limite) return limite;
   const { id } = await params;
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });

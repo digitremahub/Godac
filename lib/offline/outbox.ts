@@ -4,6 +4,7 @@
  * encodées même si l'onglet est fermé ou le téléphone redémarre.
  */
 import { decisionApresEchec, rejouablePar } from "@/lib/offline/rejeu";
+import { avecVerrouRejeu } from "@/lib/offline/verrou-onglets";
 
 export type OfflineMutation = {
   id: string;
@@ -158,7 +159,12 @@ export async function enqueueOfflineMutation(url: string, init: RequestInit): Pr
   signal();
   return item;
 }
-export async function flushOfflineMutations(): Promise<{ synced: number; pending: number; error?: string }> {
+export type ResultatRejeu = { synced: number; pending: number; error?: string };
+/** Un seul onglet à la fois rejoue la file ; les autres constatent simplement l'état de la file. */
+export async function flushOfflineMutations(): Promise<ResultatRejeu> {
+  return avecVerrouRejeu(rejouerFile, async () => ({ synced: 0, pending: (await listOfflineMutations()).length }));
+}
+async function rejouerFile(): Promise<ResultatRejeu> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: 0, pending: (await listOfflineMutations()).length };
   let synced = 0;
   const abandons: string[] = [];

@@ -5,7 +5,7 @@ import { verifyRegistrationResponse, type RegistrationResponseJSON } from "@simp
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { consommerChallenge, webauthnConfig } from "@/lib/auth/webauthn";
 
 const bodySchema = z.object({
   response: z.custom<RegistrationResponseJSON>((v) => typeof v === "object" && v !== null),
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
-  const expectedChallenge = cookieStore.get(WEBAUTHN_CHALLENGE_COOKIE)?.value;
+  const expectedChallenge = await consommerChallenge(cookieStore);
   if (!expectedChallenge) {
     return NextResponse.json({ error: "Session d'inscription expirée, recommencez." }, { status: 400 });
   }
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Vérification échouée" }, { status: 400 });
   }
-  cookieStore.delete(WEBAUTHN_CHALLENGE_COOKIE);
 
   if (!verification.verified || !verification.registrationInfo) {
     return NextResponse.json({ error: "Vérification échouée" }, { status: 400 });

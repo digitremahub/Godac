@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { optionsCookieChallenge, webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { cookieChallengeSigne, optionsCookieChallenge, webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import type { RaisonPasskey } from "@/lib/auth/passkey-erreurs";
 
 // Corps vide ({}) : connexion sans e-mail, par clé « découvrable ».
@@ -35,6 +37,9 @@ function journal(raison: RaisonPasskey, detail?: string) {
  * exist or just has no passkey — doesn't confirm account existence.
  */
 export async function POST(req: Request) {
+  // Limitée par IP : `available` révèle quels comptes ont une passkey (la réponse ne peut pas être uniforme sans déclencher la biométrie pour tout le monde).
+  const limite = await limiterParIp(req, REGLES_LIMITE.passkeyOptions);
+  if (limite) return limite;
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {
     journal("requete_invalide");
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, options.challenge, optionsCookieChallenge(origin));
+  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, cookieChallengeSigne(options.challenge), optionsCookieChallenge(origin));
 
   return NextResponse.json({ available: true, decouvrable, options });
 }

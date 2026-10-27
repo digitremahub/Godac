@@ -4,7 +4,7 @@ import { generateRegistrationOptions } from "@simplewebauthn/server";
 import { isoUint8Array } from "@simplewebauthn/server/helpers";
 import { requireAppUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { optionsCookieChallenge, webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { cookieChallengeSigne, optionsCookieChallenge, webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
 
 /**
  * Step 1 of registering a passkey from /account (any role — see
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, options.challenge, optionsCookieChallenge(origin));
+  cookieStore.set(WEBAUTHN_CHALLENGE_COOKIE, cookieChallengeSigne(options.challenge), optionsCookieChallenge(origin));
 
   return NextResponse.json(options);
 }

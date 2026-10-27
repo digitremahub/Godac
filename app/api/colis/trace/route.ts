@@ -17,13 +17,23 @@ const pointSchema = z.object({
   v: z.number().min(0).max(100).nullish(),
   cap: z.number().min(0).max(360).nullish(),
 });
-const bodySchema = z.object({ run_id: z.string().uuid(), points: z.array(pointSchema).min(1).max(MAX_POINTS_REQUETE) });
+const bodySchema = z
+  .object({
+    run_id: z.string().uuid(),
+    // Ancien format : points seuls (min 1). Nouveau : lot éventuellement vide avec la dernière position.
+    points: z.array(pointSchema).max(MAX_POINTS_REQUETE).default([]),
+    position: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+  })
+  .refine((b) => b.points.length > 0 || b.position, "Aucun point");
 
 /**
  * Fil d'Ariane GPS de la tournée colis EN COURS (lots envoyés par l'app
  * chauffeur, voir components/colis/useTraceGps.ts). Hors tournée en cours,
  * rien n'est enregistré ({ ignore: true }, le client vide sa file). La
- * table refuse aussi d'elle-même (RLS + trigger de garde).
+ * table refuse aussi d'elle-même (RLS + trigger de garde). Le même appel
+ * peut porter `position` : dernière position du chauffeur pour la carte de
+ * suivi (ce que faisait POST /api/colis/position, conservé pour les
+ * anciennes versions de l'application).
  */
 export async function POST(req: Request) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -54,9 +64,17 @@ export async function POST(req: Request) {
       speed: p.v ?? null,
       heading: p.cap ?? null,
     }));
-  if (!lignes.length) return NextResponse.json({ ok: true, enregistres: 0 });
-  const { error } = await supabase.from("delivery_run_track_points").insert(lignes);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (lignes.length) {
+    const { error } = await supabase.from("delivery_run_track_points").insert(lignes);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (parsed.data.position) {
+    const { error } = await supabase
+      .from("delivery_runs")
+      .update({ last_lat: parsed.data.position.lat, last_lng: parsed.data.position.lng, last_position_at: new Date().toISOString() })
+      .eq("id", run.id);
+    if (error) console.error("trace: dernière position non enregistrée", error.message);
+  }
   return NextResponse.json({ ok: true, enregistres: lignes.length });
 }
 
