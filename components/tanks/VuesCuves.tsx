@@ -8,6 +8,7 @@ import { AddTankForm } from "@/components/tanks/AddTankForm";
 import { TankDeliveryForm } from "@/components/tanks/TankDeliveryForm";
 import { TankPhotosTable } from "@/components/tanks/TankPhotosTable";
 import { TankDeliveriesTable } from "@/components/tanks/TankDeliveriesTable";
+import { libelleCarburant } from "@/lib/fuel/vocabulaire";
 
 
 /** Onglets Carburant › Cuves et Carburant › Approvisionnements (ex-/tanks à onglets internes). */
@@ -64,7 +65,7 @@ export async function TanksTab({ canManage }: { canManage: boolean }) {
                   <p className="text-sm text-navy/65">{tank.services?.name ?? "Sans service"}</p>
                 </div>
                 <span className={tank.fuel_type === "diesel" ? "badge-teal" : "badge-gold"}>
-                  {tank.fuel_type === "diesel" ? "Diesel" : "AdBlue"}
+                  {libelleCarburant(tank.fuel_type)}
                 </span>
               </div>
 

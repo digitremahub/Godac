@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveTourActor } from "@/lib/tours/on-behalf";
 import { getCurrentTankPmp } from "@/lib/fuel/current-pmp";
-import { checkOdometerJump, checkOdometerNotRegressing } from "@/lib/business/odometer";
-import { getVehicleKmReadingsAround } from "@/lib/vehicles/odometer-reference";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { MOTIF_MAX } from "@/lib/fuel/controles-saisie";
+import { evaluerControlesSaisie, suiteControles } from "@/lib/fuel/controles-saisie-serveur";
+import { journaliser } from "@/lib/audit/journal";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 const bodySchema = z.object({
   vehicle_id: z.string().uuid(),
@@ -24,10 +26,9 @@ const bodySchema = z.object({
   unit_price: z.coerce.number().positive().max(10).optional(),
   product: z.enum(["gazole", "adblue"]).optional(),
   station_name: z.string().optional(),
+  /** Confirmation des contrôles km / capacité (réponse 409 CONTROLE_A_CONFIRMER) : le plein est enregistré et l'écart signalé à l'encadrement. */
+  confirmer_controles: z.object({ motif: z.string().trim().max(MOTIF_MAX) }).optional(),
 });
-
-/** Tolérance au-delà de la capacité du réservoir (jauge, mousse). */
-const MARGE_RESERVOIR = 1.1;
 
 /**
  * Module 2: saisie d'un plein, deux cas :
@@ -37,8 +38,11 @@ const MARGE_RESERVOIR = 1.1;
  * - achat en station (tank_id absent) : litres, prix au litre et produit
  *   du ticket, sans cuve ni totaliseur.
  * Contrôles : litres plausibles pour le réservoir du véhicule, kilométrage
- * ni en recul ni en saut absurde. Stock, PMP, écarts et alertes sont
- * calculés par les triggers (migration 121).
+ * ni en recul ni en saut absurde (lib/fuel/controles-saisie.ts, mêmes règles
+ * que la validation d'un ticket OCR). Un contrôle en échec n'est pas un refus
+ * définitif : réponse 409 « à confirmer », puis le chauffeur confirme avec un
+ * motif, le plein est enregistré et l'écart remonte dans « À traiter ».
+ * Stock, PMP, écarts et alertes sont calculés par les triggers (migration 121).
  */
 export async function POST(req: Request) {
   const g = await garderApi({ roles: "tous" });
@@ -109,61 +113,57 @@ export async function POST(req: Request) {
     }
   }
 
-  const capacite = Number(product === "adblue" ? vehicle.adblue_capacity_liters : vehicle.tank_capacity_liters) || null;
-  if (capacite && liters > capacite * MARGE_RESERVOIR) {
-    return NextResponse.json(
-      { error: `${liters} L dépasse la capacité du réservoir ${product === "adblue" ? "AdBlue " : ""}du véhicule (${capacite} L). Vérifiez la saisie.` },
-      { status: 422 },
-    );
+  const controles = await evaluerControlesSaisie(createAdminSupabaseClient(), {
+    vehicle,
+    liters,
+    product,
+    km: d.vehicle_km,
+    occurredAt: d.occurred_at,
+  });
+  const suite = suiteControles(controles, d.confirmer_controles, appUser.id);
+  if ("reponse" in suite) return suite.reponse;
+
+  const ligne = {
+    organization_id: appUser.organization_id,
+    vehicle_id: d.vehicle_id,
+    tank_id: d.tank_id ?? null,
+    driver_id: driverId,
+    created_by: appUser.id,
+    occurred_at: d.occurred_at,
+    totalizer_before: station ? null : totalizerBefore,
+    totalizer_after: station ? null : d.totalizer_after,
+    totalizer_before_photo_path: station ? undefined : d.totalizer_before_photo_path,
+    totalizer_after_photo_path: station ? undefined : d.totalizer_after_photo_path,
+    vehicle_km: d.vehicle_km ?? null,
+    vehicle_km_photo_path: d.vehicle_km_photo_path,
+    liters,
+    unit_price: unitPrice,
+    product,
+    station_name: d.station_name,
+    status: "manual",
+  };
+  const inserer = (champs: Record<string, unknown>) => supabase.from("fuel_entries").insert(champs).select("id, gap_flagged, totalizer_gap, pmp_at_entry").single();
+  let { data, error } = await inserer(suite.confirme ? { ...ligne, controle_confirme: suite.confirme } : ligne);
+  let confirmationPerdue = false;
+  if (error && suite.confirme && estSchemaManquant(error)) {
+    // Migration 20261108000003 pas appliquée : le plein est enregistré quand même (jamais de saisie perdue),
+    // la confirmation et son motif sont tracés au journal d'audit.
+    confirmationPerdue = true;
+    ({ data, error } = await inserer(ligne));
   }
 
-  if (d.vehicle_km !== undefined) {
-    // Saisie rétroactive : comparer le kilométrage aux relevés connus à
-    // la date réelle du plein, pas au relevé actuel (qui peut être supérieur).
-    // Client admin : le véhicule est déjà vérifié dans l'organisation, et
-    // toutes ses tournées doivent compter (la RLS limiterait un chauffeur
-    // aux siennes).
-    const { avant: dernier, apres: suivant } = await getVehicleKmReadingsAround(createAdminSupabaseClient(), vehicle.id, d.occurred_at);
-    const recul = checkOdometerNotRegressing(d.vehicle_km, dernier?.km ?? null, `la dernière lecture à cette date (${dernier?.source ?? "véhicule"})`);
-    if (!recul.ok) return NextResponse.json({ error: recul.message }, { status: 422 });
-    // Saisie rétroactive : le kilométrage ne peut pas dépasser un relevé postérieur.
-    if (suivant && d.vehicle_km > suivant.km) {
-      const date = new Date(suivant.at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
-      return NextResponse.json(
-        { error: `${d.vehicle_km} km dépasse un relevé postérieur au plein (${suivant.km} km le ${date}, ${suivant.source}). Vérifiez la saisie.` },
-        { status: 422 },
-      );
-    }
-    const saut = checkOdometerJump(d.vehicle_km, dernier?.km ?? null, dernier?.at ?? null, new Date(d.occurred_at));
-    if (!saut.ok) return NextResponse.json({ error: saut.message }, { status: 422 });
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message ?? "Plein non enregistré." }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from("fuel_entries")
-    .insert({
-      organization_id: appUser.organization_id,
-      vehicle_id: d.vehicle_id,
-      tank_id: d.tank_id ?? null,
-      driver_id: driverId,
-      created_by: appUser.id,
-      occurred_at: d.occurred_at,
-      totalizer_before: station ? null : totalizerBefore,
-      totalizer_after: station ? null : d.totalizer_after,
-      totalizer_before_photo_path: station ? undefined : d.totalizer_before_photo_path,
-      totalizer_after_photo_path: station ? undefined : d.totalizer_after_photo_path,
-      vehicle_km: d.vehicle_km ?? null,
-      vehicle_km_photo_path: d.vehicle_km_photo_path,
-      liters,
-      unit_price: unitPrice,
-      product,
-      station_name: d.station_name,
-      status: "manual",
-    })
-    .select("id, gap_flagged, totalizer_gap, pmp_at_entry")
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (suite.confirme) {
+    await journaliser({
+      organizationId: appUser.organization_id,
+      userId: appUser.id,
+      action: "plein_controle_confirme",
+      targetTable: "fuel_entries",
+      targetId: data.id,
+      details: { controles: suite.confirme.controles.map((c) => c.code), motif: suite.confirme.motif, ...(confirmationPerdue ? { colonne_absente: true } : {}) },
+    });
   }
 
   return NextResponse.json({ fuelEntry: data });

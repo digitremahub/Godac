@@ -3,6 +3,10 @@
 import { Fragment, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { BadgeStatutEcart, FuelEntryDetail } from "@/components/fuel/FuelEntryDetail";
+import { libelleCarburant } from "@/lib/fuel/vocabulaire";
+import { BoutonJoindreTicket } from "@/components/fuel/BoutonJoindreTicket";
+import { justificatifManquant } from "@/lib/fuel/justificatif";
+import { LIBELLES_STATUT_PLEIN } from "@/lib/fuel/detail-plein";
 import type { StatutEcart } from "@/lib/fuel/ecarts";
 
 export interface FuelHistoryRow {
@@ -15,6 +19,8 @@ export interface FuelHistoryRow {
   product?: string | null;
   station_name?: string | null;
   tank_id?: string | null;
+  /** Photo du ticket ; absente sur un plein enregistré : « Joindre le ticket » est proposé. */
+  ticket_photo_path?: string | null;
   tanks?: { name: string } | null;
   vehicles?: { registration: string } | null;
   users?: { full_name: string } | null;
@@ -34,14 +40,9 @@ function sourceLabel(e: FuelHistoryRow): string {
 function StatusBadge({ status, gapFlagged, statutEcart }: { status: string; gapFlagged?: boolean | null; statutEcart?: StatutEcart }) {
   if (statutEcart && statutEcart !== "aucun") return <BadgeStatutEcart statut={statutEcart} />;
   if (!statutEcart && gapFlagged) return <span className="badge-orange">Écart détecté</span>;
-  const map: Record<string, { cls: string; label: string }> = {
-    manual: { cls: "badge-neutral", label: "Manuel" },
-    validated: { cls: "badge-teal", label: "Validé" },
-    pending_ocr: { cls: "badge-gold", label: "OCR en cours" },
-    awaiting_validation: { cls: "badge-gold", label: "À valider" },
-    ocr_failed: { cls: "badge-orange", label: "Échec OCR" },
-  };
-  const s = map[status] ?? { cls: "badge-neutral", label: status };
+  // Mêmes libellés que la fiche du plein (lib/fuel/detail-plein.ts).
+  const classes: Record<string, string> = { manual: "badge-neutral", validated: "badge-teal", pending_ocr: "badge-gold", awaiting_validation: "badge-gold", ocr_failed: "badge-orange" };
+  const s = { cls: classes[status] ?? "badge-neutral", label: LIBELLES_STATUT_PLEIN[status] ?? status };
   return <span className={s.cls}>{s.label}</span>;
 }
 
@@ -105,7 +106,7 @@ export function FuelHistoryTable({
                   <td className="py-2">{new Date(e.occurred_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td>
                   {showVehicle && <td className="py-2">{e.vehicles?.registration ?? "—"}</td>}
                   {showDriver && <td className="py-2">{e.users?.full_name ?? "—"}</td>}
-                  <td className="py-2">{e.product === "adblue" ? "AdBlue" : "Gazole"}</td>
+                  <td className="py-2">{libelleCarburant(e.product ?? "gazole")}</td>
                   <td className="py-2">{sourceLabel(e)}</td>
                   <td className="py-2">{e.liters ?? "—"} L</td>
                   <td className="py-2">{e.total_amount ?? "—"} €</td>
@@ -113,10 +114,11 @@ export function FuelHistoryTable({
                   <td className="py-2">
                     <StatusBadge status={e.status} gapFlagged={e.gap_flagged} statutEcart={e.statut_ecart} />
                   </td>
-                  <td className="py-2 text-right">
+                  <td className="whitespace-nowrap py-2 text-right">
+                    {e.ticket_photo_path !== undefined && justificatifManquant(e) && <BoutonJoindreTicket entryId={e.id} />}
                     <button
                       type="button"
-                      className="btn-ghost !px-2 !py-1 text-xs"
+                      className="btn-ghost min-h-[44px] !px-2 !py-1 text-xs"
                       aria-expanded={estOuvert}
                       aria-controls={`plein-${e.id}`}
                       onClick={() => setOuvert(estOuvert ? null : e.id)}

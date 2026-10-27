@@ -10,7 +10,9 @@
  * - prix unitaire éloigné du PMP de la cuve (> 15 %, idem trigger) ;
  * - montant du ticket lu par OCR ≠ litres × prix (lib/ocr/ticket-check.ts) ;
  * - consommation anormale du véhicule (alerte consumption_anomaly liée au
- *   plein, posée par after_fuel_entry_consumption_check).
+ *   plein, posée par after_fuel_entry_consumption_check) ;
+ * - contrôle de saisie (kilométrage, capacité du réservoir) que le chauffeur
+ *   a confirmé avec un motif (colonne controle_confirme, lib/fuel/controles-saisie.ts).
  *
  * Le traitement est un journal (table fuel_gap_reviews, migration
  * 20261022000001) : chaque action est une ligne, la dernière donne le
@@ -19,12 +21,13 @@
 
 import { peutDecider } from "@/lib/hierarchie/demandes";
 import { ticketAmountMismatch, ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
+import { lireControleConfirme } from "@/lib/fuel/controles-saisie";
 
 /** Tolérances identiques aux triggers SQL (migration 121). */
 export const TOLERANCE_TOTALISEUR_LITRES = 0.5;
 export const SEUIL_ECART_PRIX_PMP = 0.15;
 
-export type CodeEcart = "totaliseur" | "litres_totaliseur" | "prix_pmp" | "ticket_ocr" | "consommation";
+export type CodeEcart = "totaliseur" | "litres_totaliseur" | "prix_pmp" | "ticket_ocr" | "consommation" | "controle_confirme";
 
 export interface Ecart {
   code: CodeEcart;
@@ -43,6 +46,8 @@ export interface PleinPourEcarts {
   pmp_at_entry?: number | string | null;
   tank_id?: string | null;
   ocr_raw?: unknown;
+  /** Contrôle de saisie confirmé par le chauffeur (migration 20261108000003) ; absent : aucun. */
+  controle_confirme?: unknown;
 }
 
 /** Alerte liée au plein (alerts.related_table = 'fuel_entries'). */
@@ -120,6 +125,15 @@ export function ecartsDuPlein(plein: PleinPourEcarts, alertes: readonly AlerteLi
       code: "consommation",
       libelle: "Consommation anormale",
       detail: conso.message?.trim() || "Consommation du véhicule en hausse par rapport à son habitude.",
+    });
+  }
+
+  const confirme = lireControleConfirme(plein.controle_confirme);
+  if (confirme) {
+    ecarts.push({
+      code: "controle_confirme",
+      libelle: "Contrôle de saisie confirmé par le chauffeur",
+      detail: `${confirme.controles.map((c) => c.message).join(" ")} Motif du chauffeur : « ${confirme.motif} ».`,
     });
   }
 

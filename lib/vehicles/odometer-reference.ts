@@ -114,6 +114,8 @@ export async function getVehicleKmReadingsAround(
   supabase: SupabaseClient,
   vehicleId: string,
   occurredAt: string,
+  /** Plein en cours de correction : son propre relevé ne se compare pas à lui-même. */
+  excludeFuelEntryId?: string,
 ): Promise<RelevesEncadrants> {
   const iso = new Date(occurredAt).toISOString();
   type Ligne = Record<string, unknown>;
@@ -122,6 +124,7 @@ export async function getVehicleKmReadingsAround(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let q: any = supabase.from(table).select(colonnes).eq("vehicle_id", vehicleId).not(colonneKm, "is", null);
     if (statuts) q = q.in("status", statuts);
+    if (statuts && excludeFuelEntryId) q = q.neq("id", excludeFuelEntryId);
     q = avant ? q.lte(colonneDate, iso) : q.gt(colonneDate, iso);
     const { data } = await q.order(colonneDate, { ascending: !avant }).limit(1);
     return ((data ?? []) as Ligne[])[0] ?? null;

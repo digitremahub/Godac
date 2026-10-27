@@ -69,7 +69,7 @@ export function EditTankForm({
       <div>
         <label className="block"><span className="label">Type</span>
         <select className="input" value={fuelType} onChange={(e) => setFuelType(e.target.value as "diesel" | "adblue")}>
-          <option value="diesel">Diesel</option>
+          <option value="diesel">Gazole</option>
           <option value="adblue">AdBlue</option>
         </select></label>
       </div>

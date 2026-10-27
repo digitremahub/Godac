@@ -6,12 +6,17 @@
  * « resolved » (même statut que le traitement d'un écart carburant) : elles
  * ne comptent plus dans « Notifications ouvertes ».
  *
+ * Échéances de la flotte (echeance_vehicule) : l'alerte se clôt quand le
+ * document est renouvelé (remplacé ou nouvelle date), l'amende réglée ou
+ * classée, et quand un palier plus urgent (J-7, J0) prend le relais du précédent
+ * — la condition est la clé de dédoublonnage (lib/alerts/echeances.ts).
+ *
  * Fichier pur : la sélection est testée dans lib/alerts/__tests__/cloture.test.ts,
  * l'écriture est faite par lib/exploitation/surveillance-serveur.ts.
  */
 
 /** Types d'alerte clos tout seuls quand leur condition disparaît. */
-export const TYPES_CLOTURE_AUTO = ["tournee_retard", "tournee_non_demarree", "tournee_sans_chauffeur"] as const;
+export const TYPES_CLOTURE_AUTO = ["tournee_retard", "tournee_non_demarree", "tournee_sans_chauffeur", "echeance_vehicule"] as const;
 
 export interface AlerteACloturer {
   id: string;
@@ -32,4 +37,18 @@ export function alertesAClore(ouvertes: readonly AlerteACloturer[], conditionsAc
       return Boolean(actifs) && Boolean(a.related_id) && !actifs!.has(a.related_id!);
     })
     .map((a) => a.id);
+}
+
+export interface AlerteEcheanceOuverte {
+  id: string;
+  cle_dedoublonnage: string | null;
+}
+
+/**
+ * Identifiants des alertes d'échéance ouvertes à clore : celles dont la clé
+ * (échéance + palier) n'est plus parmi les clés actives. Une alerte sans clé
+ * (créée autrement) n'est jamais touchée.
+ */
+export function alertesEcheanceAClore(ouvertes: readonly AlerteEcheanceOuverte[], clesActives: ReadonlySet<string>): string[] {
+  return ouvertes.filter((a) => Boolean(a.cle_dedoublonnage) && !clesActives.has(a.cle_dedoublonnage!)).map((a) => a.id);
 }

@@ -20,6 +20,18 @@ import { rolesDestinatairesEffectifs } from "@/lib/roles/perimetre";
  */
 export const TYPES_ALERTE_TOURNEE: readonly string[] = ["tournee_retard", "tournee_non_demarree", "tournee_sans_chauffeur"];
 
+/**
+ * Même périmètre pour les échéances de la flotte (contrôle technique,
+ * assurance, amende : cron /api/cron/echeances-flotte) : encadrement du
+ * service du véhicule, exploitation et direction pour toute l'organisation ;
+ * jamais le comptable ni le chauffeur ; un véhicule sans service reste à
+ * l'exploitation et à la direction.
+ */
+export const TYPES_ALERTE_ECHEANCE: readonly string[] = ["echeance_vehicule"];
+
+/** Alertes réservées à l'encadrement et bornées au service : tournées et échéances de la flotte. */
+const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE];
+
 export interface DestinatairePossible {
   id: string;
   role: string;
@@ -46,7 +58,7 @@ export function estLimiteAuService(role: string, serviceId: string | null | unde
  * tournée sont encadrées ici ; le reste suit la RLS d'origine.
  */
 export function alerteVisiblePour(role: string, type: string, serviceId: string | null | undefined, mesServices: readonly string[] = []): boolean {
-  if (!TYPES_ALERTE_TOURNEE.includes(type)) return true;
+  if (!TYPES_ALERTE_ENCADREMENT_SERVICE.includes(type)) return true;
   if (role === "comptable" || role === "chauffeur") return false;
   if (ROLES_PAR_SERVICE.includes(role)) return Boolean(serviceId) && mesServices.includes(serviceId!);
   return true;
@@ -63,7 +75,7 @@ export function choisirDestinataires<T extends DestinatairePossible>(
   alerte: { service_id?: string | null; type?: string },
   servicesDe: ReadonlyMap<string, readonly string[]>,
 ): T[] {
-  const tournee = TYPES_ALERTE_TOURNEE.includes(alerte.type ?? "");
+  const tournee = TYPES_ALERTE_ENCADREMENT_SERVICE.includes(alerte.type ?? "");
   return candidats.filter((c) => {
     if (tournee) return alerteVisiblePour(c.role, alerte.type!, alerte.service_id, servicesDe.get(c.id) ?? []);
     return !estLimiteAuService(c.role, alerte.service_id) || (servicesDe.get(c.id) ?? []).includes(alerte.service_id!);
@@ -82,7 +94,7 @@ export function alerteAffichable(role: string, a: { type: string; service_id?: s
 
 /** Managers dont les services sont à lire : ceux d'une alerte de service ou d'une alerte de tournée. */
 export function serviceAVerifier(role: string, type: string, serviceId: string | null | undefined): boolean {
-  return ROLES_PAR_SERVICE.includes(role) && (Boolean(serviceId) || TYPES_ALERTE_TOURNEE.includes(type));
+  return ROLES_PAR_SERVICE.includes(role) && (Boolean(serviceId) || TYPES_ALERTE_ENCADREMENT_SERVICE.includes(type));
 }
 
 /**

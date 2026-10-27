@@ -141,7 +141,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (!garde.ok) return garde.reponse;
       if (garde.autoValidee) await tracerAutoValidation(appUser, { table: "fines", id, decision: body.status });
     }
-    const { error } = await supabase.from("fines").update({ status: body.status }).eq("id", id);
+    // closed_at (migration 20261108000003) : date de clôture, point de départ de la conservation d'un an annoncée.
+    // Une amende réglée ou classée la pose ; rouverte (contestée), elle la retire.
+    const cloture = body.status === "paid" || body.status === "dismissed";
+    let { error } = await supabase.from("fines").update({ status: body.status, closed_at: cloture ? now : null }).eq("id", id);
+    if (error && estSchemaManquant(error)) ({ error } = await supabase.from("fines").update({ status: body.status }).eq("id", id));
     if (error && estValeurEnumInconnue(error)) return NextResponse.json({ error: "Statut « classée » indisponible : migration 20261026000003 à appliquer." }, { status: 409 });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (fine.driver_id) {

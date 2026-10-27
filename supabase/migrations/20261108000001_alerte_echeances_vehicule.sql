@@ -1,0 +1,14 @@
+-- Carburant / flotte, lot 2 : type d'alerte « échéance véhicule », créé une
+-- fois par jour par le cron /api/cron/echeances-flotte (contrôle technique,
+-- assurance, licence et autres papiers du véhicule, date limite de paiement
+-- minoré d'une amende) aux paliers J-30, J-7 et J0, relayé en cloche, push
+-- et e-mail comme les autres alertes, puis clos tout seul quand le document
+-- est renouvelé ou l'amende réglée.
+--
+-- Fichier séparé : une nouvelle valeur d'enum ne peut pas être utilisée dans
+-- la transaction qui l'ajoute (colonne de dédoublonnage, index unique et
+-- périmètre de lecture sont dans 20261108000002).
+-- ADDITIVE et rejouable. NON appliquée à la création : tant qu'elle ne l'est
+-- pas, le cron ne crée simplement pas ces alertes (« À traiter » calcule les
+-- échéances directement depuis les documents et les amendes).
+alter type public.alert_type add value if not exists 'echeance_vehicule';

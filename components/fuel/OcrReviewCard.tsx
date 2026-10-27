@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { FuelEntryForm, type FuelEntryFormValues } from "@/components/fuel/FuelEntryForm";
+import { ConfirmerControles } from "@/components/fuel/ConfirmerControles";
+import { CODE_CONTROLE_A_CONFIRMER, type ControleSaisie } from "@/lib/fuel/controles-saisie";
 import { fuelEntryPayload } from "@/lib/fuel/entry-payload";
 import { ticketExtrasFromOcrRaw } from "@/lib/ocr/ticket-check";
 import { isoToDatetimeLocal } from "@/lib/utils/datetime-local";
@@ -13,13 +15,15 @@ export function OcrReviewCard({ entry }: { entry: any }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Contrôle de saisie en échec (kilométrage, réservoir) : confirmer avec un motif plutôt que perdre la relecture.
+  const [aConfirmer, setAConfirmer] = useState<{ controles: ControleSaisie[]; valeurs: FuelEntryFormValues; markManual: boolean } | null>(null);
   // Un ticket photographié vient d'une station ; une ligne déjà
   // rattachée à une cuve peut l'être à tort (ancien parcours OCR qui
   // imposait une cuve) — le relecteur peut la détacher.
   const [station, setStation] = useState(!entry.tank_id);
   const ticket = ticketExtrasFromOcrRaw(entry.ocr_raw);
 
-  async function submit(values: FuelEntryFormValues, markManual: boolean) {
+  async function submit(values: FuelEntryFormValues, markManual: boolean, motif?: string) {
     setBusy(true);
     setError(null);
     try {
@@ -29,10 +33,17 @@ export function OcrReviewCard({ entry }: { entry: any }) {
         body: JSON.stringify({
           ...fuelEntryPayload(values, { station, method: "PATCH" }),
           ...(markManual ? { markManual: true } : { validate: true }),
+          ...(motif ? { confirmer_controles: { motif } } : {}),
         }),
       });
       const json = await res.json();
+      if (res.status === 409 && json.code === CODE_CONTROLE_A_CONFIRMER && Array.isArray(json.controles)) {
+        setAConfirmer({ controles: json.controles, valeurs: values, markManual });
+        if (motif) setError(typeof json.error === "string" ? json.error : null);
+        return;
+      }
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Données refusées — vérifiez les champs.");
+      setAConfirmer(null);
       setDone(true);
       router.refresh();
     } catch (e) {
@@ -101,6 +112,16 @@ export function OcrReviewCard({ entry }: { entry: any }) {
             station={station}
             onStationChange={entry.tank_id ? setStation : undefined}
             ticket={ticket}
+            bas={
+              aConfirmer && (
+                <ConfirmerControles
+                  controles={aConfirmer.controles}
+                  busy={busy}
+                  onConfirmer={(motif) => submit(aConfirmer.valeurs, aConfirmer.markManual, motif)}
+                  onCorriger={() => setAConfirmer(null)}
+                />
+              )
+            }
             onSubmit={(v) => submit(v, entry.status === "ocr_failed")}
           />
         </div>

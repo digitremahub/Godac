@@ -28,6 +28,7 @@ export const TYPES_A_TRAITER = [
   "tournee_non_demarree",
   "tournee_en_retard",
   "ticket_ocr",
+  "echeance_vehicule",
   "bulletin_paie",
   "conge",
   "arret",
@@ -47,10 +48,11 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   tournee_non_demarree: { singulier: "Tournée non démarrée", pluriel: "Tournées non démarrées" },
   tournee_en_retard: { singulier: "Tournée en retard", pluriel: "Tournées en retard" },
   ticket_ocr: { singulier: "Ticket à vérifier", pluriel: "Tickets à vérifier" },
+  echeance_vehicule: { singulier: "Échéance véhicule", pluriel: "Échéances véhicules" },
   bulletin_paie: { singulier: "Bulletins à valider", pluriel: "Bulletins à valider" },
   conge: { singulier: "Congé", pluriel: "Congés" },
   arret: { singulier: "Arrêt de travail", pluriel: "Arrêts de travail" },
-  contestation: { singulier: "Contestation", pluriel: "Contestations" },
+  contestation: { singulier: "Contestation client", pluriel: "Contestations clients" },
   inscription: { singulier: "Inscription", pluriel: "Inscriptions" },
 };
 
@@ -70,6 +72,7 @@ export const ECRANS_PAR_TYPE: Record<TypeATraiter, readonly string[]> = {
   tournee_non_demarree: ["exploitation.planning"],
   tournee_en_retard: ["exploitation.suivi"],
   ticket_ocr: ["carburant.revue_ocr"],
+  echeance_vehicule: ["flotte.vehicules", "flotte.amendes"],
   bulletin_paie: ["equipe.paie"],
   conge: ["equipe.conges"],
   arret: ["equipe.arrets"],
@@ -92,6 +95,7 @@ export type Urgence = "haute" | "normale";
 export const TYPES_MANAGER: readonly TypeATraiter[] = [
   "ecart_carburant",
   "ticket_ocr",
+  "echeance_vehicule",
   "entretien",
   "conge",
   "tournee_sans_chauffeur",
@@ -160,6 +164,8 @@ export const SEUILS_URGENCE: Record<TypeATraiter, { ancienneteHeures: number | n
   tournee_en_retard: { ancienneteHeures: null, echeanceHeures: null },
   // Ticket de carburant à relire (OCR) : une journée d'attente suffit à le dire urgent.
   ticket_ocr: { ancienneteHeures: 48, echeanceHeures: null },
+  // Contrôle technique, assurance, licence, amende à payer au tarif minoré : urgent à 7 jours de l'échéance ou une fois dépassée.
+  echeance_vehicule: { ancienneteHeures: null, echeanceHeures: 168 },
   // Bulletins du mois : l'urgence est déclarée par la source (mois passé).
   bulletin_paie: { ancienneteHeures: null, echeanceHeures: null },
   conge: { ancienneteHeures: 120, echeanceHeures: 72 },

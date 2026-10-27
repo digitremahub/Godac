@@ -5,6 +5,8 @@ import { parisDay } from "@/lib/utils/paris-time";
 import { estValeurEnumInconnue } from "@/lib/rattachement/tolerance";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
 import { chargerDeclarations } from "@/lib/ticpe/declarations-serveur";
+import { controlesDeLaPeriode } from "@/lib/ticpe/periode-serveur";
+import { compterParGravite } from "@/lib/ticpe/controles";
 import { argentNonReclame, estDeclaree, prochaineEcheance, rappelEra } from "@/lib/ticpe/echeances";
 import { lignesDeLaPeriode, totaliser } from "@/lib/ticpe/montant";
 import { formatJour } from "@/lib/ticpe/bareme";
@@ -33,7 +35,9 @@ async function dejaEnvoye(admin: SupabaseClient, organizationId: string, kind: s
  *    précédente, à établir au plus tard le 31 janvier (une fois par an) ;
  *  - d'octobre à décembre : montants de l'année N-2 non réclamés, perdus
  *    au 31 décembre (une fois par an).
- * Destinataires : direction et comptable.
+ * Le rappel d'échéance dit aussi combien de points bloquants restent à régler
+ * sur la période (écran « TICPE : à régler »). Destinataires : direction et
+ * comptable, plus l'exploitation qui corrige ces points.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -53,7 +57,7 @@ export async function GET(req: Request) {
       const { reglages } = calcul.parametres;
       const { declarations } = await chargerDeclarations(admin, orgId);
       const montantDe = (p: { debut: string; fin: string }) => totaliser(lignesDeLaPeriode(calcul.lignes, p.debut, p.fin)).montant;
-      const base = { organization_id: orgId, type: "ticpe_rappel", related_table: null, related_id: null, recipient_roles: ["direction", "comptable"] };
+      const base = { organization_id: orgId, type: "ticpe_rappel", related_table: null, related_id: null, recipient_roles: ["direction", "comptable", "exploitation"] };
       const envoyer = async (kind: string, ref: string, severity: "warning" | "critical" | "info", message: string) => {
         if (await dejaEnvoye(admin, orgId, kind, ref)) return;
         const { error } = await admin.from("alerts").insert({ ...base, severity, message });
@@ -69,11 +73,19 @@ export async function GET(req: Request) {
       const e = prochaineEcheance(aujourdhui, reglages);
       const montant = montantDe(e.periode);
       if (e.joursRestants >= 0 && e.joursRestants <= reglages.rappel_jours && montant > 0 && !estDeclaree(e.periode, declarations)) {
+        // Points bloquants restants : jamais bloquant pour le rappel lui-même.
+        let bloquants = 0;
+        try {
+          bloquants = compterParGravite((await controlesDeLaPeriode(admin, orgId, e.periode, calcul)).points).bloquants;
+        } catch (err) {
+          console.error("cron TICPE : contrôles de la période", err instanceof Error ? err.message : err);
+        }
+        const restants = bloquants > 0 ? ` ${bloquants} point${bloquants > 1 ? "s" : ""} bloquant${bloquants > 1 ? "s" : ""} à régler avant de déclarer (Carburant › TICPE › À régler : correction groupée possible).` : "";
         await envoyer(
           "echeance",
           e.periode.cle,
           e.joursRestants <= 2 ? "critical" : "warning",
-          `TICPE ${e.periode.libelle} : ${euros(montant)} préparés, à déclarer avec la TVA avant le ${formatJour(e.dateLimite)}. GODAC prépare les montants ; la déclaration reste faite par l'entreprise ou son expert-comptable.`,
+          `TICPE ${e.periode.libelle} : ${euros(montant)} préparés, à déclarer avec la TVA avant le ${formatJour(e.dateLimite)}.${restants} GODAC prépare les montants ; la déclaration reste faite par l'entreprise ou son expert-comptable.`,
         );
       }
 

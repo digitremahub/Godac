@@ -21,6 +21,7 @@ const ECRAN_PAR_TABLE: Record<string, string> = {
   vehicle_interventions: "flotte.entretien",
   tank_deliveries: "carburant.approvisionnements",
   fines: "flotte.amendes",
+  vehicles: "flotte.vehicules",
   customer_disputes: "exploitation.contestations",
   rental_maintenance_requests: "flotte.loueurs_demandes",
   planning_entries: "exploitation.historique",
@@ -126,6 +127,10 @@ export function resolveAlertUrl(relatedTable: string | null, type?: string | nul
   // Décision sur son arrêt (alerte personnelle) : ses arrêts.
   if ((type === "work_stoppage" || (relatedTable === "work_stoppages" && !type)) && contexte?.recipientUserId) {
     return urlDe("moi.arrets");
+  }
+  // Échéance de papiers du véhicule et consommation au-dessus de la référence (cron de la flotte) : la fiche du véhicule.
+  if (relatedTable === "vehicles" && relatedId && (type === "echeance_vehicule" || type === "consumption_anomaly")) {
+    return urlPour({ id: "flotte.vehicule_fiche", params: { id: relatedId }, suite: type === "echeance_vehicule" ? "#papiers" : "" }, contexte);
   }
   const parType = type ? CIBLE_PAR_TYPE[type] : undefined;
   if (parType) return urlPour(parType(relatedId ?? null), contexte);

@@ -4,6 +4,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { journaliser } from "@/lib/audit/journal";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
+import { avecColonneControle } from "@/lib/fuel/colonnes-controle";
 import { alerterNiveauSuperieur, compterDirection, lirePersonne, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 import { libelleDecideurs } from "@/lib/hierarchie/demandes";
 import {
@@ -15,6 +16,7 @@ import {
   ecartsDuPlein,
   statutEcart,
   tableAbsente,
+  type PleinPourEcarts,
 } from "@/lib/fuel/ecarts";
 
 const bodySchema = z.object({
@@ -58,11 +60,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { action, commentaire } = parsed.data;
 
   // Lecture sous RLS : un plein invisible pour cette personne est introuvable.
-  const { data: plein } = await supabase
-    .from("fuel_entries")
-    .select("id, organization_id, driver_id, vehicle_id, occurred_at, liters, unit_price, totalizer_before, totalizer_after, totalizer_gap, gap_flagged, pmp_at_entry, tank_id, ocr_raw, vehicles(registration, service_id)")
-    .eq("id", id)
-    .maybeSingle();
+  const { data: pleinBrut } = await avecColonneControle(
+    (colonnes) => supabase.from("fuel_entries").select(colonnes).eq("id", id).maybeSingle(),
+    "id, organization_id, driver_id, vehicle_id, occurred_at, liters, unit_price, totalizer_before, totalizer_after, totalizer_gap, gap_flagged, pmp_at_entry, tank_id, ocr_raw, vehicles(registration, service_id)",
+  );
+  const plein = pleinBrut as unknown as
+    | (PleinPourEcarts & { id: string; organization_id: string; driver_id: string | null; vehicle_id: string; occurred_at: string; vehicles: { registration: string; service_id: string | null } | { registration: string; service_id: string | null }[] | null })
+    | null;
   if (!plein) return NextResponse.json({ error: "Plein introuvable." }, { status: 404 });
 
   const suivi = await chargerSuiviEcarts(supabase, [id]);
