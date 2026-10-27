@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer, rembourser } from "@/lib/usage/consommer";
+import { journaliserJetons } from "@/lib/usage/jetons";
 import { moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
 import { lireBordereau } from "@/lib/ocr/bordereau";
@@ -72,5 +73,7 @@ export async function POST(req: Request) {
     const code = lecture.raison === "illisible" ? "ILLISIBLE" : lecture.raison === "dense" ? "DENSE" : "LECTURE";
     return NextResponse.json({ error: message, code }, { status: lecture.raison === "illisible" || lecture.raison === "dense" ? 422 : 502 });
   }
+  // Coût réel de la lecture (modèle plus cher qu'une étiquette) : journalisé, sans changer le décompte facturé.
+  await journaliserJetons(admin, quota.eventId, "ocr_bordereau", lecture.jetons);
   return NextResponse.json({ page: normaliserPage(lecture.page, await codePays(appUser.organization_id)) });
 }

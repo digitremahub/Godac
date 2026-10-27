@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { JetonsConsommes } from "@/lib/usage/jetons";
 
 /**
  * Lot C: reads a tour report photo — either the handheld terminal's
@@ -57,7 +58,7 @@ export function normaliserLecture(input: unknown): unknown {
 }
 
 export type TourReportOcrResult =
-  | { ok: true; fields: TourReportFields; raw: unknown }
+  | { ok: true; fields: TourReportFields; raw: unknown; jetons: JetonsConsommes }
   | { ok: false; reason: string };
 
 const SYSTEM_PROMPT = `Tu lis une photo ou un scan d'un rapport de tournée de livraison (écran de terminal portable type Honeywell « Statistiques Tournée », ou compte-rendu de tournée imprimé type DPD/transporteur). Recopie uniquement les chiffres et références explicitement lisibles — ne devine jamais une valeur absente ou floue, ne fais aucun calcul : renvoie null pour ce qui n'est pas lisible.
@@ -91,6 +92,13 @@ function contentBlockFromFile(imageBytes: Buffer, filename: string) {
   const media_type = filename.endsWith(".png") ? "image/png" : filename.endsWith(".webp") ? "image/webp" : "image/jpeg";
   return { type: "image" as const, source: { type: "base64" as const, media_type, data } };
 }
+
+/** Délai d'un appel, un nouvel essai si l'API est surchargée ou injoignable. */
+const DELAI_APPEL_MS = 45_000;
+const ESSAIS_MAX = 2;
+const PAUSE_ENTRE_ESSAIS_MS = 1000;
+const STATUTS_PASSAGERS = new Set([429, 500, 502, 503, 504, 529]);
+const MESSAGE_LECTURE_INDISPONIBLE = "Lecture automatique momentanément indisponible. Réessayez dans un instant ou complétez les champs à la main.";
 
 export async function extractTourReportFromImage(imageBytes: Buffer, filename: string): Promise<TourReportOcrResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -132,41 +140,54 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
     ],
   };
 
-  let response: Response;
-  try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              contentBlockFromFile(imageBytes, filename),
-              { type: "text", text: "Extrais les champs du rapport de tournée visible sur ce document via l'outil fourni." },
-            ],
-          },
-        ],
-        tools: [{ name: "tour_report", description: "Champs extraits du rapport de tournée.", input_schema: toolSchema }],
-        tool_choice: { type: "tool", name: "tour_report" },
-      }),
-    });
-  } catch (e) {
-    return { ok: false, reason: e instanceof Error ? e.message : "network error calling Anthropic API" };
+  let response: Response | null = null;
+  for (let essai = 1; essai <= ESSAIS_MAX; essai++) {
+    try {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: AbortSignal.timeout(DELAI_APPEL_MS),
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-5",
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: [
+                contentBlockFromFile(imageBytes, filename),
+                { type: "text", text: "Extrais les champs du rapport de tournée visible sur ce document via l'outil fourni." },
+              ],
+            },
+          ],
+          tools: [{ name: "tour_report", description: "Champs extraits du rapport de tournée.", input_schema: toolSchema }],
+          tool_choice: { type: "tool", name: "tour_report" },
+        }),
+      });
+    } catch (e) {
+      // Délai dépassé ou réseau : un seul nouvel essai.
+      console.error(`tour-report: appel IA impossible (essai ${essai})`, e instanceof Error ? e.message : e);
+      response = null;
+      if (essai < ESSAIS_MAX) continue;
+      return { ok: false, reason: MESSAGE_LECTURE_INDISPONIBLE };
+    }
+    if (response.ok || !STATUTS_PASSAGERS.has(response.status) || essai === ESSAIS_MAX) break;
+    console.error(`tour-report: API ${response.status} (essai ${essai})`);
+    await new Promise((r) => setTimeout(r, PAUSE_ENTRE_ESSAIS_MS));
   }
 
+  if (!response) return { ok: false, reason: MESSAGE_LECTURE_INDISPONIBLE };
   if (!response.ok) {
-    return { ok: false, reason: `Anthropic API error ${response.status}: ${await response.text()}` };
+    // Le corps de l'erreur reste au journal serveur : il ne part jamais chez le client.
+    console.error(`tour-report: API ${response.status}`, (await response.text()).slice(0, 500));
+    return { ok: false, reason: MESSAGE_LECTURE_INDISPONIBLE };
   }
 
-  const data = (await response.json()) as { content?: { type: string; name?: string; input?: unknown }[] };
+  const data = (await response.json()) as { content?: { type: string; name?: string; input?: unknown }[]; usage?: { input_tokens?: number; output_tokens?: number } };
   const toolUse = data.content?.find((c) => c.type === "tool_use" && c.name === "tour_report");
   if (!toolUse) {
     return { ok: false, reason: "AI response did not contain the expected structured output" };
@@ -177,5 +198,5 @@ export async function extractTourReportFromImage(imageBytes: Buffer, filename: s
     return { ok: false, reason: `malformed AI response: ${parsed.error.message}` };
   }
 
-  return { ok: true, fields: parsed.data, raw: data };
+  return { ok: true, fields: parsed.data, raw: data, jetons: { entree: data.usage?.input_tokens ?? null, sortie: data.usage?.output_tokens ?? null } };
 }

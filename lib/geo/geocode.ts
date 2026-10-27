@@ -20,6 +20,9 @@ export interface GeocodeResult {
  * pourrait la confondre avec une rue française du même nom) : on passe
  * par OpenStreetMap (Nominatim), limité au pays de l'entreprise.
  */
+/** Délai maximal d'un appel de géocodage : au-delà, l'adresse reste sans coordonnées plutôt que de bloquer l'ajout. */
+export const DELAI_GEOCODAGE_MS = 6000;
+
 const NOMINATIM = "https://nominatim.openstreetmap.org";
 const NOMINATIM_HEADERS = { "User-Agent": "GODAC (https://godac.app; contact@godac.fr)", "Accept-Language": "fr" };
 
@@ -27,6 +30,7 @@ async function geocodeNominatim(address: string, country: string): Promise<Geoco
   try {
     const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&countrycodes=${country.toLowerCase()}&q=${encodeURIComponent(address)}`, {
       headers: NOMINATIM_HEADERS,
+      signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS),
     });
     if (!res.ok) return null;
     const [hit] = (await res.json()) as { lat?: string; lon?: string }[];
@@ -43,15 +47,18 @@ export async function geocodeAddress(address: string, country = "FR"): Promise<G
 
   let response: Response;
   try {
-    response = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(trimmed)}&limit=1`);
+    response = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(trimmed)}&limit=1`, { signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS) });
   } catch {
     return null;
   }
   if (!response.ok) return null;
 
-  const data = (await response.json()) as {
-    features?: { geometry?: { coordinates?: [number, number] } }[];
-  };
+  let data: { features?: { geometry?: { coordinates?: [number, number] } }[] };
+  try {
+    data = await response.json();
+  } catch {
+    return null;
+  }
   const coordinates = data.features?.[0]?.geometry?.coordinates;
   if (!coordinates || coordinates.length !== 2) return null;
 
@@ -63,7 +70,7 @@ export async function geocodeAddress(address: string, country = "FR"): Promise<G
 export async function reverseGeocode(lat: number, lng: number, country = "FR"): Promise<string | null> {
   if (country !== "FR") {
     try {
-      const res = await fetch(`${NOMINATIM}/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, { headers: NOMINATIM_HEADERS });
+      const res = await fetch(`${NOMINATIM}/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, { headers: NOMINATIM_HEADERS, signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS) });
       return res.ok ? (((await res.json()) as { display_name?: string }).display_name ?? null) : null;
     } catch {
       return null;
@@ -71,12 +78,17 @@ export async function reverseGeocode(lat: number, lng: number, country = "FR"): 
   }
   let response: Response;
   try {
-    response = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${lng}&lat=${lat}&limit=1`);
+    response = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${lng}&lat=${lat}&limit=1`, { signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS) });
   } catch {
     return null;
   }
   if (!response.ok) return null;
-  const data = (await response.json()) as { features?: { properties?: { label?: string } }[] };
+  let data: { features?: { properties?: { label?: string } }[] };
+  try {
+    data = await response.json();
+  } catch {
+    return null;
+  }
   return data.features?.[0]?.properties?.label ?? null;
 }
 
@@ -93,6 +105,7 @@ export async function geocodeAddressDetail(address: string, country = "FR"): Pro
     if (country !== "FR") {
       const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&addressdetails=1&countrycodes=${country.toLowerCase()}&q=${encodeURIComponent(trimmed)}`, {
         headers: NOMINATIM_HEADERS,
+        signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS),
       });
       if (!res.ok) return null;
       const [hit] = (await res.json()) as { lat?: string; lon?: string; address?: Record<string, string> }[];
@@ -100,7 +113,7 @@ export async function geocodeAddressDetail(address: string, country = "FR"): Pro
       const a = hit.address ?? {};
       return { lat: Number(hit.lat), lng: Number(hit.lon), city: a.village ?? a.town ?? a.city ?? a.municipality ?? null, postcode: a.postcode ?? null };
     }
-    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(trimmed)}&limit=1`);
+    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(trimmed)}&limit=1`, { signal: AbortSignal.timeout(DELAI_GEOCODAGE_MS) });
     if (!res.ok) return null;
     const data = (await res.json()) as { features?: { geometry?: { coordinates?: [number, number] }; properties?: { city?: string; postcode?: string } }[] };
     const f = data.features?.[0];

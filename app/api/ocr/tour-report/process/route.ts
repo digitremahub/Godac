@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { consommer } from "@/lib/usage/consommer";
+import { consommer, rembourser } from "@/lib/usage/consommer";
+import { journaliserJetons } from "@/lib/usage/jetons";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { extractTourReportFromImage } from "@/lib/ocr/tour-report";
 
@@ -35,7 +36,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ fields: null, error: "Lecture automatique désactivée pour votre entreprise — complétez les champs à la main." });
   }
 
-  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "ocr_tour_report");
+  const admin = createAdminSupabaseClient();
+  const quota = await consommer(admin, appUser.organization_id, appUser.id, "ocr_tour_report");
   if (!quota.ok) {
     return NextResponse.json({ fields: null, error: quota.raison });
   }
@@ -44,8 +46,11 @@ export async function POST(req: Request) {
   const result = await extractTourReportFromImage(imageBytes, parsed.data.storagePath);
 
   if (!result.ok) {
+    // Échec de notre côté (service IA, délai) : la lecture n'est pas comptée.
+    await rembourser(admin, quota.eventId);
     return NextResponse.json({ fields: null, error: result.reason });
   }
+  await journaliserJetons(admin, quota.eventId, "ocr_tour_report", result.jetons);
 
   return NextResponse.json({ fields: result.fields });
 }

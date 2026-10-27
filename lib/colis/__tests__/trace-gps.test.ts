@@ -5,6 +5,7 @@ import {
   arretsProlonges,
   depuisCompact,
   doitEnvoyer,
+  doitEnvoyerPosition,
   dureeConduiteMin,
   garderPoint,
   kmParcourus,
@@ -53,11 +54,18 @@ describe("file locale et envoi par lots", () => {
     expect(f.map((p) => p.t)).toEqual([2000, 3000, 4000]);
     expect(MAX_FILE).toBeGreaterThanOrEqual(1000);
   });
-  it("envoie dès 10 points ou après 20 s", () => {
+  it("envoie dès 10 points ou après 30 s", () => {
     expect(doitEnvoyer(0, 0, 60_000)).toBe(false);
     expect(doitEnvoyer(10, 50_000, 51_000)).toBe(true);
     expect(doitEnvoyer(3, 50_000, 60_000)).toBe(false);
-    expect(doitEnvoyer(3, 50_000, 70_000)).toBe(true);
+    expect(doitEnvoyer(3, 50_000, 70_000)).toBe(false);
+    expect(doitEnvoyer(3, 50_000, 80_000)).toBe(true);
+  });
+  it("envoie la position seule après 60 s quand aucun point n'est gardé", () => {
+    expect(doitEnvoyerPosition(true, 0, 0, 59_000)).toBe(false);
+    expect(doitEnvoyerPosition(true, 0, 0, 60_000)).toBe(true);
+    expect(doitEnvoyerPosition(false, 0, 0, 120_000)).toBe(false);
+    expect(doitEnvoyerPosition(true, 2, 0, 120_000)).toBe(false);
   });
   it("relit la file stockée en écartant les points invalides", () => {
     const brut = JSON.stringify([pt(2000), { t: 1, lat: "x" }, pt(1000), pt(3000, 0, 0, 120)]);

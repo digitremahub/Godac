@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { sendTransactionalEmail } from "@/lib/email/resend";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { EDITEUR } from "@/lib/legal/editeur";
 
 const bodySchema = z.object({
@@ -27,6 +29,8 @@ const echapper = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<
  * heure et par adresse IP (stockée hachée, jamais en clair).
  */
 export async function POST(req: Request) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.demandeDemo);
+  if (limite) return limite;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Vérifiez les champs du formulaire." }, { status: 400 });
   const d = parsed.data;

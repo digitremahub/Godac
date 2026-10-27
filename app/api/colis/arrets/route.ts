@@ -201,7 +201,8 @@ async function ajouterArret(req: Request, appUser: AppUser) {
   // Les ramasses récurrentes sont gérées par la direction sur la fiche du village,
   // afin qu’elles soient communes à tous les chauffeurs qui desservent ce village.
   return NextResponse.json({
-    stop: data,
+    // Arrêt complet (nom pro compris) : l'écran l'intègre sans recharger toute la tournée.
+    stop: nomPro ? { ...data, business_name: nomPro.slice(0, 200) } : data,
     geocoded: Boolean(pointChoisi ?? geo),
     village,
     professionnel: nomPro,

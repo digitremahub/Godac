@@ -53,6 +53,9 @@ export const ACCUEIL_GO_NAVIGATION = "/exploitation/colis";
 
 export const MESSAGE_ESSAI_TERMINE = "Essai GO Navigation terminé. Contactez GODAC pour continuer à utiliser l'application.";
 
+/** Lecture de l'offre impossible (incident) : accès refusé par prudence, réessayer. */
+export const MESSAGE_OFFRE_INDETERMINEE = "Vérification de votre abonnement momentanément impossible. Réessayez dans un instant.";
+
 const JOUR_MS = 24 * 3600 * 1000;
 
 /** Fin de l'essai : maintenant + 30 jours. */

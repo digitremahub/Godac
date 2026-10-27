@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { validatePin } from "@/lib/business/driver-pin";
 import { motDePassePin } from "@/lib/auth/pin-securise";
 import { createRecoveryCode, hashRecoveryCode, recoveryCodeMatches } from "@/lib/auth/driver-recovery";
 const schema = z.object({ recoveryCode: z.string().min(8).max(40), pin: z.string(), confirmPin: z.string() });
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.recuperationPin);
+  if (limite) return limite;
   const { id } = await params;
   const parsed = schema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Code de récupération ou PIN invalide." }, { status: 400 });

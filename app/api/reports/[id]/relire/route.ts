@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { journaliser } from "@/lib/audit/journal";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { consommer } from "@/lib/usage/consommer";
+import { consommer, rembourser } from "@/lib/usage/consommer";
+import { journaliserJetons } from "@/lib/usage/jetons";
 import { isModuleEnabled } from "@/lib/organization/modules";
 import { extractTourReportFromImage, type TourReportFields } from "@/lib/ocr/tour-report";
 import { arretsLivraison } from "@/lib/ocr/arrets";
@@ -40,24 +41,33 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     ["end", tour.end_photo_path],
   ] as const;
   if (!etapes.some(([, chemin]) => chemin)) return NextResponse.json({ error: "Aucun scan à relire." }, { status: 422 });
-  const quota = await consommer(createAdminSupabaseClient(), appUser.organization_id, appUser.id, "tour_report_reread");
+  const admin = createAdminSupabaseClient();
+  const quota = await consommer(admin, appUser.organization_id, appUser.id, "tour_report_reread");
   if (!quota.ok) return NextResponse.json({ error: quota.raison, code: "QUOTA_ATTEINT" }, { status: 429 });
 
   const lectures: Partial<Record<(typeof etapes)[number][0], TourReportFields>> = {};
   const echecs: string[] = [];
+  const jetons = { entree: 0, sortie: 0 };
   await Promise.all(
     etapes.map(async ([etape, chemin]) => {
       if (!chemin) return;
       const { data: fichier } = await supabase.storage.from("tour-photos").download(chemin);
       if (!fichier) return void echecs.push(etape);
       const r = await extractTourReportFromImage(Buffer.from(await fichier.arrayBuffer()), chemin);
-      if (r.ok) lectures[etape] = r.fields;
+      if (r.ok) {
+        lectures[etape] = r.fields;
+        jetons.entree += r.jetons.entree ?? 0;
+        jetons.sortie += r.jetons.sortie ?? 0;
+      }
       else echecs.push(etape);
     }),
   );
   if (!Object.keys(lectures).length) {
+    await rembourser(admin, quota.eventId);
     return NextResponse.json({ error: "Aucun scan n'a pu être relu." }, { status: 422 });
   }
+
+  await journaliserJetons(admin, quota.eventId, "tour_report_reread", jetons);
 
   // Départ : écran du terminal, complété par la feuille de début.
   const depart = lectures.start || lectures.start_sheet ? fusion(lectures.start, lectures.start_sheet) : null;

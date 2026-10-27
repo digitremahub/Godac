@@ -4,7 +4,9 @@ import { z } from "zod";
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { webauthnConfig, WEBAUTHN_CHALLENGE_COOKIE } from "@/lib/auth/webauthn";
+import { consommerChallenge, webauthnConfig } from "@/lib/auth/webauthn";
+import { limiterParIp } from "@/lib/http/limiteur-serveur";
+import { REGLES_LIMITE } from "@/lib/http/limite-debit";
 import { userIdDepuisHandle, type RaisonPasskey } from "@/lib/auth/passkey-erreurs";
 
 const bodySchema = z.object({
@@ -29,6 +31,8 @@ function echec(raison: RaisonPasskey, message: string, status: number, detail?: 
  * supabase.auth.verifyOtp({ token_hash }).
  */
 export async function POST(req: Request) {
+  const limite = await limiterParIp(req, REGLES_LIMITE.passkeyVerify);
+  if (limite) return limite;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return echec("requete_invalide", "Réponse biométrique illisible.", 400);
   const response = parsed.data.response;
@@ -54,7 +58,7 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
-  const expectedChallenge = cookieStore.get(WEBAUTHN_CHALLENGE_COOKIE)?.value;
+  const expectedChallenge = await consommerChallenge(cookieStore);
   if (!expectedChallenge) {
     return echec("challenge_absent", "Demande expirée ou cookie bloqué par le navigateur : réessayez (moins de 3 minutes entre l'ouverture et la validation).", 400);
   }
@@ -79,7 +83,6 @@ export async function POST(req: Request) {
     const message = e instanceof Error ? e.message : "inconnue";
     return echec("verification_echouee", `Vérification de la clé refusée : ${message}`, 400, message);
   }
-  cookieStore.delete(WEBAUTHN_CHALLENGE_COOKIE);
 
   if (!verification.verified) {
     return echec("verification_echouee", "Vérification de la clé refusée.", 400, "verified=false");
