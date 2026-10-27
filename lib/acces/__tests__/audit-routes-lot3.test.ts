@@ -129,8 +129,8 @@ describe("vercel.json : aucun cron plus fréquent qu'une fois par jour", () => {
 
 describe("migrations additives, rejouables, enum séparé", () => {
   it("les valeurs d'enum sont dans un fichier distinct de celui qui les utilise", () => {
-    const enumSql = lire("supabase/migrations/20261109000001_alertes_rh_types.sql");
-    const suite = lire("supabase/migrations/20261109000002_planning_rh_paie_lot3.sql");
+    const enumSql = lire("supabase/migrations/20261110000001_alertes_rh_types.sql");
+    const suite = lire("supabase/migrations/20261110000002_planning_rh_paie_lot3.sql");
     for (const v of ["echeance_rh", "pointage_a_regulariser", "paiement_echoue"]) expect(enumSql).toContain(`add value if not exists '${v}'`);
     expect(suite).not.toMatch(/add value/);
     expect(suite).toContain("add column if not exists needs_regularization");

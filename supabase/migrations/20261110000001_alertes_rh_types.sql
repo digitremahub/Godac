@@ -11,7 +11,7 @@
 --
 -- Fichier séparé : une nouvelle valeur d'enum ne peut pas être utilisée dans
 -- la transaction qui l'ajoute (colonnes, index et policies sont dans
--- 20261109000002). ADDITIVE et rejouable. NON appliquée à la création : tant
+-- 20261110000002). ADDITIVE et rejouable. NON appliquée à la création : tant
 -- qu'elle ne l'est pas, ces alertes ne sont simplement pas créées (« À traiter »
 -- calcule les pointages à régulariser directement depuis la table).
 alter type public.alert_type add value if not exists 'echeance_rh';
