@@ -49,7 +49,7 @@ export function BonDeCommande({
         <BoutonImprimer />
       </div>
 
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex items-start justify-between gap-4 border-b-2 border-orange pb-4">
         <Wordmark height={30} />
         <div className="text-right">
           <h1 className="text-xl">Bon de commande</h1>
@@ -84,7 +84,7 @@ export function BonDeCommande({
       <section>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-navy/[0.05] text-left">
+            <tr className="bg-orange/10 text-left">
               <th className={cel}>Désignation</th>
               <th className={`${cel} text-right`}>Mensuel HT</th>
               <th className={`${cel} text-right`}>Mise en service HT</th>
@@ -120,7 +120,7 @@ export function BonDeCommande({
               <td className={`${cel} text-right tabular-nums`}>{euros(d.mensuelHT * TVA)}</td>
               <td className={`${cel} text-right tabular-nums`}>{euros(d.miseEnServiceNetHT * TVA)}</td>
             </tr>
-            <tr>
+            <tr className="bg-orange/10">
               <td className={cel}>Total TTC</td>
               <td className={`${cel} text-right tabular-nums`}><span className="whitespace-nowrap">{euros(d.mensuelHT * (1 + TVA))} / mois</span></td>
               <td className={`${cel} text-right tabular-nums`}>{euros(d.miseEnServiceNetHT * (1 + TVA))}</td>

@@ -102,10 +102,10 @@ const ETAPES = [
 
 export function CommentCaMarche() {
   return (
-    <section id="comment-ca-marche" className="scroll-mt-20 bg-paper py-20 lg:py-24">
+    <section id="comment-ca-marche" className="scroll-mt-20 border-y border-orange-fonce/15 bg-orange-clair py-20 lg:py-24">
       <div className="mx-auto max-w-6xl px-5 sm:px-6">
         <div className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="kicker !text-teal-ink">Comment ça marche</p>
+          <p className="kicker !text-orange-texte">Comment ça marche</p>
           <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du plein au dossier, en trois étapes.</h2>
           <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
             Le chauffeur fait le plein comme d&apos;habitude. Le reste se fait tout seul, sous votre contrôle.
@@ -116,7 +116,7 @@ export function CommentCaMarche() {
             <li key={e.titre} className="card flex flex-col gap-4 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-navy/15 hover:shadow-raised">
               <div className="overflow-hidden rounded-xl">{e.illustration}</div>
               <div className="flex items-start gap-3">
-                <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-marine font-body text-sm font-bold text-[#1BE4C1]">
+                <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-fonce font-body text-sm font-bold text-white">
                   {i + 1}
                 </span>
                 <div>

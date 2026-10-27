@@ -446,26 +446,26 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       </section>
 
       {/* ── Planning, absences, paie ── */}
-      <section id="planning-paie" className="scroll-mt-20 border-t border-navy/[0.08] bg-surface py-20 lg:py-24">
+      <section id="planning-paie" className="scroll-mt-20 border-y border-orange-fonce/15 bg-orange-clair py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 max-w-2xl">
-            <p className="kicker !text-teal-ink">Planning, RH &amp; paie</p>
+            <p className="kicker !text-orange-texte">Planning, RH &amp; paie</p>
             <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du planning au bulletin, sans ressaisie.</h2>
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {PLANNING_PAIE.map((bloc) => (
               <div key={bloc.kicker} className="card flex flex-col gap-4">
-                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal text-marine">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange text-marine">
                   <bloc.icon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="kicker !text-teal-ink">{bloc.kicker}</p>
+                  <p className="kicker !text-orange-texte">{bloc.kicker}</p>
                   <h3 className="mt-2 text-xl leading-tight">{bloc.title}</h3>
                 </div>
                 <ul className="flex flex-col gap-2.5">
                   {bloc.points.map((point) => (
                     <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
-                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
+                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-orange-texte" />
                       {point}
                     </li>
                   ))}
@@ -476,7 +476,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
 
           <div className="mt-14 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-xl">
-              <p className="kicker !text-teal-ink">Et aussi</p>
+              <p className="kicker !text-orange-texte">Et aussi</p>
               <h2 className="mt-3 text-2xl leading-tight sm:text-[28px]">Le reste, sans un outil de plus.</h2>
             </div>
             <Link href="/modules" className="btn-secondary w-fit">
@@ -516,18 +516,18 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
           </div>
           <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
             {[
-              { href: "/demo?as=direction", title: "Côté direction", text: "Tableau de bord TICPE, contrôles avant déclaration, écarts carburant, planning de la semaine et bulletins.", icon: IconChartBar },
-              { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Pleins en photo, planning publié, tournée colis du jour, congés et acomptes, sur mobile.", icon: IconTruck },
+              { href: "/demo?as=direction", title: "Côté direction", text: "Tableau de bord TICPE, contrôles avant déclaration, écarts carburant, planning de la semaine et bulletins.", icon: IconChartBar, puce: "bg-marine text-teal", lien: "text-teal-ink" },
+              { href: "/demo?as=chauffeur", title: "Côté chauffeur", text: "Pleins en photo, planning publié, tournée colis du jour, congés et acomptes, sur mobile.", icon: IconTruck, puce: "bg-orange-fonce text-white", lien: "text-orange-texte" },
             ].map((d) => (
               <a key={d.href} href={d.href} className="card-hover group flex flex-col gap-4">
-                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
+                <span aria-hidden="true" className={`flex h-11 w-11 items-center justify-center rounded-xl ${d.puce}`}>
                   <d.icon className="h-5 w-5" />
                 </span>
                 <span>
                   <span className="block font-display text-lg font-bold">{d.title}</span>
                   <span className="mt-1 block text-sm text-navy/65">{d.text}</span>
                 </span>
-                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-teal-ink">
+                <span className={`mt-auto inline-flex items-center gap-2 text-sm font-semibold ${d.lien}`}>
                   Ouvrir la démo
                   <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </span>
@@ -541,7 +541,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       <section id="tournee-colis" className="scroll-mt-20 bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
           <div className="mb-12 max-w-2xl">
-            <p className="kicker !text-teal-ink">Tournée colis</p>
+            <p className="kicker !text-orange-texte">Tournée colis</p>
             <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du scan du colis à la preuve de livraison.</h2>
             <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
               La tournée se prépare depuis le planning, quel que soit le transporteur donneur d&apos;ordre.
@@ -551,7 +551,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             {TOURNEE_COLIS.map((bloc) => (
               <li key={bloc.title} className="card flex flex-col gap-4">
                 <span className="flex items-center gap-3">
-                  <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-marine text-teal">
+                  <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange text-marine">
                     <bloc.icon className="h-5 w-5" />
                   </span>
                   <h3 className="text-lg">{bloc.title}</h3>
@@ -559,7 +559,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 <ul className="flex flex-col gap-2.5">
                   {bloc.points.map((point) => (
                     <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
-                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
+                      <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-orange-texte" />
                       {point}
                     </li>
                   ))}
@@ -570,19 +570,22 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </div>
       </section>
 
-      {/* ── GO Navigation : en dernier, pour éveiller la curiosité ── */}
-      <section id="go-navigation" className="scroll-mt-20 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      {/* ── GO Navigation : en dernier, pour éveiller la curiosité. Bloc orange foncé
+          (#C2410C), texte BLANC plein uniquement : 5,18:1 (les nuances /80 tombent sous 4,5:1). ── */}
+      <section id="go-navigation" className="bloc-orange-fonce relative scroll-mt-20 overflow-hidden bg-orange-fonce py-20 text-white lg:py-24">
+        <div aria-hidden="true" className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 right-0 h-96 w-96 rounded-full bg-marine/25 blur-3xl" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <div>
-            <p className="kicker !text-teal-ink">En avant-première · GO Navigation</p>
+            <p className="kicker !text-white">En avant-première · GO Navigation</p>
             <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Et pour vos chauffeurs, un GPS pensé pour la tournée.</h2>
-            <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+            <p className="mt-4 text-pretty sm:text-lg">
               GO Navigation guide le chauffeur d&apos;arrêt en arrêt, aux couleurs GODAC. On vous le montre de vive voix.
             </p>
             <ul className="mt-6 flex flex-col gap-2.5">
               {GO_NAVIGATION.map((point) => (
-                <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed text-navy/70">
-                  <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-ink" />
+                <li key={point} className="flex gap-2 text-pretty text-sm leading-relaxed">
+                  <IconCheck className="mt-0.5 h-4 w-4 shrink-0" />
                   {point}
                 </li>
               ))}
@@ -592,12 +595,12 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
                 Demander un essai
                 <IconArrowRight className="h-5 w-5" />
               </Link>
-              <a href="/demo?as=chauffeur" className="btn-secondary !px-5 !py-3.5 text-base">
+              <a href="/demo?as=chauffeur" className="btn !px-5 !py-3.5 text-base text-white ring-1 ring-inset ring-white/70 hover:bg-white/10">
                 <IconPlay className="h-4 w-4" />
                 Démo côté chauffeur
               </a>
             </div>
-            <p className="mt-3 text-sm text-navy/60">Essai GO Navigation de 30 jours, sur invitation, après un premier échange avec notre équipe.</p>
+            <p className="mt-3 text-sm">Essai GO Navigation de 30 jours, sur invitation, après un premier échange avec notre équipe.</p>
           </div>
           <MaquetteGoNavigation />
         </div>
@@ -609,6 +612,7 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       <section className="px-5 pb-20 sm:px-6">
         <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 overflow-hidden rounded-3xl bg-marine px-6 py-14 text-center text-white sm:px-12 lg:flex-row lg:justify-between lg:text-left">
           <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-teal/20 blur-3xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-orange/20 blur-3xl" />
           <div className="relative">
             <h2 className="text-[28px] leading-tight sm:text-4xl">Votre TICPE ne devrait pas dormir dans un tableur.</h2>
             <p className="mt-3 text-white/70">Commencez par le carburant, ajoutez la flotte, le planning et la paie quand vous voulez.</p>

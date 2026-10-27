@@ -15,7 +15,7 @@ export const metadata = {
 };
 
 /** Nouveautés mises en avant (texte seul : les prix restent ceux du catalogue ci-dessous). */
-const NOUVEAUTES = [
+const NOUVEAUTES: { titre: string; texte: string; go?: boolean }[] = [
   {
     titre: "TICPE sans tableur",
     texte: "Véhicules éligibles repérés depuis la carte grise, montant calculé à chaque plein au barème daté, contrôles avant déclaration, documents prêts pour le comptable et rappels d'échéance.",
@@ -31,6 +31,7 @@ const NOUVEAUTES = [
   {
     titre: "Tournée colis + GO Navigation",
     texte: "Scan et lecture d'étiquette, optimisation sur les km routiers avec les horaires des pros, navigation intégrée en vue conduite, ramasses, points relais et preuves de livraison.",
+    go: true,
   },
 ];
 
@@ -66,6 +67,7 @@ export default async function ModulesPage() {
       <SiteHeader />
       <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-24 h-80 w-80 rounded-full bg-orange/15 blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-5 pb-20 pt-10 text-center sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Carburant inclus dans tous les plans · modules à la carte</p>
           <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">Contrôlez le carburant, ajoutez le reste quand vous voulez</h1>
@@ -84,7 +86,7 @@ export default async function ModulesPage() {
           <PricingSimulator plans={plans} modules={modules} prices={prices} />
         </div>
 
-        <section className="mb-16" aria-labelledby="nouveautes">
+        <section className="mb-16 rounded-3xl border border-orange-fonce/15 bg-orange-clair p-5 sm:p-8" aria-labelledby="nouveautes">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <h2 id="nouveautes" className="text-2xl sm:text-3xl">Nouveautés</h2>
             <Link href="/contact?essai=go-navigation" className="btn-secondary w-fit">
@@ -93,13 +95,16 @@ export default async function ModulesPage() {
           </div>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {NOUVEAUTES.map((n) => (
-              <li key={n.titre} className="card flex flex-col gap-2 border-teal/30">
+              <li
+                key={n.titre}
+                className={n.go ? "card flex flex-col gap-2 !border-orange-fonce !bg-orange-fonce text-white" : "card flex flex-col gap-2 border-teal/30"}
+              >
                 <h3 className="text-lg">{n.titre}</h3>
-                <p className="text-sm text-navy/70">{n.texte}</p>
+                <p className={n.go ? "text-sm" : "text-sm text-navy/70"}>{n.texte}</p>
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-navy/60">
+          <p className="mt-3 text-xs text-navy/70">
             GO Navigation fait partie du module Tournée colis. L&apos;essai de 30 jours se fait sur invitation, après un premier échange.
           </p>
         </section>

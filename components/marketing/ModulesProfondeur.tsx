@@ -7,13 +7,22 @@ import { useScene3D } from "@/components/marketing/useScene3D";
 import { decalageParallaxe, inclinaison } from "@/lib/vitrine/scene";
 
 /** Un module par carte, dans l'ordre de la vitrine : TICPE d'abord, GO Navigation en dernier. */
-const MODULES: { cle: CleIllustration; href: string; titre: string; texte: string; profondeur: number }[] = [
-  { cle: "ticpe", href: "#ticpe", titre: "TICPE", texte: "Vos camions éligibles repérés, le remboursement chiffré plein par plein.", profondeur: 10 },
-  { cle: "carburant", href: "#carburant", titre: "Carburant", texte: "Chaque litre tracé de la cuve au ticket, sans ressaisie.", profondeur: 26 },
-  { cle: "flotte", href: "#flotte", titre: "Flotte", texte: "Vos véhicules suivis, de la carte grise à l’amende.", profondeur: 10 },
-  { cle: "planning", href: "#planning-paie", titre: "Planning, RH & paie", texte: "Du planning au bulletin, sans ressaisie.", profondeur: 26 },
-  { cle: "colis", href: "#tournee-colis", titre: "Tournée colis", texte: "Arrêts, ramasses et preuves de livraison dans le même écran.", profondeur: 10 },
-  { cle: "go", href: "#go-navigation", titre: "GO Navigation", texte: "Le GPS pensé pour la tournée, en avant-première.", profondeur: 26 },
+/** Une couleur d'accent par pôle : teal (carburant, flotte), orange (planning, colis), orange foncé (GO). */
+type Accent = "teal" | "orange" | "fonce";
+const ACCENTS: Record<Accent, { face: string; texte: string; lien: string }> = {
+  teal: { face: "hover:border-teal-ink/40", texte: "text-navy/65", lien: "text-teal-ink" },
+  orange: { face: "hover:border-orange-fonce/40", texte: "text-navy/65", lien: "text-orange-texte" },
+  // Fond orange foncé : texte blanc plein (5,18:1), jamais d'opacité.
+  fonce: { face: "bloc-orange-fonce !border-orange-fonce !bg-orange-fonce text-white hover:!border-white/60", texte: "", lien: "" },
+};
+
+const MODULES: { cle: CleIllustration; href: string; titre: string; texte: string; profondeur: number; accent: Accent }[] = [
+  { cle: "ticpe", href: "#ticpe", titre: "TICPE", texte: "Vos camions éligibles repérés, le remboursement chiffré plein par plein.", profondeur: 10, accent: "teal" },
+  { cle: "carburant", href: "#carburant", titre: "Carburant", texte: "Chaque litre tracé de la cuve au ticket, sans ressaisie.", profondeur: 26, accent: "teal" },
+  { cle: "flotte", href: "#flotte", titre: "Flotte", texte: "Vos véhicules suivis, de la carte grise à l’amende.", profondeur: 10, accent: "teal" },
+  { cle: "planning", href: "#planning-paie", titre: "Planning, RH & paie", texte: "Du planning au bulletin, sans ressaisie.", profondeur: 26, accent: "orange" },
+  { cle: "colis", href: "#tournee-colis", titre: "Tournée colis", texte: "Arrêts, ramasses et preuves de livraison dans le même écran.", profondeur: 10, accent: "orange" },
+  { cle: "go", href: "#go-navigation", titre: "GO Navigation", texte: "Le GPS pensé pour la tournée, en avant-première.", profondeur: 26, accent: "fonce" },
 ];
 
 const INCLINAISON_MAX = 9;
@@ -96,11 +105,11 @@ export function ModulesProfondeur() {
     <ul ref={liste} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {MODULES.map((m) => (
         <li key={m.cle} className="vitrine-carte" data-profondeur={m.profondeur} onPointerMove={pencher} onPointerLeave={redresser}>
-          <a href={m.href} className="vitrine-carte-face card card-hover flex h-full flex-col gap-3 hover:border-teal-ink/40">
+          <a href={m.href} className={`vitrine-carte-face card card-hover flex h-full flex-col gap-3 ${ACCENTS[m.accent].face}`}>
             <IllustrationModule cle={m.cle} />
             <h3 className="text-lg">{m.titre}</h3>
-            <p className="text-pretty text-sm leading-relaxed text-navy/65">{m.texte}</p>
-            <span className="mt-auto inline-flex items-center gap-1.5 pt-1 text-sm font-semibold text-teal-ink">
+            <p className={`text-pretty text-sm leading-relaxed ${ACCENTS[m.accent].texte}`}>{m.texte}</p>
+            <span className={`mt-auto inline-flex items-center gap-1.5 pt-1 text-sm font-semibold ${ACCENTS[m.accent].lien}`}>
               Voir le détail
               <IconArrowRight className="h-4 w-4" />
             </span>

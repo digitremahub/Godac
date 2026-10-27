@@ -25,8 +25,9 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
       <SiteHeader />
       <div className="relative overflow-hidden bg-marine text-[#F0F4FF]">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 top-10 h-96 w-96 rounded-full bg-teal/15 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-orange/15 blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-8 text-center sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
+          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${essaiGo ? "text-orange" : "text-teal"}`}>
             {essaiGo ? "Essai GO Navigation · 30 jours · sur invitation" : "Démonstration gratuite · sans engagement"}
           </p>
           <h1 className="mt-4 text-[32px] leading-tight sm:text-5xl">
@@ -51,7 +52,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
             <ol className="flex flex-col gap-4">
               {ETAPES.map(([t, d], i) => (
                 <li key={t} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marine text-xs font-semibold text-teal">{i + 1}</span>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-fonce text-xs font-semibold text-white">{i + 1}</span>
                   <div>
                     <p className="font-semibold">{t}</p>
                     <p className="text-sm text-navy/65">{d}</p>
@@ -59,22 +60,22 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
                 </li>
               ))}
             </ol>
-            <div className="rounded-xl bg-navy/[0.04] p-4 text-sm text-navy/70">
+            <div className="rounded-xl border border-orange-fonce/15 bg-orange-clair p-4 text-sm text-navy/75">
               <p>
                 Envie de voir tout de suite ?{" "}
-                <Link href="/demo?as=direction" className="font-semibold text-teal-ink hover:underline">
+                <Link href="/demo?as=direction" className="font-semibold text-orange-texte hover:underline">
                   Ouvrir la démo en ligne
                 </Link>
               </p>
               <p className="mt-2">
                 Par e-mail :{" "}
-                <a href={`mailto:${EDITEUR.email}`} className="text-teal-ink hover:underline">
+                <a href={`mailto:${EDITEUR.email}`} className="text-orange-texte hover:underline">
                   {EDITEUR.email}
                 </a>
               </p>
               <p className="mt-2">
                 Tarifs et simulateur :{" "}
-                <Link href="/modules" className="text-teal-ink hover:underline">
+                <Link href="/modules" className="text-orange-texte hover:underline">
                   Modules & tarifs
                 </Link>
               </p>
