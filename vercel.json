@@ -47,6 +47,18 @@
     {
       "path": "/api/cron/rh-quotidien",
       "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/planning-semaine-suivante",
+      "schedule": "0 4 * * 4"
+    },
+    {
+      "path": "/api/cron/planning-envoi-auto?creneau=15h-utc",
+      "schedule": "0 15 * * 5"
+    },
+    {
+      "path": "/api/cron/planning-envoi-auto?creneau=16h-utc",
+      "schedule": "0 16 * * 5"
     }
   ]
 }

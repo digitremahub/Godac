@@ -1,3 +1,4 @@
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -70,6 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const plan = planifierCopies(copiesVersDates([affectation], dates, { driverId: parsed.data.driver_id, vehicleId: parsed.data.vehicle_id }), existantes, { absent: absentSelon(absences) });
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  if (r.creees > 0) await noterModificationPlanning(appUser.organization_id, plan.aCreer.map((l) => ({ serviceId: l.service_id, startAt: l.start_at })));
 
   return NextResponse.json({ id: r.ids[0] ?? null, ids: r.ids, created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, warning: r.warning });
 }

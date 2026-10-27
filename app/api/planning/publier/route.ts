@@ -2,13 +2,10 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { addDays } from "@/lib/planning/dates";
-import { minuitParis } from "@/lib/ticpe/export";
-import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { estPoleBureau } from "@/lib/organization/poles";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
-import { cleSemaine, destinatairesPublication, messagePublication, periodePublication, type AffectationPubliee, type ChangementAPublier } from "@/lib/planning/publication";
+import { periodePublication } from "@/lib/planning/publication";
+import { publierSemaines } from "@/lib/planning/publication-serveur";
 
 const bodySchema = z.object({
   /** Période affichée (jour, semaine ou mois) : la publication porte sur ses semaines entières. */
@@ -26,10 +23,13 @@ const bodySchema = z.object({
  *   20261030000003_planning_publication.sql) ;
  * - sans cette migration (planning_changements absente) : récapitulatif à
  *   tous les chauffeurs de la période, comme l'ancien « Valider et envoyer ».
- * Validation par le client de la session (RLS : un manager publie ses
- * services) ; alertes et nettoyage des changements par le client service
- * role, alerts n'ayant pas de policy d'insertion pour les clients (comme
- * app/api/cron/weekly-planning-digest) — le rôle est vérifié au-dessus.
+ * Le travail est fait par lib/planning/publication-serveur.ts › publierSemaines,
+ * aussi utilisé par « Confirmer et envoyer aux chauffeurs » et l'envoi
+ * automatique du vendredi. Validation par le client de la session (RLS : un
+ * manager publie ses services) ; alertes et nettoyage des changements par le
+ * client service role, alerts n'ayant pas de policy d'insertion pour les
+ * clients — le rôle est vérifié au-dessus. Publier une semaine générée
+ * automatiquement la rend visible des chauffeurs (planning_semaines_auto).
  */
 export async function POST(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
@@ -58,67 +58,7 @@ export async function POST(req: Request) {
   }
   if (!serviceIds.length) return NextResponse.json({ error: "Aucun service à publier." }, { status: 400 });
 
-  const depuis = minuitParis(periode.debut);
-  const avant = minuitParis(addDays(periode.fin, 1));
-  const [{ data: validations }, { data: entrees, error: entreesError }, changementsLus] = await Promise.all([
-    supabase.from("planning_validations").select("service_id, week_start").in("service_id", serviceIds).in("week_start", periode.lundis),
-    supabase
-      .from("planning_entries")
-      .select("driver_id, service_id, tour_number, start_at, status, vehicles(registration)")
-      .in("service_id", serviceIds)
-      .eq("status", "planned")
-      .not("driver_id", "is", null)
-      .gte("start_at", depuis)
-      .lt("start_at", avant)
-      .order("start_at"),
-    supabase
-      .from("planning_changements")
-      .select("id, driver_id, service_id, tour_number, start_at, nature")
-      .eq("organization_id", appUser.organization_id)
-      .in("service_id", serviceIds)
-      .gte("start_at", depuis)
-      .lt("start_at", avant),
-  ]);
-  if (entreesError) return NextResponse.json({ error: entreesError.message }, { status: 500 });
-  if (changementsLus.error && !estSchemaManquant(changementsLus.error)) return NextResponse.json({ error: changementsLus.error.message }, { status: 500 });
-  const changements = changementsLus.error ? null : ((changementsLus.data ?? []) as ChangementAPublier[]);
-
-  const publiees = new Set(((validations ?? []) as { service_id: string; week_start: string }[]).map((v) => cleSemaine(v.service_id, v.week_start)));
-  const destinataires = destinatairesPublication({ affectations: (entrees ?? []) as unknown as AffectationPubliee[], changements, publiees });
-
-  // 1. Semaines publiées (le trigger suit désormais leurs changements).
-  const lignes = serviceIds.flatMap((service_id) =>
-    periode.lundis.map((week_start) => ({ organization_id: appUser.organization_id, service_id, week_start, validated_at: new Date().toISOString(), validated_by: appUser.id })),
-  );
-  const { error: validationError } = await supabase.from("planning_validations").upsert(lignes, { onConflict: "organization_id,service_id,week_start" });
-  if (validationError) return NextResponse.json({ error: validationError.message }, { status: 500 });
-
-  // 2. Une notification par chauffeur, 3. changements publiés effacés.
-  if (destinataires.length || changements?.length) {
-    let admin: ReturnType<typeof createAdminSupabaseClient>;
-    try {
-      admin = createAdminSupabaseClient();
-    } catch {
-      return NextResponse.json({ error: "Envoi des notifications indisponible (configuration du serveur)." }, { status: 500 });
-    }
-    if (destinataires.length) {
-      const { error } = await admin.from("alerts").insert(
-        destinataires.map((d) => ({
-          organization_id: appUser.organization_id,
-          type: "planning_validated",
-          severity: "info",
-          message: messagePublication(d),
-          related_table: "planning_entries",
-          recipient_user_id: d.driverId,
-        })),
-      );
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    if (changements?.length) {
-      const { error } = await admin.from("planning_changements").delete().in("id", changements.map((c) => c.id));
-      if (error) console.warn("[planning/publier] Changements publiés non effacés", error.message);
-    }
-  }
-
-  return NextResponse.json({ sent: destinataires.length, debut: periode.debut, fin: periode.fin, suivi: changements !== null });
+  const r = await publierSemaines({ db: supabase, organizationId: appUser.organization_id, validateurId: appUser.id, serviceIds, debut: periode.debut, fin: periode.fin, mode: "manuel" });
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json({ sent: r.sent, debut: r.debut, fin: r.fin, suivi: r.suivi });
 }

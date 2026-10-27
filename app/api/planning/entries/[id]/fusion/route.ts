@@ -1,3 +1,4 @@
+import { noterModificationEntree } from "@/lib/planning/suivi-auto-serveur";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { journaliser } from "@/lib/audit/journal";
@@ -69,6 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   const r = await definirFusion(supabase, appUser.organization_id, appUser.id, entree.id, ids);
   if (r.erreur) return reponseErreurFusion({ message: r.erreur, code: r.manquante ? "42P01" : null });
+  await noterModificationEntree(appUser.organization_id, entree.id);
   await journaliser({
     organizationId: appUser.organization_id,
     userId: appUser.id,

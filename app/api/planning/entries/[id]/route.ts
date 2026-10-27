@@ -8,6 +8,7 @@ import { parisCalendarDate } from "@/lib/planning/dates";
 import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation";
 import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 import { refusSiFermee } from "@/lib/planning/ouverture-serveur";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const patchSchema = z.object({
   start_at: z.string().datetime().optional(),
@@ -65,6 +66,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (changeDeChauffeur && avant.driver_id) avertissementFiche = await libererFicheAncienChauffeur(supabase, id);
   }
 
+  // Ligne avant déplacement : la semaine d'origine d'une affectation glissée vers une autre semaine est modifiée aussi.
+  const { data: avantDeplacement } = champs.start_at || champs.service_id ? await supabase.from("planning_entries").select("service_id, start_at").eq("id", id).maybeSingle() : { data: null };
+
   const { data, error } = await supabase
     .from("planning_entries")
     .update(champs)
@@ -83,7 +87,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
-
+  await noterModificationPlanning(appUser.organization_id, [
+    { serviceId: data.service_id, startAt: data.start_at },
+    ...(avantDeplacement ? [{ serviceId: avantDeplacement.service_id as string, startAt: avantDeplacement.start_at as string }] : []),
+  ]);
 
   const warning = data.driver_id
     ? await warnIfDriverDoubleBooked(supabase, {
@@ -119,11 +126,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .delete()
     .eq("id", id)
     .eq("status", "planned")
-    .select("id")
+    .select("id, service_id, start_at")
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
+  await noterModificationPlanning(g2.appUser.organization_id, [{ serviceId: data.service_id as string, startAt: data.start_at as string }]);
   await journaliser({ organizationId: g2.appUser.organization_id, userId: g2.appUser.id, action: "planning_tournee_retiree", targetTable: "planning_entries", targetId: id });
   return NextResponse.json({ ok: true });
 }

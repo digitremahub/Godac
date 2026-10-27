@@ -1,0 +1,13 @@
+-- Planning de la semaine suivante : type d'alerte « planning à confirmer »,
+-- créé par /api/cron/planning-semaine-suivante (génération du jeudi) et
+-- /api/cron/planning-envoi-auto (rappel ou envoi automatique du vendredi),
+-- relayé en cloche, push et e-mail à la direction, l'exploitation et aux
+-- managers du service (jamais aux chauffeurs ni au comptable).
+--
+-- Fichier séparé : une nouvelle valeur d'enum ne peut pas être utilisée dans
+-- la transaction qui l'ajoute (clé de dédoublonnage et périmètre de lecture
+-- sont dans 20261111000003).
+-- ADDITIVE et rejouable. NON appliquée à la création : tant qu'elle ne l'est
+-- pas, ces alertes ne sont simplement pas créées (« À traiter » et le bandeau
+-- du Planning lisent directement planning_semaines_auto).
+alter type public.alert_type add value if not exists 'planning_a_confirmer';

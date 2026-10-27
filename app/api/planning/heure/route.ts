@@ -6,6 +6,7 @@ import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { changementsHeure, HEURE_VALIDE, modelesDeLaTournee } from "@/lib/planning/heure";
 import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 import type { AffectationPlanning } from "@/lib/planning/semaine";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -100,5 +101,6 @@ export async function POST(req: Request) {
     modifiees++;
     if (c.prevenir) prevenus++;
   }
+  if (modifiees > 0) await noterModificationPlanning(appUser.organization_id, [{ serviceId: service_id, jour: debut }, { serviceId: service_id, jour: fin }]);
   return NextResponse.json({ modifiees, prevenus, conflits, modeles: 0 });
 }

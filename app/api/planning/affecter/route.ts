@@ -11,6 +11,7 @@ import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation"
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { ficheApresAffectation, ficheAPreparer, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 import type { AffectationPlanning } from "@/lib/planning/semaine";
 
 const bodySchema = z.object({
@@ -207,6 +208,8 @@ export async function POST(req: Request) {
     }
   }
 
+  // Semaine générée automatiquement : première modification manuelle (pas d'envoi automatique le vendredi).
+  if (ids.length > 0) await noterModificationPlanning(appUser.organization_id, [{ serviceId: service_id, jour: premier }, { serviceId: service_id, jour: dernier }]);
   if (places > 0) {
     await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "planning_affectation", targetTable: "planning_entries", targetId: ids[0] ?? null, details: { chauffeur: driver_id, places, affectations: ids.slice(0, 50) } });
   }

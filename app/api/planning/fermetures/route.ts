@@ -9,6 +9,7 @@ import { decisionsFermeture, decisionsReouverture } from "@/lib/planning/fermetu
 import { cloreAlertesDesTournees } from "@/lib/planning/fermeture-serveur";
 import type { AffectationPlanning } from "@/lib/planning/semaine";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const bodySchema = z.object({
   /** false : fermer ; true : rouvrir. */
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
         .select("id");
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       const rouvertes = (data ?? []).length;
+      if (rouvertes) await noterModificationPlanning(appUser.organization_id, dates.map((jour) => ({ serviceId: service_id, jour })));
       if (rouvertes) await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "tournee_rouverte", targetTable: "planning_entries", targetId: data![0]!.id, details: { ...trace, dates: decisions.filter((d) => d.type === "rouvrir").map((d) => d.date), lignes: rouvertes } });
       return NextResponse.json({ ok: true, rouvertes });
     }
@@ -138,6 +140,7 @@ export async function POST(req: Request) {
   }
 
   if (ids.length) {
+    await noterModificationPlanning(appUser.organization_id, dates.map((jour) => ({ serviceId: service_id, jour })));
     const alertesClosees = await cloreAlertesDesTournees(appUser.organization_id, ids);
     await journaliser({
       organizationId: appUser.organization_id,
