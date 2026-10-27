@@ -33,6 +33,14 @@
   --c-tint-1: 15 118 110;
   --c-tint-2: 146 102 10;
   --c-tint-3: 194 65 12;
+  /* Vitrine publique : blocs orange de la marque, identiques dans tous
+     les thèmes sauf le fond clair et son texte d'accent, qui suivent le
+     mode sombre. orange-fonce = fond fixe (texte BLANC uniquement, 5,18:1) ;
+     orange-clair = fond de bloc alterné ; orange-texte = texte d'accent
+     sur orange-clair et sur les cartes (7,3:1 sur blanc, 6,6:1 sur le fond). */
+  --c-orange-fonce: 194 65 12;
+  --c-orange-clair: 255 241 231;
+  --c-orange-texte: 154 52 18;
   --color-paper: rgb(var(--c-paper));
   color-scheme: light;
 }
@@ -48,6 +56,8 @@
     --c-orange-ink: 255 140 96;
     --c-gold-ink: 245 200 66;
     --c-relais-ink: 196 181 253;
+    --c-orange-clair: 37 22 15;
+    --c-orange-texte: 255 140 96;
     color-scheme: dark;
   }
 }
@@ -59,6 +69,8 @@
   --c-orange-ink: 255 140 96;
   --c-gold-ink: 245 200 66;
   --c-relais-ink: 196 181 253;
+  --c-orange-clair: 37 22 15;
+  --c-orange-texte: 255 140 96;
   color-scheme: dark;
 }
 
@@ -107,6 +119,8 @@
   --c-tint-1: 255 107 53;
   --c-tint-2: 245 200 66;
   --c-tint-3: 194 65 12;
+  --c-orange-clair: 37 22 15;
+  --c-orange-texte: 255 140 96;
   color-scheme: dark;
 }
 
@@ -201,6 +215,11 @@
   /* Thin, low-contrast scrollbar on the navy sidebar. */
   .sidebar-scroll::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.15);
+  }
+  /* Bloc orange foncé de la vitrine : l'anneau teal-ink se confondrait
+     avec le fond, on passe au blanc (5,18:1). */
+  .bloc-orange-fonce :focus-visible {
+    outline-color: #ffffff;
   }
   .sidebar-scroll :focus-visible {
     outline-color: theme("colors.teal");
