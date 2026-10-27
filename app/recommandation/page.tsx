@@ -31,7 +31,7 @@ export default function RecommandationPage() {
         <BoutonImprimer />
       </div>
 
-      <header className="flex flex-col gap-3 border-b border-navy/15 pb-5">
+      <header className="flex flex-col gap-3 border-b-2 border-orange pb-5">
         <Wordmark height={32} />
         <h1 className="text-[28px] leading-tight sm:text-4xl print:text-3xl">Vos chauffeurs utilisent déjà GO</h1>
         <p className="text-base text-navy/75">
@@ -51,7 +51,7 @@ export default function RecommandationPage() {
         </ul>
       </section>
 
-      <section className="break-inside-avoid rounded-xl border border-navy/15 p-4">
+      <section className="break-inside-avoid rounded-xl border-2 border-orange/60 bg-orange/[0.06] p-4">
         <h2 className="font-display text-lg font-bold">Essai de 30 jours de l&apos;offre complète</h2>
         <p className="mt-1 text-sm text-navy/75">
           Testez GODAC avec vos chauffeurs pendant 30 jours. Demandez une démonstration : nous vous rappelons sous un jour ouvré.
