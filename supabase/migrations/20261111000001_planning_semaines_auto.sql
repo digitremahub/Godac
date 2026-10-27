@@ -74,6 +74,8 @@ as $$
       and s.service_id = p_service
       and s.semaine_debut = (date_trunc('week', p_start at time zone 'Europe/Paris'))::date
       and s.publie_at is null
+      -- Masquée seulement jusqu'au début de la semaine : un planning jamais publié ne laisse pas un chauffeur sans planning.
+      and s.semaine_debut > (now() at time zone 'Europe/Paris')::date
   );
 $$;
 
