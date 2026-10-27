@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { decideRoutageDomaine, normaliserHote, typeHote, urlCanoniqueVitrine } from "@/lib/domaines/routage";
 
 const PUBLIC_PATHS = [
   "/",
@@ -71,6 +72,19 @@ function isPublicPath(pathname: string): boolean {
  * signed-in-but-orgless user to /onboarding.
  */
 export async function middleware(request: NextRequest) {
+  // Domaine (lib/domaines/routage.ts), avant toute lecture de session : sur godac.fr, les
+  // routes applicatives partent en 308 vers godac.app. /api/**, webhooks, crons et fichiers
+  // statiques ne sont jamais redirigés. Hôtes inconnus (vercel.app, localhost) : inchangé.
+  const hoteRequete = { host: request.headers.get("host"), forwardedHost: request.headers.get("x-forwarded-host") };
+  const decisionAvant = decideRoutageDomaine({
+    ...hoteRequete,
+    pathname: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+  });
+  if (decisionAvant.action === "rediriger") {
+    return NextResponse.redirect(decisionAvant.url, decisionAvant.status);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -96,6 +110,17 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // godac.app : l'accueil « / » mène à la connexion ou au tableau de bord selon la session.
+  const decisionSession = decideRoutageDomaine({
+    ...hoteRequete,
+    pathname,
+    search: request.nextUrl.search,
+    connecte: !!user,
+  });
+  if (decisionSession.action === "rediriger") {
+    return NextResponse.redirect(decisionSession.url, decisionSession.status);
+  }
+
   if (!user && !isPublicPath(pathname)) {
     // Une API appelée sans session répond 401 en JSON : la redirection vers
     // /sign-in d'un POST donnait un « 405 » incompréhensible côté écran.
@@ -112,6 +137,13 @@ export async function middleware(request: NextRequest) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Pages de la vitrine : l'URL de référence est toujours celle de godac.fr, quel que soit
+  // l'hôte qui sert la page (évite le contenu dupliqué entre godac.fr et godac.app).
+  const canonique = urlCanoniqueVitrine(pathname);
+  if (canonique && typeHote(normaliserHote(hoteRequete.host, hoteRequete.forwardedHost)) !== "autre") {
+    response.headers.set("Link", `<${canonique}>; rel="canonical"`);
   }
 
   return response;
