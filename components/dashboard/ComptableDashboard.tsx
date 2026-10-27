@@ -31,7 +31,7 @@ function currentQuarterRange(): { start: string; end: string } {
  * ces écrans. Il n'est rattaché à aucun service : tout est à l'échelle de
  * l'organisation.
  */
-export async function ComptableDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
+export async function ComptableDashboard({ appUser, enabledModules, suite }: { appUser: AppUser; enabledModules: string[]; /** Raccourcis et « Premiers pas » (page.tsx), placés après le titre et le bloc « À traiter ». */ suite?: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
   const ticpeEnabled = enabledModules.includes("ticpe_export");
   const payslipsEnabled = enabledModules.includes("payslips");
@@ -93,6 +93,7 @@ export async function ComptableDashboard({ appUser, enabledModules }: { appUser:
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Carburant, factures, paie et TICPE du mois." />
+      {suite}
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {/* La vérification des tickets est réservée à l'encadrement : le comptable consulte la liste filtrée des pleins. */}

@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { ATraiterAttente, ATraiterBloc } from "@/components/dashboard/ATraiterBloc";
 import { ClassementConsommation, IndicateursDirection, NotificationsOuvertes, ReportingDirection, Squelette, SqueletteTuiles, TourneesColisEnCours } from "@/components/dashboard/BlocsAccueil";
+import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
+import { USAGE_FEATURES } from "@/lib/usage/quotas";
 import { PageHeader } from "@/components/ui";
 import type { AppUser } from "@/lib/auth/session";
 
@@ -17,7 +19,7 @@ import type { AppUser } from "@/lib/auth/session";
  * l'ancien calcul sans elle). Les codes de secours des chauffeurs sont dans
  * Équipe › Utilisateurs.
  */
-export function DirectionDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
+export function DirectionDashboard({ appUser, enabledModules, suite }: { appUser: AppUser; enabledModules: string[]; /** Raccourcis et « Premiers pas » (page.tsx), placés après le titre et le bloc « À traiter ». */ suite?: React.ReactNode }) {
   const biEnabled = enabledModules.includes("bi_reporting");
   return (
     <div>
@@ -27,6 +29,10 @@ export function DirectionDashboard({ appUser, enabledModules }: { appUser: AppUs
       <Suspense fallback={<ATraiterAttente />}>
         <ATraiterBloc appUser={appUser} enabledModules={enabledModules} />
       </Suspense>
+      {suite}
+
+      {/* Quotas d'IA : seulement ceux qui dépassent 80 % du volume inclus. */}
+      <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={USAGE_FEATURES} seuil={80} />
 
       <Suspense fallback={<SqueletteTuiles />}>
         <IndicateursDirection appUser={appUser} enabledModules={enabledModules} />

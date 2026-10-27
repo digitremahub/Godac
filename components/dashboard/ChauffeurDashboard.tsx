@@ -60,10 +60,13 @@ async function loadRenfortVillages(supabase: Supabase, routeId: string, entryId:
 export async function ChauffeurDashboard({
   appUser,
   enabledModules,
+  suite,
   presenceMonth,
 }: {
   appUser: AppUser;
   enabledModules: string[];
+  /** Ligne « Premiers pas » (page.tsx), placée après le titre. */
+  suite?: React.ReactNode;
   /** "YYYY-MM" from ?presence= — defaults to the current Paris month. */
   presenceMonth?: string;
 }) {
@@ -181,6 +184,7 @@ export async function ChauffeurDashboard({
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre journée en un coup d'œil." />
+      {suite}
       {timeClockEnabled && (autoClockRes.data as { auto_clock_enabled?: boolean } | null)?.auto_clock_enabled && (
         <AssistedClock hasOpenTour={Boolean(openTour)} />
       )}

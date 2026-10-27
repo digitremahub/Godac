@@ -864,17 +864,19 @@ export function TourneeColis({
   const ordreTri = groupes.flatMap((g) => g.arrets).filter((s) => s.status === "pending").map((s) => ({ id: s.id, list_id: s.list_id ?? null }));
   const multi = groupesComplets.length > 1 || groupesComplets[0]?.liste != null;
   const listeCible = cible === AUTO || !groupesComplets.some((g) => (g.liste?.id ?? null) === cible) ? AUTO : cible;
-  const cibles = [{ id: AUTO, nom: "Automatique (village, sinon commune hors tournée)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
+  const cibles = [{ id: AUTO, nom: "Automatique (par village)" }, ...groupesComplets.filter((g) => g.liste).map((g) => ({ id: g.liste!.id, nom: nomGroupe(g) }))];
   const choixCible = multi && (
-    <label className="flex flex-wrap items-center gap-1.5 text-sm">
+    <label className="flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
       <span className="text-navy/65">Ajouter dans :</span>
-      <select className="input !w-auto !py-1.5" value={listeCible ?? ""} onChange={(e) => setCible(e.target.value || null)} aria-label="Liste où ajouter les colis">
+      {/* Largeur bornée : sans max-w-full, le libellé le plus long d'une liste élargissait toute la page. */}
+      <select className="input min-w-0 max-w-full flex-1 truncate !py-1.5" value={listeCible ?? ""} onChange={(e) => setCible(e.target.value || null)} aria-label="Liste où ajouter les colis">
         {cibles.map((c) => (
           <option key={c.id ?? ""} value={c.id ?? ""}>
             {c.nom}
           </option>
         ))}
       </select>
+      {listeCible === AUTO && <span className="basis-full text-xs text-navy/60">Selon le village de l'adresse, sinon la commune hors tournée.</span>}
     </label>
   );
 
@@ -1014,7 +1016,7 @@ export function TourneeColis({
         {l && suppression?.id === l.id && (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-orange/40 p-2 text-sm">
             <span>Déplacer ses {c.arrets} arrêt(s) vers</span>
-            <select className="input !w-auto !py-1.5" value={suppression.vers} onChange={(e) => setSuppression({ ...suppression, vers: e.target.value })} aria-label="Liste de destination">
+            <select className="input min-w-0 max-w-full !w-auto !py-1.5" value={suppression.vers} onChange={(e) => setSuppression({ ...suppression, vers: e.target.value })} aria-label="Liste de destination">
               {lists
                 .filter((x) => x.id !== l.id)
                 .map((x) => (
@@ -1168,8 +1170,8 @@ export function TourneeColis({
             {groupes.find((g) => g.arrets.includes(prochain))?.liste?.is_hors_tournee && <BadgeHorsTournee />}
           </p>
           <div>
-            <p className="font-display text-xl font-bold leading-snug">{prochain.address}</p>
-            {prochain.recipient && <p className="text-sm text-navy/70">{prochain.recipient}</p>}
+            <p className="break-words font-display text-xl font-bold leading-snug">{prochain.address}</p>
+            {prochain.recipient && <p className="break-words text-sm text-navy/70">{prochain.recipient}</p>}
             {prochain.notes && <p className="mt-1 text-sm text-navy/70">{prochain.notes}</p>}
             <BadgeHoraires stop={prochain} fenetres={horaires.fenetres.get(prochain.id) ?? null} passage={horaires.passages.get(prochain.id)} />
           </div>
@@ -1449,8 +1451,8 @@ export function TourneeColis({
                               {s.status === "pending" && !s.phone && <BadgeSansTelephone />}
                             </div>
                           )}
-                          <p className="text-sm font-semibold leading-snug">{s.address}</p>
-                          <p className="text-xs text-navy/60">
+                          <p className="break-words text-sm font-semibold leading-snug">{s.address}</p>
+                          <p className="break-words text-xs text-navy/60">
                             {[
                               s.recipient,
                               s.phone,
@@ -1560,7 +1562,7 @@ export function TourneeColis({
                           </button>
                           {multi && lists.length > 1 && (
                             <select
-                              className="input !w-auto !px-2 !py-1 text-xs"
+                              className="input min-w-0 max-w-full !w-auto !px-2 !py-1 text-xs"
                               value=""
                               onChange={(e) => changerListe(s, e.target.value)}
                               aria-label={`Déplacer ${s.address} dans une autre liste`}

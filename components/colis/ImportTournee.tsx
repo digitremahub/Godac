@@ -138,9 +138,9 @@ export function ImportTournee({
             ))}
           </ol>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <label className="flex items-center gap-1.5">
+            <label className="flex min-w-0 max-w-full items-center gap-1.5">
               <span className="text-navy/65">Importer dans</span>
-              <select className="input !w-auto !py-1.5" value={cible} onChange={(e) => setCible(e.target.value)} aria-label="Liste où importer">
+              <select className="input min-w-0 max-w-full !w-auto !py-1.5" value={cible} onChange={(e) => setCible(e.target.value)} aria-label="Liste où importer">
                 {cibles.map((c) => (
                   <option key={c.id ?? ""} value={c.id ?? ""}>
                     {c.nom}

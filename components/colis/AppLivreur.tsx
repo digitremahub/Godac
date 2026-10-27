@@ -751,7 +751,7 @@ export function AppLivreur({
   const arretCarte = stops.find((s) => s.id === selection) ?? prochain ?? null;
 
   return (
-    <div className={`flex flex-col bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
+    <div className={`flex flex-col overflow-x-clip bg-paper ${enCarte ? "h-dvh" : "min-h-dvh"}`}>
       {/* Sortie du dépôt pointée automatiquement : surveillance dès qu'aucune tournée n'est en cours (après la clôture, écran de retour au dépôt compris). */}
       <SortieDepotLivreur actif={runs !== null && !runEnCours} flottant={enNavigation || retourOuvert} fix={fixGps} apresCloture={tourneeVueEnCours.current} />
       {!enNavigation && (
@@ -785,7 +785,7 @@ export function AppLivreur({
             <div className="flex items-baseline justify-between gap-2">
               {actives.length > 1 ? (
                 <select
-                  className="min-w-0 rounded-lg bg-white/10 px-2 py-1 text-sm font-semibold text-white"
+                  className="min-w-0 max-w-full truncate rounded-lg bg-white/10 px-2 py-1 text-sm font-semibold text-white"
                   value={run.id}
                   onChange={(e) => choisir(e.target.value)}
                   aria-label="Choisir la tournée"
@@ -1002,8 +1002,8 @@ export function AppLivreur({
                       {arretCarte.status !== "pending" ? ` · ${libelleStatut(arretCarte).toLowerCase()}` : arretCarte.id === prochain?.id ? " · prochain" : ""}
                     </span>
                   </p>
-                  <p className="font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
-                  {arretCarte.recipient && <p className="text-sm text-navy/70">{arretCarte.recipient}</p>}
+                  <p className="break-words font-display text-lg font-bold leading-snug">{arretCarte.address}</p>
+                  {arretCarte.recipient && <p className="break-words text-sm text-navy/70">{arretCarte.recipient}</p>}
                   {arretCarte.status === "pending" && <BadgeHoraires stop={arretCarte} fenetres={horaires.fenetres.get(arretCarte.id) ?? null} passage={horaires.passages.get(arretCarte.id)} />}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -1142,8 +1142,8 @@ export function AppLivreur({
               </span>
             </p>
             <div>
-              <p className="font-display text-2xl font-bold leading-tight">{prochain.address}</p>
-              {prochain.recipient && <p className="mt-1 text-base text-navy/75">{prochain.recipient}</p>}
+              <p className="break-words font-display text-2xl font-bold leading-tight">{prochain.address}</p>
+              {prochain.recipient && <p className="mt-1 break-words text-base text-navy/75">{prochain.recipient}</p>}
               {prochain.notes && <p className="mt-1 text-sm text-navy/65">{prochain.notes}</p>}
               {prochain.lat === null && <p className="mt-1 text-xs font-semibold text-orange-ink">Adresse non localisée : vérifiez-la dans la navigation.</p>}
               <div className="flex flex-wrap items-center gap-2">
@@ -1335,7 +1335,7 @@ export function AppLivreur({
                           {!s.phone && <BadgeSansTelephone />}
                         </div>
                       )}
-                      <p className="text-sm font-semibold leading-snug">{s.address}</p>
+                      <p className="break-words text-sm font-semibold leading-snug">{s.address}</p>
                       <p className="truncate text-xs text-navy/60">{[s.recipient, s.parcel_count > 1 && `${s.parcel_count} colis`, formatPoids(s.weight_kg)].filter(Boolean).join(" · ") || " "}</p>
                       <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
                       <div className="mt-1.5 flex flex-wrap gap-2">

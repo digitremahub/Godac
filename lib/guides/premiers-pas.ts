@@ -23,6 +23,23 @@ const LIENS_LIBRES = ["/account"];
 /** Clé de mémorisation du bandeau refermé (par rôle). */
 export const clePremiersPas = (role: string) => `godac.premiers-pas.${role}`;
 
+/** Valeurs mémorisées : « vu » après la première visite, « ferme » après la croix. */
+export const PREMIERS_PAS_VU = "vu";
+export const PREMIERS_PAS_FERME = "ferme";
+
+/** Le bandeau est replié à l'ouverture : une ligne, jamais un écran de boutons avant le titre. */
+export const PREMIERS_PAS_REPLIE_PAR_DEFAUT = true;
+
+/** Affiché seulement à la première visite : rien de mémorisé pour ce rôle sur cet appareil (stockage illisible : on l'affiche, replié). */
+export function afficherPremiersPas(memorise: string | null | undefined): boolean {
+  return memorise !== PREMIERS_PAS_VU && memorise !== PREMIERS_PAS_FERME;
+}
+
+/** Libellé de la ligne repliée : « Premiers pas · 4 actions ». */
+export function libellePremiersPas(nb: number): string {
+  return `Premiers pas · ${nb} action${nb > 1 ? "s" : ""}`;
+}
+
 export function premiersPas(role: UserRole, conduit: boolean, modules: ReadonlySet<string>): PremierPas[] {
   const guide = guideFiltre(guideDe(role, conduit), [...modules]);
   const vus = new Set<string>();
