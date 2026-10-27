@@ -8,7 +8,7 @@ import { IconPointRelais, IconCheck, IconMapPin, IconQrCode, IconRamasse, IconMe
 import { ALERTE_SANS_TELEPHONE, arretsSansTelephone, lienSms, lienTel, normaliserTelephone } from "@/lib/colis/telephone";
 import { BoutonGoFlottant } from "@/components/colis/BoutonGoFlottant";
 import { RetourDepot, type DestinationRetour, type InfoGasoil } from "@/components/colis/RetourDepot";
-import { FicheEdition } from "@/components/colis/FicheEdition";
+import { FenetreArret } from "@/components/colis/FenetreArret";
 import { formatPoids, sommePoids } from "@/lib/colis/poids";
 import { BadgeSansTelephone } from "@/components/colis/AlertesArret";
 import { garderEcranAllume } from "@/lib/colis/natif";
@@ -21,7 +21,7 @@ import { BadgeArret, EncocheArret, bordureArret } from "@/components/colis/Ramas
 import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libelleStatut, resumeCodeQr } from "@/lib/colis/livraison";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type RunResume, type Stop, type Toast } from "@/components/colis/commun";
 import { ToastColis } from "@/components/colis/ToastColis";
-import { PastillesContact, CasesContact } from "@/components/colis/ContactsArret";
+import { PastillesContact } from "@/components/colis/ContactsArret";
 import { InterrupteurMode } from "@/components/colis/InterrupteurMode";
 import { useModeSimple } from "@/components/colis/useModeSimple";
 import { useSuiviAppel } from "@/components/colis/useSuiviAppel";
@@ -116,7 +116,6 @@ export function AppLivreur({
   const [livraison, setLivraison] = useState<Stop | null>(null);
   const [detailsStop, setDetailsStop] = useState<Stop | null>(null);
   /** Fiche en cours de modification (erreur de saisie à la base). */
-  const [ficheEdition, setFicheEdition] = useState(false);
   /** Tournées pour lesquelles la proposition de retour au dépôt a été vue (fermée ou lancée). */
   const [retourVu, setRetourVu] = useState<Set<string>>(new Set());
   /** Arrêt en cours de clôture (n'importe lequel des restants, pas seulement le prochain). */
@@ -677,7 +676,6 @@ export function AppLivreur({
   /** « Reprendre GO » depuis la préparation (ou ouverture de GO depuis la livraison) : un clic. */
   function ouvrirGo() {
     setDetailsStop(null);
-    setFicheEdition(false);
     setPreparationDemandee(ECRAN_REPRISE_GO.preparationDemandee);
     changerVue(ECRAN_REPRISE_GO.vue);
   }
@@ -882,7 +880,6 @@ export function AppLivreur({
           onAppel={lancerAppel}
           onTelephone={ajouterTelephone}
           onHoraires={setHorairesStop}
-          onFiche={setDetailsStop}
           onPasser={passerAdresseSuivante}
           onDeposer={deposer}
           onReoptimiser={() => reoptimiser().then(() => undefined)}
@@ -1042,50 +1039,28 @@ export function AppLivreur({
 
 
       {detailsStop && (
-        <div className="fixed inset-0 z-[85] flex items-end justify-center bg-navy/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="fiche-arret-title">
-          <section className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-pop">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 id="fiche-arret-title" className="font-display text-xl font-bold">Fiche de livraison</h2>
-                <p className="mt-1 text-sm text-navy/60">{estRamasse(detailsStop) ? "Ramasse" : estPointRelais(detailsStop) ? `Point relais${detailsStop.relay_name ? ` · ${detailsStop.relay_name}` : ""}` : "Livraison"}</p>
-              </div>
-              <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => { setDetailsStop(null); setFicheEdition(false); }} aria-label="Fermer la fiche">✕</button>
-            </div>
-            {ficheEdition ? (
-              <FicheEdition
-                stop={detailsStop}
-                biais={maPosition ?? (run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null)}
-                onFermer={() => setFicheEdition(false)}
-                onEnregistre={async (texte) => {
-                  setFicheEdition(false);
-                  setDetailsStop(null);
-                  await rechargerRun();
-                  setToast({ ok: true, text: texte });
-                }}
-              />
-            ) : (
-              <>
-            <p className="mt-4 break-words text-lg font-semibold">{detailsStop.address}</p>
-              {detailsStop.recipient && <p className="mt-1">{detailsStop.recipient}</p>}
-              {detailsStop.phone && <a href={lienTel(detailsStop.phone)} onClick={() => lancerAppel(detailsStop)} className="mt-1 inline-block text-sm text-teal-ink underline">{detailsStop.phone}</a>}
-              {detailsStop.notes && <p className="mt-2 rounded-lg bg-navy/5 p-3 text-sm">{detailsStop.notes}</p>}
-              <p className="mt-3 text-sm text-navy/65">Prévu : {detailsStop.parcel_count} colis{detailsStop.packages_picked_up != null ? ` · ${estPointRelais(detailsStop) ? "retours repris" : "récupérés"} : ${detailsStop.packages_picked_up}` : ""}{detailsStop.packages_delivered != null ? ` · déposés : ${detailsStop.packages_delivered}` : ""}</p>
-              <div className="mt-3">
-                <CasesContact valeur={stops.find((x) => x.id === detailsStop.id) ?? detailsStop} onChange={(champ, v) => void basculerContact(detailsStop, champ, v)} />
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <a className="btn-secondary justify-center" href={waze(detailsStop)} target="_blank" rel="noreferrer"><IconNavigation className="h-4 w-4" /> Waze</a>
-                <a className="btn-secondary justify-center" href={gmaps(detailsStop)} target="_blank" rel="noreferrer"><IconMapPin className="h-4 w-4" /> Google Maps</a>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" className="btn-secondary justify-center" onClick={() => { setDetailsStop(null); void passerAdresseSuivante(detailsStop); }}>Passer plus tard</button>
-                <button type="button" className="btn-primary justify-center" onClick={() => { const s = detailsStop; setDetailsStop(null); terminer(s); }}>{simple ? "Livré" : "Traiter cet arrêt"}</button>
-              </div>
-                <button type="button" className="btn-ghost mt-2 min-h-[44px] w-full justify-center text-sm" onClick={() => setFicheEdition(true)}>✏️ Modifier la fiche</button>
-              </>
-            )}
-          </section>
-        </div>
+        <FenetreArret
+          stop={stops.find((x) => x.id === detailsStop.id) ?? detailsStop}
+          numero={stops.findIndex((x) => x.id === detailsStop.id) + 1}
+          modeSimple={simple}
+          peutPasser={pending.length > 1}
+          lecture={run?.status === "done"}
+          horaires={horaires}
+          biais={maPosition ?? (run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null)}
+          onFermer={() => setDetailsStop(null)}
+          onAppel={lancerAppel}
+          onTelephone={ajouterTelephone}
+          onHoraires={setHorairesStop}
+          onLivre={terminer}
+          onNonLivre={(x) => demanderNonLivre(x, "echec")}
+          onRetirer={retirerAdresse}
+          onPasser={passerAdresseSuivante}
+          onContact={basculerContact}
+          onModifie={async (texte) => {
+            await rechargerRun();
+            setToast({ ok: true, text: texte });
+          }}
+        />
       )}
 
       {confirmationLancement && run && <LancementTournee runId={run.id} busy={busy} onAnnuler={() => setConfirmationLancement(false)} onConfirme={demarrer} />}

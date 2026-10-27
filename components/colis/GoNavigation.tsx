@@ -15,6 +15,7 @@ import { dateParis } from "@/lib/colis/heure-paris";
 import { pastille, marqueurVehicule, etatVehicule } from "@/components/colis/marqueurs";
 import { api, gmaps, waze, SMS_ARRIVEE, type Liste, type Run, type Stop, type Toast } from "@/components/colis/commun";
 import { PastillesContact } from "@/components/colis/ContactsArret";
+import { FenetreArret } from "@/components/colis/FenetreArret";
 import { InterrupteurMode } from "@/components/colis/InterrupteurMode";
 import { libelleLivre } from "@/lib/colis/mode-simple";
 import type { ChampContact } from "@/lib/colis/contacts";
@@ -128,7 +129,6 @@ export interface GoNavigationProps {
   onCloture: (s: Stop, mode: "choix" | "echec") => void;
   onTelephone: (s: Stop) => void;
   onHoraires: (s: Stop) => void;
-  onFiche: (s: Stop) => void;
   onPasser: (s: Stop) => void;
   onDeposer: (id: string, cible: CibleDepot) => Promise<void>;
   onReoptimiser: () => Promise<void>;
@@ -1397,13 +1397,14 @@ export function GoNavigation(p: GoNavigationProps) {
       )}
 
       {menuArret && (
-        <MenuRapideArret
+        <FenetreArret
           stop={stops.find((x) => x.id === menuArret.id) ?? menuArret}
           numero={numero(menuArret)}
           modeSimple={p.modeSimple}
           peutPasser={restants.length > 1}
           lecture={fige}
           horaires={horaires}
+          biais={position ?? (run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null)}
           onFermer={() => setMenuArret(null)}
           onAppel={p.onAppel}
           onTelephone={p.onTelephone}
@@ -1414,7 +1415,10 @@ export function GoNavigation(p: GoNavigationProps) {
           onRetirer={p.onRetirer}
           onPasser={p.onPasser}
           onContact={p.onContact}
-          onFiche={p.onFiche}
+          onModifie={async (texte) => {
+            await p.onRecharger();
+            p.onToast({ ok: true, text: texte });
+          }}
         />
       )}
 
@@ -1850,132 +1854,6 @@ function AjoutAdresse({
         <button type="button" className="btn-primary justify-center !py-3.5 text-base" disabled={envoi || adresse.trim().length < 5 || !validerChoix(creneau).ok} onClick={ajouter}>
           {envoi ? "Ajout…" : "Ajouter à la tournée"}
         </button>
-      </section>
-    </div>
-  );
-}
-
-/**
- * Menu rapide d'un arrêt (appui long sur sa ligne ou son repère, ou « ⋯ ») :
- * toutes les actions de l'arrêt en un seul écran, sans confirmation — retirer
- * se défait avec « Annuler ». Zones tactiles de 48 px.
- */
-function MenuRapideArret({
-  stop: s,
-  numero,
-  modeSimple,
-  peutPasser,
-  lecture,
-  horaires,
-  onFermer,
-  onAppel,
-  onTelephone,
-  onHoraires,
-  onLivre,
-  onNonLivre,
-  onCorriger,
-  onRetirer,
-  onPasser,
-  onContact,
-  onFiche,
-}: {
-  stop: Stop;
-  numero: number;
-  modeSimple: boolean;
-  peutPasser: boolean;
-  /** Tournée clôturée : consultation (appel, horaires, fiche, navigation externe). */
-  lecture: boolean;
-  horaires: Horaires;
-  onFermer: () => void;
-  onAppel: (s: Stop) => void;
-  onTelephone: (s: Stop) => void;
-  onHoraires: (s: Stop) => void;
-  onLivre: (s: Stop) => void;
-  onNonLivre: (s: Stop) => void;
-  onCorriger: (s: Stop) => void;
-  onRetirer: (s: Stop) => void;
-  onPasser: (s: Stop) => void;
-  onContact: (s: Stop, champ: ChampContact, valeur: boolean) => void;
-  onFiche: (s: Stop) => void;
-}) {
-  const agir = (f: (s: Stop) => void) => () => {
-    onFermer();
-    f(s);
-  };
-  const action = "flex min-h-[48px] items-center rounded-xl bg-navy/[0.05] px-4 text-left text-sm font-semibold text-navy";
-  const lien = "btn-secondary min-h-[48px] justify-center !px-2 !py-2 text-sm";
-  return (
-    <div className="fixed inset-0 z-[75] flex items-end justify-center bg-marine/60 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="menu-arret-titre" onClick={onFermer}>
-      <section className="flex max-h-[85dvh] w-full max-w-md flex-col gap-2 overflow-y-auto rounded-t-3xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="menu-arret-titre" className="min-w-0 font-display text-base font-bold leading-snug">
-            Arrêt {numero} · {s.address}
-          </h2>
-          <button type="button" className="btn-ghost min-h-[44px] !px-2" onClick={onFermer} aria-label="Fermer">
-            ✕
-          </button>
-        </div>
-        {!lecture && (
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="btn-primary min-h-[48px] justify-center" onClick={agir(onLivre)}>
-              <IconCheck className="h-5 w-5" /> {libelleLivre(modeSimple, s)}
-            </button>
-            <button type="button" className="btn-secondary min-h-[48px] justify-center text-orange-ink" onClick={agir(onNonLivre)}>
-              <IconX className="h-5 w-5" /> Non livré
-            </button>
-          </div>
-        )}
-        {s.phone ? (
-          <a href={lienTel(s.phone)} onClick={() => { onFermer(); onAppel(s); }} className={`${action} gap-2 text-teal-ink`}>
-            <IconPhone className="h-4 w-4" /> Appeler {s.recipient ?? ""}
-          </a>
-        ) : (
-          !lecture && (
-            <button type="button" className={`${action} gap-2`} onClick={agir(onTelephone)}>
-              <IconPhone className="h-4 w-4" /> Ajouter le numéro
-            </button>
-          )
-        )}
-        {!lecture && (
-          <div className="flex flex-wrap gap-1.5">
-            <PastillesContact stop={s} onChange={(champ, v) => onContact(s, champ, v)} />
-          </div>
-        )}
-        <button type="button" className={action} onClick={agir(onHoraires)}>
-          🕘 Horaires
-          <BadgeHoraires stop={s} fenetres={horaires.fenetres.get(s.id) ?? null} passage={horaires.passages.get(s.id)} />
-        </button>
-        <button type="button" className={action} onClick={agir(onFiche)}>
-          Fiche de l&apos;arrêt
-        </button>
-        {!lecture && (
-          <button type="button" className={action} onClick={agir(onCorriger)}>
-            ✏️ Modifier l&apos;adresse
-          </button>
-        )}
-        {!lecture && peutPasser && (
-          <button type="button" className={action} onClick={agir(onPasser)}>
-            Passer à plus tard
-          </button>
-        )}
-        <div className="grid grid-cols-2 gap-1.5">
-          {s.phone && (
-            <a href={lienSms(s.phone, SMS_ARRIVEE)} className={lien}>
-              <IconMessage className="h-4 w-4" /> SMS « j&apos;arrive »
-            </a>
-          )}
-          <a href={waze(s)} target="_blank" rel="noreferrer" className={lien}>
-            <IconNavigation className="h-4 w-4" /> Waze
-          </a>
-          <a href={gmaps(s)} target="_blank" rel="noreferrer" className={lien}>
-            <IconMapPin className="h-4 w-4" /> Google Maps
-          </a>
-        </div>
-        {!lecture && (
-          <button type="button" className={`${action} text-orange-ink`} onClick={agir(onRetirer)}>
-            Retirer cette adresse
-          </button>
-        )}
       </section>
     </div>
   );
