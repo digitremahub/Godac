@@ -70,7 +70,7 @@ const COLONNES_PIED = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-marine text-[#F0F4FF]">
+    <footer className="border-t-4 border-orange bg-marine text-[#F0F4FF]">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
         <div className="flex flex-col items-start gap-5">
           <Wordmark inverted height={34} />

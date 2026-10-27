@@ -31,6 +31,11 @@ const config: Config = {
         "on-teal": "rgb(var(--c-on-teal) / <alpha-value>)",
         "on-orange": "rgb(var(--c-on-orange) / <alpha-value>)",
         "teal-sur-menu": "rgb(var(--c-teal-sur-menu) / <alpha-value>)",
+        // Vitrine publique (app/globals.css) : fond orange foncé fixe (texte
+        // blanc), fond orange clair alterné, texte d'accent sur ces fonds.
+        "orange-fonce": "rgb(var(--c-orange-fonce) / <alpha-value>)",
+        "orange-clair": "rgb(var(--c-orange-clair) / <alpha-value>)",
+        "orange-texte": "rgb(var(--c-orange-texte) / <alpha-value>)",
         gold: "#F5C842",
         // Points relais (tournée colis) : violet, distinct de l'or des ramasses.
         relais: "#A78BFA",
