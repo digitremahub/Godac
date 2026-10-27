@@ -56,6 +56,7 @@
 | Équipe & RH | Calendrier des congés | `/equipe/conges/calendrier` | — | 🔒 | 🔒 | — | 🔒 | leave_management |
 | Équipe & RH | Arrêts de travail | `/equipe/conges/arrets` | ↪ /moi/arrets | 🔒 | 🔒 | ✅ | 🔒 | — |
 | Équipe & RH | Paie & salaires | `/equipe/paie` | — | — | — | ✅ | ✅ | payslips |
+| Équipe & RH | Préparer la paie du mois | `/equipe/paie/preparer` | — | — | — | 🔒 | 🔒 | payslips |
 | Équipe & RH | Heures & salaires | `/equipe/paie/heures` | — | — | — | 🔒 | 🔒 | planning?, time_clock? |
 | Équipe & RH | Fiches de paie | `/equipe/paie/fiches` | — | — | — | 🔒 | 🔒 | payslips |
 | Équipe & RH | Demandes d'acompte | `/equipe/paie/acomptes` | ↪ /moi/acomptes | ↪ /moi/acomptes | ↪ /moi/acomptes | 🔒 | 🔒 | payslips |

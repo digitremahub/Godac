@@ -1,4 +1,5 @@
 import { garderApi } from "@/lib/acces/garde-api";
+import { journaliser } from "@/lib/audit/journal";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { COLONNES_MODELE_TRANSPORT, profilSchema } from "@/lib/paie/schemas";
@@ -23,5 +24,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ userId: 
     ({ error } = await supabase.from("payroll_profiles").upsert(sans));
   }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "paie_profil_modifie",
+    targetTable: "payroll_profiles",
+    targetId: userId,
+    details: { salarie: userId, regime: parsed.data.regime, tauxHoraire: parsed.data.hourly_rate, heuresContractuelles: parsed.data.contractual_hours, cadre: parsed.data.is_cadre },
+  });
   return NextResponse.json({ ok: true });
 }

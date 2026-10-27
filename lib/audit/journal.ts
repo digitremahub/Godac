@@ -84,7 +84,6 @@ export const ACTIONS_AUDIT = {
   utilisateur_invite: "Utilisateur invité ou créé (rôle attribué)",
   organisation_modifiee: "Paramètres de l'organisation modifiés",
   paie_lot_prepare: "Paie du mois préparée en lot (bulletins en attente de validation)",
-  paie_prime_marquee: "Prime marquée récurrente ou ponctuelle",
   facturation_impaye: "Paiement échoué enregistré (facture Stripe impayée)",
   palier_stripe_echec: "Palier d'utilisateurs : mise à jour Stripe en échec (reprise au prochain passage)",
 } as const;

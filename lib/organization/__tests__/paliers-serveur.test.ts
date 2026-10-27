@@ -89,6 +89,17 @@ describe("synchroniserPaliers", () => {
     expect(stripeItemsUpdate).toHaveBeenCalledOnce();
   });
 
+  it("échec Stripe : la base n'est pas modifiée (le cron réessaiera) et l'échec est signalé", async () => {
+    stripeItemsUpdate.mockRejectedValueOnce(new Error("stripe indisponible"));
+    const client = fauxClient({ module_user_tiers: grille, organization_modules: ligne, users: { count: 30 } });
+    const changes = await synchroniserPaliers(client as never, "org-1");
+    expect(changes).toEqual([{ organizationId: "org-1", moduleKey: "route_optimizer", utilisateurs: 30, prix: 59, echecStripe: "stripe indisponible" }]);
+    // Seul le marquage de l'échec est écrit, jamais le nouveau prix.
+    const maj = client.appels.filter((a) => a.methode === "update").map((a) => a.args[0] as Record<string, unknown>);
+    expect(maj.some((m) => "effective_monthly_price" in m)).toBe(false);
+    expect(maj.some((m) => m.stripe_sync_pending === true)).toBe(true);
+  });
+
   it("lève une erreur si la grille est illisible", async () => {
     const client = fauxClient({ module_user_tiers: { error: { message: "rls" } } });
     await expect(synchroniserPaliers(client as never)).rejects.toThrow(/Grille/);

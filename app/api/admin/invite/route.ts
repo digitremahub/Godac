@@ -1,4 +1,5 @@
 import { garderApi } from "@/lib/acces/garde-api";
+import { journaliser } from "@/lib/audit/journal";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inviteOrganizationMember } from "@/lib/auth/invitations";
@@ -52,5 +53,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 
+  await journaliser({
+    organizationId: appUser.organization_id,
+    userId: appUser.id,
+    action: "utilisateur_invite",
+    targetTable: "users",
+    details: { role: parsed.data.role, service: parsed.data.service_id ?? null },
+  });
   return NextResponse.json({ ok: true });
 }

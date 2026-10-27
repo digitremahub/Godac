@@ -21,7 +21,7 @@ const dateFr = (j: string) => `${j.slice(8, 10)}/${j.slice(5, 7)}/${j.slice(0, 4
 
 /** Demandes (en attente ou approuvées) du même salarié qui recouvrent la période, hors la demande elle-même. */
 export function congesQuiSeChevauchent(du: string, au: string, existants: readonly CongeExistant[], idIgnore?: string): CongeExistant[] {
-  return existants.filter((c) => c.id !== idIgnore && (c.status === "pending" || c.status === "approved") && c.du <= au && c.au >= du);
+  return existants.filter((c) => (idIgnore === undefined || c.id !== idIgnore) && (c.status === "pending" || c.status === "approved") && c.du <= au && c.au >= du);
 }
 
 /**
