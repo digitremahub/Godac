@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { estPresence } from "@/lib/organization/poles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { mondayOf, toISODate, addDays } from "@/lib/planning/dates";
+import { addDays, parisCalendarDate } from "@/lib/planning/dates";
+import { lundiDe } from "@/lib/planning/publication";
+import { minuitParis } from "@/lib/ticpe/export";
+import { estMasquee, servicesPublieesRecemment } from "@/lib/planning/semaines-auto";
+import { semainesMasqueesDe } from "@/lib/planning/suivi-auto-serveur";
 
 interface DigestEntry {
   tour_number: string;
@@ -27,7 +31,11 @@ function buildDigestMessage(entries: DigestEntry[]): string {
 
 /**
  * Vercel Cron, Fridays at 17:00 Europe/Paris (see vercel.json) — the weekly digest
- * replicates the paper/WhatsApp habit of handing each driver their
+ * n'annonce QUE les semaines PUBLIÉES (planning_validations) : une semaine non
+ * publiée, y compris générée automatiquement le jeudi et pas encore confirmée,
+ * ne part jamais aux chauffeurs ; un service publié depuis moins de 20 h (publication
+ * manuelle, confirmation ou envoi automatique) n'est pas annoncé une seconde fois.
+ * Replicates the paper/WhatsApp habit of handing each driver their
  * full next-week schedule in one go, as a complement to the
  * per-assignment notifications the planning_entries_after_upsert
  * trigger already sends the moment a manager plans or moves a tour.
@@ -50,9 +58,10 @@ export async function GET(req: Request) {
 
   const supabase = createAdminSupabaseClient();
 
-  // Runs on a Friday; mondayOf(today) is this week's Monday, so +7
-  // days is the Monday of the week being announced.
-  const nextMonday = addDays(toISODate(mondayOf(new Date())), 7);
+  // Runs on a Friday; the Monday of this week (Paris) + 7 days is the
+  // Monday of the week being announced.
+  const maintenant = new Date();
+  const nextMonday = addDays(lundiDe(parisCalendarDate(maintenant.toISOString())), 7);
   const weekEnd = addDays(nextMonday, 7);
 
   const { data: planningOrgs, error: orgsError } = await supabase
@@ -64,19 +73,28 @@ export async function GET(req: Request) {
 
   let digestsSent = 0;
   for (const { organization_id } of planningOrgs ?? []) {
+    // Services dont la semaine annoncée est publiée (planning_validations), et pas publiée à l'instant.
+    const { data: validations } = await supabase.from("planning_validations").select("service_id, validated_at").eq("organization_id", organization_id).eq("week_start", nextMonday);
+    const recents = servicesPublieesRecemment((validations ?? []) as { service_id: string; validated_at: string }[], maintenant);
+    const publies = new Set(((validations ?? []) as { service_id: string }[]).map((v) => v.service_id).filter((id) => !recents.has(id)));
+    if (publies.size === 0) continue;
+    // Filet : une semaine générée automatiquement et pas encore publiée reste masquée (planning_semaines_auto).
+    const masquees = await semainesMasqueesDe(supabase, organization_id);
+
     const { data: entries, error: entriesError } = await supabase
       .from("planning_entries")
-      .select("driver_id, tour_number, start_at, end_at, status, vehicles(registration)")
+      .select("driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
       .eq("organization_id", organization_id)
+      .in("service_id", [...publies])
       .not("driver_id", "is", null)
-      .gte("start_at", `${nextMonday}T00:00:00`)
-      .lt("start_at", `${weekEnd}T00:00:00`)
+      .gte("start_at", minuitParis(nextMonday))
+      .lt("start_at", minuitParis(weekEnd))
       .order("start_at");
     if (entriesError || !entries || entries.length === 0) continue;
 
     const byDriver = new Map<string, DigestEntry[]>();
-    for (const e of entries as unknown as (DigestEntry & { driver_id: string | null })[]) {
-      if (!e.driver_id) continue;
+    for (const e of entries as unknown as (DigestEntry & { driver_id: string | null; service_id: string })[]) {
+      if (!e.driver_id || estMasquee(masquees, e)) continue;
       byDriver.set(e.driver_id, [...(byDriver.get(e.driver_id) ?? []), e]);
     }
     if (byDriver.size === 0) continue;

@@ -38,11 +38,20 @@ export const TYPES_ALERTE_ECHEANCE: readonly string[] = ["echeance_vehicule"];
  */
 export const TYPES_ALERTE_RH: readonly string[] = ["echeance_rh", "pointage_a_regulariser"];
 
+/**
+ * Planning de la semaine suivante à confirmer (génération du jeudi, rappel et envoi
+ * automatique du vendredi : cron planning-semaine-suivante et planning-envoi-auto).
+ * Information d'encadrement : direction et exploitation pour toute l'organisation,
+ * manager pour son service seulement (l'alerte porte le service) ; jamais le
+ * chauffeur (le planning ne lui est envoyé qu'à la confirmation) ni le comptable.
+ */
+export const TYPES_ALERTE_PLANNING: readonly string[] = ["planning_a_confirmer"];
+
 /** Alertes de facturation (paiement échoué) : la direction seule. */
 export const TYPES_ALERTE_DIRECTION: readonly string[] = ["paiement_echoue"];
 
-/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte et alertes RH. */
-const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH];
+/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte, alertes RH et planning à confirmer. */
+const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH, ...TYPES_ALERTE_PLANNING];
 
 export interface DestinatairePossible {
   id: string;

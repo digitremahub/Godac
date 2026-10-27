@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { parisCalendarDate } from "@/lib/planning/dates";
 import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  await noterModificationPlanning(appUser.organization_id, [{ serviceId: data.service_id, startAt: data.start_at }]);
 
   const warning = await warnIfDriverDoubleBooked(supabase, {
     organizationId: appUser.organization_id,

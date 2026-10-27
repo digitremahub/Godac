@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { estPresence } from "@/lib/organization/poles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { estMasquee } from "@/lib/planning/semaines-auto";
+import { semainesMasqueesDe } from "@/lib/planning/suivi-auto-serveur";
 
 interface Entry {
   driver_id: string;
+  service_id: string;
   tour_number: string;
   start_at: string;
   end_at: string | null;
@@ -40,7 +43,7 @@ export async function GET(req: Request) {
   let remindersSent = 0;
   for (const { organization_id } of orgs ?? []) {
     const { data, error } = await supabase.from("planning_entries")
-      .select("driver_id, tour_number, start_at, end_at, status, vehicles(registration)")
+      .select("driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
       .eq("organization_id", organization_id).not("driver_id", "is", null)
       .gte("start_at", `${tomorrow}T00:00:00`).lt("start_at", `${dayAfter}T00:00:00`)
       .in("status", ["planned", "in_progress"]).order("start_at");
@@ -54,7 +57,9 @@ export async function GET(req: Request) {
       .eq("organization_id", organization_id).eq("status", "approved").lte("start_date", tomorrow).gte("end_date", tomorrow);
     for (const c of (conges ?? []) as { driver_id: string }[]) enArret.add(c.driver_id);
     const byDriver = new Map<string, Entry[]>();
-    for (const row of data as unknown as Entry[]) if (!enArret.has(row.driver_id)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
+    // Semaine générée automatiquement et pas encore publiée : rien ne part aux chauffeurs.
+    const masquees = await semainesMasqueesDe(supabase, organization_id);
+    for (const row of data as unknown as Entry[]) if (!enArret.has(row.driver_id) && !estMasquee(masquees, row)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
     const alerts = Array.from(byDriver.entries()).map(([driverId, entries]) => {
       const lines = entries.map(e => {
         const start = new Date(e.start_at);

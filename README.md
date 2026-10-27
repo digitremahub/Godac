@@ -243,7 +243,10 @@ intégration :
   `vercel.json` tous les samedis). Vercel ajoute automatiquement
   l'en-tête `Authorization: Bearer <CRON_SECRET>` sur ses propres appels
   cron dès que cette variable est définie — la route répond 500 tant
-  qu'elle ne l'est pas, plutôt que de tourner sans protection.
+  qu'elle ne l'est pas, plutôt que de tourner sans protection. Elle protège
+  aussi la génération du planning de la semaine suivante (jeudi) et son
+  envoi automatique (vendredi 17 h) : voir `docs/planning-semaine-suivante.md`
+  (flux et limites du plan Hobby).
 
 Ne jamais committer `.env.local`. `.gitignore` l'exclut déjà.
 

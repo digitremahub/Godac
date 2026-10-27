@@ -113,6 +113,8 @@ describe("aucune route API ne s'ouvre sans garde", () => {
     "app/api/cron/echeances-flotte/route.ts",
     "app/api/cron/rh-quotidien/route.ts",
     "app/api/cron/daily-planning-reminder/route.ts",
+    "app/api/cron/planning-semaine-suivante/route.ts",
+    "app/api/cron/planning-envoi-auto/route.ts",
     "app/api/csp-report/route.ts",
     "app/api/geo/search/route.ts",
     "app/api/webhooks/supabase-alerts/route.ts",

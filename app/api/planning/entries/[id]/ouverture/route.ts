@@ -1,3 +1,4 @@
+import { noterModificationEntree } from "@/lib/planning/suivi-auto-serveur";
 import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -84,6 +85,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou hors de votre service." }, { status: 404 });
 
+  await noterModificationEntree(appUser.organization_id, id);
   await journaliser({
     organizationId: appUser.organization_id,
     userId: appUser.id,

@@ -2,6 +2,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { plannedDuplicates } from "@/lib/planning/duplicates";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 /**
  * Direction (or exploitation, whole organisation) removal of a duplicated planned entry. The duplicate
@@ -21,7 +22,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const { data: target } = await supabase
     .from("planning_entries")
-    .select("id, driver_id, start_at")
+    .select("id, driver_id, service_id, start_at")
     .eq("id", id)
     .eq("organization_id", appUser.organization_id)
     .maybeSingle();
@@ -42,5 +43,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const { error } = await supabase.from("planning_entries").delete().eq("id", id).eq("status", "planned");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await noterModificationPlanning(appUser.organization_id, [{ serviceId: target.service_id as string, startAt: target.start_at as string }]);
   return NextResponse.json({ ok: true });
 }

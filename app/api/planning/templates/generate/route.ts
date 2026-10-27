@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { minuitParis } from "@/lib/ticpe/export";
 import { cleCreneau } from "@/lib/planning/cle-creneau";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const schema = z.object({
   week_start: z.string().date(),
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
     .select("id, service_id, tour_number, start_at");
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
   skipped += rows.length - (inserted?.length ?? 0);
+  if (inserted?.length) await noterModificationPlanning(appUser.organization_id, [{ serviceId: service_id, jour: week_start }]);
 
   return NextResponse.json({ created: inserted?.length ?? 0, skipped });
 }

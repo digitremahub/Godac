@@ -6,7 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { garderDecision, tracerAutoValidation } from "@/lib/hierarchie/serveur";
 import { journaliser } from "@/lib/audit/journal";
 import { controlerApprobation } from "@/lib/leaves/controle";
-import { affectationsDuConge, signalerAffectationsConge } from "@/lib/leaves/planning-serveur";
+import { affectationsDuConge, signalerAbsenceSemaineGeneree, signalerAffectationsConge } from "@/lib/leaves/planning-serveur";
 import { soldesConges } from "@/lib/paie/conges-serveur";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { parisDay } from "@/lib/utils/paris-time";
@@ -153,6 +153,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           du: data.start_date,
           au: data.end_date,
           affectationIds: touchees.map((t) => t.id),
+        });
+        // Semaine suivante générée automatiquement et pas encore confirmée : l'encadrement qui la voit est prévenu aussi.
+        await signalerAbsenceSemaineGeneree(createAdminSupabaseClient(), {
+          organizationId: appUser.organization_id,
+          driverId: current.driver_id,
+          nom: salarie?.full_name ?? "Le salarié",
+          du: data.start_date,
+          au: data.end_date,
+          affectations: touchees,
         });
       }
     }

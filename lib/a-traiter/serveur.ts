@@ -19,7 +19,8 @@ import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards 
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
 import { parisDay } from "@/lib/utils/paris-time";
-import { addDays } from "@/lib/planning/dates";
+import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
+import { estUrgentLeVendredi, libelleSemaine, vendrediAvant, HEURE_ENVOI_AUTO } from "@/lib/planning/semaines-auto";
 import { paysOrganisation } from "@/lib/pays/serveur";
 import { MENTION_A_VALIDER, reglesTempsTravail } from "@/lib/pays/temps-travail";
 import { LIBELLE_CONTROLE_REPOS, controlerTempsTravail, joursDepuisPointages } from "@/lib/time-clock/repos";
@@ -692,6 +693,45 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
                 href: urlDe("equipe.utilisateur_fiche", { id: a.related_id! }),
               };
             }),
+        };
+      },
+    },
+    {
+      // Planning de la semaine suivante généré le jeudi, ni confirmé ni publié (planning_semaines_auto, sous la RLS : un manager ne voit que son service).
+      // Table absente (migration 20261111000001 pas appliquée) : rien à lister. Urgent à partir du vendredi.
+      type: "planning_a_confirmer",
+      nom: "plannings à confirmer",
+      ecran: "exploitation.planning",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase
+            .from("planning_semaines_auto")
+            .select("id, service_id, semaine_debut, genere_at, modifie_at, services(name)")
+            .eq("organization_id", org)
+            .is("publie_at", null)
+            .is("confirme_at", null)
+            // Une semaine terminée et jamais envoyée n'est plus à confirmer.
+            .gte("semaine_debut", addDays(aujourdhui, -6))
+            .order("semaine_debut", { ascending: true })
+            .limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((l) => {
+            const service = (Array.isArray(l.services) ? l.services[0] : l.services)?.name as string | undefined;
+            const limite = parisWallTimeToUtcISOString(vendrediAvant(l.semaine_debut), `${HEURE_ENVOI_AUTO}:00`);
+            return {
+              type: "planning_a_confirmer" as const,
+              id: l.id,
+              libelle: `Planning ${libelleSemaine(l.semaine_debut)} à confirmer${service ? ` · ${service}` : ""}`,
+              detail: l.modifie_at ? "Modifié, pas encore envoyé aux chauffeurs : confirmez avant vendredi 17 h" : "Envoyé tout seul aux chauffeurs vendredi à 17 h si rien ne change",
+              depuis: l.genere_at,
+              echeance: limite,
+              critique: estUrgentLeVendredi(l.semaine_debut, aujourdhui),
+              ecran: "exploitation.planning",
+              href: `${urlDe("exploitation.planning")}?view=week&week=${l.semaine_debut}&service=${l.service_id}`,
+            };
+          }),
         };
       },
     },

@@ -6,6 +6,7 @@ import { addDays } from "@/lib/planning/dates";
 import { estCopiable, jourDe, joursDeLaSemaine, planifierCopies, type AffectationPlanning, type CopieDemandee } from "@/lib/planning/semaine";
 import { affectationsAutour, inscrireCopies } from "@/lib/planning/copies-serveur";
 import { absentSelon, lireAbsences } from "@/lib/planning/absences";
+import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
 
 const bodySchema = z
   .object({
@@ -88,5 +89,6 @@ export async function POST(req: Request) {
 
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  if (r.creees > 0) await noterModificationPlanning(appUser.organization_id, plan.aCreer.map((l) => ({ serviceId: l.service_id, startAt: l.start_at })));
   return NextResponse.json({ created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, source_count: sources.length, warning: r.warning });
 }

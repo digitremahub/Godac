@@ -1,3 +1,4 @@
+import { noterModificationEntree } from "@/lib/planning/suivi-auto-serveur";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { journaliser } from "@/lib/audit/journal";
@@ -54,6 +55,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const r = await ecrireRepartition(supabase, appUser.organization_id, appUser.id, fusion, connus);
   if (r.erreur) return reponseErreurFusion({ message: r.erreur });
+  if (r.modifies > 0) await noterModificationEntree(appUser.organization_id, entree.id);
 
   // Chauffeur désigné sans la tournée dans son planning ce jour-là : sa fiche ne pourra pas la charger.
   const surLaTournee = await chauffeursDeLaFusion(supabase, appUser.organization_id, entree);
