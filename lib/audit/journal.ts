@@ -92,6 +92,7 @@ export const ACTIONS_AUDIT = {
   paie_lot_prepare: "Paie du mois préparée en lot (bulletins en attente de validation)",
   facturation_impaye: "Paiement échoué enregistré (facture Stripe impayée)",
   palier_stripe_echec: "Palier d'utilisateurs : mise à jour Stripe en échec (reprise au prochain passage)",
+  accuse_parametres_indicatifs: "Mention « documents indicatifs » (paie, TICPE, carburant) lue et acceptée : l'entreprise vérifie paramètres et résultats",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

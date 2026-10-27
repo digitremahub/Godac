@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 import { ENTETE_PLEINS_EXPORT, avertissementTroncature, mentionTva, totauxParProduit, totauxPleins, type FiltresExportPleins, type LignePleinExport } from "@/lib/fuel/export";
 
 /** Classeur Excel des pleins : une feuille « Pleins » (une ligne par plein, totaux en pied) et une feuille « Synthèse » (filtres, totaux par produit). */
@@ -27,6 +28,7 @@ export async function classeurPleins(params: { organisation: string; filtres: Fi
   synthese.addRow([`Période : du ${filtres.du} au ${filtres.au} (jours de Paris)`]);
   synthese.addRow([`Statut : ${filtres.statut} · véhicule : ${filtres.vehicule ? "filtré" : "tous"} · chauffeur : ${filtres.chauffeur ? "filtré" : "tous"}`]);
   synthese.addRow([mentionTva()]);
+  synthese.addRow([MENTION_INDICATIVE]);
   if (tronque) synthese.addRow([avertissementTroncature()]).font = { bold: true };
   synthese.addRow([]);
   synthese.addRow(["Produit", "Pleins", "Litres", "Montant TTC (€)", "Montant HT (€)", "TVA (€)"]).font = { bold: true };

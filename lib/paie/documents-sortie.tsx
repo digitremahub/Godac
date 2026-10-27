@@ -2,6 +2,7 @@ import "server-only";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 // Importer pdf.tsx enregistre aussi la police embarquée (NotoSans).
 import { chargerLogo, themeBulletin, type LogoPdf } from "@/lib/paie/pdf";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 
 /**
  * Documents de fin de contrat aux couleurs de GODAC (même charte que le
@@ -73,6 +74,7 @@ function styles(accent: string, encre: string) {
     signature: { width: "45%", borderTopWidth: 0.5, borderTopColor: TRAIT, paddingTop: 4, fontSize: 8, color: TEXTE_DOUX, minHeight: 50 },
     footer: { position: "absolute", bottom: 16, left: 34, right: 34, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 0.5, borderTopColor: TRAIT, paddingTop: 4 },
     footerTexte: { fontSize: 6.5, color: TEXTE_DOUX },
+    mentionIndicative: { marginTop: 10, marginBottom: 24, fontSize: 6.5, color: TEXTE_DOUX },
     pastille: { width: 5, height: 5, borderRadius: 1, backgroundColor: TEAL, marginRight: 3 },
   });
 }
@@ -286,6 +288,8 @@ function DocumentSortie({ type, d, logo }: { type: TypeDocumentSortie; d: Donnee
             </View>
           </>
         )}
+
+        <Text style={s.mentionIndicative}>{MENTION_INDICATIVE}</Text>
 
         <View style={s.footer} fixed>
           <Text style={s.footerTexte}>

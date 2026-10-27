@@ -73,6 +73,7 @@ export function BonDeCommande({
           <p className="text-xs font-semibold uppercase tracking-wide text-navy/55">Client</p>
           <ChampVide label="Raison sociale" />
           <ChampVide label="SIRET" />
+          <ChampVide label="N° de TVA (client hors France)" />
           <ChampVide label="Adresse" />
           <ChampVide label="Signataire et fonction" />
           <ChampVide label="E-mail / téléphone" />
@@ -140,7 +141,10 @@ export function BonDeCommande({
           Abonnement d’une durée initiale de 12 mois à compter de l’ouverture de l’accès, puis renouvelable de mois en mois,
           résiliable avec un préavis d’un mois. Facturation mensuelle terme à échoir, payable à réception par prélèvement SEPA
           ou carte bancaire. Mise en service facturée à la commande, ou échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour le chauffeur, facturée à l’entreprise par palier d’utilisateurs.
-          Données hébergées en France.
+          Données stockées sur des serveurs situés en France. Prix hors taxes ; TVA française 20 % pour un client établi en France
+          (client assujetti établi hors de France : voir CGV, article 7). Retard de paiement : intérêts et indemnité forfaitaire
+          de 40 € (CGV, article 8). Outil d’organisation : paramètres, calculs et déclarations (paie, TICPE, carburant) à vérifier
+          par le client avec son expert-comptable (CGV, article 13).
         </p>
         <p>
           Documents contractuels (version {VERSION_CONTRATS}), acceptés par la signature du présent bon : conditions générales

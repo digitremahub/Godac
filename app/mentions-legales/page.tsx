@@ -17,7 +17,7 @@ export default function MentionsLegalesPage() {
       </p>
       <p>
         <strong>Hébergement du site et de l&apos;application.</strong> Vercel Inc., 440 N Barranca Ave #4133, Covina,
-        CA 91723, États-Unis — vercel.com. Les traitements serveur sont exécutés dans la région de Paris (France).
+        CA 91723, États-Unis — vercel.com. Les fonctions serveur sont exécutées dans la région de Paris (France).
       </p>
       <p>
         <strong>Hébergement des données.</strong> Supabase, 970 Toa Payoh North #07-04, Singapour 318992 —
@@ -27,6 +27,14 @@ export default function MentionsLegalesPage() {
         <strong>Propriété intellectuelle.</strong> La marque GODAC, son logo, les textes, visuels et le logiciel sont
         protégés. Toute reproduction ou réutilisation, totale ou partielle, sans autorisation écrite préalable est
         interdite.
+      </p>
+      <p>
+        <strong>Cartes.</strong> Fonds de carte © contributeurs OpenStreetMap (licence ODbL) et OpenFreeMap.
+      </p>
+      <p>
+        <strong>Nature du service.</strong> GODAC est un outil d&apos;organisation et de gain de temps destiné aux entreprises. Il ne
+        fournit aucun conseil juridique, fiscal, comptable ou social : les calculs (paie, TICPE, carburant, congés, heures) sont
+        indicatifs et restent à vérifier par l&apos;entreprise avec son expert-comptable ou son responsable paie.
       </p>
       <p>
         <strong>Données personnelles.</strong> Le traitement des données est décrit dans la{" "}

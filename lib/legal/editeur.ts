@@ -26,7 +26,7 @@ export const EDITEUR = {
 };
 
 /** Version des documents contractuels, rappelée sur le bon de commande. */
-export const VERSION_CONTRATS = "1.0 — octobre 2026";
+export const VERSION_CONTRATS = "1.1 — octobre 2026";
 
 /** Désignation de l'éditeur dans les contrats (« ci-après l'Éditeur »). */
 export function designationEditeur(): string {
