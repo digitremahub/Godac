@@ -4,6 +4,8 @@ import { PageHeader, Card, EmptyState, StatTile } from "@/components/ui";
 import { AvertissementTicpe } from "@/components/ticpe/AvertissementTicpe";
 import { SelecteurPeriode } from "@/components/ticpe/SelecteurPeriode";
 import { AnnulerDeclaration, MarquerDeclaree } from "@/components/ticpe/Declarations";
+import { BandeauOnboardingTicpe } from "@/components/ticpe/BandeauOnboardingTicpe";
+import { etapesOnboarding } from "@/lib/ticpe/onboarding";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
 import { chargerDeclarations } from "@/lib/ticpe/declarations-serveur";
 import { controlesDeLaPeriode, periodeDemandee } from "@/lib/ticpe/periode-serveur";
@@ -70,6 +72,19 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
   const ecartPeriode = declarationDeLaPeriode ? ecarts.get(declarationDeLaPeriode.id) : undefined;
   const peutDeclarer = declarationsDisponibles && ["direction", "comptable"].includes(appUser.role);
   const periodeTerminee = periode.fin < aujourdhui;
+  // Onboarding : ce qui manque pour des montants fiables (barème « à confirmer » = taux utilisables dont la confirmation reste à faire).
+  const etapes = etapesOnboarding({
+    reglagesEnregistres: calcul.parametres.reglagesEnregistres,
+    tauxAConfirmer: calcul.parametres.bareme.filter((l) => l.taux_eur_hl !== null && l.a_confirmer && (!l.date_fin || l.date_fin >= aujourdhui)).length,
+    vehicules: [...calculPeriode.evalues.values()].map((x) => ({
+      id: x.vehicule.id,
+      registration: x.vehicule.registration,
+      compte: x.vehicule.status === "active" && x.eligibilite.statut !== "exclu",
+      capaciteReservoir: x.vehicule.tank_capacity_liters,
+      raisons: x.eligibilite.raisons.map((r) => r.code),
+    })),
+    points,
+  });
 
   return (
     <div>
@@ -83,6 +98,7 @@ export default async function TicpeTableauDeBordPage({ searchParams }: { searchP
         }
       />
       <AvertissementTicpe migrationManquante={migrationManquante} />
+      <BandeauOnboardingTicpe etapes={etapes} organizationId={appUser.organization_id} />
       {calcul.tronque && <p className="mb-3 text-sm text-orange-ink">Trop de pleins : montants incomplets.</p>}
       {aRegulariser > 0 && (
         <p className="mb-3 rounded-lg border border-orange-ink/30 bg-surface p-3 text-sm text-orange-ink" role="alert">

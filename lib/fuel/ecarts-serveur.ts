@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pleinsATraiter, tableAbsente, type AlerteLiee, type PleinPourEcarts } from "@/lib/fuel/ecarts";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
+import { avecColonneControle } from "@/lib/fuel/colonnes-controle";
 
 /** Ligne de fuel_gap_reviews (migration 20261022000001). */
 export interface LigneTraitementEcart {
@@ -94,19 +95,22 @@ export async function chargerEcartsATraiter(
   const depuisFenetre = new Date(Date.now() - jours * 86400000).toISOString();
   const depuis = filtres.du && filtres.du > depuisFenetre ? filtres.du : depuisFenetre;
   type Ligne = PleinPourEcarts & { id: string };
-  const { rows, truncated } = await fetchAllRows<Ligne>(
-    (a, b) => {
-      let q = supabase
-        .from("fuel_entries")
-        .select("id, liters, unit_price, totalizer_before, totalizer_after, totalizer_gap, gap_flagged, pmp_at_entry, tank_id, ocr_raw")
-        .gte("occurred_at", depuis);
-      if (filtres.vehicule) q = q.eq("vehicle_id", filtres.vehicule);
-      if (filtres.chauffeur) q = q.eq("driver_id", filtres.chauffeur);
-      if (filtres.avant) q = q.lt("occurred_at", filtres.avant);
-      return q.order("occurred_at", { ascending: false }).order("id", { ascending: false }).range(a, b) as unknown as PromiseLike<{ data: Ligne[] | null; error: { message: string } | null }>;
-    },
-    { maxRows: 20000 },
-  );
+  const lireLignes = (colonnes: string) =>
+    fetchAllRows<Ligne>(
+      (a, b) => {
+        let q = supabase.from("fuel_entries").select(colonnes).gte("occurred_at", depuis);
+        if (filtres.vehicule) q = q.eq("vehicle_id", filtres.vehicule);
+        if (filtres.chauffeur) q = q.eq("driver_id", filtres.chauffeur);
+        if (filtres.avant) q = q.lt("occurred_at", filtres.avant);
+        return q.order("occurred_at", { ascending: false }).order("id", { ascending: false }).range(a, b) as unknown as PromiseLike<{ data: Ligne[] | null; error: { message: string } | null }>;
+      },
+      { maxRows: 20000 },
+    );
+  // controle_confirme : migration 20261108000003 ; sans elle, relecture sans la colonne.
+  const { rows, truncated } = await avecColonneControle(async (colonnes) => {
+    const r = await lireLignes(colonnes);
+    return { ...r, error: r.error ? { message: r.error } : null };
+  }, "id, liters, unit_price, totalizer_before, totalizer_after, totalizer_gap, gap_flagged, pmp_at_entry, tank_id, ocr_raw");
   if (rows.length === 0) return { ids: [], tronque: truncated };
   // Une requête pour le journal, une pour les alertes de consommation (seul
   // type d'alerte qui crée un écart) : tous deux postérieurs au plein, donc

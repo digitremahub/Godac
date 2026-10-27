@@ -203,7 +203,7 @@ export default function ConfidentialitePage() {
             réduit aux initiales) ; adresses, initiales et photos de livraison conservées 12 mois pour traiter les contestations, puis
             supprimées.
           </li>
-          <li>Amendes : jusqu&apos;à leur traitement, puis 1 an maximum (délai de prescription des contraventions).</li>
+          <li>Amendes* : jusqu&apos;à leur traitement (réglée ou classée), puis 1 an maximum (délai de prescription des contraventions), avis et pièces jointes compris.</li>
           <li>Journaux de connexion : 1 an maximum.</li>
           <li>
             Bulletins de paie : le code du travail impose à l&apos;employeur de les tenir à la disposition du salarié pendant 50 ans, ou

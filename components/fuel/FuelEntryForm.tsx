@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui";
 import { CounterPhotoCapture } from "@/components/shared/CounterPhotoCapture";
 import { validateFuelEntryValues, type FuelEntryFormValues } from "@/lib/fuel/entry-payload";
@@ -62,6 +62,9 @@ export function FuelEntryForm({
   station = false,
   onStationChange,
   ticket,
+  hideKm = false,
+  hideDate = false,
+  bas,
   onSubmit,
 }: {
   initialValues?: Partial<FuelEntryFormValues>;
@@ -75,6 +78,12 @@ export function FuelEntryForm({
   station?: boolean;
   onStationChange?: (station: boolean) => void;
   ticket?: TicketExtras | null;
+  /** Kilométrage déjà saisi à l'étape précédente de l'assistant : champ masqué, valeur conservée et envoyée. */
+  hideKm?: boolean;
+  /** Date déjà saisie à l'étape du kilométrage (assistant) : champ masqué, valeur conservée. À laisser visible pour vérifier la date lue sur un ticket. */
+  hideDate?: boolean;
+  /** Contenu libre avant le bouton : photo du ticket facultative, confirmation d'un contrôle. */
+  bas?: ReactNode;
   onSubmit: (values: FuelEntryFormValues) => void;
 }) {
   const ticketProduct = classifyTicketFuel(ticket?.fuel_type);
@@ -117,6 +126,7 @@ export function FuelEntryForm({
         </label>
       )}
 
+      {!hideDate && (
       <div>
         <label className="block"><span className="label">Date et heure</span>
         <input
@@ -128,6 +138,7 @@ export function FuelEntryForm({
           onChange={(e) => set("occurred_at", e.target.value)}
         /></label>
       </div>
+      )}
 
       {!station && (
       <div className="grid grid-cols-2 gap-3">
@@ -182,6 +193,7 @@ export function FuelEntryForm({
       </div>
       )}
 
+      {!hideKm && (
       <div>
         <label className="block"><span className="label">Kilométrage du véhicule</span>
         <input
@@ -192,6 +204,7 @@ export function FuelEntryForm({
           onChange={(e) => set("vehicle_km", e.target.value)}
         /></label>
       </div>
+      )}
 
       {priceFields ? (
         <div className="grid grid-cols-2 gap-3">
@@ -259,9 +272,11 @@ export function FuelEntryForm({
         </div>
       )}
 
+      {bas}
+
       {formError && <p role="alert" className="text-sm text-orange-ink">{formError}</p>}
 
-      <button className="btn-primary" disabled={busy} onClick={submit}>
+      <button className="btn-primary min-h-[44px]" disabled={busy} onClick={submit}>
         {busy ? "Enregistrement…" : submitLabel}
       </button>
     </Card>

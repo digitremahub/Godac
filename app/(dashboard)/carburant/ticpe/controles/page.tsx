@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { garderPage } from "@/lib/acces/garde-page";
-import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState } from "@/components/ui";
+import { PointsARegler } from "@/components/ticpe/PointsARegler";
 import { AvertissementTicpe } from "@/components/ticpe/AvertissementTicpe";
 import { SelecteurPeriode } from "@/components/ticpe/SelecteurPeriode";
 import { chargerParametresTicpe } from "@/lib/ticpe/serveur";
@@ -38,22 +38,7 @@ export default async function ControlesTicpePage({ searchParams }: { searchParam
       {points.length === 0 ? (
         <EmptyState title="Rien à régler" description="Aucun point bloquant ni avertissement sur cette période." />
       ) : (
-        <Card className="overflow-x-auto">
-          <ul className="flex flex-col divide-y divide-navy/5">
-            {points.map((pt) => (
-              <li key={pt.cle}>
-                <Link href={pt.lien} className="flex flex-wrap items-start gap-3 py-2.5 hover:bg-navy/[0.02]">
-                  <span className={pt.gravite === "bloquant" ? "badge-orange" : "badge-gold"}>{pt.gravite === "bloquant" ? "Bloquant" : "Avertissement"}</span>
-                  <span className="min-w-0 flex-1 text-sm">
-                    <span className="font-medium text-navy">{pt.titre}</span>
-                    <span className="block text-navy/70">{pt.detail}</span>
-                  </span>
-                  <span className="text-xs text-teal-ink">Corriger →</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <PointsARegler points={points} />
       )}
     </div>
   );

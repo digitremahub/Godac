@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cheminsPhotos, enLots } from "@/lib/retention/photos";
+import { RETENTION_AMENDES_JOURS, STATUTS_AMENDE_CLOTUREE, cheminsAmendes, limiteClotureAmendes } from "@/lib/retention/amendes";
 
 /** Retention periods announced in app/confidentialite — keep both in sync. */
 export const RETENTION_DAYS = {
@@ -20,6 +21,8 @@ export const RETENTION_DAYS = {
   auditLog: 3 * 365,
   /** Journal anti-abus du lien prestataire (IP hachées). */
   providerAccessLog: 30,
+  /** Amendes : un an après leur clôture (réglée ou classée), comme annoncé ; en cours, jamais. */
+  fines: RETENTION_AMENDES_JOURS,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -108,10 +111,58 @@ export async function purgeExpiredData() {
   results.deliveryPhotos = photosEffacees;
   results.parcelRuns = erreurTournees ?? tourneesSupprimees;
 
+  // Amendes clôturées depuis plus d'un an : pièces effacées d'abord, lignes ensuite.
+  const amendes = await purgerAmendes(admin);
+  results.fineFiles = amendes.fichiers;
+  results.fines = amendes.erreur ?? amendes.amendes;
+
   const access = await admin.from("rental_provider_access_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.providerAccessLog));
   results.providerAccessLog = access.error ? access.error.message : (access.count ?? 0);
 
   return results;
+}
+
+type Admin = ReturnType<typeof createAdminSupabaseClient>;
+
+/**
+ * Purge des amendes réglées ou classées depuis plus d'un an, lot par lot
+ * jusqu'à épuisement (100 par lot). Pour chaque lot, les pièces (avis, pièces
+ * jointes, photos des échanges) sont effacées du stockage AVANT les lignes ; si
+ * l'effacement échoue, les amendes du lot sont conservées pour un prochain
+ * passage plutôt que de laisser des fichiers orphelins. Colonne closed_at
+ * absente (migration 20261108000003 pas appliquée) : rien n'est purgé.
+ */
+export async function purgerAmendes(admin: Admin, maintenant: Date = new Date()): Promise<{ fichiers: number; amendes: number; erreur: string | null }> {
+  const limite = limiteClotureAmendes(maintenant);
+  let fichiers = 0;
+  let amendes = 0;
+  for (;;) {
+    const { data: lot, error } = await admin
+      .from("fines")
+      .select("id, photo_path, document_paths")
+      .in("status", [...STATUTS_AMENDE_CLOTUREE])
+      .not("closed_at", "is", null)
+      .lt("closed_at", limite)
+      .order("closed_at")
+      .limit(100);
+    if (error) return { fichiers, amendes, erreur: error.message };
+    const ids = (lot ?? []).map((a) => a.id as string);
+    if (ids.length === 0) return { fichiers, amendes, erreur: null };
+
+    const { data: echanges, error: erreurEchanges } = await admin.from("case_comments").select("photo_paths").in("fine_id", ids);
+    if (erreurEchanges) return { fichiers, amendes, erreur: erreurEchanges.message };
+    const chemins = cheminsAmendes((lot ?? []) as { photo_path?: string | null; document_paths?: string[] | null }[], (echanges ?? []) as { photo_paths?: string[] | null }[]);
+    for (const morceau of enLots(chemins)) {
+      const { error: e } = await admin.storage.from("fine-photos").remove(morceau);
+      if (e) return { fichiers, amendes, erreur: `Pièces non effacées : ${e.message}` };
+    }
+    fichiers += chemins.length;
+
+    const suppression = await admin.from("fines").delete({ count: "exact" }).in("id", ids);
+    if (suppression.error) return { fichiers, amendes, erreur: suppression.error.message };
+    if (!suppression.count) return { fichiers, amendes, erreur: null };
+    amendes += suppression.count;
+  }
 }
 
 /** Chemins de toutes les photos de preuve des arrêts de ces tournées (pagination), ou le message d'erreur. */

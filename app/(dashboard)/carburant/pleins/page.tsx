@@ -7,11 +7,14 @@ import { PageHeader, Card } from "@/components/ui";
 import { FuelHistoryTable } from "@/components/fuel/FuelHistoryTable";
 import { FuelHistoryFilters } from "@/components/fuel/FuelHistoryFilters";
 import { NewFuelEntryWizard } from "@/components/fuel/NewFuelEntryWizard";
-import { nextDay, parisMidnightIso } from "@/lib/utils/paris-time";
+import { ExportPleins } from "@/components/fuel/ExportPleins";
+import { perimetreExportPleins } from "@/lib/fuel/export";
+import { nextDay, parisDay, parisMidnightIso } from "@/lib/utils/paris-time";
 import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
 import { chargerEcartsATraiter, chargerSuiviEcarts, FENETRE_ECARTS_JOURS } from "@/lib/fuel/ecarts-serveur";
 import { ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
+import { avecColonneControle } from "@/lib/fuel/colonnes-controle";
 import { calculerTicpe } from "@/lib/ticpe/calcul-serveur";
 import { jourParis, libelleLigne } from "@/lib/ticpe/montant";
 
@@ -54,11 +57,13 @@ export default async function FuelPage({
   const selfIsDriver = appUser.conduit;
 
   if (wizardMode) {
-    const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }, { data: driver }, { data: employees }] = await Promise.all([
+    const [{ data: vehicles }, { data: tanks }, ocrEnabled, { data: assignedVehicle }, { data: dernierPlein }, { data: driver }, { data: employees }] = await Promise.all([
       supabase.from("vehicles").select("id, registration, type").eq("status", "active").order("registration"),
-      supabase.from("tanks").select("id, name, fuel_type").order("name"),
+      supabase.from("tanks").select("id, name, fuel_type, current_totalizer_index").order("name"),
       isModuleEnabled(supabase, appUser.organization_id, "ocr"),
       supabase.from("vehicles").select("id").eq("assigned_driver_id", appUser.id).eq("status", "active").maybeSingle(),
+      // Dernier véhicule utilisé pour un plein : repris par l'assistant quand aucun véhicule n'est affecté ni scanné.
+      supabase.from("fuel_entries").select("vehicle_id").eq("driver_id", appUser.id).order("occurred_at", { ascending: false }).limit(1).maybeSingle(),
       params.driver ? supabase.from("users").select("full_name").eq("id", params.driver).maybeSingle() : Promise.resolve({ data: null }),
       // Secours téléphone en panne / urgence : la direction (et tout
       // manager) peut saisir un plein pour n'importe quel chauffeur,
@@ -91,6 +96,7 @@ export default async function FuelPage({
           initialDriverId={params.driver}
           initialDriverName={driver?.full_name}
           assignedVehicleId={assignedVehicle?.id}
+          lastVehicleId={dernierPlein?.vehicle_id ?? undefined}
           selfDriverId={appUser.id}
           selfDriverName={appUser.full_name}
           selfIsDriver={selfIsDriver}
@@ -121,50 +127,56 @@ export default async function FuelPage({
   const filtreATraiter = Boolean(params.a_traiter) && ecartsATraiter !== null;
   const idsPage = filtreATraiter ? ecartsATraiter!.ids.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
 
-  let query = supabase
-    .from("fuel_entries")
-    .select(
-      "id, vehicle_id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, totalizer_gap, totalizer_before, totalizer_after, pmp_at_entry, ocr_raw, station_name, product, tank_id, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
-      { count: "exact" },
-    )
-    .order("occurred_at", { ascending: false })
-    .order("id", { ascending: false });
+  const lireHistorique = (colonnes: string) => {
+    let query = supabase
+      .from("fuel_entries")
+      .select(colonnes, { count: "exact" })
+      .order("occurred_at", { ascending: false })
+      .order("id", { ascending: false });
 
-  if (filtreATraiter) {
-    // Aucun plein à traiter : identifiant nul pour une page vide.
-    query = query.in("id", idsPage.length > 0 ? idsPage : ["00000000-0000-0000-0000-000000000000"]);
-  } else {
-    query = query.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-    if (pleinCible) query = query.eq("id", pleinCible);
-    if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
-    if (params.driver) query = query.eq("driver_id", params.driver);
-    if (params.status) query = query.eq("status", params.status);
-    if (from) query = query.gte("occurred_at", parisMidnightIso(from));
-    if (to) query = query.lt("occurred_at", parisMidnightIso(nextDay(to)));
-  }
+    if (filtreATraiter) {
+      // Aucun plein à traiter : identifiant nul pour une page vide.
+      query = query.in("id", idsPage.length > 0 ? idsPage : ["00000000-0000-0000-0000-000000000000"]);
+    } else {
+      query = query.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+      if (pleinCible) query = query.eq("id", pleinCible);
+      if (params.vehicle) query = query.eq("vehicle_id", params.vehicle);
+      if (params.driver) query = query.eq("driver_id", params.driver);
+      if (params.status) query = query.eq("status", params.status);
+      if (from) query = query.gte("occurred_at", parisMidnightIso(from));
+      if (to) query = query.lt("occurred_at", parisMidnightIso(nextDay(to)));
+    }
+    return query;
+  };
 
-  const [{ data: entries, error, count }, { data: vehicles }, { data: drivers }] = await Promise.all([
-    query,
+  // controle_confirme : migration 20261108000003 ; sans elle, relecture sans la colonne.
+  const [{ data: entriesBrut, error, count }, { data: vehicles }, { data: drivers }] = await Promise.all([
+    avecColonneControle(
+      lireHistorique,
+      "id, vehicle_id, occurred_at, liters, unit_price, total_amount, status, gap_flagged, totalizer_gap, totalizer_before, totalizer_after, pmp_at_entry, ocr_raw, station_name, product, tank_id, ticket_photo_path, vehicles(registration), users!fuel_entries_driver_id_fkey(full_name), tanks(name)",
+    ),
     supabase.from("vehicles").select("id, registration").order("registration"),
     canSeeOtherDrivers ? supabase.from("users").select("id, full_name").eq("active", true).order("full_name") : Promise.resolve({ data: null }),
   ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entries = (entriesBrut ?? []) as any[];
 
   // Écarts de chaque plein et statut de leur traitement (journal
   // fuel_gap_reviews ; tolère la migration pas encore appliquée).
-  const suivi = await chargerSuiviEcarts(supabase, (entries ?? []).map((e) => e.id));
-  const lignes = (entries ?? []).map(({ ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry, ...e }) => ({
+  const suivi = await chargerSuiviEcarts(supabase, entries.map((e) => e.id));
+  const lignes = entries.map(({ ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry, controle_confirme, ...e }) => ({
     ...e,
     statut_ecart: statutEcart(
-      ecartsDuPlein({ ...e, ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry }, suivi.alertes.get(e.id) ?? []).length,
+      ecartsDuPlein({ ...e, ocr_raw, totalizer_before, totalizer_after, totalizer_gap, pmp_at_entry, controle_confirme }, suivi.alertes.get(e.id) ?? []).length,
       suivi.traitements.get(e.id) ?? [],
     ),
   }));
   // Montant TICPE de chaque plein de la page (module Export TICPE,
   // encadrement et comptable) : plafond compté sur l'année entière.
-  if (g.modules.has("ticpe_export") && canSeeOtherDrivers && (entries ?? []).length > 0) {
+  if (g.modules.has("ticpe_export") && canSeeOtherDrivers && entries.length > 0) {
     try {
-      const vehiculesPage = [...new Set((entries ?? []).map((e: any) => e.vehicle_id as string).filter(Boolean))];
-      const annees = (entries ?? []).map((e) => Number(jourParis(e.occurred_at).slice(0, 4)));
+      const vehiculesPage = [...new Set(entries.map((e) => e.vehicle_id as string).filter(Boolean))];
+      const annees = entries.map((e) => Number(jourParis(e.occurred_at).slice(0, 4)));
       const calcul = await calculerTicpe(supabase, appUser.organization_id, { anneeDebut: Math.min(...annees), anneeFin: Math.max(...annees), vehicleIds: vehiculesPage });
       const parId = new Map(calcul.lignes.map((l) => [l.id, libelleLigne(l)]));
       for (const l of lignes as any[]) l.ticpe = l.product === "adblue" ? null : (parId.get(l.id) ?? null);
@@ -195,6 +207,10 @@ export default async function FuelPage({
         drivers={canSeeOtherDrivers ? (drivers ?? []).map((d) => ({ id: d.id, label: d.full_name })) : null}
         aTraiter={ecartsATraiter ? aTraiter : null}
       />
+
+      {perimetreExportPleins(appUser.role) && (
+        <ExportPleins du={from ?? `${parisDay().slice(0, 7)}-01`} au={to ?? parisDay()} vehicule={params.vehicle} chauffeur={params.driver} />
+      )}
 
       {error && <Card className="mb-4 text-orange-ink">{error.message}</Card>}
 

@@ -19,6 +19,8 @@ import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards 
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
 import { parisDay } from "@/lib/utils/paris-time";
+import { echeancesSouhaitees } from "@/lib/alerts/echeances";
+import { lireAmendesAEcheance, lireDocumentsVehicules } from "@/lib/alerts/echeances-serveur";
 import { PLAFOND_PAR_SOURCE, ROLES_A_TRAITER, construireListe, typeVisiblePour, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
 
 /**
@@ -455,6 +457,56 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
             ecran: "carburant.revue_ocr",
             href: urlDe("carburant.revue_ocr"),
             personneId: p.driver_id,
+          })),
+        };
+      },
+    },
+    {
+      // Papiers des véhicules (contrôle technique, assurance, licence…) à renouveler dans 30 jours ou moins, ou échus.
+      // Calculés directement depuis les documents (les mêmes règles que le cron des échéances) : visibles même sans la migration des alertes.
+      type: "echeance_vehicule",
+      nom: "échéances des papiers des véhicules",
+      ecran: "flotte.vehicules",
+      lire: async () => {
+        const documents = await lireDocumentsVehicules(supabase, org);
+        // La lecture des papiers est ouverte à l'organisation (RLS) : le manager ne voit que les véhicules de ses services.
+        const mes = appUser.role === "manager" ? await mesServices() : [];
+        const dansMesServices = (e: { serviceId: string | null }) => dansLePerimetre(appUser.role, mes, e.serviceId);
+        const echeances = echeancesSouhaitees(documents, [], aujourdhui).filter(dansMesServices).slice(0, PLAFOND_PAR_SOURCE);
+        return {
+          plafonne: echeances.length >= PLAFOND_PAR_SOURCE,
+          brutes: echeances.map((e) => ({
+            type: "echeance_vehicule" as const,
+            id: e.cle,
+            libelle: e.message.split(" : ")[0]!,
+            detail: `Échéance le ${jourDate(e.echeance)}/${e.echeance.slice(0, 4)} · ${e.jours < 0 ? `dépassée depuis ${-e.jours} j` : e.jours === 0 ? "aujourd'hui" : `dans ${e.jours} j`}`,
+            echeance: e.echeance,
+            critique: e.palier <= 7,
+            ecran: "flotte.vehicules",
+            href: `${urlDe("flotte.vehicule_fiche", { id: e.vehicleId! })}#papiers`,
+          })),
+        };
+      },
+    },
+    {
+      // Amendes à payer au tarif minoré avant leur date limite (30 jours ou moins). Hors périmètre d'un manager, comme les amendes à attribuer.
+      type: "echeance_vehicule",
+      nom: "échéances des amendes",
+      ecran: "flotte.amendes",
+      lire: async () => {
+        if (appUser.role === "manager") return { brutes: [] };
+        const echeances = echeancesSouhaitees([], await lireAmendesAEcheance(supabase, org), aujourdhui).slice(0, PLAFOND_PAR_SOURCE);
+        return {
+          plafonne: echeances.length >= PLAFOND_PAR_SOURCE,
+          brutes: echeances.map((e) => ({
+            type: "echeance_vehicule" as const,
+            id: e.cle,
+            libelle: e.message.split(" : ")[0]!,
+            detail: `Tarif minoré jusqu'au ${jourDate(e.echeance)}/${e.echeance.slice(0, 4)} · ${e.jours < 0 ? `dépassé depuis ${-e.jours} j` : e.jours === 0 ? "aujourd'hui" : `dans ${e.jours} j`}`,
+            echeance: e.echeance,
+            critique: e.palier <= 7,
+            ecran: "flotte.amendes",
+            href: `${urlDe("flotte.amendes")}?amende=${e.relatedId}`,
           })),
         };
       },

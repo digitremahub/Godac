@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { garderApi } from "@/lib/acces/garde-api";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { chargerSuiviEcarts } from "@/lib/fuel/ecarts-serveur";
+import { ROLES_CORRECTION_PLEIN } from "@/lib/ticpe/corrections";
+import { avecColonneControle } from "@/lib/fuel/colonnes-controle";
 import { droitsEcart, ecartsDuPlein, statutEcart } from "@/lib/fuel/ecarts";
 import { compterDirection, lirePersonne } from "@/lib/hierarchie/serveur";
 import { libelleADecider } from "@/lib/hierarchie/demandes";
@@ -37,13 +39,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!g.ok) return g.reponse;
   const { appUser, supabase, modules } = g;
 
-  const { data: e, error } = await supabase
-    .from("fuel_entries")
-    .select(
-      "id, organization_id, occurred_at, created_at, updated_at, status, product, liters, unit_price, total_amount, station_name, tank_id, vehicle_id, driver_id, vehicle_km, vehicle_km_photo_path, totalizer_before, totalizer_after, totalizer_before_photo_path, totalizer_after_photo_path, totalizer_gap, gap_flagged, pmp_at_entry, ticket_photo_path, ocr_raw, ocr_confidence, ocr_error, created_by, validated_by, validated_at, vehicles(registration), tanks(name)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const { data: eBrut, error } = await avecColonneControle(
+    (colonnes) => supabase.from("fuel_entries").select(colonnes).eq("id", id).maybeSingle(),
+    "id, organization_id, occurred_at, created_at, updated_at, status, product, liters, unit_price, total_amount, station_name, tank_id, vehicle_id, driver_id, vehicle_km, vehicle_km_photo_path, totalizer_before, totalizer_after, totalizer_before_photo_path, totalizer_after_photo_path, totalizer_gap, gap_flagged, pmp_at_entry, ticket_photo_path, ocr_raw, ocr_confidence, ocr_error, created_by, validated_by, validated_at, vehicles(registration), tanks(name)",
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = eBrut as any;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!e) return NextResponse.json({ error: "Plein introuvable." }, { status: 404 });
 
@@ -134,16 +135,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           litresHorsPlafond: l.litresHorsPlafond,
           montant: l.montant,
           justificatif: l.justificatif,
-          justificatifModifiable: ["manager", "exploitation", "direction"].includes(appUser.role) && !e.ticket_photo_path,
+          justificatifModifiable: (ROLES_CORRECTION_PLEIN as readonly string[]).includes(appUser.role) && !e.ticket_photo_path,
           zoneSaisie: calcul.pleins.get(id)?.ticpe_zone === "corse" || calcul.pleins.get(id)?.ticpe_zone === "metropole" ? (calcul.pleins.get(id)!.ticpe_zone as "corse" | "metropole") : null,
           zonePropose: l.zonePropose ? LIBELLES_ZONE[l.zonePropose] : null,
           zoneIncertaine: l.zoneIncertaine === true,
           paysAchat: calcul.pleins.get(id)?.pays_achat ?? null,
-          zoneModifiable: ["manager", "exploitation", "direction"].includes(appUser.role),
+          zoneModifiable: (ROLES_CORRECTION_PLEIN as readonly string[]).includes(appUser.role),
           periodeDeclaree: declaree ? (declaree.periode_libelle ?? declaree.periode_cle) : null,
           doublon: l.doublon === true,
           doublonLeveLe: calcul.pleins.get(id)?.ticpe_doublon_leve_le ?? null,
-          doublonLevable: ["manager", "exploitation", "direction"].includes(appUser.role) && (l.doublon === true || Boolean(calcul.pleins.get(id)?.ticpe_doublon_leve_le)),
+          doublonLevable: (ROLES_CORRECTION_PLEIN as readonly string[]).includes(appUser.role) && (l.doublon === true || Boolean(calcul.pleins.get(id)?.ticpe_doublon_leve_le)),
         };
       }
     } catch (err) {
