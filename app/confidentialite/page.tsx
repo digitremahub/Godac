@@ -17,7 +17,8 @@ export default function ConfidentialitePage() {
   return (
     <LegalPageLayout title="Politique de confidentialité">
       <p>
-        François, éditeur de GODAC (ci-après « nous »), attache une attention particulière à la protection des
+        François, éditeur de GODAC (ci-après « nous », identité et contact dans les{" "}
+        <Link href="/mentions-legales" className="text-teal-ink hover:underline">mentions légales</Link>), attache une attention particulière à la protection des
         données personnelles traitées dans le cadre de l&apos;application GODAC, conformément au Règlement Général
         sur la Protection des Données (RGPD) et à la loi Informatique et Libertés.
       </p>
@@ -47,8 +48,11 @@ export default function ConfidentialitePage() {
             dans la messagerie.
           </li>
           <li>
-            <strong>Position GPS au moment du pointage :</strong> uniquement lorsque vous pointez, pour vérifier que
-            vous êtes au dépôt.
+            <strong>Position GPS au moment du pointage :</strong> lorsque vous pointez, pour vérifier que vous êtes au
+            dépôt. Si votre entreprise utilise le <strong>pointage assisté</strong>, votre position est aussi lue environ
+            une fois par minute, application ouverte et visible (4 heures au plus), pour détecter votre arrivée au dépôt
+            ou votre sortie ; rien n&apos;est conservé de ces lectures, sauf l&apos;heure de votre dernière présence au
+            dépôt (et la position de l&apos;arrivée ou de la sortie enregistrée automatiquement).
           </li>
           <li>
             <strong>Position pendant une tournée colis en cours :</strong> si l&apos;entreprise utilise le module Tournée
@@ -102,6 +106,12 @@ export default function ConfidentialitePage() {
           l&apos;entreprise à organiser son activité et ses obligations légales (temps de travail, comptabilité,
           désignation du conducteur). GODAC ne vend ni ne loue aucune donnée, et n&apos;affiche aucune publicité.
         </p>
+        <p>
+          Géolocalisation : votre position n&apos;est utilisée que pour le pointage au dépôt, le suivi d&apos;une tournée en
+          cours et l&apos;analyse des trajets, pendant votre temps de travail. Elle ne doit jamais servir à vous suivre en
+          dehors de vos horaires. Votre employeur doit vous en informer et, lorsqu&apos;il existe, consulter son comité
+          social et économique.
+        </p>
       </Section>
 
       <Section title="Lecture automatique par intelligence artificielle">
@@ -122,7 +132,8 @@ export default function ConfidentialitePage() {
             (France).
           </li>
           <li>
-            <strong>Vercel Inc.</strong> — hébergement de l&apos;application ; traitements exécutés à Paris (France).
+            <strong>Vercel Inc.</strong> — hébergement de l&apos;application ; fonctions exécutées à Paris (France), le réseau de
+            diffusion du fournisseur pouvant faire transiter les requêtes (adresse IP) par d&apos;autres pays.
           </li>
           <li>
             <strong>Anthropic</strong> — lecture automatique des documents et assistant, uniquement si l&apos;entreprise active ces options (États-Unis).
@@ -132,6 +143,13 @@ export default function ConfidentialitePage() {
           </li>
           <li>
             <strong>Stripe</strong> — paiement de l&apos;abonnement.
+          </li>
+          <li>
+            <strong>Cartes, adresses et itinéraires</strong> — Base Adresse Nationale (France), Photon / Komoot (Allemagne),
+            OpenStreetMap / Nominatim (Royaume-Uni), un service d&apos;itinéraires OSRM et, le cas échéant, Google Places
+            (États-Unis) : ils reçoivent le texte d&apos;une adresse saisie ou des coordonnées de points d&apos;arrêt (sans nom),
+            et les serveurs de cartes (OpenStreetMap, OpenFreeMap) reçoivent l&apos;adresse IP de votre appareil et la zone
+            affichée.
           </li>
           <li>
             Les services de notification des navigateurs (Apple, Google, Mozilla) — acheminement des notifications,
@@ -204,7 +222,12 @@ export default function ConfidentialitePage() {
             supprimées.
           </li>
           <li>Amendes* : jusqu&apos;à leur traitement (réglée ou classée), puis 1 an maximum (délai de prescription des contraventions), avis et pièces jointes compris.</li>
-          <li>Journaux de connexion : 1 an maximum.</li>
+          <li>Journal d&apos;audit des actions sensibles (exports, changements de droits, bulletins validés)* : 3 ans.</li>
+          <li>Journal anti-abus du lien d&apos;un prestataire (adresses IP hachées)* : 30 jours.</li>
+          <li>
+            Journaux techniques de connexion et d&apos;erreur : conservés par les hébergeurs, pour une durée limitée fixée par chacun
+            (de quelques jours à 1 an au plus).
+          </li>
           <li>
             Bulletins de paie : le code du travail impose à l&apos;employeur de les tenir à la disposition du salarié pendant 50 ans, ou
             jusqu&apos;à ses 75 ans (art. D3243-8). GODAC les conserve tant que l&apos;entreprise utilise GODAC, puis comme les autres données
@@ -253,7 +276,8 @@ export default function ConfidentialitePage() {
         <p>
           GODAC n&apos;utilise que des cookies strictement nécessaires à la connexion, et le stockage local de votre
           navigateur pour vos préférences (thème, taille du texte). Aucun cookie publicitaire ni outil de mesure
-          d&apos;audience tiers : aucun consentement n&apos;est donc requis.
+          d&apos;audience tiers : aucun consentement n&apos;est donc requis. L&apos;affichage d&apos;une carte contacte les serveurs
+          de cartes (OpenStreetMap, OpenFreeMap), qui reçoivent votre adresse IP.
         </p>
       </Section>
 

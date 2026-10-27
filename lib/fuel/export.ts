@@ -12,6 +12,7 @@
  * neutralisation de l'injection de formule.
  */
 import { documentCsv, nombreFr } from "@/lib/paie/csv";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 
 /** Rôles qui exportent les pleins ; le manager est borné à son service par la RLS. */
 export const ROLES_EXPORT_PLEINS = ["comptable", "direction", "exploitation", "manager"] as const;
@@ -233,6 +234,7 @@ export function csvPleins(lignes: readonly LignePleinExport[], options: { tronqu
   const pied: (string | number | null)[][] = [["", "", "", "", "", "", "", "", "", "", "", "", "", ""], ligneTotal("TOTAL", total)];
   if (parProduit.length > 1) for (const p of parProduit) pied.push(ligneTotal(`Total ${p.produit}`, p.totaux));
   pied.push([mentionTva()]);
+  pied.push([MENTION_INDICATIVE]);
   if (options.tronque) pied.push([avertissementTroncature()]);
   return documentCsv(ENTETE_PLEINS_EXPORT, [...cellules, ...pied]);
 }

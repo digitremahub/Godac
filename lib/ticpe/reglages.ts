@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 import type { CategorieTicpe } from "@/lib/ticpe/bareme";
 
 export const REGIMES_TVA = ["mensuel", "trimestriel", "annuel_ca12"] as const;
@@ -136,5 +137,5 @@ export function activiteActive(reglages: ReglagesTicpe, categorie: CategorieTicp
 }
 
 /** Avertissement à afficher partout. */
-export const AVERTISSEMENT_TICPE = "GODAC prépare les montants ; la déclaration reste faite par l'entreprise ou son expert-comptable.";
+export const AVERTISSEMENT_TICPE = MENTION_INDICATIVE;
 export const MENTION_A_CONFIRMER = "à confirmer par l'expert-comptable";

@@ -10,12 +10,14 @@ const cellule = "border border-navy/10 px-2 py-1.5 align-top";
 /** Traitements réalisés pour le compte du Client (annexe 1). */
 const TRAITEMENTS: [string, string, string][] = [
   ["Comptes et rôles", "Salariés et dirigeants du Client", "Nom, prénom, e-mail, téléphone, rôle, service, code chauffeur, code PIN chiffré, clés de connexion"],
-  ["Carburant et flotte", "Chauffeurs", "Pleins, kilométrages, photos de tickets et de compteurs, véhicule utilisé"],
+  ["Carburant, flotte et TICPE", "Chauffeurs", "Pleins, kilométrages, photos de tickets et de compteurs, véhicule utilisé, cartes grises des véhicules"],
   ["Planning, tournées, congés", "Chauffeurs et encadrement", "Affectations, horaires, tournées, absences et congés"],
-  ["Pointage", "Salariés", "Heures de pointage, position GPS au seul moment du pointage"],
+  ["Pointage", "Salariés", "Heures de pointage, position GPS au moment du pointage ; si le pointage assisté est utilisé : lecture ponctuelle de la position (environ chaque minute, application ouverte et visible) pour détecter l’arrivée au dépôt ou la sortie, seule l’heure de dernière présence au dépôt étant mémorisée"],
   ["Messagerie, intranet, alertes", "Salariés", "Messages, pièces jointes, convocations, notifications"],
-  ["Amendes", "Conducteurs", "Avis de contravention, véhicule, conducteur désigné"],
-  ["Paie (si souscrit)", "Salariés", "Rémunération, heures, absences, frais, numéro de sécurité sociale, coordonnées bancaires éventuelles, taux de prélèvement à la source"],
+  ["Amendes", "Conducteurs", "Avis de contravention (données relatives à des infractions routières), véhicule, conducteur désigné"],
+  ["Absences et arrêts de travail", "Salariés", "Dates, type d’arrêt, prolongation, photo du volet destiné à l’employeur (jamais le volet médical) ; congés"],
+  ["Paie (si souscrit)", "Salariés", "Rémunération, contrat, heures, primes, absences, frais, acomptes, retenues et saisies sur salaire (saisie, ATD, pension), numéro de sécurité sociale, date de naissance, coordonnées bancaires éventuelles, taux de prélèvement à la source, bulletins et documents de sortie"],
+  ["Registre unique du personnel (si souscrit)", "Salariés", "Identité, date et lieu de naissance, nationalité, titre de travail, qualification, dates d’entrée et de sortie"],
   ["Tournée colis (si souscrit)", "Destinataires des colis du Client, chauffeurs", "Nom, adresse, téléphone, photo du colis déposé (nom réduit aux initiales, téléphone et consignes effacés à 30 jours ; adresses et photos conservées 12 mois pour les contestations) ; dernière position du chauffeur pendant la tournée en cours (effacée à la clôture) et trajet emprunté pendant la tournée en cours, pour l'analyse des trajets (conservé 1 an)"],
   ["Contestations clients (si souscrit)", "Clients du Client, chauffeurs", "Réclamation, référence, adresse, réponse du chauffeur"],
   ["Assistant (si souscrit)", "Utilisateurs", "Questions posées et réponses"],
@@ -28,13 +30,17 @@ const TRAITEMENTS: [string, string, string][] = [
 
 /** Sous-traitants ultérieurs autorisés (annexe 3). */
 const SOUS_TRAITANTS: [string, string, string][] = [
-  ["Supabase Inc.", "Base de données, fichiers, authentification", "Serveurs à Paris (France)"],
-  ["Vercel Inc.", "Hébergement et exécution de l’application", "Exécution à Paris (France) ; société américaine (DPF / clauses types)"],
+  ["Supabase Inc.", "Base de données, fichiers, authentification", "Serveurs à Paris (France) ; société de droit américain : accès d’administration ou de support éventuellement depuis un pays tiers, encadré par les clauses types"],
+  ["Vercel Inc.", "Hébergement et exécution de l’application", "Exécution des fonctions à Paris (France) ; réseau de diffusion du fournisseur (pages, fichiers statiques, adresses IP et requêtes HTTP) pouvant transiter hors de France ; société américaine (DPF / clauses types)"],
   ["Anthropic PBC", "Lecture automatique et assistant — uniquement si le Client active ces modules", "États-Unis (DPF / clauses types) ; pas d’entraînement des modèles"],
   ["Resend Inc.", "Envoi des e-mails de notification", "États-Unis (DPF / clauses types)"],
   ["Services de notification (Apple, Google, Mozilla)", "Acheminement des notifications sur les téléphones", "Variable ; contenu limité au message affiché"],
-  ["Base Adresse Nationale (État français)", "Géolocalisation des adresses en France", "France"],
-  ["OpenStreetMap Foundation (Nominatim)", "Géolocalisation des adresses hors de France — Clients établis hors de France uniquement", "Royaume-Uni (décision d’adéquation)"],
+  ["Base Adresse Nationale (État français)", "Recherche et géolocalisation d’adresses en France (texte de l’adresse saisie)", "France"],
+  ["Komoot GmbH (Photon)", "Recherche d’adresses et d’établissements (texte saisi, position approximative pour classer les résultats)", "Allemagne (Union européenne)"],
+  ["OpenStreetMap Foundation (Nominatim)", "Géolocalisation d’adresses et d’établissements (texte saisi), notamment pour les Clients établis hors de France", "Royaume-Uni (décision d’adéquation)"],
+  ["Service d’itinéraires OSRM (serveur public du projet OSRM)", "Calcul des itinéraires et des indications de navigation : coordonnées des arrêts et du point de départ, sans nom ni identifiant", "Localisation variable, à confirmer ; l’Éditeur peut le remplacer par un serveur d’itinéraires dédié"],
+  ["OpenStreetMap Foundation, OpenFreeMap (fonds de carte)", "Affichage des cartes dans le navigateur de l’Utilisateur (adresse IP, zone affichée)", "Royaume-Uni / variable"],
+  ["Google LLC (Places)", "Aide à la saisie d’adresses (texte saisi) — uniquement si ce service est activé par l’Éditeur", "États-Unis (DPF / clauses types)"],
 ];
 
 export default function DpaPage() {
@@ -52,13 +58,19 @@ export default function DpaPage() {
           L’Éditeur traite les données personnelles décrites en annexe 1, pour la seule fourniture de la solution GODAC, pendant
           la durée du contrat puis jusqu’à la restitution et à la suppression des données prévues à l’article 9.
         </p>
+        <p>
+          Nature des traitements : collecte, enregistrement, organisation, stockage, consultation, mise en forme (documents PDF
+          et Excel), transmission aux sous-traitants ultérieurs de l’annexe 3 et effacement. Finalités, catégories de personnes
+          et de données : annexe 1. Aucune donnée de santé n’est requise : le Client évite de saisir des éléments médicaux dans
+          les champs libres.
+        </p>
       </Article>
 
       <Article n={2} titre="Instructions du Client">
         <p>
           L’Éditeur ne traite les données que sur instruction documentée du Client : le contrat, le paramétrage de la solution
           et l’activation des modules par le Client valent instructions. Si une instruction lui paraît contraire au RGPD,
-          l’Éditeur en informe immédiatement le Client. L’Éditeur n’utilise pas les données pour son propre compte ; il
+          l’Éditeur en informe immédiatement le Client. L’Éditeur n’utilise pas les données pour son propre compte et ne les traite pas au-delà de ces instructions, sauf obligation du droit de l’Union ou français (dont il informe alors le Client, sauf interdiction légale) ; il
           peut produire des statistiques anonymes d’usage et, pour l’assistant, une foire aux questions à partir de questions
           rendues anonymes, sans lien possible avec le Client ou ses salariés.
         </p>
@@ -91,7 +103,8 @@ export default function DpaPage() {
         <p>
           Les données sont hébergées en France. Les transferts éventuels vers un pays tiers (annexe 3) sont encadrés par une
           décision d’adéquation, notamment le cadre de protection des données UE–États-Unis (Data Privacy Framework), ou par
-          les clauses contractuelles types de la Commission européenne.
+          les clauses contractuelles types de la Commission européenne. Le Client autorise ces transferts ; l’Éditeur lui
+          communique sur demande les garanties mises en œuvre.
         </p>
       </Article>
 
@@ -108,7 +121,8 @@ export default function DpaPage() {
           L’Éditeur notifie au Client toute violation de données personnelles le concernant dans un délai maximal de
           quarante-huit (48) heures après en avoir pris connaissance, avec les informations disponibles (nature, catégories
           et nombre approximatif de personnes et de données concernées, conséquences probables, mesures prises), afin de
-          permettre au Client de notifier l’autorité de contrôle dans les 72 heures.
+          permettre au Client de notifier l’autorité de contrôle dans les 72 heures. Le Client reste responsable de cette
+          notification et de l’information des personnes concernées lorsqu’elle est requise.
         </p>
       </Article>
 
@@ -132,7 +146,15 @@ export default function DpaPage() {
       <Article n={11} titre="Obligations du Client">
         <ul className={listeLegale}>
           <li>Disposer d’une base légale pour chaque traitement et informer ses salariés et, le cas échéant, ses propres clients (destinataires de colis).</li>
-          <li>Tenir son registre des traitements et, si nécessaire, consulter ses instances représentatives du personnel (pointage, géolocalisation au pointage).</li>
+          <li>
+            Tenir son registre des traitements, consulter son comité social et économique lorsqu’il existe (pointage,
+            géolocalisation au pointage, pointage assisté, suivi de tournée) et réaliser une analyse d’impact lorsqu’elle est
+            requise.
+          </li>
+          <li>
+            Utiliser la géolocalisation pour la seule finalité déclarée, de façon proportionnée et uniquement pendant le temps de
+            travail : aucun suivi d’un salarié en dehors de ses horaires.
+          </li>
           <li>Ne saisir dans la solution que des données pertinentes et nécessaires.</li>
           <li>Choisir l’activation des modules d’intelligence artificielle en connaissance de cause.</li>
         </ul>
@@ -172,7 +194,8 @@ export default function DpaPage() {
         <li>Droits par rôle : un chauffeur ne voit que ses propres données ; documents sensibles réservés à l’encadrement.</li>
         <li>Codes PIN stockés sous forme chiffrée ; connexion sans mot de passe possible (passkeys) ; coupure immédiate d’un compte désactivé.</li>
         <li>Fichiers sensibles (photos de livraison, réclamations) dans des espaces privés, lus uniquement par liens temporaires.</li>
-        <li>Purge automatique des données à durée limitée (positions GPS, tournées colis, conversations de l’assistant).</li>
+        <li>Purge automatique des données à durée limitée (positions GPS, tournées colis, conversations de l’assistant, amendes clôturées, pointages anciens).</li>
+        <li>Journal d’audit des actions sensibles (exports, changements de droits, bulletins validés), lisible par la direction du Client, conservé trois ans.</li>
         <li>Sauvegardes de la base de données ; accès d’administration limité à l’Éditeur et protégé.</li>
         <li>Contrôles automatiques du code (typage, tests, compilation) avant toute mise en production.</li>
       </ul>
@@ -199,7 +222,8 @@ export default function DpaPage() {
         </table>
       </div>
       <p>
-        Contact pour toute question relative aux données : <a href={`mailto:${EDITEUR.email}`} className={lien}>{EDITEUR.email}</a>.
+        Stripe (paiement de l’abonnement) traite les données de facturation du Client ; l’Éditeur en est responsable de traitement
+        (ce n’est pas un traitement réalisé pour le compte du Client) : il est hors du périmètre de cet accord. Contact pour toute question relative aux données : <a href={`mailto:${EDITEUR.email}`} className={lien}>{EDITEUR.email}</a>.
       </p>
     </LegalPageLayout>
   );

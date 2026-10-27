@@ -3,6 +3,7 @@ import path from "node:path";
 import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer, type Styles as ReactPdfStyles } from "@react-pdf/renderer";
 import type { Bulletin, LigneBulletin, Section } from "@/lib/paie/types";
 import { telechargerImageSure } from "@/lib/http/fetch-image-sure";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 
 // Même police embarquée que lib/payslips/generate-pdf.tsx (voir son
 // commentaire : les polices standard de pdfkit ne passent pas sur Vercel).
@@ -441,7 +442,7 @@ function BulletinDoc({ d, logo }: { d: BulletinPdfData; logo: LogoPdf | null }) 
             </Text>
             <Text style={s.mentionDouce}>
               Cotisations sociales : www.urssaf.fr · Retraite : www.info-retraite.fr. Bulletin calculé à partir des paramètres légaux en vigueur et
-              des réglages de l&apos;entreprise ; l&apos;employeur reste responsable de son exactitude.
+              des réglages de l&apos;entreprise ; l&apos;employeur reste responsable de son exactitude. {MENTION_INDICATIVE}
             </Text>
           </View>
         </View>

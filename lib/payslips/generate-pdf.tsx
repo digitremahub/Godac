@@ -1,6 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { Document, Page, Text, View, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 
 // react-pdf's own "standard" fonts (Helvetica, etc.) are loaded by
 // pdfkit from node_modules/pdfkit/js/standard-fonts/* at render time,
@@ -259,7 +260,7 @@ function PayslipDocument({ data }: { data: PayslipPdfData }) {
           nominative (DSN). Les heures travaillées, congés pris et cumuls annuels affichés sont calculés à partir des
           données GODAC (pointeuse, congés, bulletins déjà générés) et n&apos;intègrent ni heures supplémentaires
           majorées, ni régularisations. À faire valider par votre expert-comptable ou votre logiciel de paie avant
-          toute remise officielle au salarié.
+          toute remise officielle au salarié. {MENTION_INDICATIVE}
         </Text>
       </Page>
     </Document>

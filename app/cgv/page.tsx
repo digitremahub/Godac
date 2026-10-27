@@ -65,25 +65,34 @@ export default function CgvPage() {
       <Article n={3} titre="Souscription">
         <p>
           Le contrat est conclu à la signature du bon de commande par le Client ou à la validation de la souscription en
-          ligne. Le Client déclare agir à des fins professionnelles : aucun droit de rétractation ne s’applique.
+          ligne. Le Client déclare agir à des fins entrant dans le champ de son activité professionnelle principale : aucun droit de
+          rétractation ne s’applique.
         </p>
         <p>
           Les devis et bons de commande émis par l’Éditeur sont valables trente (30) jours. L’offre « Fondateur », lorsqu’elle
           est proposée, est réservée aux dix premiers clients et figure sur le bon de commande.
         </p>
+        <p>
+          <strong>Essai gratuit.</strong> L’Éditeur peut proposer un essai gratuit sur invitation (essai « GO Navigation » :
+          trente (30) jours, limité à la Tournée colis et à la navigation chauffeur, avec des plafonds mensuels d’utilisation).
+          L’essai n’est pas facturé, n’engage à aucune souscription et ne se transforme jamais en abonnement sans bon de
+          commande ou souscription en ligne du Client. À son terme, l’accès est fermé sauf souscription ; les données de l’essai
+          sont alors traitées comme celles d’un contrat arrivé à son terme (article 11). L’essai est fourni en l’état, sans
+          engagement de niveau de service.
+        </p>
       </Article>
 
       <Article n={4} titre="Description du service">
         <p>
-          L’Éditeur met la Solution à disposition du Client en mode SaaS (logiciel en ligne), hébergée en France. Le
+          L’Éditeur met la Solution à disposition du Client en mode SaaS (logiciel en ligne), dont les données sont stockées sur des serveurs situés en France (région de Paris). Le
           périmètre fonctionnel dépend de la Formule et des Modules souscrits, décrits sur la{" "}
           <Link href="/modules" className={lien}>page Modules & tarifs</Link> à la date de la commande.
         </p>
         <p>
           L’application mobile GODAC Livreur est mise à la disposition des chauffeurs du Client lorsque le module « Tournée
           colis » est souscrit ; elle est gratuite pour le chauffeur et facturée au Client par palier d’utilisateurs (chauffeurs
-          actifs), selon la grille publiée sur la page Modules & tarifs. Le palier est recalculé chaque mois et s’applique à
-          l’échéance suivante, sans prorata.
+          actifs), selon la grille publiée sur la page Modules & tarifs. Le palier est mis à jour automatiquement (chaque nuit) selon le
+          nombre de chauffeurs actifs et validés, et s’applique à la prochaine échéance de facturation, sans prorata.
         </p>
         <p>
           La Solution évolue : l’Éditeur peut ajouter, améliorer ou remplacer des fonctionnalités, sans réduire de manière
@@ -108,15 +117,26 @@ export default function CgvPage() {
       <Article n={6} titre="Durée">
         <p>
           L’abonnement est souscrit pour une période initiale de douze (12) mois à compter de l’ouverture de l’accès, sauf
-          durée différente prévue au bon de commande. À son terme, il se renouvelle tacitement par périodes d’un (1) mois,
-          résiliables à tout moment avec un préavis d’un (1) mois, par écrit (e-mail à {EDITEUR.email} ou depuis l’espace
-          Facturation).
+          durée différente prévue au bon de commande. À son terme, il se renouvelle tacitement par périodes d’un (1) mois.
+        </p>
+        <p>
+          Chaque partie peut mettre fin à l’abonnement par écrit (e-mail à {EDITEUR.email} ou depuis l’espace Facturation) avec
+          un préavis d’un (1) mois ; la résiliation prend effet à la fin du mois de préavis ou, si elle est postérieure, à la
+          fin de la période initiale. Pendant la période initiale de douze mois, l’abonnement est ferme et ne peut être
+          résilié avant son terme que dans les cas prévus au contrat (manquement, article 17 ; force majeure, article 16 ;
+          révision des prix, article 7 ; modification des CGV, article 20 ; nouveau sous-traitant ultérieur refusé, accord de
+          sous-traitance).
         </p>
       </Article>
 
       <Article n={7} titre="Prix, facturation et paiement">
         <ul className={listeLegale}>
           <li>Les prix sont exprimés en euros hors taxes ; la TVA au taux en vigueur s’y ajoute.</li>
+          <li>
+            Client assujetti établi hors de France : la TVA française n’est pas facturée lorsque la prestation est imposable
+            dans son pays selon les règles de territorialité de la TVA (autoliquidation par le Client) ; le Client indique son
+            numéro de TVA sur le bon de commande.
+          </li>
           <li>
             L’abonnement (Formule + Modules optionnels) est facturé mensuellement, terme à échoir, et payable à réception par
             prélèvement SEPA ou carte bancaire.
@@ -152,14 +172,18 @@ export default function CgvPage() {
           légal, et donne lieu à une indemnité forfaitaire pour frais de recouvrement de quarante (40) euros (articles
           L. 441-10 et D. 441-5 du Code de commerce). Après une mise en demeure restée sans effet pendant quinze (15) jours,
           l’Éditeur peut suspendre l’accès à la Solution jusqu’au paiement, sans que cette suspension n’interrompe la
-          facturation. Les Données du Client sont conservées pendant la suspension.
+          facturation. Les Données du Client sont conservées pendant la suspension. Aucun escompte n’est accordé pour paiement anticipé.
         </p>
       </Article>
 
       <Article n={9} titre="Obligations de l’Éditeur">
         <ul className={listeLegale}>
           <li>Fournir la Solution conformément à sa description, avec diligence et selon les règles de l’art (obligation de moyens).</li>
-          <li>Héberger les Données du Client en France et en assurer la sécurité et la sauvegarde.</li>
+          <li>
+            Stocker les Données du Client sur des serveurs situés en France (région de Paris), auprès des prestataires
+            listés dans l’accord de sous-traitance, et en assurer la sécurité et la sauvegarde dans les conditions de
+            l’engagement de service.
+          </li>
           <li>
             Assurer le support et la maintenance dans les conditions de l’
             <Link href="/sla" className={lien}>engagement de niveau de service</Link>.
@@ -172,12 +196,17 @@ export default function CgvPage() {
         <ul className={listeLegale}>
           <li>Gérer ses Utilisateurs, leurs droits et la confidentialité de leurs identifiants, et désactiver sans délai les comptes des personnes qui quittent l’entreprise.</li>
           <li>Utiliser la Solution conformément à sa destination, aux CGU et à la réglementation.</li>
-          <li>Informer ses salariés des traitements de données réalisés via la Solution (pointage, géolocalisation au pointage, photos…).</li>
           <li>
-            Vérifier les résultats produits par la Solution avant toute décision : la Solution est un outil d’aide. Le Client
-            demeure seul responsable, en qualité d’employeur et de transporteur, de ses bulletins de paie et déclarations
-            sociales, du respect des temps de conduite et de repos, de la désignation des conducteurs, du traitement des
-            réclamations de ses clients et de ses obligations fiscales.
+            Informer individuellement ses salariés des traitements de données réalisés via la Solution (pointage, position au
+            pointage, pointage assisté, suivi d’une tournée colis en cours, photos…), consulter son comité social et économique
+            lorsqu’il existe, tenir son registre des traitements et, si nécessaire, réaliser une analyse d’impact. Le Client
+            n’utilise pas ces données pour surveiller un salarié en dehors de son temps de travail.
+          </li>
+          <li>
+            Vérifier les résultats produits par la Solution avant toute décision (article 13). Le Client demeure seul
+            responsable, en qualité d’employeur et de transporteur, de ses bulletins de paie et déclarations sociales, du
+            respect des temps de conduite et de repos, de la désignation des conducteurs, du traitement des réclamations de
+            ses clients et de ses obligations fiscales.
           </li>
         </ul>
       </Article>
@@ -190,8 +219,13 @@ export default function CgvPage() {
         </p>
         <p>
           À la fin du contrat, quelle qu’en soit la cause, le Client peut exporter ses données depuis la Solution ou demander
-          à l’Éditeur, dans les trente (30) jours, un export dans un format standard (CSV). Les Données du Client sont ensuite
-          supprimées dans un délai de trois (3) mois, sauf obligation légale de conservation.
+          à l’Éditeur, dans les trente (30) jours suivant la fin du contrat, un export dans un format standard (CSV). Les
+          Données du Client sont ensuite supprimées dans un délai de trois (3) mois, sauf obligation légale de conservation.
+        </p>
+        <p>
+          GODAC n’est pas un service d’archivage légal : le Client exporte et archive lui-même, avant cette suppression, les
+          documents qu’il doit conserver (notamment les bulletins de paie, dont la durée légale de conservation par
+          l’employeur est de cinquante ans, ses factures et ses justificatifs fiscaux).
         </p>
       </Article>
 
@@ -203,33 +237,71 @@ export default function CgvPage() {
         </p>
       </Article>
 
-      <Article n={13} titre="Propriété intellectuelle">
+      <Article n={13} titre="Outil d’organisation : paramètres légaux, calculs et déclarations">
+        <p>
+          GODAC est un outil d’organisation et de gain de temps. Il prépare, calcule et met en forme, à partir des données et
+          des paramètres de l’entreprise, des éléments tels que les bulletins de paie, les heures, les congés et les heures
+          supplémentaires, la TICPE (barème, éligibilité, récapitulatifs et documents de déclaration, notamment 3310-TIC /
+          douane) et les consommations de carburant.
+        </p>
+        <ul className={listeLegale}>
+          <li>
+            L’Éditeur fournit des paramètres par défaut (barèmes, taux, seuils) qu’il s’efforce de tenir à jour. Ils sont
+            donnés à titre indicatif et ne constituent ni un conseil juridique, fiscal, comptable ou social, ni une prestation
+            d’expertise comptable.
+          </li>
+          <li>
+            Le Client reste seul responsable de vérifier, avant tout usage, les paramètres légaux et conventionnels applicables
+            à son entreprise (convention collective, régime, taux, éligibilité et barème TICPE…), les calculs et les
+            résultats, ainsi que de l’exactitude de ses bulletins de paie, de ses déclarations sociales et fiscales et des
+            remboursements qu’il demande.
+          </li>
+          <li>
+            Le Client fait vérifier ces éléments par son expert-comptable ou son responsable paie avant toute déclaration ou
+            remise de bulletin. Les écrans et documents concernés portent la mention « Document établi à titre indicatif par
+            GODAC à partir des paramètres de l’entreprise. À faire vérifier par votre expert-comptable / responsable paie
+            avant tout usage déclaratif. » ; la direction ou le comptable peut en accuser lecture dans la Solution
+            (l’accusé est daté et tracé au journal d’audit).
+          </li>
+          <li>
+            L’Éditeur s’efforce de corriger toute erreur de calcul ou de paramètre par défaut qui lui est signalée, dans les
+            délais de l’engagement de service. Ces stipulations ne limitent pas sa responsabilité au-delà de l’article 15 et ne
+            s’appliquent pas en cas de faute lourde ou dolosive.
+          </li>
+        </ul>
+      </Article>
+
+      <Article n={14} titre="Propriété intellectuelle">
         <p>
           La Solution, la marque GODAC, les logiciels, bases et contenus fournis par l’Éditeur restent sa propriété. L’Éditeur
           concède au Client, pour la durée du contrat et pour ses besoins internes, un droit d’utilisation personnel, non
           exclusif et non cessible de la Solution. Toute reproduction, décompilation ou mise à disposition de tiers est
-          interdite.
+          interdite. Le Client autorise l’Éditeur à héberger et traiter les Données du Client pour la seule fourniture de la Solution.
         </p>
       </Article>
 
-      <Article n={14} titre="Limitation de responsabilité">
+      <Article n={15} titre="Limitation de responsabilité">
         <p>
           Chaque partie répond des dommages directs causés par ses manquements prouvés. L’Éditeur ne répond pas des dommages
-          indirects (perte de chiffre d’affaires, de clientèle ou de données imputable au Client, amendes, pénalités ou
-          redressements résultant des décisions du Client). Sauf faute lourde ou dolosive, la responsabilité totale de
-          l’Éditeur est limitée aux sommes payées par le Client au titre des douze (12) mois précédant le fait générateur.
+          indirects (perte de chiffre d’affaires, de clientèle ou de données imputable au Client), ni des amendes, pénalités,
+          majorations ou redressements résultant des données ou paramètres saisis ou validés par le Client, ou de
+          l’absence des vérifications prévues à l’article 13. Sauf faute lourde ou dolosive, et sauf dommage corporel, la
+          responsabilité totale de l’Éditeur au titre du contrat est limitée aux sommes hors taxes payées par le Client au
+          titre des douze (12) mois précédant le fait générateur (ou, si le contrat a moins de douze mois, aux sommes dues
+          pour la première année). Cette limite ne s’applique pas à l’obligation de paiement du Client.
         </p>
       </Article>
 
-      <Article n={15} titre="Force majeure">
+      <Article n={16} titre="Force majeure">
         <p>
           Aucune partie n’est responsable d’un manquement dû à un cas de force majeure au sens de l’article 1218 du Code
-          civil (notamment panne générale des réseaux ou de l’hébergeur, catastrophe, décision administrative). Si
+          civil (notamment panne générale des réseaux ou défaillance d’un hébergeur lorsqu’elle présente les caractères de la force majeure,
+          catastrophe, décision administrative). Si
           l’empêchement dure plus de trente (30) jours, chaque partie peut résilier le contrat sans indemnité.
         </p>
       </Article>
 
-      <Article n={16} titre="Résiliation pour manquement">
+      <Article n={17} titre="Résiliation pour manquement">
         <p>
           En cas de manquement grave d’une partie, non réparé trente (30) jours après une mise en demeure par lettre
           recommandée ou e-mail avec accusé de réception, l’autre partie peut résilier le contrat de plein droit, sans
@@ -237,28 +309,28 @@ export default function CgvPage() {
         </p>
       </Article>
 
-      <Article n={17} titre="Confidentialité">
+      <Article n={18} titre="Confidentialité">
         <p>
           Chaque partie garde confidentielles les informations de l’autre dont elle a connaissance dans le cadre du contrat,
           pendant sa durée et trois (3) ans après son terme.
         </p>
       </Article>
 
-      <Article n={18} titre="Référence commerciale">
+      <Article n={19} titre="Référence commerciale">
         <p>
           Sauf opposition écrite du Client, l’Éditeur peut citer son nom et son logo comme référence client, sans divulguer
           aucune donnée de son activité.
         </p>
       </Article>
 
-      <Article n={19} titre="Modification des CGV">
+      <Article n={20} titre="Modification des CGV">
         <p>
           L’Éditeur peut faire évoluer les présentes CGV ; la nouvelle version est notifiée au Client au moins trente (30)
           jours avant son entrée en vigueur. En cas de désaccord, le Client peut résilier sans frais avant cette date.
         </p>
       </Article>
 
-      <Article n={20} titre="Droit applicable et litiges">
+      <Article n={21} titre="Droit applicable et litiges">
         <p>
           Le contrat est soumis au droit français. Les parties recherchent d’abord une solution amiable. À défaut, tout
           litige relève de la compétence exclusive de {juridiction()}, y compris en cas de référé ou de pluralité de

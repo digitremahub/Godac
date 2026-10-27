@@ -7,6 +7,7 @@ import type { IdentitesBulletin } from "@/lib/paie/rendu-bulletin";
 import { RUBRIQUES, libelleStatut, type LigneJournal, type Part, type TotauxJournal } from "@/lib/paie/journal";
 import { champsManquants, libelleContrat, partiesRegistre, SEXES, titreTravail, type EntreeRegistre } from "@/lib/registre/personnel";
 import { dateFr } from "@/lib/paie/csv";
+import { MENTION_INDICATIVE } from "@/lib/legal/mention-indicative";
 
 const { MARINE, PAPER, SURFACE, TRAIT, ZEBRE, TEXTE_DOUX } = PALETTE_PDF;
 const ORANGE = "#B45309";
@@ -199,7 +200,7 @@ function JournalDoc({ d, logo }: { d: JournalPdfData; logo: LogoPdf | null }) {
           {d.totaux.nonValides > 0
             ? ` ${d.totaux.nonValides} bulletin${d.totaux.nonValides > 1 ? "s ne sont" : " n'est"} pas encore validé${d.totaux.nonValides > 1 ? "s" : ""} par la direction : ce journal est provisoire.`
             : ""}{" "}
-          Document de contrôle : la déclaration sociale nominative (DSN) est établie et déposée par votre expert-comptable.
+          Document de contrôle : la déclaration sociale nominative (DSN) est établie et déposée par votre expert-comptable. {MENTION_INDICATIVE}
         </Text>
         <PiedDePage s={s} texte={`Journal de paie · ${d.libelleMois} · Édité le ${d.dateEdition}`} />
       </Page>

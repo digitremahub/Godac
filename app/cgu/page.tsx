@@ -22,7 +22,8 @@ export default function CguPage() {
         <p>
           GODAC est un logiciel de gestion pour les entreprises de transport routier : carburant, flotte, planning et
           tournées, pointage, congés, messagerie, tournées colis et, selon l’abonnement de l’Entreprise, paie, amendes et
-          contestations clients.
+          contestations clients. C’est un outil d’organisation et de gain de temps, qui ne remplace ni le jugement de
+          l’Utilisateur ni les vérifications de l’Entreprise (article 6).
         </p>
       </Article>
 
@@ -50,8 +51,11 @@ export default function CguPage() {
           <Link href="/confidentialite" className={lien}>politique de confidentialité</Link>. La position GPS n’est relevée
           qu’au moment du pointage et, pour les chauffeurs, pendant une tournée colis en cours (suivi de la livraison par
           l’Entreprise : dernière position effacée à la clôture, trajet emprunté conservé 1 an pour l’analyse des trajets,
-          masquable pendant une pause). En dehors de ces
-          moments, GODAC ne suit jamais les déplacements.
+          masquable pendant une pause). Si l’Entreprise utilise le pointage assisté, la position est aussi lue environ
+          toutes les minutes, application ouverte et visible (4 heures au plus), pour détecter l’arrivée au dépôt ou la
+          sortie : seule l’heure de la dernière présence au dépôt est mémorisée, pas le trajet. En dehors de ces
+          moments, GODAC ne suit jamais les déplacements, et l’Entreprise ne doit pas utiliser ces données pour surveiller
+          l’Utilisateur hors de son temps de travail.
         </p>
       </Article>
 
@@ -73,7 +77,18 @@ export default function CguPage() {
         </p>
       </Article>
 
-      <Article n={6} titre="Disponibilité">
+      <Article n={6} titre="Résultats et vérification">
+        <p>
+          Les calculs et documents produits par GODAC (bulletins de paie, heures, congés, TICPE, consommations de carburant)
+          sont établis à titre indicatif à partir des paramètres de l’Entreprise, qui reste responsable de les vérifier avec
+          son expert-comptable ou son responsable paie avant tout usage déclaratif. Un Utilisateur qui constate une
+          anomalie la signale à l’Entreprise ou à l’Éditeur ; GODAC fournit des paramètres par défaut sans valeur de conseil
+          juridique, fiscal, comptable ou social. Voir l’article 13 des{" "}
+          <Link href="/cgv#article-13" className={lien}>conditions générales de vente</Link>.
+        </p>
+      </Article>
+
+      <Article n={7} titre="Disponibilité">
         <p>
           L’Éditeur s’efforce de rendre le service accessible en permanence, sous réserve des opérations de maintenance et
           des aléas des réseaux, dans les conditions de l’<Link href="/sla" className={lien}>engagement de service</Link>{" "}
@@ -81,14 +96,14 @@ export default function CguPage() {
         </p>
       </Article>
 
-      <Article n={7} titre="Propriété intellectuelle">
+      <Article n={8} titre="Propriété intellectuelle">
         <p>
           L’application, la marque GODAC et leurs contenus sont protégés. L’Utilisateur bénéficie d’un droit d’usage limité à
           son activité pour l’Entreprise, pendant la durée de son accès.
         </p>
       </Article>
 
-      <Article n={8} titre="Contact et droit applicable">
+      <Article n={9} titre="Contact et droit applicable">
         <p>
           Pour toute question : <a href={`mailto:${EDITEUR.email}`} className={lien}>{EDITEUR.email}</a>, ou en priorité
           l’Entreprise. Les présentes CGU sont soumises au droit français.
