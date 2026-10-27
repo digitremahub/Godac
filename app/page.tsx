@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
-import { ImageCarousel } from "@/components/marketing/ImageCarousel";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import { HeroScene3D } from "@/components/marketing/HeroScene3D";
 import { AnimationGodac } from "@/components/marketing/AnimationGodac";
@@ -192,14 +191,6 @@ const ET_AUSSI = [
   },
 ];
 
-const HOME_SLIDES = [
-  { src: "/home/scene-ravitaillement.png", alt: "Un chauffeur scanne son ticket de ravitaillement, le PMP est recalculé automatiquement" },
-  { src: "/home/scene-carburant.png", alt: "Tableau de bord carburant avec suivi des dépenses et du prix moyen pondéré" },
-  { src: "/home/scene-flotte.png", alt: "Tableau de bord de suivi de la flotte et des entretiens à prévoir" },
-  { src: "/home/scene-pilotage.png", alt: "Tableau de bord GODAC avec véhicules, chauffeurs et alertes en un coup d'œil" },
-  { src: "/home/scene-gestion.png", alt: "Gestion centralisée des demandes, entretiens et documents de la flotte" },
-];
-
 const REPLACES = ["Le tableur TICPE", "Les tickets papier", "Les groupes WhatsApp", "Les relances par téléphone"];
 
 /** Tournée colis (avant GO Navigation, qui ferme la page). */
@@ -299,15 +290,12 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <HeroScene3D />
           </section>
 
-          {/* ── Le nom, en animation : G·O·D·A·C ── */}
+          {/* ── Le nom, en animation : G·O·D·A·C (lettres du logo, sans mots) ── */}
           <section aria-labelledby="titre-godac" className="relative border-t border-white/10">
-            <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">
-              <div className="mx-auto mb-10 max-w-2xl text-center">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">Le nom GODAC</p>
-                <h2 id="titre-godac" className="mt-3 text-[28px] leading-tight sm:text-4xl">
-                  Ce que veut dire GODAC.
-                </h2>
-              </div>
+            <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:py-28">
+              <h2 id="titre-godac" className="sr-only">
+                GODAC : Gestion et Optimisation Des Actifs et Charges
+              </h2>
               <AnimationGodac />
             </div>
           </section>
@@ -503,18 +491,6 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             ))}
           </ul>
         </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section id="en-images" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-6 lg:py-28">
-        <div className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="kicker !text-teal-ink">En images</p>
-          <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">GODAC, en un coup d&apos;œil</h2>
-          <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-            Pleins, cuves, flotte et pilotage&nbsp;: quelques écrans de l&apos;application.
-          </p>
-        </div>
-        <ImageCarousel slides={HOME_SLIDES} />
       </section>
 
       {/* ── Demo ── */}

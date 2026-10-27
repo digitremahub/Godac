@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Image from "next/image";
 import { IconCoins } from "@/components/layout/icons";
 import { Pave3D } from "@/components/marketing/Pave3D";
 import { useScene3D } from "@/components/marketing/useScene3D";
@@ -22,8 +21,8 @@ const INCLINAISON_MAX = 5;
 
 /**
  * Scène d'accueil : une tournée qui se dessine sur une carte en perspective,
- * un camion et des colis en volumes simples, l'écran carburant en
- * profondeur. Purement décorative (aria-hidden) ; le titre et les appels à
+ * un camion et des colis en volumes simples, la carte d'un plein éligible
+ * en avant. Purement décorative (aria-hidden) ; le titre et les appels à
  * l'action restent dans la page. Rendue statique par défaut, animée seulement
  * si useScene3D l'autorise.
  */
@@ -99,17 +98,6 @@ export function HeroScene3D() {
             <Pave3D x={`${(ARRETS[4]!.x / 400) * 100 - 2}%`} y={`${(ARRETS[4]!.y / 300) * 100 - 15}%`} l={3.4} p={3.4} h={3.4} z={1} teinte="teal" />
             <Pave3D x={`${(ARRETS[5]!.x / 400) * 100 - 3}%`} y={`${(ARRETS[5]!.y / 300) * 100 - 20}%`} l={5} p={5} h={5} z={2} teinte="orange" />
           </div>
-        </div>
-
-        <div className="vitrine-ecran">
-          <Image
-            src="/home/scene-carburant.png"
-            alt=""
-            fill
-            priority
-            sizes="(min-width: 1024px) 320px, 60vw"
-            className="object-cover object-center"
-          />
         </div>
 
         <div className="vitrine-puce hidden items-center gap-3 rounded-2xl bg-surface p-3 pr-4 text-navy shadow-pop sm:flex" style={{ fontSize: "1rem" }}>

@@ -1,9 +1,11 @@
 /**
  * Le nom GODAC déployé en toutes lettres. Seul endroit à modifier pour
- * changer la signification affichée sur le site (animation de l'accueil,
- * pied de page, README). Phrase officielle :
+ * changer la signification du nom (texte masqué visuellement de l'animation
+ * de l'accueil, étiquettes d'accessibilité du pied de page, README). Phrase officielle :
  * « Gestion et Optimisation Des Actifs et Charges ».
  *
+ * Les mots ne sont plus affichés à l'écran (l'animation montre seulement les
+ * lettres du logo) ; ils servent au texte accessible et au référencement.
  * `liaison` est le petit mot qui précède le mot de la lettre dans la phrase
  * (« Gestion ET Optimisation »). Pistes de remplacement possibles :
  * « … Des Activités de Conduite », « … Des Activités Connectées ».

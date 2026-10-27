@@ -403,9 +403,9 @@
 .vitrine-plan {
   position: absolute;
   left: 6%;
-  top: 30%;
+  top: 14%;
   width: 88%;
-  height: 64%;
+  height: 76%;
   transform-style: preserve-3d;
   transform: rotateX(58deg) rotateZ(-24deg);
   border-radius: 1.2em;
@@ -418,17 +418,6 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-}
-.vitrine-ecran {
-  position: absolute;
-  right: 4%;
-  top: 5%;
-  width: 50%;
-  aspect-ratio: 16 / 10;
-  transform: translateZ(4em) rotateY(-8deg);
-  border-radius: 1em;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18), 0 2em 3em -1em rgba(0, 0, 0, 0.55);
 }
 .vitrine-puce {
   position: absolute;
@@ -558,22 +547,26 @@
 }
 
 /* ── Vitrine : animation GODAC ─────────────────────────────────────────
-   Les lettres s'assemblent en profondeur, les mots se déploient un à un le
-   long du trait de la tournée. Couleurs de marque en dur (GO teal, DAC orange)
-   pour rester identiques dans les cinq thèmes. Par défaut (serveur, mouvement
+   Les lettres du logo (tracés vectoriels, lib/vitrine/glyphes-godac.ts)
+   s'assemblent en profondeur, puis le trait de la tournée les relie par des
+   points. Aucun mot. Couleurs de marque en dur (GO teal, DAC orange) pour
+   rester identiques dans les cinq thèmes. --u = taille d'une unité du repère
+   du logo (la hauteur d'une lettre vaut 546 u). Par défaut (serveur, mouvement
    réduit, appareil modeste) tout est affiché, immobile ; le composant pose
    data-etat="attente" puis "joue", et data-anime="oui" tant qu'il est à l'écran. */
 .godac-lettre {
   display: block;
-  font-family: var(--font-heading), sans-serif;
-  font-weight: 800;
-  line-height: 1;
+  flex: none;
+  height: calc(546 * var(--u));
+  width: calc(var(--w) * var(--u));
   --teinte: #1be4c1;
   --ombre: #0b7f6d;
   color: var(--teinte);
-  text-shadow:
-    0 1px 0 var(--ombre), 0 2px 0 var(--ombre), 0 3px 0 var(--ombre), 0 4px 0 var(--ombre),
-    0 5px 0 var(--ombre), 0 6px 0 var(--ombre), 0 14px 22px rgba(0, 0, 0, 0.45);
+  overflow: visible;
+  /* Extrusion : trois ombres pleines cumulées, puis l'ombre portée. */
+  filter:
+    drop-shadow(0 var(--pas) 0 var(--ombre)) drop-shadow(0 var(--pas) 0 var(--ombre)) drop-shadow(0 var(--pas) 0 var(--ombre))
+    drop-shadow(0 calc(var(--pas) * 2.5) calc(var(--pas) * 3.5) rgba(0, 0, 0, 0.45));
 }
 .godac-lettre--orange {
   --teinte: #ff6b35;
@@ -581,35 +574,29 @@
 }
 
 .godac-scene {
+  --u: min(calc((100vw - 2.5rem) / 3320), 0.33px);
+  --pas: calc(var(--u) * 6.5);
   perspective: 1100px;
   perspective-origin: 50% 20%;
 }
-.godac-liste {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  max-width: 22rem;
-  margin: 0 auto;
-  padding: 0;
-  list-style: none;
+.godac-rangee {
+  display: flex;
+  justify-content: center;
+  padding-bottom: calc(var(--pas) * 3);
   transform-style: preserve-3d;
 }
 .godac-etape {
   position: relative;
-  display: grid;
-  grid-template-columns: 4.25rem 1.75rem minmax(0, 1fr);
-  grid-template-rows: minmax(4.5rem, auto);
-  column-gap: 0.75rem;
-  align-items: center;
+  flex: none;
+  width: calc(var(--w) * var(--u));
+  margin-left: calc(var(--ecart) * var(--u));
   transform-style: preserve-3d;
-}
-.godac-etape .godac-lettre {
-  font-size: 3.5rem;
-  text-align: center;
 }
 .godac-voie {
   position: relative;
-  align-self: stretch;
-  width: 100%;
+  display: block;
+  height: 1.75rem;
+  margin-top: calc(var(--pas) * 3);
 }
 .godac-noeud {
   position: absolute;
@@ -635,26 +622,13 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 3px;
-  height: 100%;
-  margin-left: -1.5px;
+  width: calc(var(--suite) * var(--u));
+  height: 3px;
+  margin-top: -1.5px;
   border-radius: 2px;
-  background: linear-gradient(#1be4c1, #5eeed6);
+  background: linear-gradient(90deg, #1be4c1, #5eeed6);
   box-shadow: 0 0 10px rgba(27, 228, 193, 0.7);
-  transform-origin: top;
-}
-.godac-mot {
-  font-family: var(--font-heading), sans-serif;
-  font-size: 1.375rem;
-  font-weight: 700;
-  line-height: 1.15;
-  color: #f0f4ff;
-}
-.godac-et {
-  font-family: var(--font-body), sans-serif;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #1be4c1;
+  transform-origin: left;
 }
 .godac-rejouer {
   display: inline-flex;
@@ -677,54 +651,24 @@
   outline-offset: 2px;
 }
 
-@media (min-width: 640px) {
-  .godac-liste {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    max-width: none;
-  }
-  .godac-etape {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1.5rem auto;
-    row-gap: 0.5rem;
-    justify-items: center;
-    text-align: center;
-    padding: 0 0.25rem;
-  }
-  .godac-etape .godac-lettre {
-    font-size: clamp(4rem, 9.5vw, 8rem);
-    padding-bottom: 0.75rem;
-  }
-  .godac-trait {
-    left: 50%;
-    top: 50%;
-    width: 100%;
-    height: 3px;
-    margin: -1.5px 0 0;
-    background: linear-gradient(90deg, #1be4c1, #5eeed6);
-    transform-origin: left;
-  }
-  .godac-mot {
-    font-size: clamp(1.05rem, 1.7vw, 1.4rem);
-  }
-}
-
 /* Logo compact (pied de page) */
 .godac-compact {
+  --u: 0.06px;
+  --pas: max(1px, calc(var(--u) * 6.5));
   display: inline-flex;
-  flex-direction: column;
-  gap: 0.5rem;
   perspective: 600px;
 }
 .godac-compact-lettres {
   position: relative;
   display: flex;
-  gap: 0.35rem;
-  padding-bottom: 0.6rem;
+  padding-bottom: 0.7rem;
   transform-style: preserve-3d;
 }
 .godac-compact-lettres .godac-lettre {
-  font-size: 2rem;
-  text-shadow: 0 1px 0 var(--ombre), 0 2px 0 var(--ombre), 0 3px 0 var(--ombre), 0 8px 12px rgba(0, 0, 0, 0.4);
+  margin-left: calc(var(--ecart) * var(--u));
+  filter:
+    drop-shadow(0 var(--pas) 0 var(--ombre)) drop-shadow(0 var(--pas) 0 var(--ombre))
+    drop-shadow(0 calc(var(--pas) * 3) calc(var(--pas) * 3) rgba(0, 0, 0, 0.4));
 }
 .godac-compact-trait {
   position: absolute;
@@ -737,10 +681,6 @@
   box-shadow: 0 0 10px rgba(27, 228, 193, 0.55);
   transform-origin: left;
 }
-.godac-compact-phrase {
-  font-size: 0.875rem;
-  color: rgba(240, 244, 255, 0.72);
-}
 
 /* Départ de chaque lettre : décalée en profondeur, de côté et pivotée. */
 .godac-etape:nth-child(1), .godac-compact-lettres .godac-lettre:nth-child(1) { --ox: -90px; --oy: 30px; --ry: -70deg; }
@@ -750,7 +690,7 @@
 .godac-etape:nth-child(5), .godac-compact-lettres .godac-lettre:nth-child(5) { --ox: -60px; --oy: -30px; --ry: -65deg; }
 
 /* En attente d'entrer à l'écran : tout est prêt, rien n'est visible. */
-:is(.godac-scene, .godac-compact)[data-etat="attente"] :is(.godac-lettre, .godac-mot, .godac-noeud, .godac-trait, .godac-compact-trait) {
+:is(.godac-scene, .godac-compact)[data-etat="attente"] :is(.godac-lettre, .godac-noeud, .godac-trait, .godac-compact-trait) {
   opacity: 0;
 }
 
@@ -758,42 +698,25 @@
   :is(.godac-scene, .godac-compact)[data-etat="joue"] .godac-lettre {
     animation: godac-assemble 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--dl, 0ms) both;
   }
-  .godac-scene[data-etat="joue"] .godac-mot {
-    animation: godac-mot 0.6s ease-out var(--dm, 0ms) both;
-  }
   .godac-scene[data-etat="joue"] .godac-noeud {
-    animation: godac-noeud 0.5s ease-out var(--dm, 0ms) both;
+    animation: godac-noeud 0.4s ease-out var(--dn, 0ms) both;
   }
   .godac-scene[data-etat="joue"] .godac-trait {
     animation:
-      godac-trait-y 0.52s ease-in-out var(--dt, 0ms) both,
+      godac-trait-x 0.42s ease-in-out var(--dt, 0ms) both,
       godac-halo 3.4s ease-in-out calc(var(--dt, 0ms) + 0.6s) infinite;
   }
   .godac-compact[data-etat="joue"] .godac-compact-trait {
     animation: godac-trait-x 0.9s ease-in-out 0.9s both;
   }
-  .godac-scene[data-etat="joue"][data-anime="non"] :is(.godac-mot, .godac-noeud, .godac-trait) {
+  .godac-scene[data-etat="joue"][data-anime="non"] :is(.godac-noeud, .godac-trait) {
     animation-play-state: paused;
-  }
-  @media (min-width: 640px) {
-    .godac-scene[data-etat="joue"] .godac-trait {
-      animation:
-        godac-trait-x 0.52s ease-in-out var(--dt, 0ms) both,
-        godac-halo 3.4s ease-in-out calc(var(--dt, 0ms) + 0.6s) infinite;
-    }
-    .godac-scene[data-etat="joue"][data-anime="non"] .godac-trait {
-      animation-play-state: paused;
-    }
   }
 }
 @keyframes godac-assemble {
   from { opacity: 0; transform: translate3d(var(--ox), var(--oy), -380px) rotateX(35deg) rotateY(var(--ry)) scale(0.7); }
   55% { opacity: 1; }
   to { opacity: 1; transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
-}
-@keyframes godac-mot {
-  from { opacity: 0; transform: translate3d(0, -10px, 0) scale(0.94); filter: blur(4px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
 }
 @keyframes godac-noeud {
   from { opacity: 0; transform: scale(0); }
@@ -803,10 +726,6 @@
 @keyframes godac-trait-x {
   from { opacity: 1; transform: scaleX(0); }
   to { opacity: 1; transform: scaleX(1); }
-}
-@keyframes godac-trait-y {
-  from { opacity: 1; transform: scaleY(0); }
-  to { opacity: 1; transform: scaleY(1); }
 }
 @keyframes godac-halo {
   0%, 100% { opacity: 1; }
