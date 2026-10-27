@@ -54,7 +54,7 @@ export type OnResultat = (texte: string, ton: Ton) => void;
 
 const json = (corps: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
 
-type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; a_remplacer?: number; warning?: string | null };
+type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; a_remplacer?: number; fusionnees?: number; warning?: string | null };
 
 /**
  * Duplique des affectations une par une (POST /api/planning/entries/[id]/duplicate),
@@ -63,8 +63,9 @@ type ReponseCopie = { created?: number; skipped?: number; conflicts?: number; a_
  */
 export async function dupliquerAffectations(
   demandes: { id: string; target_dates: string[]; driver_id?: string; vehicle_id?: string }[],
-): Promise<{ creees: number; ignorees: number; conflits: number; aRemplacer: number; erreurs: string[]; avertissements: string[] }> {
+): Promise<{ creees: number; ignorees: number; conflits: number; aRemplacer: number; fusionnees: number; erreurs: string[]; avertissements: string[] }> {
   const resultats: { creees: number; ignorees: number; conflits: number; aRemplacer: number }[] = [];
+  let fusionnees = 0;
   const erreurs: string[] = [];
   const avertissements: string[] = [];
   for (const { id, ...corps } of demandes) {
@@ -73,10 +74,11 @@ export async function dupliquerAffectations(
       erreurs.push(r.refus.message);
       continue;
     }
+    fusionnees += r.data.fusionnees ?? 0;
     resultats.push({ creees: r.data.created ?? 0, ignorees: r.data.skipped ?? 0, conflits: r.data.conflicts ?? 0, aRemplacer: r.data.a_remplacer ?? 0 });
     if (r.data.warning) avertissements.push(r.data.warning);
   }
-  return { ...cumulerResultats(resultats), erreurs: [...new Set(erreurs)], avertissements: [...new Set(avertissements)] };
+  return { ...cumulerResultats(resultats), fusionnees, erreurs: [...new Set(erreurs)], avertissements: [...new Set(avertissements)] };
 }
 
 /** Message de fin d'une duplication : « X créées, Y ignorées (déjà occupées), Z en conflit ». */
@@ -358,7 +360,7 @@ export function EditionAffectation({
 // Dupliquer la semaine (1 à 8 semaines), avec aperçu.
 // ---------------------------------------------------------------------------
 
-type ReponseSemaine = { created: number; skipped: number; conflicts: number; a_remplacer?: number; source_count: number; warning?: string | null };
+type ReponseSemaine = { created: number; skipped: number; conflicts: number; a_remplacer?: number; fusionnees?: number; source_count: number; warning?: string | null };
 
 export function DupliquerSemaine({
   lundi,
@@ -402,7 +404,7 @@ export function DupliquerSemaine({
     const r = await fetchGodac<ReponseSemaine>("/api/planning/duplicate-week", json(corps));
     setBusy(false);
     if (!r.ok) return setErreur(r.refus.message);
-    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts, aRemplacer: r.data.a_remplacer });
+    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts, aRemplacer: r.data.a_remplacer, fusionnees: r.data.fusionnees });
     onResultat(`Semaine dupliquée sur ${semaines} semaine${semaines > 1 ? "s" : ""} : ${texte}.${r.data.warning ? ` ${r.data.warning}` : ""}`, r.data.conflicts || r.data.a_remplacer ? "attention" : "ok");
     onFermer();
   }
@@ -431,7 +433,7 @@ export function DupliquerSemaine({
       </fieldset>
 
       <div className="mt-4 rounded-lg bg-navy/[0.04] p-3 text-sm" aria-live="polite">
-        {chargement ? "Calcul de l'aperçu…" : apercu ? (apercu.source_count === 0 ? "Aucune affectation à dupliquer cette semaine." : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts, aRemplacer: apercu.a_remplacer })}.`) : null}
+        {chargement ? "Calcul de l'aperçu…" : apercu ? (apercu.source_count === 0 ? "Aucune affectation à dupliquer cette semaine." : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts, aRemplacer: apercu.a_remplacer, fusionnees: apercu.fusionnees })}.`) : null}
       </div>
       {erreur && (
         <p role="alert" className="mt-2 text-sm text-orange-ink">

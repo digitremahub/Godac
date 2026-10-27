@@ -227,7 +227,8 @@ export function servicesPublieesRecemment(validations: readonly { service_id: st
 
 export type DecisionEnvoiAuto =
   | { action: "publier" }
-  | { action: "rappeler" }
+  /** `motif: "doublon_fusion"` : une tournée d'origine d'une fusion est encore affectée (le rappel le dit, qu'elle soit modifiée ou non). */
+  | { action: "rappeler"; motif?: "doublon_fusion" }
   | { action: "rien"; raison: "pas_vendredi" | "avant_17h" | "deja_publiee" | "rappel_deja_envoye" | "mauvaise_semaine" };
 
 /**
@@ -236,21 +237,28 @@ export type DecisionEnvoiAuto =
  *    et 16 h UTC, une seule des deux tombe après 17 h selon la saison) ;
  *  - déjà confirmée ou publiée : rien (idempotent) ;
  *  - intacte : publication automatique ;
- *  - modifiée : rappel (une seule fois), sauf PUBLICATION_AUTO_SI_MODIFIE.
+ *  - modifiée : rappel (une seule fois), sauf PUBLICATION_AUTO_SI_MODIFIE ;
+ *  - DOUBLON de fusion (`doublonsFusion` > 0 : une tournée d'origine d'une
+ *    fusion est encore affectée, lib/planning/fusion-verrou.ts) : jamais
+ *    d'envoi automatique, même sans modification ni PUBLICATION_AUTO_SI_MODIFIE ;
+ *    rappel à l'encadrement (une seule fois), tant que le doublon subsiste.
  */
 export function decisionEnvoiAuto(p: {
   ligne: Pick<LigneSuivi, "semaine_debut" | "modifie_at" | "confirme_at" | "publie_at" | "rappel_envoye_at">;
   maintenant: Date;
   publierSiModifie?: boolean;
+  /** Tournées d'origine d'une fusion encore affectées dans cette semaine (ce service). */
+  doublonsFusion?: number;
 }): DecisionEnvoiAuto {
   const t = instantParis(p.maintenant);
   if (t.rang !== RANG_VENDREDI) return { action: "rien", raison: "pas_vendredi" };
   if (t.heure < HEURE_ENVOI_AUTO) return { action: "rien", raison: "avant_17h" };
   if (p.ligne.semaine_debut !== semaineSuivante(t.jour).lundi) return { action: "rien", raison: "mauvaise_semaine" };
   if (p.ligne.publie_at || p.ligne.confirme_at) return { action: "rien", raison: "deja_publiee" };
-  if (!p.ligne.modifie_at || (p.publierSiModifie ?? PUBLICATION_AUTO_SI_MODIFIE)) return { action: "publier" };
+  const doublon = (p.doublonsFusion ?? 0) > 0;
+  if (!doublon && (!p.ligne.modifie_at || (p.publierSiModifie ?? PUBLICATION_AUTO_SI_MODIFIE))) return { action: "publier" };
   if (p.ligne.rappel_envoye_at) return { action: "rien", raison: "rappel_deja_envoye" };
-  return { action: "rappeler" };
+  return doublon ? { action: "rappeler", motif: "doublon_fusion" } : { action: "rappeler" };
 }
 
 /** Peut-on confirmer ? Non s'il reste des cases à remplacer, sauf « Envoyer quand même ». */
@@ -296,10 +304,12 @@ export interface ResumeSemaine {
   conflits: number;
   /** Cases déjà présentes dans la semaine (planning commencé à la main) : laissées telles quelles. */
   deja_presentes: number;
+  /** Cases de tournées d'origine d'une fusion : ni recopiées ni comblées par un modèle (lib/planning/fusion-verrou.ts). */
+  fusionnees: number;
   absents: CaseAbsente[];
 }
 
-export const resumeVide = (): ResumeSemaine => ({ tournees: 0, chauffeurs: 0, a_remplacer: 0, sans_chauffeur_modeles: 0, fermees: 0, conflits: 0, deja_presentes: 0, absents: [] });
+export const resumeVide = (): ResumeSemaine => ({ tournees: 0, chauffeurs: 0, a_remplacer: 0, sans_chauffeur_modeles: 0, fermees: 0, conflits: 0, deja_presentes: 0, fusionnees: 0, absents: [] });
 
 const nombre = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
@@ -315,6 +325,7 @@ export function lireResume(brut: unknown): ResumeSemaine {
     fermees: nombre(r.fermees),
     conflits: nombre(r.conflits),
     deja_presentes: nombre(r.deja_presentes),
+    fusionnees: nombre(r.fusionnees),
     absents,
   };
 }
@@ -345,13 +356,14 @@ export function listeAbsents(absents: readonly CaseAbsente[]): string {
   return out.join(" ; ");
 }
 
-/** « 24 tournées planifiées, 18 chauffeurs affectés, 3 cases à remplacer, 1 tournée fermée, 0 conflit » */
+/** « 24 tournées planifiées, 18 chauffeurs affectés, 3 cases à remplacer, 1 tournée fermée, 0 conflit » (+ « 1 tournée fusionnée » s'il y en a) */
 export function texteResume(r: ResumeSemaine): string {
   return [
     `${pluriel(r.tournees, "tournée planifiée", "tournées planifiées")}`,
     `${pluriel(r.chauffeurs, "chauffeur affecté", "chauffeurs affectés")}`,
     `${pluriel(r.a_remplacer, "case à remplacer", "cases à remplacer")}`,
     `${pluriel(r.fermees, "tournée fermée", "tournées fermées")}`,
+    ...(r.fusionnees ? [pluriel(r.fusionnees, "tournée fusionnée", "tournées fusionnées")] : []),
     `${pluriel(r.conflits, "conflit", "conflits")}`,
   ].join(", ");
 }
@@ -364,6 +376,7 @@ export const titreGeneration = (lundi: string, service?: string | null) => `Plan
 export function messageGeneration(lundi: string, resume: ResumeSemaine, service?: string | null): string {
   const lignes = [titreGeneration(lundi, service), `${texteResume(resume)}.`];
   if (resume.absents.length) lignes.push(`À remplacer : ${listeAbsents(resume.absents)}.`);
+  if (resume.fusionnees) lignes.push(`${pluriel(resume.fusionnees, "tournée fusionnée laissée vide", "tournées fusionnées laissées vides")} (non recopiée${resume.fusionnees > 1 ? "s" : ""} : elle${resume.fusionnees > 1 ? "s sont regroupées" : " est regroupée"} dans une autre tournée).`);
   if (resume.deja_presentes) lignes.push(`${pluriel(resume.deja_presentes, "case déjà présente laissée telle quelle", "cases déjà présentes laissées telles quelles")} (planning commencé à la main).`);
   return lignes.join("\n");
 }
@@ -378,6 +391,10 @@ export const messageAbsenceApparue = (p: { nom: string; du: string; au: string; 
 /** Rappel critique du vendredi : semaine modifiée mais pas envoyée. */
 export const messageRappelModifie = (lundi: string, service?: string | null) =>
   `Planning modifié mais pas envoyé : confirmez maintenant${duService(service)}\nLe planning ${libelleSemaine(lundi)} a été modifié depuis sa génération automatique : il n'est pas envoyé tout seul aux chauffeurs.`;
+
+/** Rappel critique du vendredi : une tournée d'origine d'une fusion est encore affectée (doublon). */
+export const messageRappelDoublonFusion = (lundi: string, doublons: number, service?: string | null) =>
+  `Planning non envoyé : ${pluriel(doublons, "doublon de tournée fusionnée", "doublons de tournées fusionnées")}${duService(service)}\nLe planning ${libelleSemaine(lundi)} n'est pas envoyé tout seul : ${pluriel(doublons, "tournée d'origine d'une fusion est encore affectée", "tournées d'origine d'une fusion sont encore affectées")}. Retirez l'affectation ou gardez la tournée séparée, puis confirmez.`;
 
 /** Clôture : envoi automatique. */
 export const messageEnvoiAuto = (lundi: string, casesARemplacer: number, service?: string | null) =>
@@ -435,7 +452,9 @@ const cleCase = (tournee: string, jour: string) => `${tournee}|${jour}`;
  *  - chauffeur recopié absent (congé approuvé ou demandé, arrêt, compte inactif
  *    ou sorti) : la case est créée SANS chauffeur, « à remplacer » ;
  *  - modèles actifs : une ligne sans chauffeur pour chaque tournée × jour du
- *    modèle encore vide (jamais en double d'une copie, ni sur un jour fermé).
+ *    modèle encore vide (jamais en double d'une copie, ni sur un jour fermé) ;
+ *  - tournées d'origine d'une fusion (`fusionnees`) : ni recopiées (source), ni
+ *    créées (cible, copie ou modèle) ; comptées dans le résumé.
  */
 export function planifierSemaineSuivante(p: {
   lundiSource: string;
@@ -445,6 +464,13 @@ export function planifierSemaineSuivante(p: {
   modeles: readonly ModeleGeneration[];
   contexte: ContexteAbsences;
   nomDe: (driverId: string) => string;
+  /**
+   * Cases (clés « tournée|jour », semaine source COMME cible) des tournées
+   * d'origine d'une fusion : une tournée fusionnée n'est ni recopiée comme une
+   * affectation ni comblée par un modèle, et la fusion elle-même n'est pas
+   * recopiée (lib/planning/fusion-verrou.ts › clesTourneeJour).
+   */
+  fusionnees?: ReadonlySet<string>;
 }): PlanSemaine {
   const joursSource = new Set(Array.from({ length: 7 }, (_, i) => addDays(p.lundiSource, i)));
   const joursCible = Array.from({ length: 7 }, (_, i) => addDays(p.lundiCible, i));
@@ -458,11 +484,18 @@ export function planifierSemaineSuivante(p: {
   // Cases déjà présentes dans la semaine cible (une tournée par jour, quelle que soit l'heure).
   const occupees = new Set(existantes.map((e) => cleCase(e.tour_number, jourDe(e.start_at))));
 
+  const fusionnees = p.fusionnees ?? new Set<string>();
+  const fusionneesCible = new Set<string>();
   const copiables = dansSource.filter((s) => s.tour_open !== false && estCopiable(s));
   const demandes: CopieDemandee[] = [];
   let dejaPresentes = 0;
   for (const source of copiables) {
     const date = addDays(jourDe(source.start_at), decalage);
+    // Tournée d'origine d'une fusion (semaine source ou cible) : pas une affectation à recopier.
+    if (fusionnees.has(cleCase(source.tour_number, jourDe(source.start_at))) || fusionnees.has(cleCase(source.tour_number, date))) {
+      fusionneesCible.add(cleCase(source.tour_number, date));
+      continue;
+    }
     if (occupees.has(cleCase(source.tour_number, date))) {
       dejaPresentes++;
       continue;
@@ -494,11 +527,13 @@ export function planifierSemaineSuivante(p: {
 
   // Modèles : cases encore vides, jamais en double d'une copie ni sur un jour fermé.
   const prises = new Set<string>([...occupees, ...fermeesSource, ...lignes.map((l) => cleCase(l.tour_number, jourDe(l.start_at)))]);
+  for (const cle of fusionnees) if (joursCible.includes(cle.split("|")[1] ?? "")) prises.add(cle);
   for (const jour of joursCible) {
     const jourSemaine = new Date(`${jour}T12:00:00Z`).getUTCDay();
     for (const m of p.modeles) {
       if (!(m.weekdays ?? []).includes(jourSemaine) || !m.tour_number) continue;
       const cle = cleCase(m.tour_number, jour);
+      if (fusionnees.has(cle)) fusionneesCible.add(cle);
       if (prises.has(cle)) continue;
       prises.add(cle);
       lignes.push({
@@ -513,7 +548,7 @@ export function planifierSemaineSuivante(p: {
   }
 
   const conflits = compterConflitsVehicule([...existantes, ...lignes.map((l, i) => ({ ...l, id: `plan-${i}`, status: "planned" }))]);
-  const resume = resumeDesLignes(lignes, absents, { fermees: fermeesSource.size, conflits, deja_presentes: dejaPresentes });
+  const resume = resumeDesLignes(lignes, absents, { fermees: fermeesSource.size, conflits, deja_presentes: dejaPresentes, fusionnees: fusionneesCible.size });
   return { lignes, absents, resume };
 }
 
@@ -541,6 +576,8 @@ export interface LigneBandeau {
   status: string;
   tour_open?: boolean | null;
   nom_chauffeur?: string | null;
+  /** Tournée d'origine d'une fusion ce jour-là (lib/planning/fusion-verrou.ts) : case verrouillée, jamais « à pourvoir ». */
+  fusionnee?: boolean;
 }
 
 export interface CaseBandeau {
@@ -550,10 +587,10 @@ export interface CaseBandeau {
   tournee: string;
 }
 
-/** Cases à pourvoir en ce moment : prévues, ouvertes, sans chauffeur. */
+/** Cases à pourvoir en ce moment : prévues, ouvertes, sans chauffeur, hors tournées fusionnées. */
 export function casesSansChauffeur(lignes: readonly LigneBandeau[]): CaseBandeau[] {
   return lignes
-    .filter((l) => l.status === "planned" && l.tour_open !== false && !l.driver_id && !l.tour_number.startsWith("PRESENCE-"))
+    .filter((l) => l.status === "planned" && l.tour_open !== false && !l.fusionnee && !l.driver_id && !l.tour_number.startsWith("PRESENCE-"))
     .map((l) => ({ entree_id: l.id, jour: jourDe(l.start_at), heure: heureDe(l.start_at), tournee: l.tour_number }))
     .sort((a, b) => (a.jour + a.heure + a.tournee).localeCompare(b.jour + b.heure + b.tournee, "fr", { numeric: true }));
 }
@@ -572,7 +609,7 @@ export interface AffectationAbsente extends CaseBandeau {
 export function affectationsDeChauffeursAbsents(lignes: readonly LigneBandeau[], contexte: ContexteAbsences): AffectationAbsente[] {
   const out: AffectationAbsente[] = [];
   for (const l of lignes) {
-    if (l.status !== "planned" || l.tour_open === false || !l.driver_id) continue;
+    if (l.status !== "planned" || l.tour_open === false || l.fusionnee || !l.driver_id) continue;
     const jour = jourDe(l.start_at);
     const a = estAbsentOuInactif(l.driver_id, jour, contexte);
     if (!a || a.raison === "conge_demande") continue;
@@ -596,7 +633,7 @@ export const cleSuivi = (serviceId: string, startAt: string) => cleSemaine(servi
 export function resumeDesLignes(
   lignes: readonly LigneAGenerer[],
   absents: readonly CaseAbsente[],
-  base: Pick<ResumeSemaine, "fermees" | "conflits" | "deja_presentes">,
+  base: Pick<ResumeSemaine, "fermees" | "conflits" | "deja_presentes"> & { fusionnees?: number },
 ): ResumeSemaine {
   const sansChauffeurModeles = lignes.filter((l) => l.origine === "modele").length;
   return {
@@ -607,6 +644,7 @@ export function resumeDesLignes(
     fermees: base.fermees,
     conflits: base.conflits,
     deja_presentes: base.deja_presentes,
+    fusionnees: base.fusionnees ?? 0,
     absents: [...absents],
   };
 }
@@ -624,6 +662,7 @@ export function cumulerResumes(avant: ResumeSemaine, ajout: ResumeSemaine): Resu
     fermees: Math.max(avant.fermees, ajout.fermees),
     conflits: Math.max(avant.conflits, ajout.conflits),
     deja_presentes: ajout.deja_presentes,
+    fusionnees: Math.max(avant.fusionnees, ajout.fusionnees),
     absents: [...avant.absents, ...ajout.absents],
   };
 }

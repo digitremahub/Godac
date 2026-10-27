@@ -47,11 +47,20 @@ export const TYPES_ALERTE_RH: readonly string[] = ["echeance_rh", "pointage_a_re
  */
 export const TYPES_ALERTE_PLANNING: readonly string[] = ["planning_a_confirmer"];
 
+/**
+ * Tournée fusionnée (« Tournée n°105 fusionnée avec la n°106 le lundi 9 novembre » :
+ * app/api/planning/entries/[id]/fusion, lib/planning/fusion-verrou-serveur.ts).
+ * Information d'encadrement, même périmètre que le planning à confirmer :
+ * direction et exploitation pour toute l'organisation, manager pour son service
+ * seulement (l'alerte porte le service) ; jamais le chauffeur ni le comptable.
+ */
+export const TYPES_ALERTE_FUSION: readonly string[] = ["planning_fusion"];
+
 /** Alertes de facturation (paiement échoué) : la direction seule. */
 export const TYPES_ALERTE_DIRECTION: readonly string[] = ["paiement_echoue"];
 
-/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte, alertes RH et planning à confirmer. */
-const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH, ...TYPES_ALERTE_PLANNING];
+/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte, alertes RH, planning à confirmer et tournées fusionnées. */
+const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH, ...TYPES_ALERTE_PLANNING, ...TYPES_ALERTE_FUSION];
 
 export interface DestinatairePossible {
   id: string;

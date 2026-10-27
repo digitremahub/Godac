@@ -6,6 +6,9 @@ import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { parisCalendarDate } from "@/lib/planning/dates";
 import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
+import { messageRefusAffectation, verrouDe } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
+import { libelleJour } from "@/lib/planning/semaine";
 
 const bodySchema = z.object({
   service_id: z.string().uuid(),
@@ -27,6 +30,9 @@ const bodySchema = z.object({
  * Inserting/updating a 'planned' row also fires the
  * after_planning_entry_upsert trigger, which notifies the driver.
  *
+ * Tournée d'origine d'une fusion ce jour-là (lib/planning/fusion-verrou.ts) :
+ * case verrouillée, 409 explicite (on modifie la tournée qui la regroupe).
+ *
  * Tournée colis active pour l'organisation : même comportement que
  * POST /api/colis/affectations (lib/colis/fiche-a-l-affectation.ts) —
  * question « séparées ou reliées » si le chauffeur a déjà une tournée ce
@@ -47,6 +53,9 @@ export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient();
   const colis = g.modules.has("route_optimizer");
   const date = parisCalendarDate(parsed.data.start_at);
+  const { verrous } = await verrousDeLaPeriode(supabase, appUser.organization_id, parsed.data.service_id, date, date);
+  const verrou = verrouDe(verrous, parsed.data.service_id, parsed.data.tour_number, date);
+  if (verrou) return NextResponse.json({ error: messageRefusAffectation(verrou, libelleJour), code: "tournee_fusionnee", hote: verrou.hoteNumero }, { status: 409 });
   const conducteur = { id: parsed.data.driver_id, organization_id: appUser.organization_id };
   if (colis) {
     const choix = await questionAvantAffectation(supabase, conducteur, date, parsed.data.regroupement, "planning/entries");

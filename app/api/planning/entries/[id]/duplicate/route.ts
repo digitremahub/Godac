@@ -4,9 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays } from "@/lib/planning/dates";
-import { copiesVersDates, estCopiable, jourDe, planifierCopies, type AffectationPlanning } from "@/lib/planning/semaine";
+import { copiesVersDates, estCopiable, jourDe, libelleJour, planifierCopies, type AffectationPlanning } from "@/lib/planning/semaine";
 import { affectationsAutour, inscrireCopies } from "@/lib/planning/copies-serveur";
 import { absentSelon, lireAbsences } from "@/lib/planning/absences";
+import { ecarterFusionnees, messageRefusAffectation, messageVerrou, verrouDe } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 const bodySchema = z.object({
   /** Ancien appel : un seul jour (défaut : même jour la semaine suivante). */
@@ -28,6 +30,10 @@ const bodySchema = z.object({
  * un chauffeur déjà pris à la même heure est signalé (conflit), pas bloqué ;
  * un chauffeur en congé validé ou en arrêt ce jour-là n'est pas placé
  * (copie créée sans chauffeur, « à remplacer »).
+ * Tournée d'origine d'une fusion (lib/planning/fusion-verrou.ts), jour source
+ * ou jour cible : case verrouillée, rien n'est copié et le jour est compté dans
+ * `fusionnees` ; 409 explicite si plus rien ne peut être copié. La fusion
+ * elle-même n'est pas recopiée (la duplication ne copie que des affectations).
  * Réservé à l'encadrement ; RLS limite un manager à ses services.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -67,11 +73,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lecture du planning impossible." }, { status: 500 });
   }
   const triees = [...dates].sort();
+  // Tournées fusionnées (jour source ou jours cibles) : écartées, comptées.
+  const jourSource = jourDe(affectation.start_at);
+  const bornes = [jourSource, ...triees].sort();
+  const { verrous } = await verrousDeLaPeriode(supabase, appUser.organization_id, affectation.service_id, bornes[0]!, bornes.at(-1)!);
+  const demandes = copiesVersDates([affectation], dates, { driverId: parsed.data.driver_id, vehicleId: parsed.data.vehicle_id });
+  const { gardees, fusionnees } = ecarterFusionnees(demandes, verrous);
+  if (!gardees.length) {
+    // La source elle-même est fusionnée (doublon) : on l'explique ; sinon, les jours cibles le sont tous.
+    const verrouSource = verrouDe(verrous, affectation.service_id, affectation.tour_number, jourSource);
+    const verrou = verrouSource ?? verrouDe(verrous, affectation.service_id, affectation.tour_number, fusionnees[0]!.date)!;
+    return NextResponse.json(
+      { error: verrouSource ? messageVerrou(verrou) : messageRefusAffectation(verrou, libelleJour), code: "tournee_fusionnee", hote: verrou.hoteNumero, fusionnees: fusionnees.length },
+      { status: 409 },
+    );
+  }
   const absences = await lireAbsences(supabase, appUser.organization_id, triees[0]!, triees[triees.length - 1]!);
-  const plan = planifierCopies(copiesVersDates([affectation], dates, { driverId: parsed.data.driver_id, vehicleId: parsed.data.vehicle_id }), existantes, { absent: absentSelon(absences) });
+  const plan = planifierCopies(gardees, existantes, { absent: absentSelon(absences) });
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
   if (r.creees > 0) await noterModificationPlanning(appUser.organization_id, plan.aCreer.map((l) => ({ serviceId: l.service_id, startAt: l.start_at })));
 
-  return NextResponse.json({ id: r.ids[0] ?? null, ids: r.ids, created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, warning: r.warning });
+  return NextResponse.json({ id: r.ids[0] ?? null, ids: r.ids, created: r.creees, skipped: r.ignorees, fusionnees: fusionnees.length, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, warning: r.warning });
 }

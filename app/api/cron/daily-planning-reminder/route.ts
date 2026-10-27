@@ -3,8 +3,11 @@ import { estPresence } from "@/lib/organization/poles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { estMasquee } from "@/lib/planning/semaines-auto";
 import { semainesMasqueesDe } from "@/lib/planning/suivi-auto-serveur";
+import { fusionneeAvec, originesParHote, sansFusionnees } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 interface Entry {
+  id: string;
   driver_id: string;
   service_id: string;
   tour_number: string;
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
   let remindersSent = 0;
   for (const { organization_id } of orgs ?? []) {
     const { data, error } = await supabase.from("planning_entries")
-      .select("driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
+      .select("id, driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
       .eq("organization_id", organization_id).not("driver_id", "is", null)
       .gte("start_at", `${tomorrow}T00:00:00`).lt("start_at", `${dayAfter}T00:00:00`)
       .in("status", ["planned", "in_progress"]).order("start_at");
@@ -59,7 +62,10 @@ export async function GET(req: Request) {
     const byDriver = new Map<string, Entry[]>();
     // Semaine générée automatiquement et pas encore publiée : rien ne part aux chauffeurs.
     const masquees = await semainesMasqueesDe(supabase, organization_id);
-    for (const row of data as unknown as Entry[]) if (!enArret.has(row.driver_id) && !estMasquee(masquees, row)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
+    // Tournées d'origine d'une fusion : pas de rappel (le travail est porté par la tournée hôte, lib/planning/fusion-verrou.ts).
+    const { verrous } = await verrousDeLaPeriode(supabase, organization_id, null, tomorrow, tomorrow);
+    const origines = originesParHote(verrous);
+    for (const row of sansFusionnees(data as unknown as Entry[], verrous)) if (!enArret.has(row.driver_id) && !estMasquee(masquees, row)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
     const alerts = Array.from(byDriver.entries()).map(([driverId, entries]) => {
       const lines = entries.map(e => {
         const start = new Date(e.start_at);
@@ -68,7 +74,8 @@ export async function GET(req: Request) {
           const end = e.end_at ? new Date(e.end_at).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) : null;
           return `${time}${end ? `–${end}` : ""} — présence`;
         }
-        return `${time} — tournée n°${e.tour_number}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
+        const fusion = fusionneeAvec(e.tour_number, origines.get(e.id) ?? []);
+        return `${time} — tournée n°${e.tour_number}${fusion ? ` (${fusion})` : ""}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
       });
       return { organization_id, type: "planning_assignment", severity: "info", message: `Rappel de votre planning pour demain (${new Date(`${tomorrow}T12:00:00Z`).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" })}) :\n${lines.join("\n")}`, related_table: "planning_entries", recipient_user_id: driverId };
     });

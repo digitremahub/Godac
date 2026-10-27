@@ -18,6 +18,8 @@ import { bulletinsAValiderParMois, suiteMoisPaie } from "@/lib/paie/accueil";
 import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards } from "@/lib/exploitation/retards";
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
+import { doublonsFusion } from "@/lib/planning/fusion-verrou";
+import { marquerFusionneesAujourdhuiDemain, nommerDoublons, verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 import { parisDay } from "@/lib/utils/paris-time";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { estUrgentLeVendredi, libelleSemaine, vendrediAvant, HEURE_ENVOI_AUTO } from "@/lib/planning/semaines-auto";
@@ -145,7 +147,9 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
   let planningPromesse: Promise<LignePlanningJour[]> | null = null;
   const planning = () => {
     planningPromesse ??= (async () => {
-      const lignes = await (options.planningDuJour ?? (() => lirePlanningDuJour(supabase, maintenant)))();
+      // Tournées d'origine d'une fusion : marquées, ni « sans chauffeur » ni « non démarrées » (lib/planning/fusion-verrou.ts).
+      const lues = await (options.planningDuJour ?? (() => lirePlanningDuJour(supabase, maintenant)))();
+      const lignes = await marquerFusionneesAujourdhuiDemain(supabase, org, lues, maintenant);
       if (appUser.role !== "manager") return lignes;
       const mes = await mesServices();
       return lignes.filter((l) => dansLePerimetre(appUser.role, mes, l.service_id));
@@ -346,7 +350,7 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       nom: "tournées sans chauffeur",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = (await planning()).filter((t) => t.status === "planned" && !t.driver_id && t.tour_open !== false && t.start_at >= debutJour && t.start_at < finDemain).slice(0, PLAFOND_PAR_SOURCE);
+        const rows = (await planning()).filter((t) => t.status === "planned" && !t.driver_id && t.tour_open !== false && !t.fusionnee && t.start_at >= debutJour && t.start_at < finDemain).slice(0, PLAFOND_PAR_SOURCE);
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
           brutes: rows.map((t) => ({
@@ -392,12 +396,41 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
       },
     },
     {
+      // Doublons de fusion : une tournée d'origine d'une fusion est encore affectée (les 3 prochaines semaines).
+      // Le travail serait compté deux fois ; le doublon bloque aussi l'envoi automatique du vendredi. Source tolérante : sans les tables de fusion, vide.
+      type: "planning_doublon_fusion",
+      nom: "doublons de tournées fusionnées",
+      ecran: "exploitation.planning",
+      lire: async () => {
+        const { entrees, verrous } = await verrousDeLaPeriode(supabase, org, null, aujourdhui, addDays(aujourdhui, 21));
+        let doublons = doublonsFusion(entrees, verrous);
+        if (appUser.role === "manager") {
+          const mes = await mesServices();
+          doublons = doublons.filter((d) => dansLePerimetre(appUser.role, mes, d.serviceId));
+        }
+        doublons = doublons.slice(0, PLAFOND_PAR_SOURCE);
+        const nommes = await nommerDoublons(supabase, org, doublons);
+        return {
+          plafonne: doublons.length >= PLAFOND_PAR_SOURCE,
+          brutes: nommes.map((d) => ({
+            type: "planning_doublon_fusion" as const,
+            id: d.entry_id,
+            libelle: `Doublon : la tournée n°${d.tour_number} est fusionnée avec la n°${d.hote}`,
+            detail: `Déjà affectée à ${d.chauffeur ?? "un chauffeur"} le ${jourDate(d.date)} : retirez l'affectation ou gardez la tournée séparée`,
+            echeance: parisWallTimeToUtcISOString(d.date, "00:00"),
+            ecran: "exploitation.planning",
+            href: lienPlanning(doublons.find((x) => x.entryId === d.entry_id)!.verrou.hoteEntryId),
+          })),
+        };
+      },
+    },
+    {
       // Tournées planifiées du jour, avec chauffeur, pas démarrées alors que l'heure prévue est passée.
       type: "tournee_non_demarree",
       nom: "tournées non démarrées",
       ecran: "exploitation.planning",
       lire: async () => {
-        const rows = (await planning()).filter((t) => t.status === "planned" && t.driver_id && t.start_at >= debutJour && t.start_at < limiteRetard).slice(0, PLAFOND_PAR_SOURCE);
+        const rows = (await planning()).filter((t) => t.status === "planned" && t.driver_id && !t.fusionnee && t.start_at >= debutJour && t.start_at < limiteRetard).slice(0, PLAFOND_PAR_SOURCE);
         return {
           plafonne: rows.length >= PLAFOND_PAR_SOURCE,
           brutes: rows.map((t) => ({

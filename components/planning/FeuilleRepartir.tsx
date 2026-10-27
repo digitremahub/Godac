@@ -18,8 +18,18 @@ import {
   type Reconciliation,
 } from "@/lib/planning/fusion";
 
+/** Affectation déjà posée sur une tournée d'origine de cette fusion (lib/planning/fusion-verrou-serveur.ts › DoublonSignale). */
+interface DoublonFeuille {
+  entry_id: string;
+  tour_number: string;
+  chauffeur: string | null;
+  status: string;
+  message: string;
+}
+
 interface EtatFusion {
   fusionnee: boolean;
+  doublons?: DoublonFeuille[];
   routes: { id: string; tour_number: string }[];
   routes_disponibles: { id: string; tour_number: string; villages: number }[];
   elements: { villages: ElementFusion[]; ramasses: ElementFusion[] };
@@ -49,6 +59,7 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
   const [choix, setChoix] = useState<Record<string, string>>({});
   const [origines, setOrigines] = useState<string[]>([]);
   const [reel, setReel] = useState<ReponseReconciliation | null>(null);
+  const [doublons, setDoublons] = useState<DoublonFeuille[]>([]);
 
   const url = `/api/planning/entries/${entree.id}`;
   const jour = jourDe(entree.start_at);
@@ -58,6 +69,7 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
     if (!r.ok) return setErreur(r.refus.message);
     setErreur(null);
     setEtat(r.data);
+    setDoublons(r.data.doublons ?? []);
     setOrigines(r.data.routes.map((x) => x.id));
     const index = indexerRepartition(r.data.lignes);
     const depart: Record<string, string> = {};
@@ -85,15 +97,30 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
 
   async function enregistrerFusion() {
     setOccupe(true);
-    const r = await fetchGodac(`${url}/fusion`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ route_ids: origines }) });
+    const r = await fetchGodac<{ doublons?: DoublonFeuille[] }>(`${url}/fusion`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ route_ids: origines }) });
     setOccupe(false);
     if (!r.ok) return setErreur(r.refus.message);
     await charger();
-    onResultat(origines.length ? "Tournée fusionnée enregistrée : répartissez ses villages et ses ramasses." : "Ce n'est plus une tournée fusionnée.", "ok");
+    // Une affectation existe déjà sur une tournée d'origine : la fusion est enregistrée, le doublon est signalé.
+    const trouves = r.data.doublons ?? [];
+    setDoublons(trouves);
+    if (trouves.length) return onResultat(`Tournée fusionnée enregistrée. ${trouves.map((d) => d.message).join(" ")}`, "attention");
+    onResultat(origines.length ? "Tournée fusionnée enregistrée : répartissez ses villages et ses ramasses. Les tournées regroupées ne s'affectent plus." : "Ce n'est plus une tournée fusionnée.", "ok");
+  }
+
+  /** « Retirer l'affectation » d'un doublon (confirmation ; trace d'audit côté serveur). */
+  async function retirerDoublon(d: DoublonFeuille) {
+    if (!(await confirmer({ titre: `Retirer ${d.chauffeur ?? "le chauffeur"} de la tournée ${d.tour_number} ?`, message: `La tournée ${d.tour_number} est regroupée dans la ${entree.tour_number} : son affectation est retirée (la fiche colis préparée aussi). L'opération est tracée dans le journal d'audit.`, action: "Retirer l'affectation", danger: true }))) return;
+    setOccupe(true);
+    const r = await fetchGodac(`/api/planning/entries/${d.entry_id}/doublon-fusion`, { method: "DELETE" });
+    setOccupe(false);
+    if (!r.ok) return setErreur(r.refus.message);
+    setDoublons((l) => l.filter((x) => x.entry_id !== d.entry_id));
+    onResultat(`${d.chauffeur ?? "Le chauffeur"} retiré de la tournée ${d.tour_number} : le doublon est résolu.`, "ok");
   }
 
   async function retirerFusion() {
-    if (!(await confirmer({ titre: "Ce n'est plus une tournée fusionnée ?", message: "La répartition provisoire de ses villages et de ses ramasses est effacée. Les fiches colis déjà créées ne sont pas modifiées.", action: "Retirer la fusion", danger: true }))) return;
+    if (!(await confirmer({ titre: "Ce n'est plus une tournée fusionnée ?", message: "Les tournées regroupées redeviennent des cases normales, affectables ; la répartition provisoire de leurs villages et de leurs ramasses est effacée et l'alerte de fusion est close. Les fiches colis déjà créées ne sont pas modifiées.", action: "Ne plus fusionner", danger: true }))) return;
     setOccupe(true);
     const r = await fetchGodac(`${url}/fusion`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ route_ids: [] }) });
     setOccupe(false);
@@ -148,6 +175,29 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
       )}
       {!etat && !erreur && <p className="text-sm text-navy/65">Chargement…</p>}
 
+      {etat && doublons.length > 0 && (
+        <section role="alert" aria-label="Doublons" className="mb-3 flex flex-col gap-2 rounded-xl border-2 p-3" style={{ borderColor: "#d62718" }}>
+          <h3 className="text-sm font-bold">
+            {doublons.length} doublon{doublons.length > 1 ? "s" : ""} : tournée{doublons.length > 1 ? "s" : ""} regroupée{doublons.length > 1 ? "s" : ""} déjà affectée{doublons.length > 1 ? "s" : ""}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {doublons.map((d) => (
+              <li key={d.entry_id} className="flex flex-col gap-2 text-sm">
+                <span>{d.message}</span>
+                {d.status === "planned" ? (
+                  <button type="button" className="btn-dark min-h-[48px] self-start !px-4 text-sm max-md:w-full max-md:text-base" disabled={occupe} onClick={() => void retirerDoublon(d)}>
+                    Retirer l&apos;affectation
+                  </button>
+                ) : (
+                  <span className="text-xs text-navy/65">Tournée déjà démarrée : l&apos;affectation ne peut plus être retirée d&apos;ici.</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-navy/65">Ou gardez la tournée séparée : « Ne plus fusionner ». Tant que le doublon subsiste, l&apos;envoi automatique du vendredi est bloqué.</p>
+        </section>
+      )}
+
       {etat && (
         <>
           <details open={!etat.fusionnee} className="mb-3 rounded-xl border border-navy/10 p-3">
@@ -173,7 +223,7 @@ export function FeuilleRepartir({ entree, onFermer, onResultat }: { entree: Entr
               </button>
               {etat.fusionnee && (
                 <button type="button" className="btn-secondary min-h-[48px] !px-4 text-sm" disabled={occupe} onClick={() => void retirerFusion()}>
-                  Ce n&apos;est pas une fusion
+                  Ne plus fusionner
                 </button>
               )}
             </div>

@@ -6,6 +6,7 @@ import { couleurChauffeur, initiales, type ArretPlanning, type LigneTournee, typ
 import type { AffectationPlanning, CongePlanning, ModelePlanning, VehiculePlanning } from "@/lib/planning/semaine";
 import type { EntreeAffichee } from "@/components/planning/FenetresPlanning";
 import type { FiltreOuverture } from "@/lib/planning/ouverture";
+import type { DoublonFusion, VerrouFusion } from "@/lib/planning/fusion-verrou";
 
 // ---------------------------------------------------------------------------
 // Données de l'écran d'affectation (lues par la page serveur).
@@ -56,6 +57,8 @@ export interface DonneesAffectations {
   fiches: Record<string, string>;
   /** Tournées fusionnées (lundi) de la période, par affectation. Vide sans la migration 20261105000001. */
   fusions: Record<string, FusionPlanning>;
+  /** Cases verrouillées par une fusion (tournées d'origine, même jour, même service) : lib/planning/fusion-verrou.ts. */
+  verrous: VerrouFusion[];
   /** Nom de la personne qui a fermé chaque tournée fermée, par affectation. */
   fermeesPar: Record<string, string | null>;
   /** Chauffeurs à prévenir à la prochaine publication (null : inconnu). */
@@ -73,6 +76,10 @@ export interface ContexteAffectations {
   affectations: EntreeAffectation[];
   lignes: LigneTournee[];
   parCase: Map<string, EntreeAffectation[]>;
+  /** Cases verrouillées par une fusion, par cleCaseTournee(ligne.cle, jour). */
+  verrous: Map<string, VerrouFusion>;
+  /** Affectations posées sur une tournée d'origine d'une fusion (doublons à traiter). */
+  doublons: DoublonFusion[];
   jours: string[];
   aujourdhui: string;
   petitEcran: boolean;
@@ -109,6 +116,10 @@ export interface ContexteAffectations {
   changerFermeture: (ligne: LigneTournee, dates: string[], fermer: boolean) => void;
   /** Ouvre la feuille « Répartir » (tournée fusionnée) de cette affectation. */
   ouvrirRepartition: (entree: EntreeAffectation) => void;
+  /** Ouvre la tournée hôte d'une case fusionnée (feuille « Répartir » de la ligne hôte du jour). */
+  ouvrirHote: (verrou: VerrouFusion) => void;
+  /** Retire l'affectation d'un doublon (confirmation, trace d'audit). */
+  retirerDoublon: (doublon: DoublonFusion) => void;
 }
 
 export const Contexte = createContext<ContexteAffectations | null>(null);

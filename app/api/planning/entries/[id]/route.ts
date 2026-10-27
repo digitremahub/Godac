@@ -9,6 +9,10 @@ import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation"
 import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
 import { refusSiFermee } from "@/lib/planning/ouverture-serveur";
 import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
+import { messageRefusAffectation, verrouDe } from "@/lib/planning/fusion-verrou";
+import { cloreAlertesFusion, verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { libelleJour } from "@/lib/planning/semaine";
 
 const patchSchema = z.object({
   start_at: z.string().datetime().optional(),
@@ -26,6 +30,10 @@ const patchSchema = z.object({
  * planning grid's drag-to-move and edit actions call. Scoped to
  * status='planned' so a manager can't retroactively edit a tour the
  * driver has already started or finished from here.
+ *
+ * Tournée d'origine d'une fusion (lib/planning/fusion-verrou.ts) : on ne lui
+ * place pas de chauffeur et on n'y déplace pas d'affectation (409 explicite).
+ * Retirer le chauffeur d'un doublon reste possible.
  *
  * Changement de chauffeur (glisser, retirer) : la fiche colis préparée pour
  * l'ancien chauffeur lui est retirée (lib/planning/fiche-reaffectation.ts) ;
@@ -49,6 +57,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (fermee) return NextResponse.json({ error: fermee }, { status: 423 });
 
   const supabase = await createServerSupabaseClient();
+
+  // Case verrouillée par une fusion : ni chauffeur placé, ni affectation déplacée vers elle.
+  if (champs.driver_id || champs.start_at || champs.service_id || champs.tour_number) {
+    const { data: courante } = await supabase.from("planning_entries").select("service_id, tour_number, driver_id, start_at").eq("id", id).eq("organization_id", appUser.organization_id).maybeSingle();
+    if (courante) {
+      const service = champs.service_id ?? (courante.service_id as string);
+      const tournee = champs.tour_number ?? (courante.tour_number as string);
+      const debut = champs.start_at ?? (courante.start_at as string);
+      const jour = parisCalendarDate(debut);
+      const chauffeurFinal = champs.driver_id !== undefined ? champs.driver_id : (courante.driver_id as string | null);
+      const deplacee = service !== courante.service_id || tournee !== courante.tour_number || jour !== parisCalendarDate(courante.start_at as string);
+      if (champs.driver_id || (deplacee && chauffeurFinal)) {
+        const { verrous } = await verrousDeLaPeriode(supabase, appUser.organization_id, service, jour, jour);
+        const verrou = verrouDe(verrous, service, tournee, jour);
+        if (verrou) return NextResponse.json({ error: messageRefusAffectation(verrou, libelleJour), code: "tournee_fusionnee", hote: verrou.hoteNumero }, { status: 409 });
+      }
+    }
+  }
+
   const colis = g.modules.has("route_optimizer");
   let avertissementFiche: string | null = null;
   let changeDeChauffeur = false;
@@ -132,6 +159,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Affectation introuvable ou déjà démarrée." }, { status: 404 });
   await noterModificationPlanning(g2.appUser.organization_id, [{ serviceId: data.service_id as string, startAt: data.start_at as string }]);
+  // Ligne hôte d'une fusion supprimée : ses alertes « fusionnée avec… » n'ont plus d'objet (la fusion part avec elle).
+  try {
+    await cloreAlertesFusion(createAdminSupabaseClient(), g2.appUser.organization_id, id);
+  } catch {
+    // Jamais bloquant.
+  }
   await journaliser({ organizationId: g2.appUser.organization_id, userId: g2.appUser.id, action: "planning_tournee_retiree", targetTable: "planning_entries", targetId: id });
   return NextResponse.json({ ok: true });
 }

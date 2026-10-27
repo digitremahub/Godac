@@ -83,6 +83,8 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   // Planning de la semaine suivante à confirmer (génération du jeudi, rappel du vendredi) : la vue Semaine
   // de cette semaine, service filtré (la page déduit semaine et service de la ligne de suivi : related_id).
   planning_a_confirmer: (id) => ({ id: "exploitation.planning", suite: id ? `?semaine_auto=${encodeURIComponent(id)}` : "" }),
+  // Tournée fusionnée (alerte d'encadrement, related_id = ligne hôte du jour) : le Planning au jour de la fusion, tournée hôte mise en avant.
+  planning_fusion: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
   // Échéance RH (permis, visite médicale, fin de contrat, document) : la fiche du salarié.
   echeance_rh: (id) => (id ? { id: "equipe.utilisateur_fiche", params: { id } } : { id: "equipe.utilisateurs" }),
   // Sortie oubliée, pointage clos avec une heure estimée : la liste « Pointages à régulariser ».

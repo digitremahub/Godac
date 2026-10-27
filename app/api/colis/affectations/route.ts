@@ -7,6 +7,9 @@ import { ficheApresAffectation, questionAvantAffectation } from "@/lib/colis/fic
 import { parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
+import { messageRefusAffectation, verrouDe } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
+import { libelleJour } from "@/lib/planning/semaine";
 
 const roles = ["direction", "manager", "exploitation"];
 const schema = z.object({
@@ -72,6 +75,10 @@ export async function POST(req: Request) {
   }
 
   const start_at = parisWallTimeToUtcISOString(date, time);
+  // Tournée d'origine d'une fusion ce jour-là (lib/planning/fusion-verrou.ts) : case verrouillée, pas d'affectation.
+  const { verrous } = await verrousDeLaPeriode(supabase, user.organization_id, service_id, date, date);
+  const verrou = verrouDe(verrous, service_id, tour_number, date);
+  if (verrou) return NextResponse.json({ error: messageRefusAffectation(verrou, libelleJour), code: "tournee_fusionnee", hote: verrou.hoteNumero }, { status: 409 });
   const conducteur = { id: driver_id, organization_id: user.organization_id };
 
   // Autre affectation ou fiche ouverte ce jour-là : demander séparées ou

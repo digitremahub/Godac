@@ -6,7 +6,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { decisionsAffectation } from "@/lib/planning/affectation";
 import { absentSelon, lireAbsences } from "@/lib/planning/absences";
-import { jourDe } from "@/lib/planning/semaine";
+import { jourDe, libelleJour } from "@/lib/planning/semaine";
+import { messageRefusAffectation, partagerJours, verrouDe } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 import { libererFicheAncienChauffeur } from "@/lib/planning/fiche-reaffectation";
 import { warnIfDriverDoubleBooked } from "@/lib/planning/conflict-alert";
 import { ficheApresAffectation, ficheAPreparer, questionAvantAffectation } from "@/lib/colis/fiche-a-l-affectation";
@@ -41,6 +43,9 @@ const CHAMPS = "id, service_id, tour_number, driver_id, vehicle_id, start_at, st
  *   prend (l'ancien chauffeur perd sa fiche colis, il est prévenu à la
  *   publication) ;
  * - tournée déjà démarrée, ou fermée (planning_entries.tour_open) : rien ;
+ * - tournée d'origine d'une fusion ce jour-là (lib/planning/fusion-verrou.ts) :
+ *   case verrouillée, rien n'est placé et le jour est compté dans `fusionnees` ;
+ *   si TOUS les jours demandés sont fusionnés : 409 explicite (aucune écriture) ;
  * - chauffeur en congé validé ou en arrêt ce jour-là : il n'est PAS placé,
  *   une case vide devient une affectation « à remplacer » (sans chauffeur).
  * Tournée colis active : même question « séparées ou reliées » que
@@ -58,13 +63,13 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const { service_id, tour_number, driver_id, heure, regroupement, imposer_heure } = parsed.data;
-  const dates = [...new Set(parsed.data.dates)].sort();
-  const premier = dates[0]!;
-  const dernier = dates[dates.length - 1]!;
+  const demandees = [...new Set(parsed.data.dates)].sort();
+  const premier = demandees[0]!;
+  const dernier = demandees[demandees.length - 1]!;
   const supabase = await createServerSupabaseClient();
   const colis = g.modules.has("route_optimizer");
 
-  const [{ data: chauffeur }, { data: existantes, error: lectureError }, absences, { data: attribues }] = await Promise.all([
+  const [{ data: chauffeur }, { data: existantes, error: lectureError }, absences, { data: attribues }, { verrous }] = await Promise.all([
     supabase.from("users").select("id").eq("id", driver_id).eq("organization_id", appUser.organization_id).eq("active", true).or(FILTRE_CONDUCTEURS).maybeSingle(),
     supabase
       .from("planning_entries")
@@ -79,9 +84,17 @@ export async function POST(req: Request) {
     parsed.data.vehicle_id === undefined
       ? supabase.from("vehicles").select("id, service_id").eq("organization_id", appUser.organization_id).eq("assigned_driver_id", driver_id)
       : Promise.resolve({ data: null }),
+    verrousDeLaPeriode(supabase, appUser.organization_id, service_id, premier, dernier),
   ]);
   if (!chauffeur) return NextResponse.json({ error: "Chauffeur introuvable ou inactif dans votre organisation." }, { status: 400 });
   if (lectureError) return NextResponse.json({ error: lectureError.message }, { status: 500 });
+
+  // Tournée d'origine d'une fusion : case verrouillée. Refus net si tous les jours le sont, sinon ils sont ignorés et comptés.
+  const { libres: dates, fusionnes: joursFusionnes } = partagerJours(verrous, service_id, tour_number, demandees);
+  if (!dates.length) {
+    const verrou = verrouDe(verrous, service_id, tour_number, joursFusionnes[0]!)!;
+    return NextResponse.json({ error: messageRefusAffectation(verrou, libelleJour), code: "tournee_fusionnee", hote: verrou.hoteNumero, fusionnees: joursFusionnes.length }, { status: 409 });
+  }
 
   const vehicule =
     parsed.data.vehicle_id !== undefined
@@ -213,5 +226,5 @@ export async function POST(req: Request) {
   if (places > 0) {
     await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "planning_affectation", targetTable: "planning_entries", targetId: ids[0] ?? null, details: { chauffeur: driver_id, places, affectations: ids.slice(0, 50) } });
   }
-  return NextResponse.json({ places, absents, figees, fermees, deja, ids, warning: [...new Set(avertissements)].join(" ") || null });
+  return NextResponse.json({ places, absents, figees, fermees, fusionnees: joursFusionnes.length, deja, ids, warning: [...new Set(avertissements)].join(" ") || null });
 }

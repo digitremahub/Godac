@@ -375,18 +375,21 @@ export function planifierCopies(
 const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 
 /** « 42 affectations seront créées, 3 créneaux déjà occupés ignorés, 1 en conflit, 2 à remplacer (chauffeur absent) » */
-export function texteApercu(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number }): string {
+export function texteApercu(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number; fusionnees?: number }): string {
   const parts = [`${pluriel(r.creees, "affectation sera créée", "affectations seront créées")}`];
   if (r.ignorees) parts.push(pluriel(r.ignorees, "créneau déjà occupé ignoré", "créneaux déjà occupés ignorés"));
   if (r.conflits) parts.push(`${r.conflits} en conflit (chauffeur déjà pris à la même heure)`);
   if (r.aRemplacer) parts.push(`${r.aRemplacer} à remplacer (chauffeur en congé ou en arrêt ce jour-là)`);
+  if (r.fusionnees) parts.push(`${pluriel(r.fusionnees, "tournée fusionnée ignorée", "tournées fusionnées ignorées")}`);
   return parts.join(", ");
 }
 
 /** « 3 créées, 1 ignorée (déjà occupée), 0 en conflit » (+ « 1 à remplacer (absent) ») */
-export function texteResultat(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number }): string {
+export function texteResultat(r: { creees: number; ignorees: number; conflits: number; aRemplacer?: number; fusionnees?: number }): string {
   const base = `${pluriel(r.creees, "créée", "créées")}, ${pluriel(r.ignorees, "ignorée", "ignorées")} (déjà occupée${r.ignorees > 1 ? "s" : ""}), ${r.conflits} en conflit`;
-  return r.aRemplacer ? `${base}, ${r.aRemplacer} à remplacer (absent)` : base;
+  const avecAbsents = r.aRemplacer ? `${base}, ${r.aRemplacer} à remplacer (absent)` : base;
+  // Tournées d'origine d'une fusion : jamais recopiées comme des affectations.
+  return r.fusionnees ? `${avecAbsents}, ${pluriel(r.fusionnees, "tournée fusionnée", "tournées fusionnées")} : inchangée${r.fusionnees > 1 ? "s" : ""}` : avecAbsents;
 }
 
 /** Additionne des résultats partiels (une requête par affectation copiée). */

@@ -25,6 +25,7 @@ export const TYPES_A_TRAITER = [
   "ticpe",
   "tournee_sans_chauffeur",
   "repartition_a_attribuer",
+  "planning_doublon_fusion",
   "planning_a_confirmer",
   "tournee_non_demarree",
   "tournee_en_retard",
@@ -49,6 +50,7 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   ticpe: { singulier: "TICPE", pluriel: "TICPE" },
   tournee_sans_chauffeur: { singulier: "Tournée sans chauffeur", pluriel: "Tournées sans chauffeur" },
   repartition_a_attribuer: { singulier: "Tournée fusionnée à répartir", pluriel: "Tournées fusionnées à répartir" },
+  planning_doublon_fusion: { singulier: "Doublon : tournée fusionnée déjà affectée", pluriel: "Doublons : tournées fusionnées déjà affectées" },
   planning_a_confirmer: { singulier: "Planning à confirmer", pluriel: "Plannings à confirmer" },
   tournee_non_demarree: { singulier: "Tournée non démarrée", pluriel: "Tournées non démarrées" },
   tournee_en_retard: { singulier: "Tournée en retard", pluriel: "Tournées en retard" },
@@ -77,6 +79,7 @@ export const ECRANS_PAR_TYPE: Record<TypeATraiter, readonly string[]> = {
   ticpe: ["carburant.ticpe_controles"],
   tournee_sans_chauffeur: ["exploitation.planning"],
   repartition_a_attribuer: ["exploitation.planning"],
+  planning_doublon_fusion: ["exploitation.planning"],
   planning_a_confirmer: ["exploitation.planning"],
   tournee_non_demarree: ["exploitation.planning"],
   tournee_en_retard: ["exploitation.suivi"],
@@ -117,6 +120,8 @@ export const TYPES_MANAGER: readonly TypeATraiter[] = [
   "echeance_rh",
   "tournee_sans_chauffeur",
   "repartition_a_attribuer",
+  // Tournée d'origine d'une fusion encore affectée (doublon) : lecture limitée à son service par la RLS du planning.
+  "planning_doublon_fusion",
   // Planning de la semaine suivante généré le jeudi : lecture limitée à son service par la RLS de planning_semaines_auto.
   "planning_a_confirmer",
   "tournee_non_demarree",
@@ -178,6 +183,8 @@ export const SEUILS_URGENCE: Record<TypeATraiter, { ancienneteHeures: number | n
   tournee_sans_chauffeur: { ancienneteHeures: null, echeanceHeures: 3 },
   // Tournée fusionnée du jour dont des villages ou ramasses restent « À attribuer » : urgent à l'approche du départ.
   repartition_a_attribuer: { ancienneteHeures: null, echeanceHeures: 3 },
+  // Doublon de fusion : urgent à moins de 48 h du jour de la tournée (le doublon bloque aussi l'envoi automatique du vendredi).
+  planning_doublon_fusion: { ancienneteHeures: null, echeanceHeures: 48 },
   // Planning de la semaine suivante à confirmer : l'urgence est déclarée par la source (à partir du vendredi).
   planning_a_confirmer: { ancienneteHeures: null, echeanceHeures: null },
   tournee_non_demarree: { ancienneteHeures: null, echeanceHeures: null },

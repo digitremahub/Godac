@@ -8,6 +8,8 @@ import { addDays, parisWallTimeToUtcISOString } from "@/lib/planning/dates";
 import { lireAbsences } from "@/lib/planning/absences";
 import { cleSemaine, periodePublication } from "@/lib/planning/publication";
 import { publierSemaines } from "@/lib/planning/publication-serveur";
+import { clesTourneeJour, marquerFusionnees } from "@/lib/planning/fusion-verrou";
+import { doublonsDeLaSemaine, lireVerrous, verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 import { cloreAlertesPlanning, lireSuivi, libererPublication, reserverPublication, reserverRappel } from "@/lib/planning/suivi-auto-serveur";
 import type { AffectationPlanning } from "@/lib/planning/semaine";
 import {
@@ -27,6 +29,7 @@ import {
   lundisAvecAffectations,
   messageEnvoiAuto,
   messageGeneration,
+  messageRappelDoublonFusion,
   messageRappelModifie,
   MESSAGE_SANS_SOURCE,
   SEMAINES_SOURCE_MAX,
@@ -256,6 +259,8 @@ export async function genererSemaine(
         continue;
       }
       const lundiSource = trouvee ?? lundiPrecedent;
+      // Tournées d'origine d'une fusion (semaine source ou cible) : ni recopiées ni comblées par un modèle. Tolérant : sans fusion, vide.
+      const { verrous } = await verrousDeLaPeriode(admin, organizationId, s.id, lundiSource, addDays(lundi, 6));
       const plan = planifierSemaineSuivante({
         lundiSource,
         lundiCible: lundi,
@@ -264,6 +269,7 @@ export async function genererSemaine(
         modeles: modeles.filter((m) => m.service_id === s.id),
         contexte,
         nomDe: (id) => noms.get(id) ?? "Chauffeur",
+        fusionnees: clesTourneeJour(verrous, s.id),
       });
       if (!plan.lignes.length && !existantes.length && !ligne) {
         bilan.services.push({ ...base, statut: "rien", message: "Aucune tournée à recopier ni modèle actif." });
@@ -316,7 +322,7 @@ export async function genererSemaine(
       const absents: CaseAbsente[] = plan.absents
         .map((a) => ({ ...a, entree_id: idParCle.get(cleLigne(a.tournee, parisWallTimeToUtcISOString(a.jour, a.heure))) ?? null }))
         .filter((a) => a.entree_id);
-      const final = resumeDesLignes(lignesCreees, absents, { fermees: plan.resume.fermees, conflits: plan.resume.conflits, deja_presentes: plan.resume.deja_presentes });
+      const final = resumeDesLignes(lignesCreees, absents, { fermees: plan.resume.fermees, conflits: plan.resume.conflits, deja_presentes: plan.resume.deja_presentes, fusionnees: plan.resume.fusionnees });
       const resume = ligne ? cumulerResumes(lireResume(ligne.resume), final) : final;
 
       const maj: Record<string, unknown> = { resume };
@@ -331,7 +337,7 @@ export async function genererSemaine(
         action: ligne ? "planning_semaine_regeneree" : "planning_semaine_generee",
         targetTable: "planning_semaines_auto",
         targetId: courante.id,
-        details: { service: s.id, semaine: lundi, creees: lignesCreees.length, chauffeurs: final.chauffeurs, a_remplacer: final.a_remplacer, fermees: final.fermees, conflits: final.conflits, deja_presentes: final.deja_presentes, mode: ligne ? "cases_vides" : p.manuel ? "manuel" : "auto", source: lundiSource },
+        details: { service: s.id, semaine: lundi, creees: lignesCreees.length, chauffeurs: final.chauffeurs, a_remplacer: final.a_remplacer, fermees: final.fermees, conflits: final.conflits, deja_presentes: final.deja_presentes, fusionnees: final.fusionnees, mode: ligne ? "cases_vides" : p.manuel ? "manuel" : "auto", source: lundiSource },
       });
 
       // Génération à la demande : la personne qui a cliqué est prévenue par l'écran, personne d'autre.
@@ -375,7 +381,9 @@ export async function confirmerSemaine(p: { db: Db; admin: Db; organizationId: s
   } catch (e) {
     return { ok: false, status: 500, error: e instanceof Error ? e.message : "Lecture du planning impossible." };
   }
-  const casesARemplacer = casesSansChauffeur(lignes.map((l) => ({ ...l, tour_open: l.tour_open }))).length;
+  // Une tournée d'origine d'une fusion n'est pas une case à remplacer (lib/planning/fusion-verrou.ts).
+  const verrous = await lireVerrous(p.db, p.organizationId, lignes);
+  const casesARemplacer = casesSansChauffeur(marquerFusionnees(lignes, verrous).map((l) => ({ ...l, tour_open: l.tour_open }))).length;
   const verdict = verdictConfirmation({ casesARemplacer, envoyerQuandMeme: p.envoyerQuandMeme });
   if (!verdict.ok) return { ok: false, status: 409, code: verdict.code, error: verdict.message, casesARemplacer };
 
@@ -445,7 +453,13 @@ export async function envoyerSemainesAuto(admin: Db, organizationId: string, mai
   const nomService = new Map(((services ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
 
   for (const ligne of suivi.lignes) {
-    const decision = decisionEnvoiAuto({ ligne, maintenant });
+    let decision = decisionEnvoiAuto({ ligne, maintenant });
+    // Doublon de fusion (une tournée d'origine encore affectée) : pas d'envoi automatique, rappel à l'encadrement.
+    let doublons = 0;
+    if (decision.action === "publier" || decision.action === "rappeler") {
+      doublons = (await doublonsDeLaSemaine(admin, organizationId, ligne.service_id, ligne.semaine_debut)).length;
+      if (doublons > 0) decision = decisionEnvoiAuto({ ligne, maintenant, doublonsFusion: doublons });
+    }
     if (decision.action === "rien") {
       bilan.ignorees++;
       if (decision.raison === "avant_17h" || decision.raison === "pas_vendredi") bilan.attente = decision.raison;
@@ -458,8 +472,9 @@ export async function envoyerSemainesAuto(admin: Db, organizationId: string, mai
           bilan.ignorees++;
           continue;
         }
-        await creerAlerte(admin, { organizationId, serviceId: ligne.service_id, ligneId: ligne.id, severity: "critical", message: messageRappelModifie(ligne.semaine_debut, nom), cle: cleAlerteRappel(ligne.service_id, ligne.semaine_debut) });
-        await journaliser({ organizationId, userId: null, action: "planning_semaine_rappel", targetTable: "planning_semaines_auto", targetId: ligne.id, details: { service: ligne.service_id, semaine: ligne.semaine_debut } });
+        const parDoublon = decision.motif === "doublon_fusion";
+        await creerAlerte(admin, { organizationId, serviceId: ligne.service_id, ligneId: ligne.id, severity: "critical", message: parDoublon ? messageRappelDoublonFusion(ligne.semaine_debut, doublons, nom) : messageRappelModifie(ligne.semaine_debut, nom), cle: cleAlerteRappel(ligne.service_id, ligne.semaine_debut) });
+        await journaliser({ organizationId, userId: null, action: "planning_semaine_rappel", targetTable: "planning_semaines_auto", targetId: ligne.id, details: { service: ligne.service_id, semaine: ligne.semaine_debut, ...(parDoublon ? { doublons_fusion: doublons } : {}) } });
         bilan.rappels++;
         continue;
       }
@@ -485,7 +500,7 @@ export async function envoyerSemainesAuto(admin: Db, organizationId: string, mai
       let aRemplacer = restantes;
       try {
         const lues = await lireLignesPlanning(admin, organizationId, minuitParis(periode.debut), minuitParis(addDays(periode.fin, 1)), ligne.service_id);
-        aRemplacer = casesSansChauffeur(lues).length;
+        aRemplacer = casesSansChauffeur(marquerFusionnees(lues, await lireVerrous(admin, organizationId, lues))).length;
       } catch {
         // Compte du résumé de génération, à défaut.
       }

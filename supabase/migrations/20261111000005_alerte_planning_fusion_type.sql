@@ -1,0 +1,14 @@
+-- Tournées fusionnées : type d'alerte « planning_fusion », créé quand une ligne
+-- de planning est marquée « fusionnée » avec des tournées d'origine
+-- (PUT /api/planning/entries/[id]/fusion : « Tournée n°105 fusionnée avec la
+-- n°106 le lundi 9 novembre »). Relayé en cloche, push et e-mail à la
+-- direction, l'exploitation et aux managers du service (jamais aux chauffeurs
+-- ni au comptable) ; une alerte par fusion et par jour (cle_dedoublonnage),
+-- clôturée quand la fusion est retirée.
+--
+-- Fichier séparé : une nouvelle valeur d'enum ne peut pas être utilisée dans la
+-- transaction qui l'ajoute (périmètre de lecture dans 20261111000006).
+-- ADDITIVE et rejouable. NON appliquée à la création : tant qu'elle ne l'est
+-- pas, ces alertes ne sont simplement pas créées (« À traiter » lit les
+-- doublons directement dans le planning).
+alter type public.alert_type add value if not exists 'planning_fusion';
