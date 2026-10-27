@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/layout/SignOutButton";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { RechercheGlobale } from "@/components/layout/RechercheGlobale";
 import { IconExternal, IconMenu } from "@/components/layout/icons";
+import { VITRINE_URL } from "@/lib/domaines/routage";
 import type { UserRole } from "@/lib/types/domain";
 
 function initials(name: string) {
@@ -41,8 +42,8 @@ export function TopBar({
         >
           <IconMenu className="h-5 w-5" />
         </button>
-        <Link
-          href="/"
+        <a
+          href={VITRINE_URL}
           target="_blank"
           rel="noreferrer"
           className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-navy/65 transition-colors hover:bg-navy/[0.05] hover:text-navy md:inline-flex"
@@ -50,7 +51,7 @@ export function TopBar({
           Site vitrine
           <IconExternal className="h-3.5 w-3.5" />
           <span className="sr-only"> (nouvel onglet)</span>
-        </Link>
+        </a>
       </div>
 
       <div className="flex min-w-0 items-center gap-1 sm:gap-3">
