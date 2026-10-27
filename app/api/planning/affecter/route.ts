@@ -1,4 +1,5 @@
 import { garderApi } from "@/lib/acces/garde-api";
+import { journaliser } from "@/lib/audit/journal";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -206,5 +207,8 @@ export async function POST(req: Request) {
     }
   }
 
+  if (places > 0) {
+    await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "planning_affectation", targetTable: "planning_entries", targetId: ids[0] ?? null, details: { chauffeur: driver_id, places, affectations: ids.slice(0, 50) } });
+  }
   return NextResponse.json({ places, absents, figees, fermees, deja, ids, warning: [...new Set(avertissements)].join(" ") || null });
 }

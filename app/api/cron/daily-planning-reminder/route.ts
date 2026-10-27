@@ -49,6 +49,10 @@ export async function GET(req: Request) {
     const { data: arrets } = await supabase.from("work_stoppages").select("*")
       .eq("organization_id", organization_id).lte("start_date", tomorrow).gte("end_date", tomorrow);
     const enArret = new Set(((arrets ?? []) as { user_id: string; status?: string }[]).filter((a) => a.status !== "refuse").map((a) => a.user_id));
+    // ... ni à un salarié en congé approuvé demain (affectation restée posée : le planning la signale à l'encadrement).
+    const { data: conges } = await supabase.from("leave_requests").select("driver_id")
+      .eq("organization_id", organization_id).eq("status", "approved").lte("start_date", tomorrow).gte("end_date", tomorrow);
+    for (const c of (conges ?? []) as { driver_id: string }[]) enArret.add(c.driver_id);
     const byDriver = new Map<string, Entry[]>();
     for (const row of data as unknown as Entry[]) if (!enArret.has(row.driver_id)) byDriver.set(row.driver_id, [...(byDriver.get(row.driver_id) ?? []), row]);
     const alerts = Array.from(byDriver.entries()).map(([driverId, entries]) => {

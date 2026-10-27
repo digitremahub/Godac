@@ -1,4 +1,5 @@
 import { garderApi } from "@/lib/acces/garde-api";
+import { journaliser } from "@/lib/audit/journal";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -105,6 +106,11 @@ export async function PATCH(req: Request) {
     if (!modifiees || modifiees.length === 0) {
       return NextResponse.json({ error: "Modification refusée." }, { status: 403 });
     }
+  }
+
+  if (Object.keys(profileFields).length > 0) {
+    // Noms des champs seulement (jamais les valeurs : URSSAF, SIRET…).
+    await journaliser({ organizationId: appUser.organization_id, userId: appUser.id, action: "organisation_modifiee", targetTable: "organizations", targetId: appUser.organization_id, details: { champs: Object.keys(profileFields) } });
   }
 
   if (brand_colors !== undefined) {

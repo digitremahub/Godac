@@ -221,11 +221,21 @@ export interface PeriodeConges {
   jours: number;
 }
 
+/** Une prime est reprise chaque mois (récurrente) ou ne vaut que pour ce bulletin (ponctuelle). */
+export type NaturePrime = "recurrente" | "ponctuelle";
+
 export interface Prime {
   libelle: string;
   montant: number;
   /** false = indemnité non soumise à cotisations (rare, à justifier). */
   soumise: boolean;
+  /**
+   * Marqueur « récurrente / ponctuelle » (lib/paie/primes.ts). Absent : prime
+   * saisie avant le marqueur ou jamais précisée. Sans effet sur le calcul du bulletin.
+   */
+  nature?: NaturePrime;
+  /** Prime recopiée du bulletin du mois précédent : à confirmer (risque de double paiement). */
+  recopiee?: boolean;
 }
 
 /**

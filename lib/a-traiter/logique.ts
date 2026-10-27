@@ -32,6 +32,9 @@ export const TYPES_A_TRAITER = [
   "bulletin_paie",
   "conge",
   "arret",
+  "pointage_a_regulariser",
+  "repos_conduite",
+  "echeance_rh",
   "contestation",
   "inscription",
 ] as const;
@@ -52,6 +55,9 @@ export const LIBELLES_TYPE: Record<TypeATraiter, { singulier: string; pluriel: s
   bulletin_paie: { singulier: "Bulletins à valider", pluriel: "Bulletins à valider" },
   conge: { singulier: "Congé", pluriel: "Congés" },
   arret: { singulier: "Arrêt de travail", pluriel: "Arrêts de travail" },
+  pointage_a_regulariser: { singulier: "Pointage à régulariser", pluriel: "Pointages à régulariser" },
+  repos_conduite: { singulier: "Repos ou durée du travail à vérifier", pluriel: "Repos ou durée du travail à vérifier" },
+  echeance_rh: { singulier: "Échéance RH", pluriel: "Échéances RH" },
   contestation: { singulier: "Contestation client", pluriel: "Contestations clients" },
   inscription: { singulier: "Inscription", pluriel: "Inscriptions" },
 };
@@ -76,6 +82,9 @@ export const ECRANS_PAR_TYPE: Record<TypeATraiter, readonly string[]> = {
   bulletin_paie: ["equipe.paie"],
   conge: ["equipe.conges"],
   arret: ["equipe.arrets"],
+  pointage_a_regulariser: ["equipe.pointage"],
+  repos_conduite: ["equipe.pointage"],
+  echeance_rh: ["equipe.utilisateur_fiche"],
   contestation: ["exploitation.contestations"],
   inscription: ["equipe.inscriptions"],
 };
@@ -98,6 +107,11 @@ export const TYPES_MANAGER: readonly TypeATraiter[] = [
   "echeance_vehicule",
   "entretien",
   "conge",
+  // Pointages, repos et échéances RH : lecture limitée à ses services par la RLS (pointage, alertes) ;
+  // les échéances sensibles (visite médicale, contrat, titre de séjour) ne lui sont jamais adressées.
+  "pointage_a_regulariser",
+  "repos_conduite",
+  "echeance_rh",
   "tournee_sans_chauffeur",
   "repartition_a_attribuer",
   "tournee_non_demarree",
@@ -170,6 +184,12 @@ export const SEUILS_URGENCE: Record<TypeATraiter, { ancienneteHeures: number | n
   bulletin_paie: { ancienneteHeures: null, echeanceHeures: null },
   conge: { ancienneteHeures: 120, echeanceHeures: 72 },
   arret: { ancienneteHeures: 48, echeanceHeures: null },
+  // Sortie oubliée : le paiement des heures en dépend, urgent après deux jours.
+  pointage_a_regulariser: { ancienneteHeures: 48, echeanceHeures: null },
+  // Avertissement de repos : informatif, l'urgence est déclarée par la source (aucune).
+  repos_conduite: { ancienneteHeures: null, echeanceHeures: null },
+  // Permis, visite médicale, contrat, documents : urgent à 7 jours de l'échéance ou une fois dépassée.
+  echeance_rh: { ancienneteHeures: null, echeanceHeures: 168 },
   contestation: { ancienneteHeures: 120, echeanceHeures: null },
   inscription: { ancienneteHeures: 72, echeanceHeures: null },
 };

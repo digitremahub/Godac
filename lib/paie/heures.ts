@@ -37,6 +37,8 @@ export function sourceHeures(v: unknown): SourceHeures {
 export interface Pointage {
   entree: string;
   sortie: string | null;
+  /** Sortie estimée automatiquement (pointage oublié), pas encore régularisée par l'encadrement. */
+  aRegulariser?: boolean;
 }
 
 /** Affectation du planning (planning_entries) du salarié. */
@@ -59,7 +61,7 @@ export interface AbsenceJours {
 export type OrigineDebut = "badge" | "planning" | "depart";
 export type OrigineFin = "badge" | "retour" | "planning";
 
-export type CodeAlerteHeures = "ecart_retour" | "pointage_incomplet" | "sans_source" | "sans_pause" | "sans_pointage" | "pendant_absence";
+export type CodeAlerteHeures = "ecart_retour" | "pointage_incomplet" | "sans_source" | "sans_pause" | "sans_pointage" | "pendant_absence" | "a_regulariser";
 
 export interface AlerteHeures {
   jour: string;
@@ -162,6 +164,10 @@ export function heuresDuMois(p: {
     const termine = jour < aujourdhui;
     const ouverts = badges.filter((b) => !b.sortie);
     if (ouverts.length && termine) alerte(jour, "pointage_incomplet", `Pointage d'entrée à ${heureParis(ouverts[0]!.entree)} sans pointage de sortie.`);
+
+    // Sortie oubliée, close la nuit avec une heure estimée : les heures du jour ne sont pas fiables avant la régularisation.
+    const estimes = badges.filter((b) => b.aRegulariser);
+    if (estimes.length) alerte(jour, "a_regulariser", `Sortie estimée automatiquement (pointage de ${heureParis(estimes[0]!.entree)} oublié) : à régulariser dans Équipe › Pointage avant de valider les heures.`);
 
     const { completes, pauseMs } = sessions(badges);
     let debut: number | null = null;

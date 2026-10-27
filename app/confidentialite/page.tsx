@@ -190,7 +190,7 @@ export default function ConfidentialitePage() {
             l&apos;entreprise le demande.
           </li>
           <li>
-            Heures de pointage : 5 ans maximum, durée pendant laquelle l&apos;employeur peut avoir à justifier le temps
+            Heures de pointage* : 5 ans maximum, durée pendant laquelle l&apos;employeur peut avoir à justifier le temps
             de travail et la paie.
           </li>
           <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>

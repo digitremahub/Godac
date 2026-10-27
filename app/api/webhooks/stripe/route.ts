@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { effacerImpaye, enregistrerPaiementEchoue } from "@/lib/stripe/impaye-serveur";
 
 const STATUS_MAP: Record<Stripe.Subscription.Status, string> = {
   trialing: "trialing",
@@ -74,9 +75,21 @@ export async function POST(req: Request) {
         break;
       }
 
+      case "invoice.payment_failed": {
+        // Impayé : état enregistré et direction prévenue (cloche + e-mail). L'accès aux modules n'est PAS coupé (délai de grâce).
+        const invoice = event.data.object as Stripe.Invoice;
+        const organizationId = await organisationDeLaFacture(supabase, stripe, invoice);
+        if (organizationId) await enregistrerPaiementEchoue(supabase, organizationId, invoice);
+        else console.error("Stripe webhook : facture impayée sans organisation", invoice.id);
+        break;
+      }
+
       case "invoice.paid": {
         // Mise en service échelonnée : la ligne s'arrête après N factures payées.
         const invoice = event.data.object as Stripe.Invoice;
+        // Facture payée : plus d'impayé en cours.
+        const organisationPayee = await organisationDeLaFacture(supabase, stripe, invoice);
+        if (organisationPayee) await effacerImpaye(supabase, organisationPayee);
         const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
         if (!subscriptionId) break;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price.product"] });
@@ -103,6 +116,22 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+/**
+ * Organisation d'une facture : par le client Stripe (organizations.stripe_customer_id),
+ * sinon par les métadonnées de l'abonnement posées au checkout.
+ */
+async function organisationDeLaFacture(supabase: ReturnType<typeof createAdminSupabaseClient>, stripe: Stripe, invoice: Stripe.Invoice): Promise<string | null> {
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : (invoice.customer?.id ?? null);
+  if (customerId) {
+    const { data } = await supabase.from("organizations").select("id").eq("stripe_customer_id", customerId).maybeSingle();
+    if (data?.id) return data.id as string;
+  }
+  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : (invoice.subscription?.id ?? null);
+  if (!subscriptionId) return null;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  return subscription.metadata?.godac_organization_id ?? null;
 }
 
 const PLANS_VALIDES = ["essentiel", "starter", "pro", "business"] as const;

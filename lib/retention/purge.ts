@@ -7,6 +7,8 @@ import { RETENTION_AMENDES_JOURS, STATUTS_AMENDE_CLOTUREE, cheminsAmendes, limit
 export const RETENTION_DAYS = {
   /** Anonymised assistant questions awaiting FAQ drafting. */
   questionLog: 90,
+  /** Heures de pointage : 5 ans maximum, comme annoncé dans app/confidentialite (justification du temps de travail et de la paie). */
+  clockEntries: 5 * 365,
   /** GPS point recorded at clock-in/out (the clock times themselves are kept). */
   clockGps: 365,
   /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
@@ -47,6 +49,10 @@ export async function purgeExpiredData() {
     .lt("clocked_in_at", gpsCutoff)
     .not("clock_out_lat", "is", null);
   results.clockGpsOut = gpsOut.error ? gpsOut.error.message : (gpsOut.count ?? 0);
+
+  // Pointages de plus de 5 ans (durée annoncée) ; les heures de paie des bulletins validés sont figées dans les bulletins.
+  const pointages = await admin.from("time_clock_entries").delete({ count: "exact" }).lt("clocked_in_at", daysAgo(RETENTION_DAYS.clockEntries));
+  results.clockEntries = pointages.error ? pointages.error.message : (pointages.count ?? 0);
 
   const audit = await admin.from("audit_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.auditLog));
   results.auditLog = audit.error ? audit.error.message : (audit.count ?? 0);

@@ -197,15 +197,15 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
   let employeeDocuments: EmployeeDocument[] = [];
   if (isDirection && employeeFilesEnabled && employeeFile?.id) {
-    const { data: docs } = await supabase
-      .from("employee_documents")
-      .select("id, doc_type, uploaded_at, file_path")
-      .eq("employee_file_id", employeeFile.id)
-      .order("uploaded_at", { ascending: false });
+    // expires_at (migration 20261109000002) : repli sans la colonne.
+    const lireDocs = (colonnes: string) => supabase.from("employee_documents").select(colonnes).eq("employee_file_id", employeeFile.id).order("uploaded_at", { ascending: false });
+    let docsRes = await lireDocs("id, doc_type, uploaded_at, file_path, expires_at");
+    if (docsRes.error) docsRes = await lireDocs("id, doc_type, uploaded_at, file_path");
+    const docs = (docsRes.data ?? []) as unknown as { id: string; doc_type: string; uploaded_at: string; file_path: string; expires_at?: string | null }[];
     employeeDocuments = await Promise.all(
-      (docs ?? []).map(async (doc) => {
+      docs.map(async (doc) => {
         const { data: signed } = await supabase.storage.from("employee-documents").createSignedUrl(doc.file_path, 300);
-        return { id: doc.id, docType: doc.doc_type, uploadedAt: doc.uploaded_at, downloadUrl: signed?.signedUrl ?? null };
+        return { id: doc.id, docType: doc.doc_type, uploadedAt: doc.uploaded_at, downloadUrl: signed?.signedUrl ?? null, expiresAt: doc.expires_at ?? null };
       }),
     );
   }

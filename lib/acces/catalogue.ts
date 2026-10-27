@@ -795,6 +795,18 @@ export const ECRANS: readonly Ecran[] = [
     note: "comptable : prépare, la direction valide",
   }),
   E({
+    id: "equipe.paie_preparer",
+    section: "equipe",
+    libelle: "Préparer la paie du mois",
+    libelleSousOnglet: "Préparer le mois",
+    href: "/equipe/paie/preparer",
+    roles: ["direction", "comptable"],
+    modules: ["payslips"],
+    icone: "coins",
+    parent: "equipe.paie",
+    note: "tous les bulletins en un clic, comparaison au mois précédent, anomalies ; la direction valide",
+  }),
+  E({
     id: "equipe.heures",
     section: "equipe",
     libelle: "Heures & salaires",

@@ -8,9 +8,10 @@ import { MODES_PAIEMENT, paiementDuBulletin } from "@/lib/paie/paiement";
 import { networkErrorMessage } from "@/lib/utils/network-error";
 import { TYPES_ARRET } from "@/lib/paie/arrets";
 import { LIBELLE_MOTIF } from "@/lib/paie/sortie";
-import type { ArretTravail, TypeArret } from "@/lib/paie/types";
+import type { ArretTravail, NaturePrime, TypeArret } from "@/lib/paie/types";
 import type { ModePaiement, ParametresEntreprise, ParametresLegaux, PeriodeConges, Prime, ProfilSalarie, RegimeTransport, Retenue, Section, TypeRetenue, TypeTauxPas, VariablesMois } from "@/lib/paie/types";
 import { joursOuvrables } from "@/lib/paie/conges";
+import { LIBELLE_NATURE_PRIME, marquerPrime, primeRecopieeSansMarqueur } from "@/lib/paie/primes";
 
 const eur = (n: number | null) => (n === null ? "" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const REGIMES: { key: RegimeTransport; label: string }[] = [
@@ -459,6 +460,21 @@ export function PaieEditor({
                 <input type="checkbox" checked={p.soumise} onChange={(e) => setPrimes(primes.map((x, j) => (j === i ? { ...x, soumise: e.target.checked } : x)))} />
                 soumise
               </label>
+              <select
+                className="input w-auto !py-1.5 text-xs"
+                value={p.nature ?? ""}
+                onChange={(e) => setPrimes(primes.map((x, j) => (j === i ? marquerPrime(x, (e.target.value || undefined) as NaturePrime | undefined) : x)))}
+                aria-label="Nature de la prime : récurrente ou ponctuelle"
+              >
+                <option value="">{p.recopiee ? "Recopiée : à préciser" : "Nature non précisée"}</option>
+                <option value="recurrente">{LIBELLE_NATURE_PRIME.recurrente}</option>
+                <option value="ponctuelle">{LIBELLE_NATURE_PRIME.ponctuelle}</option>
+              </select>
+              {primeRecopieeSansMarqueur(p) && (
+                <span className="w-full text-xs" style={{ color: "#d62718" }}>
+                  Prime recopiée du mois précédent : précisez si elle est récurrente ou ponctuelle (sinon elle sera reprise le mois suivant).
+                </span>
+              )}
               <button type="button" className="btn-ghost !px-2 !py-1 text-xs text-orange-ink" onClick={() => setPrimes(primes.filter((_, j) => j !== i))}>
                 Retirer
               </button>

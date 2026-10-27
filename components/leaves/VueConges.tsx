@@ -12,6 +12,7 @@ import { urlDe } from "@/lib/acces/catalogue";
 import { lireArrets } from "@/lib/arrets/serveur";
 import { contexteHierarchie, rolesParId } from "@/lib/hierarchie/serveur";
 import { droitsDecision, libelleEnAttente } from "@/lib/hierarchie/demandes";
+import { affectationsParConge } from "@/lib/leaves/planning-serveur";
 
 /**
  * Congés : Équipe › Congés (encadrement : décisions sur son service, avec
@@ -74,6 +75,9 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
   const droitsDe = (r: any) =>
     droitsDecision({ moi: { id: appUser.id, role: appUser.role }, demandeur: { id: r.driver_id, role: roles.get(r.driver_id) ?? "chauffeur" }, directionCount });
 
+  // Congés approuvés à venir qui recouvrent des affectations déjà posées au planning (encadrement seulement).
+  const touchees = decision ? await affectationsParConge(supabase, appUser.organization_id, rows, aujourdhui) : new Map<string, number>();
+
   // Arrêts de travail reçus, à vérifier (encadrement) : rappel en tête.
   const arretsRecus = decision ? (await lireArrets(supabase, { limite: 200 })).lignes.filter((a) => a.statut === "recu") : [];
   const rolesArrets = await rolesParId(supabase, appUser.organization_id, arretsRecus.map((a) => a.userId));
@@ -128,6 +132,7 @@ export async function VueConges({ appUser, supabase, decision }: { appUser: AppU
           isOwn: r.driver_id === appUser.id,
           overlapWith: overlapsByLeaveId.get(r.id) ?? [],
           solde: soldeLigne(r),
+          affectationsALiberer: touchees.get(r.id) ?? 0,
           peutDecider: decision ? droitsDe(r).peutDecider : false,
           autoValidee: decision ? droitsDe(r).autoValidee : false,
           mention: decision ? droitsDe(r).mention : null,

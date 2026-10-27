@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { IconAlertTriangle } from "@/components/layout/icons";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface LeaveRow {
   id: string;
@@ -17,6 +18,8 @@ interface LeaveRow {
   overlapWith: string[];
   /** Solde de congés du demandeur et effet de cette demande. */
   solde?: { disponible: number; jours: number; insuffisant: boolean } | null;
+  /** Affectations du planning encore prévues et à venir sur un congé approuvé (libérables). */
+  affectationsALiberer?: number;
   /** Hiérarchie des demandes : cette personne peut-elle décider cette demande ? */
   peutDecider?: boolean;
   /** Direction seule qui décide de sa propre demande (tracée « auto-validée »). */
@@ -41,6 +44,23 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
   const [editEnd, setEditEnd] = useState("");
   const [editReason, setEditReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function liberer(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/leaves/${id}/liberer`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Libération impossible.");
+      setNotice(`${json.liberees} affectation${json.liberees > 1 ? "s" : ""} libérée${json.liberees > 1 ? "s" : ""} : la tournée reste au planning, sans chauffeur.`);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inattendue");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   function startEdit(leave: LeaveRow) {
     setEditingId(leave.id);
@@ -50,17 +70,24 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
     setError(null);
   }
 
-  async function decide(id: string, status: "approved" | "rejected") {
+  async function decide(id: string, status: "approved" | "rejected", confirmerSoldeInsuffisant = false) {
     setBusyId(id);
     setError(null);
     try {
       const res = await fetch(`/api/leaves/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(confirmerSoldeInsuffisant ? { confirmerSoldeInsuffisant: true } : {}) }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      // Solde insuffisant : le serveur demande une confirmation explicite avant d'approuver.
+      if (res.status === 409 && json.code === "SOLDE_INSUFFISANT") {
+        setBusyId(null);
+        if (await confirmer({ titre: "Solde insuffisant", message: json.error, action: "Approuver quand même" })) return decide(id, status, true);
+        return;
+      }
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : (json.error?.message ?? "Erreur"));
+      setNotice(status === "approved" && json.affectationsTouchees > 0 ? `${json.affectationsTouchees} affectation${json.affectationsTouchees > 1 ? "s" : ""} du planning ${json.affectationsTouchees > 1 ? "sont posées" : "est posée"} sur ces jours : l'encadrement est prévenu, vous pouvez les libérer.` : null);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inattendue");
@@ -96,6 +123,7 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
   return (
     <Card className="overflow-x-auto">
       {error && <p role="alert" className="mb-3 text-sm text-orange-ink">{error}</p>}
+      {notice && <p role="status" className="mb-3 text-sm text-teal-ink">{notice}</p>}
       <table className="w-full min-w-[720px] text-sm">
         <thead className="text-left text-navy/60">
           <tr>
@@ -149,6 +177,16 @@ export function LeaveRequestsList({ leaves, canDecide }: { leaves: LeaveRow[]; c
                   {leave.solde && (
                     <p className={`mt-1 text-xs ${leave.solde.insuffisant ? "font-semibold text-orange-ink" : "text-navy/60"}`}>
                       {leave.solde.jours} j ouvr. · solde {leave.solde.disponible} j{leave.solde.insuffisant ? " · solde insuffisant" : ""}
+                    </p>
+                  )}
+                  {canDecide && leave.status === "approved" && (leave.affectationsALiberer ?? 0) > 0 && (
+                    <p className="mt-1 text-xs text-orange-ink">
+                      <IconAlertTriangle className="inline-block h-4 w-4 shrink-0 align-[-0.2em]" /> {leave.affectationsALiberer} affectation{leave.affectationsALiberer! > 1 ? "s" : ""} du planning sur ces jours
+                      {leave.peutDecider !== false && (
+                        <button className="btn-secondary ml-2 !px-2 !py-1 text-xs" disabled={busyId === leave.id} onClick={() => liberer(leave.id)}>
+                          Libérer
+                        </button>
+                      )}
                     </p>
                   )}
                   {leave.overlapWith.length > 0 && (

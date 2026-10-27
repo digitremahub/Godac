@@ -19,6 +19,11 @@ import { LIBELLES_ETAT, aSurveiller, libelleRetard, libelleSignal, trierRetards 
 import { lireFusions } from "@/lib/planning/fusion-serveur";
 import { resumeRepartition, texteAAttribuer } from "@/lib/planning/fusion";
 import { parisDay } from "@/lib/utils/paris-time";
+import { addDays } from "@/lib/planning/dates";
+import { paysOrganisation } from "@/lib/pays/serveur";
+import { MENTION_A_VALIDER, reglesTempsTravail } from "@/lib/pays/temps-travail";
+import { LIBELLE_CONTROLE_REPOS, controlerTempsTravail, joursDepuisPointages } from "@/lib/time-clock/repos";
+import { estValeurEnumInconnue } from "@/lib/rattachement/tolerance";
 import { echeancesSouhaitees } from "@/lib/alerts/echeances";
 import { lireAmendesAEcheance, lireDocumentsVehicules } from "@/lib/alerts/echeances-serveur";
 import { PLAFOND_PAR_SOURCE, ROLES_A_TRAITER, construireListe, typeVisiblePour, type ElementBrut, type PersonneConnue, type ResultatListe, type TypeATraiter } from "@/lib/a-traiter/logique";
@@ -584,6 +589,109 @@ export async function chargerATraiter(supabase: Db, appUser: AppUser, modules: R
             paie: true,
             groupable: true,
           })),
+        };
+      },
+    },
+    {
+      // Sorties oubliées : pointages clos la nuit avec une heure estimée, à corriger (motif obligatoire). Lecture sous la RLS du pointage (manager : son service).
+      type: "pointage_a_regulariser",
+      nom: "pointages à régulariser",
+      ecran: "equipe.pointage",
+      lire: async () => {
+        const rows = await lire<any>(
+          supabase.from("time_clock_entries").select("id, user_id, clocked_in_at, clocked_out_at, estimated_out_source").eq("organization_id", org).eq("needs_regularization", true).order("clocked_in_at", { ascending: true }).limit(PLAFOND_PAR_SOURCE),
+        );
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows.map((p) => ({
+            type: "pointage_a_regulariser" as const,
+            id: p.id,
+            libelle: "Pointage à régulariser · {nom}",
+            detail: `Entrée le ${jourCourt(p.clocked_in_at)} à ${heure(p.clocked_in_at)} · ${p.estimated_out_source === "a_saisir" ? "sortie à saisir" : `sortie estimée à ${heure(p.clocked_out_at)}`}`,
+            depuis: p.clocked_in_at,
+            ecran: "equipe.pointage",
+            href: urlDe("equipe.pointage"),
+            // Hiérarchie : on ne régularise pas son propre pointage (direction seule : tracé).
+            auteurId: p.user_id,
+            personneId: p.user_id,
+          })),
+        };
+      },
+    },
+    {
+      // Repos quotidien, amplitude, durée hebdomadaire, jours consécutifs (7 derniers jours) : avertissements non bloquants, à valider avec l'expert paie.
+      type: "repos_conduite",
+      nom: "repos et durée du travail",
+      ecran: "equipe.pointage",
+      lire: async () => {
+        const regles = reglesTempsTravail((await paysOrganisation(supabase, org)).code);
+        if (!regles) return { brutes: [] };
+        const depuis = new Date(maintenant.getTime() - 14 * 86_400_000).toISOString();
+        const rows = await lire<any>(supabase.from("time_clock_entries").select("user_id, clocked_in_at, clocked_out_at").eq("organization_id", org).gte("clocked_in_at", depuis).order("clocked_in_at").limit(5000));
+        const parSalarie = new Map<string, { entree: string; sortie: string | null }[]>();
+        for (const r of rows) parSalarie.set(r.user_id, [...(parSalarie.get(r.user_id) ?? []), { entree: r.clocked_in_at, sortie: r.clocked_out_at }]);
+        const limite = addDays(aujourdhui, -7);
+        const brutes: ElementBrut[] = [];
+        for (const [userId, pointages] of parSalarie) {
+          const avertissements = controlerTempsTravail(joursDepuisPointages(pointages), regles).filter((a) => a.jour >= limite);
+          if (avertissements.length === 0) continue;
+          const dernier = avertissements[avertissements.length - 1]!;
+          const codes = [...new Set(avertissements.map((a) => a.code))];
+          brutes.push({
+            type: "repos_conduite",
+            id: `${userId}:${dernier.jour}:${codes.join("+")}`,
+            libelle: "Repos ou durée du travail à vérifier · {nom}",
+            detail: `${codes.map((c) => LIBELLE_CONTROLE_REPOS[c]).join(", ")} · ${court(dernier.message, 120)} (${MENTION_A_VALIDER})`,
+            depuis: `${dernier.jour}T12:00:00Z`,
+            ecran: "equipe.pointage",
+            href: urlDe("equipe.pointage"),
+            personneId: userId,
+          });
+        }
+        return { plafonne: brutes.length >= PLAFOND_PAR_SOURCE, brutes: brutes.slice(0, PLAFOND_PAR_SOURCE) };
+      },
+    },
+    {
+      // Permis, visite médicale, fin de contrat, documents datés : alertes du cron RH (lues sous la RLS : un manager ne voit que les genres non sensibles de son service).
+      // Aucune donnée médicale : seulement « visite médicale à renouveler ».
+      type: "echeance_rh",
+      nom: "échéances RH",
+      ecran: "equipe.utilisateur_fiche",
+      lire: async () => {
+        const { data, error } = await supabase
+          .from("alerts")
+          .select("id, severity, message, related_id, created_at, cle_dedoublonnage")
+          .eq("organization_id", org)
+          .eq("type", "echeance_rh")
+          .in("status", ["open", "acknowledged"])
+          .order("created_at", { ascending: true })
+          .limit(PLAFOND_PAR_SOURCE);
+        // Type d'alerte ou colonne absents (migrations 20261109000001/2 pas appliquées) : rien à lister.
+        if (error) {
+          if (estSchemaManquant(error) || estValeurEnumInconnue(error)) return { brutes: [] };
+          throw new Error(error.message);
+        }
+        const rows = (data ?? []) as { id: string; severity: string; message: string; related_id: string | null; created_at: string; cle_dedoublonnage: string | null }[];
+        return {
+          plafonne: rows.length >= PLAFOND_PAR_SOURCE,
+          brutes: rows
+            .filter((a) => a.related_id)
+            .map((a) => {
+              const [libelle, ...reste] = a.message.split(" : ");
+              // Clé : rh:<genre>:<objet>:<AAAA-MM-JJ>:<palier>.
+              const echeance = a.cle_dedoublonnage?.split(":")[3] ?? null;
+              return {
+                type: "echeance_rh" as const,
+                id: a.id,
+                libelle: libelle!,
+                detail: reste.length ? court(reste.join(" : "), 140) : null,
+                depuis: a.created_at,
+                echeance,
+                critique: a.severity !== "info",
+                ecran: "equipe.utilisateur_fiche",
+                href: urlDe("equipe.utilisateur_fiche", { id: a.related_id! }),
+              };
+            }),
         };
       },
     },

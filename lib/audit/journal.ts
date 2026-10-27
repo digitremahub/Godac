@@ -72,6 +72,20 @@ export const ACTIONS_AUDIT = {
   tournee_fusion_modifiee: "Tournée fusionnée (lundi) : tournées d'origine modifiées",
   tournee_repartition_modifiee: "Tournée fusionnée : villages et ramasses répartis (provisoire)",
   tournee_repartition_reconciliee: "Tournée fusionnée : répartition alignée sur les tournées réelles",
+  pointage_cloture_auto: "Pointages restés ouverts clos automatiquement (sortie estimée, à régulariser)",
+  pointage_regularise: "Pointage régularisé (heure de sortie corrigée, avec motif)",
+  pointage_ajoute: "Pointage manquant ajouté par l'encadrement (avec motif)",
+  planning_affectation: "Planning : chauffeur affecté, remplacé ou retiré d'une tournée",
+  planning_tournee_retiree: "Planning : tournée ou présence supprimée",
+  conge_decision: "Congé approuvé ou refusé",
+  conge_affectations_liberees: "Affectations du planning libérées (congé approuvé)",
+  paie_profil_modifie: "Profil de paie modifié (taux horaire, régime, heures)",
+  contrat_modifie: "Contrat ou rémunération modifié",
+  utilisateur_invite: "Utilisateur invité ou créé (rôle attribué)",
+  organisation_modifiee: "Paramètres de l'organisation modifiés",
+  paie_lot_prepare: "Paie du mois préparée en lot (bulletins en attente de validation)",
+  facturation_impaye: "Paiement échoué enregistré (facture Stripe impayée)",
+  palier_stripe_echec: "Palier d'utilisateurs : mise à jour Stripe en échec (reprise au prochain passage)",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

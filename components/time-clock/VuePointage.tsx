@@ -11,6 +11,9 @@ import { voitToutLOrganisation } from "@/lib/roles/perimetre";
 import { lireArrets } from "@/lib/arrets/serveur";
 import { dateCourte } from "@/lib/arrets/declaration";
 import { parisDay } from "@/lib/utils/paris-time";
+import { listerPointagesARegulariser, sortieAConfirmer } from "@/lib/time-clock/regularisation-serveur";
+import { PointagesARegulariser } from "@/components/time-clock/PointagesARegulariser";
+import { messageSortieAConfirmer } from "@/lib/time-clock/regularisation";
 
 function formatDuration(startIso: string, endIso: string | null) {
   const start = new Date(startIso).getTime();
@@ -89,9 +92,27 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
     nomsEnArret = ((u ?? []) as { full_name: string }[]).map((x) => x.full_name).sort();
   }
 
+  // Sorties oubliées, closes la nuit avec une heure estimée : l'encadrement les régularise, le salarié voit « sortie à confirmer ».
+  // Lectures tolérantes (migration 20261109000002 absente : rien à afficher).
+  const aRegulariser = vueEquipe ? await listerPointagesARegulariser(supabase, appUser.organization_id).catch(() => []) : [];
+  const monAConfirmer = vueEquipe ? null : await sortieAConfirmer(supabase, appUser.id).catch(() => null);
+  const aRegulariserIds = new Set(aRegulariser.map((p) => p.id));
+  let salaries: { id: string; nom: string }[] = [];
+  if (vueEquipe) {
+    const { data: u } = await supabase.from("users").select("id, full_name").eq("organization_id", appUser.organization_id).eq("active", true).order("full_name");
+    salaries = ((u ?? []) as { id: string; full_name: string }[]).map((x) => ({ id: x.id, nom: x.full_name }));
+  }
+
   return (
     <div>
       <PageHeader title="Pointeuse électronique" description="Badgez votre entrée et votre sortie de poste." />
+
+      {monAConfirmer && (
+        <p role="status" className="mb-4 max-w-xl rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">
+          {messageSortieAConfirmer({ sortieEstimee: monAConfirmer.sortieEstimee, source: monAConfirmer.source })}
+        </p>
+      )}
+      {vueEquipe && <PointagesARegulariser pointages={aRegulariser} salaries={salaries} moi={appUser.id} />}
 
       {monArret && (
         <p role="status" className="mb-4 max-w-xl rounded-lg bg-teal/10 px-3 py-2 text-sm text-teal-ink">
@@ -139,6 +160,7 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
                     )}
                   </span>
                   {" → "}
+                  {aRegulariserIds.has(e.id) && <span className="badge-orange mr-1">À régulariser</span>}
                   {e.clocked_out_at ? (
                     <>
                       {new Date(e.clocked_out_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { verdictDemandeConges, type SoldeConges } from "@/lib/paie/conges";
+import { confirmer } from "@/lib/ui/confirmation";
 
 interface ServiceOption {
   id: string;
@@ -56,7 +57,7 @@ export function LeaveRequestForm({ services, solde = null }: { services: Service
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  async function submit() {
+  async function submit(confirmerSoldeInsuffisant = false) {
     setBusy(true);
     setError(null);
     setSent(false);
@@ -64,10 +65,16 @@ export function LeaveRequestForm({ services, solde = null }: { services: Service
       const res = await fetch("/api/leaves", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_id: serviceId, start_date: startDate, end_date: endDate, reason: reason || undefined }),
+        body: JSON.stringify({ service_id: serviceId, start_date: startDate, end_date: endDate, reason: reason || undefined, ...(confirmerSoldeInsuffisant ? { confirmerSoldeInsuffisant: true } : {}) }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? JSON.stringify(json.error) ?? "Erreur");
+      // Le serveur contrôle le solde : insuffisant, il demande une confirmation explicite.
+      if (res.status === 409 && json.code === "SOLDE_INSUFFISANT") {
+        setBusy(false);
+        if (await confirmer({ titre: "Solde insuffisant", message: json.error, action: "Envoyer quand même" })) return submit(true);
+        return;
+      }
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : (json.error?.message ?? "Erreur"));
       setSent(true);
       setStartDate("");
       setEndDate("");
@@ -132,7 +139,7 @@ export function LeaveRequestForm({ services, solde = null }: { services: Service
       <button
         className="btn-primary self-start"
         disabled={busy || !serviceId || !startDate || !endDate}
-        onClick={submit}
+        onClick={() => submit()}
       >
         {busy ? "Envoi…" : "Envoyer la demande"}
       </button>

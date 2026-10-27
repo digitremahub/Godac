@@ -290,6 +290,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (contractual_monthly_hours !== undefined) contractFields.contractual_monthly_hours = contractual_monthly_hours;
     const { error: contractError } = await supabase.from("user_contracts").upsert(contractFields, { onConflict: "user_id" });
     if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
+    await journaliser({
+      organizationId: appUser.organization_id,
+      userId: appUser.id,
+      action: "contrat_modifie",
+      targetTable: "user_contracts",
+      targetId: id,
+      details: { salarie: id, champs: Object.keys(contractFields).filter((k) => k !== "user_id" && k !== "updated_at") },
+    });
   }
 
   if (
