@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cleCaseTournee, cleLigne, estJourPrevu, etatCase, nomCourt, type LigneTournee } from "@/lib/planning/affectation";
+import { cleCaseTournee, cleLigne, estCaseVerrouillee, estJourPrevu, etatCase, nomCourt, type LigneTournee } from "@/lib/planning/affectation";
 import { estModifiable, heureDe, jourDe, statutAffectation } from "@/lib/planning/semaine";
 import { estOuverte, ligneCorrespond } from "@/lib/planning/ouverture";
-import { BoutonFermerNonAffectee, BoutonOuverture, BoutonRepartir, EncartFermee, PastilleFermee, PastilleFusion } from "@/components/planning/OuvertureFusion";
+import { BadgeDoublon, BoutonFermerNonAffectee, BoutonOuverture, BoutonRepartir, EncartFermee, EncartFusionnee, HACHURES, PastilleFermee, PastilleFusion, PastilleFusionnee } from "@/components/planning/OuvertureFusion";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, Vehicule, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
 type Tri = "heure" | "numero" | "trous";
@@ -25,12 +25,12 @@ export function AffectationsJour({ date: dateDonnee }: { date?: string } = {}) {
   const cartes = useMemo(() => {
     const avec = ctx.lignes.map((l) => {
       const entrees = ctx.parCase.get(cleCaseTournee(l.cle, date)) ?? [];
-      return { ligne: l, entrees, etat: etatCase(entrees, estJourPrevu(l, date)) };
+      return { ligne: l, entrees, etat: etatCase(entrees, estJourPrevu(l, date), estCaseVerrouillee(ctx.verrous, l, date)) };
     });
     const tries = [...avec].sort((a, b) => {
       if (tri === "numero") return a.ligne.tourNumber.localeCompare(b.ligne.tourNumber, "fr", { numeric: true });
       if (tri === "trous") {
-        const poids = (e: string) => (e === "a_remplacer" || e === "vide_prevue" ? 0 : 1);
+        const poids = (e: string) => (e === "a_remplacer" || e === "vide_prevue" ? 0 : e === "fusionnee" ? 2 : 1);
         return poids(a.etat) - poids(b.etat) || heureCarte(a) - heureCarte(b);
       }
       return heureCarte(a) - heureCarte(b) || a.ligne.tourNumber.localeCompare(b.ligne.tourNumber, "fr", { numeric: true });
@@ -38,7 +38,7 @@ export function AffectationsJour({ date: dateDonnee }: { date?: string } = {}) {
     // Filtre Ouvertes / Fermées / Toutes : les cartes sans affectation comptent comme ouvertes.
     const montrees = tries.filter((c) => ligneCorrespond(ctx.filtreOuverture, c.entrees));
     return { roulent: montrees.filter((c) => c.etat !== "vide"), autres: montrees.filter((c) => c.etat === "vide") };
-  }, [ctx.lignes, ctx.parCase, ctx.filtreOuverture, date, tri]);
+  }, [ctx.lignes, ctx.parCase, ctx.verrous, ctx.filtreOuverture, date, tri]);
 
   return (
     <section aria-labelledby="titre-tournees" className="min-w-0">
@@ -87,7 +87,8 @@ function heureCarte(c: { ligne: LigneTournee; entrees: EntreeAffectation[] }): n
 
 export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne: LigneTournee; date: string; entrees: EntreeAffectation[]; horsJour?: boolean }) {
   const ctx = useAffectations();
-  const etat = etatCase(entrees, !horsJour);
+  const verrou = ctx.verrous.get(cleCaseTournee(ligne.cle, date)) ?? null;
+  const etat = etatCase(entrees, !horsJour, Boolean(verrou));
   const trou = etat === "a_remplacer" || etat === "vide_prevue";
   const heure = entrees[0] ? heureDe(entrees[0].start_at) : ligne.heure;
   const colis = entrees.reduce((n, e) => n + (ctx.donnees.colis[e.id] ?? 0), 0);
@@ -98,6 +99,32 @@ export function CarteTournee({ ligne, date, entrees, horsJour = false }: { ligne
   const fermable = !fermee && entrees.every((e) => !e.driver_id) && (etat === "vide_prevue" || etat === "a_remplacer" || horsJour);
   const libelleEtat = etat === "remplie" ? "Affectée" : etat === "a_remplacer" ? "À remplacer" : "Sans chauffeur";
   const arme = ctx.arme;
+
+  // Tournée d'origine d'une fusion : case verrouillée, grisée et hachurée, sans zone de dépôt ni choix de chauffeur.
+  if (verrou) {
+    const doublonsCarte = ctx.doublons.filter((d) => d.verrou.cle === verrou.cle);
+    return (
+      <li>
+        <div data-case="" data-fusionnee="" className="flex h-full flex-col rounded-2xl border-2 border-navy/15 bg-surface p-3.5 shadow-card" style={HACHURES} aria-label={`Tournée ${ligne.tourNumber} : ${verrou.hoteNumero ? `fusionnée avec la n°${verrou.hoteNumero}` : "fusionnée"}`}>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-display text-xl font-extrabold leading-none text-navy/65">{ligne.tourNumber}</h3>
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
+              {doublonsCarte.length > 0 && <BadgeDoublon />}
+              <PastilleFusionnee verrou={verrou} />
+            </span>
+          </div>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-navy/65 max-md:text-sm">
+            <span className="tabular-nums">{ligne.heure}</span>
+            {secteur && <span>· {secteur}</span>}
+            {ctx.donnees.serviceIds.length > 1 && <span className="text-navy/50">· {ctx.donnees.services.find((s) => s.id === ligne.serviceId)?.name}</span>}
+          </p>
+          <div className="mt-2.5">
+            <EncartFusionnee verrou={verrou} doublons={doublonsCarte} />
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li>

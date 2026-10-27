@@ -12,6 +12,7 @@ import {
   compteursDuJour,
   decisionsAffectation,
   estAbsent,
+  estCaseVerrouillee,
   estJourPrevu,
   etatCase,
   etapesDeplacement,
@@ -28,6 +29,7 @@ import {
 import { chauffeursAffiches, heureDe, jourDe, JOURS_LONGS, libelleJour, preRemplir, rangJour } from "@/lib/planning/semaine";
 import { compterFermees, estOuverte, ligneCorrespond, type FiltreOuverture } from "@/lib/planning/ouverture";
 import { texteFermeture, texteReouverture } from "@/lib/planning/fermeture-tournee";
+import { doublonsFusion, messageVerrou, type DoublonFusion, type VerrouFusion } from "@/lib/planning/fusion-verrou";
 import { textePublication } from "@/lib/planning/publication";
 import { confirmer } from "@/lib/ui/confirmation";
 import { Avatar, Contexte, type ContexteAffectations, type DonneesAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
@@ -37,7 +39,7 @@ import { CalendrierMois, SemaineMobile } from "@/components/planning/Affectation
 import { ColonneChauffeurs } from "@/components/planning/ColonneChauffeurs";
 import { FeuilleAffecter, type CibleFeuille } from "@/components/planning/FeuilleAffecter";
 import { FeuilleRepartir } from "@/components/planning/FeuilleRepartir";
-import { FiltreOuvertureBarre } from "@/components/planning/OuvertureFusion";
+import { BandeauDoublons, FiltreOuvertureBarre } from "@/components/planning/OuvertureFusion";
 import { FeuilleHeure, type CibleHeure, type PorteeHeure } from "@/components/planning/FeuilleHeure";
 import { texteChangementHeure } from "@/lib/planning/heure";
 import { RecopieSemaines } from "@/components/planning/RecopieSemaines";
@@ -55,7 +57,7 @@ type Etape =
   | { type: "retirer"; entree: EntreeAffectation }
   | { type: "supprimer"; entree: EntreeAffectation };
 
-type ReponseAffecter = { places: number; absents: string[]; figees: number; fermees?: number; deja: number; warning?: string | null };
+type ReponseAffecter = { places: number; absents: string[]; figees: number; fermees?: number; fusionnees?: number; deja: number; warning?: string | null };
 type Resultat = { ok: true; texte: string | null; warning: string | null; absents: number } | { ok: false; choix: ChoixRegroupementData } | { ok: false; erreur: string };
 
 type Fenetre =
@@ -122,6 +124,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     [donnees.routes, donnees.modeles, affichees, donnees.serviceIds, donnees.selectedService],
   );
   const parCase = useMemo(() => affectationsParTournee(affichees), [affichees]);
+  // Cases verrouillées par une fusion (tournées d'origine) et affectations qui y subsistent (doublons).
+  const verrous = useMemo(() => new Map(donnees.verrous.map((v) => [v.cle, v])), [donnees.verrous]);
+  const doublons = useMemo(() => doublonsFusion(affichees, verrous), [affichees, verrous]);
   // Filtre Ouvertes / Fermées : une ligne reste si une de ses affectations de la période correspond (la vue Jour filtre ses cartes elle-même).
   const lignesVisibles = useMemo(
     () => (filtreOuverture === "toutes" ? lignes : lignes.filter((l) => ligneCorrespond(filtreOuverture, jours.flatMap((d) => parCase.get(cleCaseTournee(l.cle, d)) ?? [])))),
@@ -197,7 +202,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
       if (question) return { ok: false, choix: question };
       if (!res.ok) return { ok: false, erreur: lireRefus(res.status, corps).message };
       const r = corps as ReponseAffecter;
-      return { ok: true, texte: texteAffectation({ places: r.places, absents: r.absents ?? [], figees: r.figees ?? 0, fermees: r.fermees ?? 0, deja: r.deja ?? 0 }, libelleJour), warning: r.warning ?? null, absents: (r.absents ?? []).length };
+      return { ok: true, texte: texteAffectation({ places: r.places, absents: r.absents ?? [], figees: r.figees ?? 0, fermees: r.fermees ?? 0, fusionnees: r.fusionnees ?? 0, deja: r.deja ?? 0 }, libelleJour), warning: r.warning ?? null, absents: (r.absents ?? []).length };
     }
     if (e.entree.id.startsWith("tmp:")) return { ok: false, erreur: "Enregistrement en cours : réessayez dans un instant." };
     if (e.type === "retirer") {
@@ -259,8 +264,13 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   // --- Gestes -------------------------------------------------------------
   const ligneDe = (cle: string) => lignes.find((l) => l.cle === cle);
 
-  function placer(ligne: LigneTournee, dates: string[], chauffeur: { id: string; full_name: string }, heure?: { valeur: string; imposee?: boolean }) {
+  function placer(ligne: LigneTournee, datesDemandees: string[], chauffeur: { id: string; full_name: string }, heure?: { valeur: string; imposee?: boolean }) {
+    let dates = datesDemandees;
     if (!dates.length) return setMessage({ texte: "Aucun jour à remplir.", ton: "attention" });
+    // Tournée d'origine d'une fusion : case verrouillée, jamais affectée (le serveur le refuse aussi).
+    const fusionnees = dates.filter((d) => estCaseVerrouillee(verrous, ligne, d));
+    if (fusionnees.length === dates.length) return setMessage({ texte: messageVerrou(verrous.get(cleCaseTournee(ligne.cle, fusionnees[0]!))!), ton: "attention" });
+    if (fusionnees.length) dates = dates.filter((d) => !fusionnees.includes(d));
     // Tournée fermée sans chauffeur : pas d'affectation tant qu'elle n'est pas rouverte (les jours mêlés sont triés par le serveur).
     const fermees = dates.filter((d) => etatCase(parCase.get(cleCaseTournee(ligne.cle, d)) ?? [], estJourPrevu(ligne, d)) === "fermee");
     if (fermees.length === dates.length) {
@@ -269,7 +279,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     // Un dimanche rempli doit se voir tout de suite.
     if (dates.some((d) => rangJour(d) === 6)) setDimancheDemande(true);
     const libelle = dates.length === 1 ? `${ligne.tourNumber} du ${libelleJour(dates[0]!)} → ${nomCourt(chauffeur.full_name)}` : `${ligne.tourNumber} → ${nomCourt(chauffeur.full_name)} (${dates.length} jours)`;
-    void executer([{ type: "placer", ligne, dates, driverId: chauffeur.id, ...(heure ? { heure: heure.valeur, imposerHeure: heure.imposee } : {}) }], libelle);
+    const noteFusion = fusionnees.length ? ` (${fusionnees.length} jour${fusionnees.length > 1 ? "s" : ""} fusionné${fusionnees.length > 1 ? "s" : ""}, ignoré${fusionnees.length > 1 ? "s" : ""})` : "";
+    void executer([{ type: "placer", ligne, dates, driverId: chauffeur.id, ...(heure ? { heure: heure.valeur, imposerHeure: heure.imposee } : {}) }], `${libelle}${noteFusion}`);
   }
 
   function retirer(entree: EntreeAffectation) {
@@ -297,6 +308,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         const [cle, date] = cible.slice(5).split("@") as [string, string];
         const ligne = ligneDe(cle);
         if (!ligne) return;
+        if (estCaseVerrouillee(verrous, ligne, date)) return setMessage({ texte: messageVerrou(verrous.get(cleCaseTournee(cle, date))!), ton: "attention" });
         if (absent(id, date)) return setMessage({ texte: `${nomCourt(chauffeur.full_name)} est absent le ${libelleJour(date)} (congé ou arrêt) : choisissez quelqu'un d'autre.`, ton: "attention" });
         return placer(ligne, [date], chauffeur);
       }
@@ -322,6 +334,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
       const [cle, date] = cible.slice(5).split("@") as [string, string];
       const ligne = ligneDe(cle);
       if (!ligne || (cle === source.cle && date === source.date)) return;
+      if (estCaseVerrouillee(verrous, ligne, date)) return setMessage({ texte: messageVerrou(verrous.get(cleCaseTournee(cle, date))!), ton: "attention" });
       if (absent(entree.driver_id, date)) return setMessage({ texte: `${nom} est absent le ${libelleJour(date)} (congé ou arrêt).`, ton: "attention" });
       const occupant = (parCase.get(cleCaseTournee(cle, date)) ?? []).find((a) => a.status === "planned");
 
@@ -398,6 +411,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
   // --- Toucher puis choisir ----------------------------------------------
   function ouvrirCase(cle: string, date: string) {
     const ligne = ligneDe(cle);
+    // Case verrouillée par une fusion : pas de choix de chauffeur, un message clair.
+    const verrou = verrous.get(cleCaseTournee(cle, date));
+    if (verrou) return setMessage({ texte: messageVerrou(verrou), ton: "attention" });
     if (arme && ligne && donnees.peutModifier) {
       if (absent(arme.id, date)) return setMessage({ texte: `${nomCourt(arme.full_name)} est absent le ${libelleJour(date)} (congé ou arrêt).`, ton: "attention" });
       return placer(ligne, [date], arme);
@@ -408,6 +424,38 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     const ligne = ligneDe(cle);
     if (arme && ligne) return placer(ligne, joursLigne(ligne), arme);
     setFenetre({ type: "feuille", cible: { type: "ligne", cle } });
+  }
+
+  // --- Tournée d'origine d'une fusion ---------------------------------------
+  /** Ouvre la tournée hôte du jour (feuille « Répartir » de sa ligne de planning). */
+  function ouvrirHote(v: VerrouFusion) {
+    const hote = localRef.current.find((a) => a.id === v.hoteEntryId);
+    if (!hote) return setMessage({ texte: `La tournée ${v.hoteNumero} est introuvable sur la période affichée.`, ton: "attention" });
+    setFenetre({ type: "repartir", entree: hote });
+  }
+
+  /** « Retirer l'affectation » d'un doublon : confirmation, puis la ligne est retirée (trace d'audit côté serveur). */
+  async function retirerDoublon(d: DoublonFusion) {
+    if (d.entryId.startsWith("tmp:")) return setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" });
+    const nom = nomCourt(nomChauffeur(d.driverId));
+    const ok = await confirmer({
+      titre: `Retirer ${nom} de la tournée ${d.tourNumber} ?`,
+      message: `La tournée ${d.tourNumber} est fusionnée avec la n°${d.verrou.hoteNumero} le ${libelleJour(d.date)}. Son affectation à ${nom} est retirée (la fiche colis préparée aussi) ; l'opération est tracée dans le journal d'audit.`,
+      action: "Retirer l'affectation",
+      danger: true,
+    });
+    if (!ok) return;
+    const avant = localRef.current;
+    setOccupe(true);
+    setLocal(avant.filter((a) => a.id !== d.entryId));
+    const r = await fetchGodac<{ warning?: string | null }>(`/api/planning/entries/${d.entryId}/doublon-fusion`, { method: "DELETE" });
+    setOccupe(false);
+    if (!r.ok) {
+      setLocal(avant);
+      return setMessage({ texte: `Retrait de ${nom} impossible. ${r.refus.message}`, ton: "erreur" });
+    }
+    setMessage({ texte: `${nom} retiré de la tournée ${d.tourNumber} (${libelleJour(d.date)}) : le doublon est résolu.${r.data.warning ? ` ${r.data.warning}` : ""}`, ton: r.data.warning ? "attention" : "ok" });
+    router.refresh();
   }
 
   // --- Heure de la tournée ------------------------------------------------
@@ -540,9 +588,9 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
         ? "glissez un chauffeur sur une tournée"
         : "glissez un chauffeur sur une case, une ligne ou plusieurs jours";
 
-  const compteurs = donnees.vue === "jour" ? compteursDuJour({ date: premier, lignes, parCase, chauffeurs: chauffeursAffiches(donnees.chauffeurs, donnees.rattachements, donnees.serviceIds, affichees), affectations: affichees, conges: donnees.conges, arrets: donnees.arrets }) : null;
+  const compteurs = donnees.vue === "jour" ? compteursDuJour({ date: premier, lignes, parCase, chauffeurs: chauffeursAffiches(donnees.chauffeurs, donnees.rattachements, donnees.serviceIds, affichees), affectations: affichees, conges: donnees.conges, arrets: donnees.arrets, verrous }) : null;
   const lundisDuMois = useMemo(() => [...new Set(jours.map((d) => addDays(d, -rangJour(d))))], [jours]);
-  const trous = useMemo(() => trousParJour(lignes, jours, parCase), [lignes, jours, parCase]);
+  const trous = useMemo(() => trousParJour(lignes, jours, parCase, verrous), [lignes, jours, parCase, verrous]);
   const totalTrous = Object.values(trous).reduce((n, t) => n + t, 0);
 
   const capteurs = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }));
@@ -552,6 +600,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     affectations: affichees,
     lignes,
     parCase,
+    verrous,
+    doublons,
     jours,
     aujourdhui,
     petitEcran,
@@ -577,6 +627,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
     basculerOuverture: (e) => void basculerOuverture(e),
     basculerOuvertureLigne: (es, fermer) => void basculerOuvertureLigne(es, fermer),
     changerFermeture: (ligne, dates, fermer) => void changerFermeture(ligne, dates, fermer),
+    ouvrirHote: (v) => ouvrirHote(v),
+    retirerDoublon: (d) => void retirerDoublon(d),
     ouvrirRepartition: (e) => (e.id.startsWith("tmp:") ? setMessage({ texte: "Enregistrement en cours : réessayez dans un instant.", ton: "attention" }) : setFenetre({ type: "repartir", entree: e })),
   };
 
@@ -669,6 +721,8 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
           </p>
         )}
 
+        <BandeauDoublons />
+
         <FiltreOuvertureBarre valeur={filtreOuverture} onChange={setFiltreOuverture} fermees={nbFermees} />
 
         {compteurs && (
@@ -677,6 +731,7 @@ export function Affectations({ donnees }: { donnees: DonneesAffectations }) {
             <Compteur n={compteurs.affectees} libelle={`affectée${compteurs.affectees > 1 ? "s" : ""}`} />
             <Compteur n={compteurs.sansChauffeur} libelle="sans chauffeur" alerte={compteurs.sansChauffeur > 0} />
             {compteurs.fermees > 0 && <Compteur n={compteurs.fermees} libelle={`fermée${compteurs.fermees > 1 ? "s" : ""}`} />}
+            {compteurs.fusionnees ? <Compteur n={compteurs.fusionnees} libelle={`fusionnée${compteurs.fusionnees > 1 ? "s" : ""}`} /> : null}
             <Compteur n={compteurs.disponibles} libelle={`chauffeur${compteurs.disponibles > 1 ? "s" : ""} disponible${compteurs.disponibles > 1 ? "s" : ""}`} />
             <Compteur n={compteurs.absents} libelle="en congé ou arrêt" />
           </ul>

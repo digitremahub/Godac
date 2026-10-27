@@ -11,12 +11,14 @@ import {
   joursSansChauffeur,
   nomCourt,
   couleurChauffeur,
+  estCaseVerrouillee,
   trousParJour,
   type LigneTournee,
 } from "@/lib/planning/affectation";
 import { estModifiable, heureDe, jourDe, JOURS_LONGS, rangJour, statutAffectation } from "@/lib/planning/semaine";
 import { estFermeeNonAffectee, estOuverte, libelleFermeture } from "@/lib/planning/ouverture";
-import { PastilleFermee } from "@/components/planning/OuvertureFusion";
+import { BadgeDoublon, HACHURES, PastilleFermee, PastilleFusionnee } from "@/components/planning/OuvertureFusion";
+import type { VerrouFusion } from "@/lib/planning/fusion-verrou";
 import { addDays } from "@/lib/planning/dates";
 import { Avatar, BoutonHeure, Depot, Glissable, useAffectations, type EntreeAffectation } from "@/components/planning/AffectationElements";
 
@@ -38,7 +40,7 @@ export function AffectationsGrille() {
   const ctx = useAffectations();
   const mois = ctx.donnees.vue === "mois";
   const [parChauffeur, setParChauffeur] = useState(false);
-  const trous = useMemo(() => trousParJour(ctx.lignes, ctx.jours, ctx.parCase), [ctx.lignes, ctx.jours, ctx.parCase]);
+  const trous = useMemo(() => trousParJour(ctx.lignes, ctx.jours, ctx.parCase, ctx.verrous), [ctx.lignes, ctx.jours, ctx.parCase, ctx.verrous]);
   const totalTrous = Object.values(trous).reduce((n, t) => n + t, 0);
 
   const boutonDimanche = !ctx.dimancheUtilise && !(mois && parChauffeur) && (
@@ -209,7 +211,7 @@ function ColonneOuverture({ ligne }: { ligne: LigneTournee }) {
   const ctx = useAffectations();
   const entrees = ctx.jours.flatMap((d) => ctx.parCase.get(cleCaseTournee(ligne.cle, d)) ?? []).filter((e) => e.status !== "cancelled" && !e.id.startsWith("tmp:"));
   const fermees = entrees.filter((e) => !estOuverte(e)).length;
-  const sansChauffeur = joursSansChauffeur(ligne, ctx.jours, ctx.parCase, ctx.aujourdhui);
+  const sansChauffeur = joursSansChauffeur(ligne, ctx.jours, ctx.parCase, ctx.aujourdhui, ctx.verrous);
   const fermeesSansChauffeur = entrees.filter(estFermeeNonAffectee);
   const affectees = entrees.filter((e) => e.driver_id);
   const fermeesAffectees = affectees.filter((e) => !estOuverte(e)).length;
@@ -308,7 +310,8 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
   const mois = ctx.donnees.vue === "mois";
   const entrees = ctx.parCase.get(cleCaseTournee(ligne.cle, date)) ?? [];
   const prevue = estJourPrevu(ligne, date);
-  const etat = etatCase(entrees, prevue);
+  const verrou = ctx.verrous.get(cleCaseTournee(ligne.cle, date)) ?? null;
+  const etat = etatCase(entrees, prevue, estCaseVerrouillee(ctx.verrous, ligne, date));
   const r = rangJour(date);
   const et = ctx.etirement;
   const etiree = et && et.cle === ligne.cle && date > et.source && date <= et.jusqua;
@@ -316,7 +319,7 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
   const premiere = entrees.find((e) => e.driver_id) ?? entrees[0];
 
   return (
-    <Depot id={`case:${cleCaseTournee(ligne.cle, date)}`} actif={ctx.glisser}>
+    <Depot id={`case:${cleCaseTournee(ligne.cle, date)}`} actif={ctx.glisser && !verrou}>
       {(survol, ref) => (
         <td
           ref={ref as any}
@@ -326,7 +329,9 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
           className={`border-b border-navy/10 align-middle ${mois ? `p-0.5 ${r === 0 ? "border-l" : ""}` : "p-1"} ${r >= 5 ? "bg-navy/[0.025]" : ""} ${date === ctx.aujourdhui ? "bg-teal/[0.06]" : ""}`}
           style={{ minWidth: mois ? 38 : 112 }}
         >
-          {etiree ? (
+          {verrou ? (
+            <CaseFusionnee verrou={verrou} libelleCase={libelleCase} />
+          ) : etiree ? (
             <div className={`flex items-center justify-center rounded-lg border-2 border-orange bg-orange/15 font-semibold text-orange-ink ${mois ? "h-9 text-xs" : "min-h-[52px] text-sm"}`}>
               {mois ? "✓" : `${nomCourt(ctx.nomChauffeur(premiere?.driver_id ?? null))} ✓`}
             </div>
@@ -372,6 +377,31 @@ function Case({ ligne, date }: { ligne: LigneTournee; date: string }) {
         </td>
       )}
     </Depot>
+  );
+}
+
+/**
+ * Case d'une tournée d'origine d'une fusion : grisée et hachurée, pastille « Fusionnée avec n°106 » cliquable
+ * (ouvre la tournée hôte du jour), sans « + » ni zone de dépôt. Mois : pastille « → 106 » ; un point rouge signale un doublon.
+ */
+function CaseFusionnee({ verrou, libelleCase }: { verrou: VerrouFusion; libelleCase: string }) {
+  const ctx = useAffectations();
+  const mois = ctx.donnees.vue === "mois";
+  const doublon = ctx.doublons.some((d) => d.verrou.cle === verrou.cle);
+  const texte = `${libelleCase} : fusionnée avec la n°${verrou.hoteNumero}${doublon ? ", déjà affectée (doublon)" : ""}`;
+  if (mois) {
+    return (
+      <div className="relative flex h-9 w-full items-center justify-center rounded-lg" style={HACHURES} title={texte} aria-label={texte}>
+        <PastilleFusionnee verrou={verrou} court className="!min-h-[28px] !px-1.5" />
+        {doublon && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface" style={{ backgroundColor: "#d62718" }} aria-hidden="true" />}
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-navy/15 px-1 py-1" style={HACHURES} title={texte}>
+      <PastilleFusionnee verrou={verrou} />
+      {doublon && <BadgeDoublon />}
+    </div>
   );
 }
 

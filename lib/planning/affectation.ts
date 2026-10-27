@@ -203,7 +203,17 @@ export function affectationsParTournee<T extends AffectationPlanning>(affectatio
   return m;
 }
 
-export type EtatCase = "remplie" | "a_remplacer" | "vide_prevue" | "vide" | "fermee";
+export type EtatCase = "remplie" | "a_remplacer" | "vide_prevue" | "vide" | "fermee" | "fusionnee";
+
+/**
+ * Cases verrouillées par une fusion (lib/planning/fusion-verrou.ts ›
+ * tourneesVerrouilleesParFusion), indexées par cleCaseTournee(ligne.cle, jour).
+ * Seule la présence de la clé compte ici.
+ */
+export type VerrousCases = ReadonlyMap<string, unknown>;
+
+/** La case (tournée × jour) est-elle verrouillée par une fusion ? */
+export const estCaseVerrouillee = (verrous: VerrousCases | undefined, ligne: Pick<LigneTournee, "cle">, date: string): boolean => Boolean(verrous?.has(cleCaseTournee(ligne.cle, date)));
 
 /**
  * État d'une case : remplie si toutes ses affectations ont un chauffeur,
@@ -212,8 +222,13 @@ export type EtatCase = "remplie" | "a_remplacer" | "vide_prevue" | "vide" | "fer
  * tournée a été fermée sans chauffeur (elle ne roule pas ce jour-là) ; ce
  * n'est pas un trou. Une fermeture n'efface pas une autre affectation de la
  * case (combiné) : seules les lignes restantes décident.
+ * « Fusionnée » (`fusionnee`) : la tournée est une tournée d'origine d'une
+ * fusion ce jour-là. Case verrouillée : ni trou, ni « sans chauffeur », ni
+ * affectable, quoi qu'elle contienne (une affectation qui s'y trouve est un
+ * doublon, signalé à part : lib/planning/fusion-verrou.ts).
  */
-export function etatCase(entrees: readonly Pick<AffectationPlanning, "driver_id" | "tour_open">[], prevue: boolean): EtatCase {
+export function etatCase(entrees: readonly Pick<AffectationPlanning, "driver_id" | "tour_open">[], prevue: boolean, fusionnee = false): EtatCase {
+  if (fusionnee) return "fusionnee";
   const actives = entrees.filter((e) => !estFermeeNonAffectee(e));
   if (actives.length) return actives.some((e) => !e.driver_id) ? "a_remplacer" : "remplie";
   if (entrees.length) return "fermee";
@@ -228,19 +243,19 @@ export const estUnTrou = (etat: EtatCase) => etat === "a_remplacer" || etat === 
  * (« Fermer les jours sans chauffeur de cette ligne ») : trous sans aucun
  * chauffeur placé, pas avant `depuis`.
  */
-export function joursSansChauffeur<T extends AffectationPlanning>(ligne: LigneTournee, jours: readonly string[], parCase: Map<string, T[]>, depuis?: string): string[] {
+export function joursSansChauffeur<T extends AffectationPlanning>(ligne: LigneTournee, jours: readonly string[], parCase: Map<string, T[]>, depuis?: string, verrous?: VerrousCases): string[] {
   return jours.filter((d) => {
     if (depuis && d < depuis) return false;
     const entrees = parCase.get(cleCaseTournee(ligne.cle, d)) ?? [];
-    return estUnTrou(etatCase(entrees, estJourPrevu(ligne, d))) && entrees.every((e) => !e.driver_id);
+    return estUnTrou(etatCase(entrees, estJourPrevu(ligne, d), estCaseVerrouillee(verrous, ligne, d))) && entrees.every((e) => !e.driver_id);
   });
 }
 
 /** Nombre de trous par jour (ligne de synthèse du mois, compteurs du jour). */
-export function trousParJour<T extends AffectationPlanning>(lignes: readonly LigneTournee[], jours: readonly string[], parCase: Map<string, T[]>): Record<string, number> {
+export function trousParJour<T extends AffectationPlanning>(lignes: readonly LigneTournee[], jours: readonly string[], parCase: Map<string, T[]>, verrous?: VerrousCases): Record<string, number> {
   const out: Record<string, number> = {};
   for (const d of jours) {
-    out[d] = lignes.filter((l) => estUnTrou(etatCase(parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d)))).length;
+    out[d] = lignes.filter((l) => estUnTrou(etatCase(parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d), estCaseVerrouillee(verrous, l, d)))).length;
   }
   return out;
 }
@@ -329,7 +344,7 @@ export interface CelluleMois {
  * tournées et de trous. Les jours hors du mois n'ont pas de données
  * (seul le mois est chargé) : couverture « hors_mois », sans compteur.
  */
-export function calendrierMois<T extends AffectationPlanning>(mois: string, lignes: readonly LigneTournee[], parCase: Map<string, T[]>): { lundi: string; jours: CelluleMois[] }[] {
+export function calendrierMois<T extends AffectationPlanning>(mois: string, lignes: readonly LigneTournee[], parCase: Map<string, T[]>, verrous?: VerrousCases): { lundi: string; jours: CelluleMois[] }[] {
   const semaines: { lundi: string; jours: CelluleMois[] }[] = [];
   for (const date of monthCalendarDays(mois)) {
     const dansMois = date.slice(0, 7) === mois;
@@ -337,8 +352,8 @@ export function calendrierMois<T extends AffectationPlanning>(mois: string, lign
     let trous = 0;
     if (dansMois) {
       for (const l of lignes) {
-        const etat = etatCase(parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date));
-        if (etat !== "vide" && etat !== "fermee") tournees++;
+        const etat = etatCase(parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date), estCaseVerrouillee(verrous, l, date));
+        if (etat !== "vide" && etat !== "fermee" && etat !== "fusionnee") tournees++;
         if (estUnTrou(etat)) trous++;
       }
     }
@@ -452,6 +467,8 @@ export interface CompteursJour {
   sansChauffeur: number;
   /** Tournées fermées sans chauffeur ce jour-là : hors des autres compteurs. */
   fermees: number;
+  /** Tournées d'origine d'une fusion ce jour-là : verrouillées, hors des autres compteurs. Absent quand il n'y en a aucune. */
+  fusionnees?: number;
   disponibles: number;
   absents: number;
 }
@@ -464,15 +481,17 @@ export function compteursDuJour<T extends AffectationPlanning>(params: {
   affectations: readonly AffectationPlanning[];
   conges: readonly CongePlanning[];
   arrets?: readonly ArretPlanning[];
+  verrous?: VerrousCases;
 }): CompteursJour {
   const { date } = params;
   const etats = params.lignes
-    .map((l) => etatCase(params.parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date)))
+    .map((l) => etatCase(params.parCase.get(cleCaseTournee(l.cle, date)) ?? [], estJourPrevu(l, date), estCaseVerrouillee(params.verrous, l, date)))
     .filter((e) => e !== "vide");
   const chauffeurs = params.chauffeurs.map((c) => etatChauffeurDuJour(c.id, date, params.affectations, params.conges, params.arrets ?? []).etat);
   return {
-    tournees: etats.filter((e) => e !== "fermee").length,
+    tournees: etats.filter((e) => e !== "fermee" && e !== "fusionnee").length,
     fermees: etats.filter((e) => e === "fermee").length,
+    ...(etats.includes("fusionnee") ? { fusionnees: etats.filter((e) => e === "fusionnee").length } : {}),
     affectees: etats.filter((e) => e === "remplie").length,
     sansChauffeur: etats.filter(estUnTrou).length,
     disponibles: chauffeurs.filter((e) => e === "disponible").length,
@@ -572,13 +591,14 @@ export function decisionsAffectation(params: {
 }
 
 /** « 4 jours placés, vendredi à remplacer (congé) » */
-export function texteAffectation(r: { places: number; absents: string[]; figees: number; deja: number; fermees?: number }, libelleJour: (d: string) => string): string {
+export function texteAffectation(r: { places: number; absents: string[]; figees: number; deja: number; fermees?: number; fusionnees?: number }, libelleJour: (d: string) => string): string {
   const parts: string[] = [];
   if (r.places) parts.push(`${r.places} jour${r.places > 1 ? "s" : ""} placé${r.places > 1 ? "s" : ""}`);
   if (r.deja) parts.push(`${r.deja} déjà en place`);
   if (r.absents.length) parts.push(`${r.absents.map(libelleJour).join(", ")} à remplacer (absent)`);
   if (r.figees) parts.push(`${r.figees} tournée${r.figees > 1 ? "s" : ""} déjà démarrée${r.figees > 1 ? "s" : ""}, inchangée${r.figees > 1 ? "s" : ""}`);
   if (r.fermees) parts.push(`${r.fermees} tournée${r.fermees > 1 ? "s" : ""} fermée${r.fermees > 1 ? "s" : ""}, inchangée${r.fermees > 1 ? "s" : ""} (à rouvrir pour la modifier)`);
+  if (r.fusionnees) parts.push(`${r.fusionnees} tournée${r.fusionnees > 1 ? "s" : ""} fusionnée${r.fusionnees > 1 ? "s" : ""}, inchangée${r.fusionnees > 1 ? "s" : ""} (modifiez la tournée qui les regroupe)`);
   return parts.join(", ") || "Rien à changer";
 }
 

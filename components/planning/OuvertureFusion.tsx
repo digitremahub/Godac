@@ -4,7 +4,8 @@ import { useAffectations, type EntreeAffectation } from "@/components/planning/A
 import type { LigneTournee } from "@/lib/planning/affectation";
 import { estOuverte, FILTRES_OUVERTURE, libelleFermeture, type FiltreOuverture } from "@/lib/planning/ouverture";
 import { texteAAttribuer } from "@/lib/planning/fusion";
-import { jourDe, rangJour } from "@/lib/planning/semaine";
+import { libellePastille, messageDoublon, messageVerrou, type DoublonFusion, type VerrouFusion } from "@/lib/planning/fusion-verrou";
+import { jourDe, libelleJour, rangJour } from "@/lib/planning/semaine";
 
 /** Rouge GODAC écrit en dur (#d62718) : il ne change pas avec le thème, comme celui du suivi des tournées. */
 const ROUGE = { backgroundColor: "#d62718", color: "#FFFFFF" } as const;
@@ -132,5 +133,122 @@ export function FiltreOuvertureBarre({ valeur, onChange, fermees }: { valeur: Fi
         ))}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tournée d'origine d'une fusion : case verrouillée (lib/planning/fusion-verrou.ts).
+// ---------------------------------------------------------------------------
+
+/** Hachures discrètes d'une case verrouillée : l'encre du thème, jamais une couleur de palette. */
+export const HACHURES = { backgroundImage: "repeating-linear-gradient(135deg, rgb(var(--c-ink) / 0.07) 0 6px, transparent 6px 12px)" } as const;
+
+/**
+ * Pastille « Fusionnée avec n°106 » (marine GODAC) : un clic ouvre la tournée
+ * hôte du jour. Lecture seule : simple étiquette.
+ */
+export function PastilleFusionnee({ verrou, court = false, className = "" }: { verrou: VerrouFusion; court?: boolean; className?: string }) {
+  const ctx = useAffectations();
+  const texte = libellePastille(verrou);
+  const base = `inline-flex max-w-full items-center justify-center rounded-full bg-marine px-2.5 py-0.5 text-center text-[11px] font-bold leading-tight text-white max-md:text-sm ${className}`;
+  const contenu = court ? `→ ${verrou.hoteNumero}` : texte;
+  if (!ctx.donnees.peutModifier) {
+    return (
+      <span className={base} title={texte} aria-label={texte}>
+        {contenu}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={ctx.occupe}
+      onClick={() => ctx.ouvrirHote(verrou)}
+      title={`${texte} : ouvrir la tournée ${verrou.hoteNumero}`}
+      aria-label={`${texte} : ouvrir la tournée ${verrou.hoteNumero}`}
+      className={`${base} min-h-[32px] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal max-md:min-h-[44px] max-md:px-3`}
+    >
+      {contenu}
+    </button>
+  );
+}
+
+/** Badge « Doublon » (rouge GODAC en dur, comme « Fermée »). */
+export function BadgeDoublon({ court = false }: { court?: boolean }) {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold max-md:text-sm" style={ROUGE} title="Une affectation existe déjà sur cette tournée fusionnée" aria-label="Doublon : affectation sur une tournée fusionnée">
+      {court ? "D" : "Doublon"}
+    </span>
+  );
+}
+
+/** « La tournée n°105 est déjà affectée à X : retirez-le ou conservez la tournée séparée » + « Retirer l'affectation ». */
+export function LigneDoublon({ doublon }: { doublon: DoublonFusion }) {
+  const ctx = useAffectations();
+  const retirable = doublon.status === "planned" && ctx.donnees.peutModifier && !doublon.entryId.startsWith("tmp:");
+  return (
+    <div className="flex flex-col gap-2 rounded-xl bg-surface p-3 text-sm max-md:text-base" style={{ boxShadow: "inset 4px 0 0 #d62718" }}>
+      <p className="flex flex-wrap items-center gap-2">
+        <BadgeDoublon />
+        <span>
+          <strong>{libelleJour(doublon.date)}</strong> · {messageDoublon({ tourNumber: doublon.tourNumber, nom: ctx.nomChauffeur(doublon.driverId), hoteNumero: doublon.verrou.hoteNumero })}
+        </span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {retirable && (
+          <button type="button" disabled={ctx.occupe} onClick={() => ctx.retirerDoublon(doublon)} className="btn-dark min-h-[44px] !px-3 text-sm max-md:min-h-[48px] max-md:w-full max-md:text-base">
+            Retirer l&apos;affectation
+          </button>
+        )}
+        {ctx.donnees.peutModifier && (
+          <button type="button" disabled={ctx.occupe} onClick={() => ctx.ouvrirHote(doublon.verrou)} className="btn-secondary min-h-[44px] !px-3 text-sm max-md:min-h-[48px] max-md:w-full max-md:text-base">
+            Ouvrir la n°{doublon.verrou.hoteNumero} (garder séparée)
+          </button>
+        )}
+        {doublon.status !== "planned" && <span className="self-center text-xs text-navy/65">Tournée déjà démarrée : l&apos;affectation ne peut plus être retirée d&apos;ici.</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Encart d'une carte (vue Jour, Semaine sur téléphone) verrouillée : le message clair, le lien vers la tournée hôte, le doublon éventuel. */
+export function EncartFusionnee({ verrou, doublons }: { verrou: VerrouFusion; doublons: DoublonFusion[] }) {
+  const ctx = useAffectations();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 rounded-xl border-2 border-navy/15 px-3 py-2.5 text-sm max-md:text-base" style={HACHURES} role="status">
+        <p>
+          <strong>{messageVerrou(verrou)}</strong> Elle n&apos;est plus à pourvoir ni surveillée, et ne s&apos;affecte pas.
+        </p>
+        {ctx.donnees.peutModifier && (
+          <button type="button" disabled={ctx.occupe} onClick={() => ctx.ouvrirHote(verrou)} className="btn-dark min-h-[44px] self-start !px-3 text-sm max-md:min-h-[48px] max-md:w-full max-md:text-base">
+            Ouvrir la tournée n°{verrou.hoteNumero}
+          </button>
+        )}
+      </div>
+      {doublons.map((d) => (
+        <LigneDoublon key={d.entryId} doublon={d} />
+      ))}
+    </div>
+  );
+}
+
+/** Bandeau de la période : tous les doublons à traiter, avec « Retirer l'affectation ». Rien sans doublon. */
+export function BandeauDoublons() {
+  const ctx = useAffectations();
+  if (ctx.doublons.length === 0) return null;
+  const n = ctx.doublons.length;
+  return (
+    <section aria-label="Doublons de tournées fusionnées" role="alert" className="flex min-w-0 flex-col gap-2 rounded-2xl border-2 bg-surface p-3" style={{ borderColor: "#d62718" }}>
+      <h3 className="text-base font-bold">
+        {n} doublon{n > 1 ? "s" : ""} : tournée{n > 1 ? "s" : ""} fusionnée{n > 1 ? "s" : ""} déjà affectée{n > 1 ? "s" : ""}
+      </h3>
+      <p className="text-sm text-navy/75 max-md:text-base">Le travail serait compté deux fois. Tant qu&apos;un doublon subsiste, la semaine n&apos;est pas envoyée toute seule aux chauffeurs le vendredi.</p>
+      <div className="flex flex-col gap-2">
+        {ctx.doublons.map((d) => (
+          <LigneDoublon key={d.entryId} doublon={d} />
+        ))}
+      </div>
+    </section>
   );
 }

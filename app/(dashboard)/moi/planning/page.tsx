@@ -4,6 +4,8 @@ import { estPresence, libelleEntreePlanning } from "@/lib/organization/poles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { DayStrip, type StripTour } from "@/components/planning/DayStrip";
+import { fusionneeAvec } from "@/lib/planning/fusion-verrou";
+import { lireOriginesFusion } from "@/lib/planning/fusion-verrou-serveur";
 import { mondayOf, toISODate, addDays, firstOfMonth, addMonths, todayISO, monthCalendarDays, parisCalendarDate } from "@/lib/planning/dates";
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -23,11 +25,12 @@ const timeFmt = (iso: string) =>
   new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 
 /** One tour on one line: status dot, n°, truck, hours — readable at a glance on a phone. */
-function TourLine({ entry, day }: { entry: any; day: string }) {
+function TourLine({ entry, day, fusion }: { entry: any; day: string; fusion?: string | null }) {
   return (
     <Link href={"/moi/planning?view=day&anchor=" + day + "&entry=" + entry.id} className="flex min-w-0 items-center gap-2 rounded-md text-sm hover:bg-teal/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-ink">
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[entry.status] ?? "bg-navy/30"}`} />
       <span className="shrink-0 font-semibold tabular-nums">{libelleEntreePlanning(entry)}</span>
+      {fusion && <span className="shrink-0 rounded-full bg-marine px-2 py-0.5 text-[11px] font-bold text-white">{fusion}</span>}
       <span className="min-w-0 truncate text-navy/70">{entry.vehicles?.registration ?? "—"}</span>
       <span className="ml-auto shrink-0 tabular-nums text-navy/70">
         {timeFmt(entry.start_at)}
@@ -134,6 +137,14 @@ export default async function MyPlanningPage({
     ? await supabase.from("tour_routes").select("id, notes, tour_route_villages(name, postal_code, notes, position)").eq("organization_id", appUser.organization_id).eq("tour_number", selectedEntry.tour_number).maybeSingle()
     : { data: null };
 
+  // Tournée hôte d'une fusion : « fusionnée avec 105 » (rien d'autre sur les tournées d'origine, que le chauffeur ne voit pas).
+  const idsLus = [...((entries ?? []) as any[]).map((e) => e.id as string), ...(selectedEntryOutsideRange ? [(selectedEntryOutsideRange as any).id as string] : [])];
+  const fusionsLues = await lireOriginesFusion(supabase, appUser.organization_id, idsLus);
+  const fusionDe = (e: any): string | null => {
+    const f = fusionsLues.find((x) => x.entryId === e.id);
+    return f ? fusionneeAvec(e.tour_number, f.tournees) : null;
+  };
+
   const entriesByDay = new Map<string, any[]>();
   for (const e of (entries ?? []) as any[]) {
     const d = parisCalendarDate(e.start_at);
@@ -149,6 +160,7 @@ export default async function MyPlanningPage({
       end_at: e.end_at,
       status: e.status,
       registration: e.vehicles?.registration ?? null,
+      fusion: fusionDe(e),
     }));
   }
   const monthTourDays = Object.keys(toursByDay)
@@ -167,7 +179,7 @@ export default async function MyPlanningPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-ink">Ma tournée affectée</p>
-              <h2 className="mt-1 text-xl font-bold">Tournée n°{selectedEntry.tour_number}</h2>
+              <h2 className="mt-1 text-xl font-bold">Tournée n°{selectedEntry.tour_number}{fusionDe(selectedEntry) ? <span className="ml-2 align-middle text-base font-semibold text-navy/70">({fusionDe(selectedEntry)})</span> : null}</h2>
               <p className="mt-1 text-sm text-navy/70">{new Date(selectedEntry.start_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" })} · {timeFmt(selectedEntry.start_at)}{selectedEntry.end_at ? "–" + timeFmt(selectedEntry.end_at) : ""}</p>
             </div>
             <Link href={"/moi/planning?view=day&anchor=" + parisCalendarDate(selectedEntry.start_at)} className="btn-secondary !px-3 !py-1.5 text-sm">Fermer</Link>
@@ -298,7 +310,7 @@ export default async function MyPlanningPage({
                     ) : (
                       dayEntries.map((e) => (
                         <div key={e.id} className="flex flex-col">
-                          <TourLine entry={e} day={dayISO} />
+                          <TourLine entry={e} day={dayISO} fusion={fusionDe(e)} />
                           {e.services?.name && <span className="pl-[18px] text-xs text-navy/60">{e.services.name}</span>}
                         </div>
                       ))

@@ -6,8 +6,13 @@ import { lundiDe } from "@/lib/planning/publication";
 import { minuitParis } from "@/lib/ticpe/export";
 import { estMasquee, servicesPublieesRecemment } from "@/lib/planning/semaines-auto";
 import { semainesMasqueesDe } from "@/lib/planning/suivi-auto-serveur";
+import { fusionneeAvec, originesParHote, sansFusionnees } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 interface DigestEntry {
+  id?: string;
+  /** « fusionnée avec 105 » pour la tournée hôte d'une fusion. */
+  fusion?: string | null;
   tour_number: string;
   start_at: string;
   end_at?: string | null;
@@ -24,7 +29,7 @@ function buildDigestMessage(entries: DigestEntry[]): string {
       const end = e.end_at ? new Date(e.end_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }) : null;
       return `${day} ${time}${end ? `–${end}` : ""} — présence`;
     }
-    return `${day} ${time} — n°${e.tour_number}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
+    return `${day} ${time} — n°${e.tour_number}${e.fusion ? ` (${e.fusion})` : ""}${e.vehicles ? ` (${e.vehicles.registration})` : ""}`;
   });
   return `Votre planning de la semaine prochaine :\n${lines.join("\n")}`;
 }
@@ -83,7 +88,7 @@ export async function GET(req: Request) {
 
     const { data: entries, error: entriesError } = await supabase
       .from("planning_entries")
-      .select("driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
+      .select("id, driver_id, service_id, tour_number, start_at, end_at, status, vehicles(registration)")
       .eq("organization_id", organization_id)
       .in("service_id", [...publies])
       .not("driver_id", "is", null)
@@ -92,10 +97,13 @@ export async function GET(req: Request) {
       .order("start_at");
     if (entriesError || !entries || entries.length === 0) continue;
 
+    // Tournées d'origine d'une fusion : pas annoncées au chauffeur ; la tournée hôte porte « fusionnée avec … ».
+    const { verrous } = await verrousDeLaPeriode(supabase, organization_id, null, nextMonday, addDays(weekEnd, -1));
+    const origines = originesParHote(verrous);
     const byDriver = new Map<string, DigestEntry[]>();
-    for (const e of entries as unknown as (DigestEntry & { driver_id: string | null; service_id: string })[]) {
+    for (const e of sansFusionnees(entries as unknown as (DigestEntry & { driver_id: string | null; service_id: string })[], verrous)) {
       if (!e.driver_id || estMasquee(masquees, e)) continue;
-      byDriver.set(e.driver_id, [...(byDriver.get(e.driver_id) ?? []), e]);
+      byDriver.set(e.driver_id, [...(byDriver.get(e.driver_id) ?? []), { ...e, fusion: fusionneeAvec(e.tour_number, origines.get(e.id ?? "") ?? []) }]);
     }
     if (byDriver.size === 0) continue;
 

@@ -11,6 +11,8 @@ export interface StripTour {
   end_at: string | null;
   status: string;
   registration: string | null;
+  /** « fusionnée avec 105 » : tournée hôte d'une fusion (lib/planning/fusion-verrou.ts). */
+  fusion?: string | null;
 }
 
 const STATUS_BAR: Record<string, string> = {
@@ -84,6 +86,7 @@ export function DayStrip({
                       {timeFmt(t.start_at)}
                       {t.end_at ? `–${timeFmt(t.end_at)}` : ""}
                     </p>
+                    {t.fusion && <p className="text-[11px] font-semibold text-navy/70">{t.fusion}</p>}
                     {t.registration && <p className="truncate text-[11px] text-navy/55">{t.registration}</p>}
                   </div>
                 </div>

@@ -6,6 +6,8 @@ import { addDays, parisCalendarDate, parisWallTimeToUtcISOString } from "@/lib/p
 import { minuitParis } from "@/lib/ticpe/export";
 import { cleCreneau } from "@/lib/planning/cle-creneau";
 import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
+import { verrouDe } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 const schema = z.object({
   week_start: z.string().date(),
@@ -18,7 +20,9 @@ const allowedRoles = ["direction", "manager", "exploitation"];
 /**
  * Génère les affectations planifiées depuis les modèles actifs.
  * Ne remplace jamais un créneau existant : les affectations déjà
- * éditées manuellement restent prioritaires.
+ * éditées manuellement restent prioritaires. Une tournée d'origine d'une fusion
+ * ce jour-là (lib/planning/fusion-verrou.ts) n'est pas générée : case
+ * verrouillée, comptée dans `fusionnees`.
  */
 export async function POST(req: Request) {
   const g = await garderApi({ modules: ["planning"] });
@@ -76,8 +80,11 @@ export async function POST(req: Request) {
     .gte("start_at", minuitParis(week_start))
     .lt("start_at", minuitParis(addDays(week_start, 7)));
   const joursFermes = new Set((fermees ?? []).map((e) => `${e.tour_number}|${parisCalendarDate(e.start_at)}`));
+  // Tournées d'origine d'une fusion cette semaine : jamais générées (lecture tolérante : sans la migration, aucune).
+  const { verrous } = await verrousDeLaPeriode(supabase, appUser.organization_id, service_id, week_start, addDays(week_start, 6));
   const rows: any[] = [];
   let skipped = 0;
+  let fusionnees = 0;
 
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
     const day = addDays(week_start, dayOffset);
@@ -87,6 +94,10 @@ export async function POST(req: Request) {
       if (!(template.weekdays ?? []).includes(weekday)) continue;
       const route = Array.isArray(template.tour_routes) ? template.tour_routes[0] : template.tour_routes;
       if (!route?.tour_number) continue;
+      if (verrouDe(verrous, service_id, route.tour_number, day)) {
+        fusionnees++;
+        continue;
+      }
       const start_at = parisWallTimeToUtcISOString(day, String(template.departure_time).slice(0, 5));
       const key = cleCreneau(service_id, route.tour_number, start_at);
       if (occupied.has(key) || joursFermes.has(`${route.tour_number}|${day}`)) {
@@ -106,7 +117,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!rows.length) return NextResponse.json({ created: 0, skipped, message: "Aucune nouvelle affectation à créer : les créneaux sont déjà présents ou aucun modèle ne correspond aux jours sélectionnés." });
+  if (!rows.length) return NextResponse.json({ created: 0, skipped, fusionnees, message: "Aucune nouvelle affectation à créer : les créneaux sont déjà présents ou aucun modèle ne correspond aux jours sélectionnés." });
 
   // Créneau créé en parallèle : ignoré (contrainte unique organisation,
   // service, tournée, départ), jamais remplacé.
@@ -118,5 +129,5 @@ export async function POST(req: Request) {
   skipped += rows.length - (inserted?.length ?? 0);
   if (inserted?.length) await noterModificationPlanning(appUser.organization_id, [{ serviceId: service_id, jour: week_start }]);
 
-  return NextResponse.json({ created: inserted?.length ?? 0, skipped });
+  return NextResponse.json({ created: inserted?.length ?? 0, skipped, fusionnees });
 }

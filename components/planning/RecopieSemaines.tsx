@@ -7,7 +7,7 @@ import { libelleJour, texteApercu, texteResultat } from "@/lib/planning/semaine"
 import { Fenetre } from "@/components/planning/Fenetre";
 import type { OnResultat } from "@/components/planning/FenetresPlanning";
 
-type Reponse = { created: number; skipped: number; conflicts: number; a_remplacer?: number; source_count: number; warning?: string | null };
+type Reponse = { created: number; skipped: number; conflicts: number; a_remplacer?: number; fusionnees?: number; source_count: number; warning?: string | null };
 
 const json = (corps: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
 
@@ -78,7 +78,7 @@ export function RecopieSemaines({
     const r = await fetchGodac<Reponse>("/api/planning/duplicate-week", json(corps));
     setBusy(false);
     if (!r.ok) return setErreur(r.refus.message);
-    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts, aRemplacer: r.data.a_remplacer });
+    const texte = texteResultat({ creees: r.data.created, ignorees: r.data.skipped, conflits: r.data.conflicts, aRemplacer: r.data.a_remplacer, fusionnees: r.data.fusionnees });
     onResultat(`Recopie faite : ${texte}.${r.data.warning ? ` ${r.data.warning}` : ""}`, r.data.conflicts || r.data.a_remplacer ? "attention" : "ok");
     onFermer();
   }
@@ -127,7 +127,7 @@ export function RecopieSemaines({
             : apercu
               ? apercu.source_count === 0
                 ? "La semaine source est vide : rien à recopier."
-                : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts, aRemplacer: apercu.a_remplacer })}.`
+                : `${texteApercu({ creees: apercu.created, ignorees: apercu.skipped, conflits: apercu.conflicts, aRemplacer: apercu.a_remplacer, fusionnees: apercu.fusionnees })}.`
               : null}
       </div>
       <p className="mt-2 text-xs text-navy/55">Rien n&apos;est écrasé : les cases déjà remplies gardent leur chauffeur.</p>

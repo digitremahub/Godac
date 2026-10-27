@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { calendrierMois, cleCaseTournee, estJourPrevu, etatCase, jourParDefaut, type CelluleMois } from "@/lib/planning/affectation";
+import { calendrierMois, cleCaseTournee, estCaseVerrouillee, estJourPrevu, etatCase, jourParDefaut, type CelluleMois } from "@/lib/planning/affectation";
 import { JOURS_COURTS, JOURS_LONGS, jourDe, rangJour } from "@/lib/planning/semaine";
 import { estOuverte } from "@/lib/planning/ouverture";
 import { AffectationsJour } from "@/components/planning/AffectationsJour";
@@ -50,7 +50,7 @@ function etatJour(c: Pick<CelluleMois, "couverture" | "trous" | "tournees">): st
  */
 export function CalendrierMois() {
   const ctx = useAffectations();
-  const semaines = useMemo(() => calendrierMois(ctx.donnees.mois, ctx.lignes, ctx.parCase), [ctx.donnees.mois, ctx.lignes, ctx.parCase]);
+  const semaines = useMemo(() => calendrierMois(ctx.donnees.mois, ctx.lignes, ctx.parCase, ctx.verrous), [ctx.donnees.mois, ctx.lignes, ctx.parCase, ctx.verrous]);
   // Tournées fermées par jour : point rouge sur le jour.
   const fermeesParJour = useMemo(() => {
     const m = new Map<string, number>();
@@ -134,8 +134,8 @@ export function SemaineMobile({ trous }: { trous: Record<string, number> }) {
           const r = rangJour(d);
           const n = trous[d] ?? 0;
           const roule = ctx.lignes.some((l) => {
-            const etat = etatCase(ctx.parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d));
-            return etat !== "vide" && etat !== "fermee";
+            const etat = etatCase(ctx.parCase.get(cleCaseTournee(l.cle, d)) ?? [], estJourPrevu(l, d), estCaseVerrouillee(ctx.verrous, l, d));
+            return etat !== "vide" && etat !== "fermee" && etat !== "fusionnee";
           });
           const actif = d === date;
           const auj = d === ctx.aujourdhui;

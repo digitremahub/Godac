@@ -70,6 +70,7 @@ export const ACTIONS_AUDIT = {
   tournee_fermee: "Tournée du planning fermée",
   tournee_rouverte: "Tournée du planning rouverte",
   tournee_fusion_modifiee: "Tournée fusionnée (lundi) : tournées d'origine modifiées",
+  planning_doublon_fusion_retire: "Planning : affectation retirée d'une tournée fusionnée (doublon)",
   tournee_repartition_modifiee: "Tournée fusionnée : villages et ramasses répartis (provisoire)",
   tournee_repartition_reconciliee: "Tournée fusionnée : répartition alignée sur les tournées réelles",
   pointage_cloture_auto: "Pointages restés ouverts clos automatiquement (sortie estimée, à régulariser)",

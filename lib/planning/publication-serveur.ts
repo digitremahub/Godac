@@ -6,6 +6,8 @@ import { addDays } from "@/lib/planning/dates";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 import { cleSemaine, destinatairesPublication, messagePublication, periodePublication, type AffectationPubliee, type ChangementAPublier } from "@/lib/planning/publication";
 import { marquerSemainesPubliees } from "@/lib/planning/suivi-auto-serveur";
+import { sansFusionnees } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 /**
  * Publication du planning aux chauffeurs (« Publier aux chauffeurs », confirmation
@@ -20,6 +22,9 @@ import { marquerSemainesPubliees } from "@/lib/planning/suivi-auto-serveur";
  *   20261030000003_planning_publication.sql) ;
  * - marque les semaines générées automatiquement comme publiées
  *   (planning_semaines_auto) : leurs lignes deviennent visibles des chauffeurs ;
+ * - une tournée d'origine d'une fusion (lib/planning/fusion-verrou.ts) n'est pas
+ *   une tournée à faire : ni dans le récapitulatif du chauffeur, ni dans ses
+ *   changements (un doublon éventuel est traité à part, « À traiter ») ;
  * - sans cette migration (planning_changements absente) : récapitulatif à tous
  *   les chauffeurs de la période, comme l'ancien « Valider et envoyer ».
  * `db` lit et valide : le client de la personne connectée (RLS : un manager
@@ -74,10 +79,13 @@ export async function publierSemaines(p: ParamsPublication): Promise<ResultatPub
   ]);
   if (entreesError) return { ok: false, status: 500, error: entreesError.message, validee: false };
   if (changementsLus.error && !estSchemaManquant(changementsLus.error)) return { ok: false, status: 500, error: changementsLus.error.message, validee: false };
-  const changements = changementsLus.error ? null : ((changementsLus.data ?? []) as ChangementAPublier[]);
+  // Cases verrouillées par une fusion (lecture tolérante : sans la migration, aucune).
+  const { verrous } = await verrousDeLaPeriode(p.db, p.organizationId, serviceIds.length === 1 ? serviceIds[0]! : null, periode.debut, periode.fin);
+  const changementsTous = changementsLus.error ? null : ((changementsLus.data ?? []) as ChangementAPublier[]);
+  const changements = changementsTous ? sansFusionnees(changementsTous, verrous) : null;
 
   const publiees = new Set(((validations ?? []) as { service_id: string; week_start: string }[]).map((v) => cleSemaine(v.service_id, v.week_start)));
-  const destinataires = destinatairesPublication({ affectations: (entrees ?? []) as unknown as AffectationPubliee[], changements, publiees });
+  const destinataires = destinatairesPublication({ affectations: sansFusionnees((entrees ?? []) as unknown as AffectationPubliee[], verrous), changements, publiees });
 
   // 1. Semaines publiées (le trigger suit désormais leurs changements).
   const lignes = serviceIds.flatMap((service_id) =>
@@ -87,7 +95,7 @@ export async function publierSemaines(p: ParamsPublication): Promise<ResultatPub
   if (validationError) return { ok: false, status: 500, error: validationError.message, validee: false };
 
   let admin = p.admin;
-  if (!admin && (destinataires.length || changements?.length)) {
+  if (!admin && (destinataires.length || changementsTous?.length)) {
     try {
       admin = createAdminSupabaseClient();
     } catch {
@@ -106,7 +114,7 @@ export async function publierSemaines(p: ParamsPublication): Promise<ResultatPub
   if (admin) await marquerSemainesPubliees(admin, { organizationId: p.organizationId, serviceIds, lundis: periode.lundis, mode: p.mode, userId: p.validateurId });
 
   // 3. Une notification par chauffeur, 4. changements publiés effacés.
-  if (admin && (destinataires.length || changements?.length)) {
+  if (admin && (destinataires.length || changementsTous?.length)) {
     if (destinataires.length) {
       const { error } = await admin.from("alerts").insert(
         destinataires.map((d) => ({
@@ -120,8 +128,9 @@ export async function publierSemaines(p: ParamsPublication): Promise<ResultatPub
       );
       if (error) return { ok: false, status: 500, error: error.message, validee: true };
     }
-    if (changements?.length) {
-      const { error } = await admin.from("planning_changements").delete().in("id", changements.map((c) => c.id));
+    // Tous les changements lus sont effacés, y compris ceux d'une case fusionnée (jamais annoncés).
+    if (changementsTous?.length) {
+      const { error } = await admin.from("planning_changements").delete().in("id", changementsTous.map((c) => c.id));
       if (error) console.warn("[planning/publier] Changements publiés non effacés", error.message);
     }
   }

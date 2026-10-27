@@ -7,6 +7,8 @@ import { estCopiable, jourDe, joursDeLaSemaine, planifierCopies, type Affectatio
 import { affectationsAutour, inscrireCopies } from "@/lib/planning/copies-serveur";
 import { absentSelon, lireAbsences } from "@/lib/planning/absences";
 import { noterModificationPlanning } from "@/lib/planning/suivi-auto-serveur";
+import { ecarterFusionnees } from "@/lib/planning/fusion-verrou";
+import { verrousDeLaPeriode } from "@/lib/planning/fusion-verrou-serveur";
 
 const bodySchema = z
   .object({
@@ -31,6 +33,9 @@ const bodySchema = z
  * - chauffeur déjà pris à la même heure : créée, comptée « en conflit » ;
  * - chauffeur en congé validé ou en arrêt de travail ce jour-là : il n'est
  *   PAS placé, l'affectation est créée sans chauffeur (« à remplacer »).
+ * - tournée d'origine d'une fusion (lib/planning/fusion-verrou.ts), semaine
+ *   source ou cible : ignorée et comptée dans `fusionnees` (jamais recopiée
+ *   comme une affectation) ; la fusion elle-même n'est pas recopiée ;
  * `dry_run` renvoie l'aperçu (« 42 affectations seront créées… »).
  * Réservé à l'encadrement ; RLS limite un manager à ses services, en
  * lecture comme en écriture.
@@ -68,9 +73,16 @@ export async function POST(req: Request) {
   if (decalages.some((d) => d === 0)) {
     return NextResponse.json({ error: "La semaine cible doit être différente de la semaine source." }, { status: 400 });
   }
-  const demandes: CopieDemandee[] = decalages.flatMap((d) => sources.map((source) => ({ source, date: addDays(jourDe(source.start_at), d) })));
+  const demandesBrutes: CopieDemandee[] = decalages.flatMap((d) => sources.map((source) => ({ source, date: addDays(jourDe(source.start_at), d) })));
+  if (demandesBrutes.length === 0) {
+    return NextResponse.json({ created: 0, skipped: 0, conflicts: 0, fusionnees: 0, source_count: 0, dry_run: Boolean(dry_run) });
+  }
+  // Tournées fusionnées (semaine source ou cibles) : écartées, comptées.
+  const jours = demandesBrutes.flatMap((d) => [jourDe(d.source.start_at), d.date]).sort();
+  const { verrous } = await verrousDeLaPeriode(supabase, appUser.organization_id, service_id ?? null, jours[0]!, jours.at(-1)!);
+  const { gardees: demandes, fusionnees } = ecarterFusionnees(demandesBrutes, verrous);
   if (demandes.length === 0) {
-    return NextResponse.json({ created: 0, skipped: 0, conflicts: 0, source_count: 0, dry_run: Boolean(dry_run) });
+    return NextResponse.json({ created: 0, skipped: 0, conflicts: 0, fusionnees: fusionnees.length, source_count: sources.length, dry_run: Boolean(dry_run) });
   }
 
   const cibles = demandes.map((d) => d.date).sort();
@@ -84,11 +96,11 @@ export async function POST(req: Request) {
   const plan = planifierCopies(demandes, existantes, { absent: absentSelon(absences) });
 
   if (dry_run) {
-    return NextResponse.json({ created: plan.aCreer.length, skipped: plan.ignorees.length, conflicts: plan.conflits.length, a_remplacer: plan.aRemplacer.length, source_count: sources.length, dry_run: true });
+    return NextResponse.json({ created: plan.aCreer.length, skipped: plan.ignorees.length, conflicts: plan.conflits.length, a_remplacer: plan.aRemplacer.length, fusionnees: fusionnees.length, source_count: sources.length, dry_run: true });
   }
 
   const r = await inscrireCopies(supabase, appUser.organization_id, plan);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
   if (r.creees > 0) await noterModificationPlanning(appUser.organization_id, plan.aCreer.map((l) => ({ serviceId: l.service_id, startAt: l.start_at })));
-  return NextResponse.json({ created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, source_count: sources.length, warning: r.warning });
+  return NextResponse.json({ created: r.creees, skipped: r.ignorees, conflicts: r.conflits, a_remplacer: plan.aRemplacer.length, fusionnees: fusionnees.length, source_count: sources.length, warning: r.warning });
 }
