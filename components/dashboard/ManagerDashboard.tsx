@@ -20,7 +20,7 @@ import { ecranOuvrable } from "@/lib/acces/tuiles-accueil";
  * (BlocsAccueil.tsx) ; le planning du jour est lu une seule fois pour la
  * page (« À traiter » et liste des tournées).
  */
-export async function ManagerDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
+export async function ManagerDashboard({ appUser, enabledModules, suite }: { appUser: AppUser; enabledModules: string[]; /** Raccourcis et « Premiers pas » (page.tsx), placés après le titre et le bloc « À traiter ». */ suite?: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
   const isManagerChauffeur = appUser.conduit;
   const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
@@ -52,6 +52,7 @@ export async function ManagerDashboard({ appUser, enabledModules }: { appUser: A
       <Suspense fallback={<ATraiterAttente />}>
         <ATraiterBloc appUser={appUser} enabledModules={enabledModules} />
       </Suspense>
+      {suite}
 
       {isManagerChauffeur && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

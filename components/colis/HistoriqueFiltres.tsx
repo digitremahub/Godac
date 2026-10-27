@@ -56,7 +56,7 @@ export function HistoriqueFiltres({
   }
 
   const select = (cle: string, libelle: string, tous: string, options: Option[]) => (
-    <select aria-label={libelle} className="input !w-auto" value={searchParams.get(cle) ?? ""} onChange={(e) => changer(cle, e.target.value)}>
+    <select aria-label={libelle} className="input min-w-0 max-w-full !w-auto" value={searchParams.get(cle) ?? ""} onChange={(e) => changer(cle, e.target.value)}>
       <option value="">{tous}</option>
       {options.map((o) => (
         <option key={o.id} value={o.id}>
@@ -88,7 +88,7 @@ export function HistoriqueFiltres({
           placeholder="Rechercher un colis : code, destinataire ou adresse (3 caractères min.)"
           aria-label="Rechercher un colis par code, destinataire ou adresse"
         />
-        <select aria-label="Filtrer par statut de livraison" className="input !w-auto" value={searchParams.get("statut") ?? ""} onChange={(e) => changer("statut", e.target.value)}>
+        <select aria-label="Filtrer par statut de livraison" className="input min-w-0 max-w-full !w-auto" value={searchParams.get("statut") ?? ""} onChange={(e) => changer("statut", e.target.value)}>
           <option value="">Tous les statuts</option>
           <option value="delivered">Livrés</option>
           <option value="failed">Non livrés</option>

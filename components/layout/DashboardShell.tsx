@@ -117,7 +117,7 @@ export function DashboardShell({
           </div>
         )}
         <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} goNavigation={goNavigation} />
-        <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-28 lg:pb-8" : ""}`}>
+        <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-[calc(9rem+env(safe-area-inset-bottom))] lg:pb-8" : ""}`}>
           <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{!goNavigation && <BandeauMenuReorganise userId={currentUserId} />}{children}</div>
         </main>
       </div>

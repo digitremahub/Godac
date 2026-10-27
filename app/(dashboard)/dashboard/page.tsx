@@ -4,8 +4,6 @@ import { ManagerDashboard } from "@/components/dashboard/ManagerDashboard";
 import { ChefEquipeDashboard } from "@/components/dashboard/ChefEquipeDashboard";
 import { ComptableDashboard } from "@/components/dashboard/ComptableDashboard";
 import { DirectionDashboard } from "@/components/dashboard/DirectionDashboard";
-import { JaugesQuotas } from "@/components/acces/JaugesQuotas";
-import { USAGE_FEATURES } from "@/lib/usage/quotas";
 import { PremiersPas } from "@/components/dashboard/PremiersPas";
 import { RaccourcisJournee } from "@/components/dashboard/RaccourcisJournee";
 import { clePremiersPas, premiersPas } from "@/lib/guides/premiers-pas";
@@ -24,8 +22,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   // ne montrent que les écrans qui s'ouvrent.
   const enabledModules = [...g.modules];
 
-  // Bandeau « Premiers pas » (refermable) et raccourcis de la journée (encadrement) au-dessus de l'accueil du rôle.
-  const entete = (
+  // Raccourcis de la journée (encadrement) et ligne « Premiers pas » : chaque accueil les place après son titre
+  // (et après son bloc « À traiter » s'il en a un), jamais avant.
+  const suite = (
     <>
       <PremiersPas pas={premiersPas(appUser.role, appUser.conduit, g.modules)} cle={clePremiersPas(appUser.role)} />
       <RaccourcisJournee role={appUser.role} modules={g.modules} conduit={appUser.conduit} />
@@ -34,29 +33,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const accueil = (() => {
     switch (appUser.role) {
       case "chauffeur":
-        return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} presenceMonth={searchParams.presence} />;
+        return <ChauffeurDashboard appUser={appUser} enabledModules={enabledModules} suite={suite} presenceMonth={searchParams.presence} />;
       case "manager":
         // Chef d'équipe : son équipe, ses véhicules, amendes et contestations, notifications.
-        return <ChefEquipeDashboard appUser={appUser} enabledModules={enabledModules} />;
+        return <ChefEquipeDashboard appUser={appUser} enabledModules={enabledModules} suite={suite} />;
       case "exploitation":
         // Exploitation : le tableau de bord du manager, sur toute l'organisation.
-        return <ManagerDashboard appUser={appUser} enabledModules={enabledModules} />;
+        return <ManagerDashboard appUser={appUser} enabledModules={enabledModules} suite={suite} />;
       case "comptable":
-        return <ComptableDashboard appUser={appUser} enabledModules={enabledModules} />;
+        return <ComptableDashboard appUser={appUser} enabledModules={enabledModules} suite={suite} />;
       case "direction":
         return (
-          <>
-            {/* Quotas d'IA : seulement ceux qui dépassent 80 % du volume inclus. */}
-            <JaugesQuotas organizationId={appUser.organization_id} role={appUser.role} fonctions={USAGE_FEATURES} seuil={80} />
-            <DirectionDashboard appUser={appUser} enabledModules={enabledModules} />
-          </>
+          <DirectionDashboard appUser={appUser} enabledModules={enabledModules} suite={suite} />
         );
     }
   })();
-  return (
-    <>
-      {entete}
-      {accueil}
-    </>
-  );
+  return accueil;
 }

@@ -205,7 +205,7 @@ export function FloatingChatWidget({
     <>
       <button
         type="button"
-        className="fixed bottom-[6.5rem] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-marine text-teal-sur-menu shadow-pop transition-transform hover:scale-105 lg:bottom-6"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-marine text-teal-sur-menu shadow-pop transition-transform hover:scale-105 lg:bottom-6"
         onClick={() => setOpen((v) => !v)}
         aria-label="Messages et assistant"
         aria-expanded={open}
@@ -219,7 +219,7 @@ export function FloatingChatWidget({
       </button>
 
       {open && (
-        <div className="fixed bottom-[11rem] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-surface shadow-pop lg:bottom-24">
+        <div className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-navy/10 bg-surface shadow-pop lg:bottom-24">
           <div className="flex items-end border-b border-navy/10 bg-navy/[0.04]">
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-2 pt-2">
             {assistantAvailable && (

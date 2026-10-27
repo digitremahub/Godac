@@ -64,7 +64,7 @@ const LIEN_VOIR_TOUT = "inline-flex min-h-[44px] items-center text-sm text-teal-
  * garde la carte Départ / Retour et le pointage assisté ; son badge QR est
  * rangé en bas de page.
  */
-export async function ChefEquipeDashboard({ appUser, enabledModules }: { appUser: AppUser; enabledModules: string[] }) {
+export async function ChefEquipeDashboard({ appUser, enabledModules, suite }: { appUser: AppUser; enabledModules: string[]; /** Raccourcis et « Premiers pas » (page.tsx), placés après le titre et le bloc « À traiter ». */ suite?: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
   const ctx = { role: appUser.role, modules: new Set(enabledModules), conduit: appUser.conduit };
   const ouvre = (id: string) => ecranOuvrable(id, ctx);
@@ -128,6 +128,7 @@ export async function ChefEquipeDashboard({ appUser, enabledModules }: { appUser
   return (
     <div>
       <PageHeader title={`Bonjour ${appUser.full_name.split(" ")[0] ?? ""}`} description="Votre équipe et vos services en un coup d'œil." />
+      {suite}
       {autoClock && <AssistedClock hasOpenTour={Boolean(tourneeOuverte)} />}
 
       {tourneeOuvrable && (
