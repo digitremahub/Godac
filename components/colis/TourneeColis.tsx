@@ -201,6 +201,8 @@ export function TourneeColis({
   const [rechercheAdresse, setRechercheAdresse] = useState("");
   /** Arrêt trouvé par la recherche ou tout juste ajouté : défilé jusqu'à lui et entouré dans la liste. */
   const [misEnAvant, setMisEnAvant] = useState<string | null>(null);
+  /** Zone « Charger les colis » : après un ajout manuel, on y revient pour saisir l'adresse suivante. */
+  const zoneSaisie = useRef<HTMLDivElement>(null);
   /** Feuille « Optimiser l'ordre » : départ et arrivée. */
   const [feuilleOptim, setFeuilleOptim] = useState(false);
   const horaires = useHoraires(run, stops);
@@ -420,9 +422,12 @@ export function TourneeColis({
       await recharger(run?.id);
       // Adresse pro : horaires cherchés sur internet en arrière-plan, sans bloquer le chargement.
       if (r.stop?.id && !r.grouped && !r.duplicate) {
-        setMisEnAvant(r.stop.id);
         void chercherHoraires([r.stop.id]);
       }
+      // Retour en haut, au niveau de la saisie d'adresse, avec un formulaire vide prêt pour l'adresse suivante.
+      // Sauf s'il reste des étiquettes lues à valider (le suivant s'ouvre tout seul) ou si le scanner est ouvert.
+      if (!scanner && brouillons.length === 0) setDraft({ adresse: "", destinataire: "", telephone: "", code: null, type: "livraison", poids: "" });
+      requestAnimationFrame(() => zoneSaisie.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
     } catch (e) {
       setToast({ ok: false, text: networkErrorMessage(e) });
     } finally {
@@ -1226,7 +1231,8 @@ export function TourneeColis({
           </button>
         </Card>
       ) : (
-        <Card className="flex flex-col gap-3">
+        <Card className="flex flex-col gap-3 scroll-mt-20">
+          <div ref={zoneSaisie} className="-mt-3 scroll-mt-20" aria-hidden="true" />
           <h2 className="text-lg">Charger les colis</h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button type="button" className="btn-primary justify-center !py-3" onClick={ouvrirScanner}>
