@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cheminsPhotos, enLots } from "@/lib/retention/photos";
 import { GPS_POINTAGE_JOURS, limiteGpsPointage } from "@/lib/retention/gps-pointage";
+import { COLONNES_CLIENT_EFFACEES, RETENTION_FICHES_CLIENT_JOURS, limiteFichesClient } from "@/lib/retention/fiches-client";
 import { RETENTION_AMENDES_JOURS, STATUTS_AMENDE_CLOTUREE, cheminsAmendes, limiteClotureAmendes } from "@/lib/retention/amendes";
 
 /** Retention periods announced in app/confidentialite — keep both in sync. */
@@ -24,6 +25,8 @@ export const RETENTION_DAYS = {
   auditLog: 3 * 365,
   /** Journal anti-abus du lien prestataire (IP hachées). */
   providerAccessLog: 30,
+  /** Fiches client de l'annuaire (téléphone, contact, consignes, statistiques de passage) : 12 mois sans mise à jour. */
+  clientFiches: RETENTION_FICHES_CLIENT_JOURS,
   /** Amendes : un an après leur clôture (réglée ou classée), comme annoncé ; en cours, jamais. */
   fines: RETENTION_AMENDES_JOURS,
 } as const;
@@ -124,6 +127,13 @@ export async function purgeExpiredData() {
   results.fineFiles = amendes.fichiers;
   results.fines = amendes.erreur ?? amendes.amendes;
 
+  // Fiches client de l'annuaire et sens de tournée sans mise à jour depuis 12 mois (migration 20261113000001 ;
+  // tables absentes = rien à purger).
+  const fiches = await purgerFichesClient(admin);
+  results.clientFichesSupprimees = fiches.erreur ?? fiches.supprimees;
+  results.clientFichesAnonymisees = fiches.erreur ?? fiches.anonymisees;
+  results.tourneeSens = fiches.erreurSens ?? fiches.sens;
+
   const access = await admin.from("rental_provider_access_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.providerAccessLog));
   results.providerAccessLog = access.error ? access.error.message : (access.count ?? 0);
 
@@ -131,6 +141,37 @@ export async function purgeExpiredData() {
 }
 
 type Admin = ReturnType<typeof createAdminSupabaseClient>;
+
+/**
+ * Purge des fiches client périmées (voir lib/retention/fiches-client.ts) : suppression des
+ * fiches sans horaires, anonymisation de celles qui en ont (updated_at inchangé, donc
+ * le passage suivant ne retrouve rien à faire), suppression du sens de tournée périmé.
+ */
+export async function purgerFichesClient(admin: Admin, maintenant: Date = new Date()): Promise<{ supprimees: number; anonymisees: number; sens: number; erreur: string | null; erreurSens: string | null }> {
+  const limite = limiteFichesClient(maintenant);
+  const manquante = (e: { code?: string | null; message?: string | null }) => e.code === "42P01" || e.code === "42703" || e.code === "PGRST205" || e.code === "PGRST204" || /does not exist|could not find/i.test(e.message ?? "");
+  let supprimees = 0;
+  let anonymisees = 0;
+  let erreur: string | null = null;
+  // Fiches sans horaires : supprimées.
+  const sansHoraires = await admin.from("delivery_address_hours").delete({ count: "exact" }).lt("updated_at", limite).filter("weekly_schedule", "eq", "{}");
+  if (sansHoraires.error) erreur = manquante(sansHoraires.error) ? null : sansHoraires.error.message;
+  else supprimees = sansHoraires.count ?? 0;
+  // Fiches avec horaires : coordonnées et statistiques effacées, horaires conservés. Seules celles qui
+  // contiennent encore une donnée client sont touchées (idempotent).
+  if (!erreur) {
+    const anon = await admin
+      .from("delivery_address_hours")
+      .update(COLONNES_CLIENT_EFFACEES, { count: "exact" })
+      .lt("updated_at", limite)
+      .or("phone.not.is.null,recipient.not.is.null,access_notes.not.is.null,delivered_count.gt.0,failed_count.gt.0,service_samples.gt.0");
+    if (anon.error) erreur = manquante(anon.error) ? null : anon.error.message;
+    else anonymisees = anon.count ?? 0;
+  }
+  const sens = await admin.from("tournee_sens").delete({ count: "exact" }).lt("updated_at", limite);
+  const erreurSens = sens.error ? (manquante(sens.error) ? null : sens.error.message) : null;
+  return { supprimees, anonymisees, sens: sens.error ? 0 : (sens.count ?? 0), erreur, erreurSens };
+}
 
 /**
  * Purge des amendes réglées ou classées depuis plus d'un an, lot par lot

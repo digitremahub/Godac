@@ -32,6 +32,8 @@ import { patchArret, retirerArret } from "@/lib/colis/envoi-arret";
 import { compteurs, grouperParListe, nomGroupe } from "@/lib/colis/listes";
 import type { Itineraire } from "@/lib/colis/itineraire";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
+import { serviceConnu } from "@/lib/colis/fiche-client";
+import type { ModeSens } from "@/lib/colis/sens-tournee";
 import { LancementTournee } from "@/components/colis/LancementTournee";
 import { separerReportes } from "@/lib/colis/villages";
 import { BadgeHoraires, HorairesSheet, useHoraires, type ResumeOptimisation } from "@/components/colis/HorairesSheet";
@@ -566,7 +568,7 @@ export function AppLivreur({
    * position connue), puis les arrêts restants s'enchaînent de la prochaine
    * adresse la plus proche à la suivante, jusqu'à l'arrivée choisie.
    */
-  async function reoptimiser(choix?: { depart: Depart | null; arrivee: Arrivee }, origine = "votre position", ponctuel = false): Promise<string | null> {
+  async function reoptimiser(choix?: { depart: Depart | null; arrivee: Arrivee; sens?: ModeSens }, origine = "votre position", ponctuel = false): Promise<string | null> {
     if (!run) return null;
     setBusy(true);
     try {
@@ -581,6 +583,7 @@ export function AppLivreur({
           strategie: "proche",
           // Ponctuel (depuis ma position / une adresse choisie) : le choix mémorisé de la tournée n'est pas modifié.
           ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : { depart: { mode: "position" } }),
+          ...(choix?.sens ? { sens: choix.sens } : {}),
           ...(ponctuel || !choix ? { memoriser: false } : {}),
         }),
       });
@@ -654,7 +657,7 @@ export function AppLivreur({
   const choix = choixDeRun(run);
   const extremites = run ? libellesExtremites(run, stops, choix) : { depart: "", arrivee: "" };
   const avancement = estimerAvancement(
-    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null, service_min: serviceConnu(s.horaire) })),
     {
       position: maPosition,
       depot: run && run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
@@ -895,7 +898,7 @@ export function AppLivreur({
       )}
 
       {feuilleOptim && run && (
-        <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee })} />
+        <OptimiserSheet run={run} stops={stops} enLivraison={run.status === "in_progress"} initial={choix} onFermer={() => setFeuilleOptim(false)} onValider={(depart, arrivee, sens) => reoptimiser({ depart: run.status === "in_progress" && depart?.mode === "position" ? null : depart, arrivee, sens })} />
       )}
 
       {run?.status === "in_progress" && stops.length > 0 && pending.length === 0 && destinationsRetour.length > 0 && !retourVu.has(run.id) && (

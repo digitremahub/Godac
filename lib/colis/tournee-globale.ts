@@ -22,6 +22,13 @@
  * la liste du premier arrêt ouvre la tournée, celle du dernier la ferme,
  * seuls les villages du milieu sont ordonnés entre les deux.
  *
+ * Sens habituel (lib/colis/sens-tournee.ts) : si `sens.reference` (ordre habituel
+ * des secteurs, par clé de nom de liste) est fourni, il sert de biais DOUX : l'ordre
+ * habituel devient un candidat et les comparaisons (candidats, Or-opt) portent sur
+ * km × (1 + λ × désordre), λ ≤ 10 %. À longueur égale l'ordre habituel gagne ; un
+ * ordre habituel nettement plus long n'est jamais retenu. Sans `sens`, le calcul est
+ * strictement celui d'avant.
+ *
  * Les distances viennent de la matrice routière (km réels) fournie par
  * l'appelant ; repli géographique sinon. Purement fonctionnel (testé dans
  * lib/colis/__tests__/tournee-globale.test.ts).
@@ -29,6 +36,7 @@
 import { distanceEstimee, memePoint, optimiserOrdre, plusProcheVoisin, type Point } from "@/lib/colis/optimisation";
 import { estListeHorsTournee, estListeReportee } from "@/lib/colis/villages";
 import { sequenceParListes, type ArretOptimisable, type ExtremitesSequence, type Liste } from "@/lib/colis/listes";
+import { cleSecteur, coutBiaise, desordre as desordreSens, lambdaBorne, ordonnerSelonReference } from "@/lib/colis/sens-tournee";
 
 /** Garde-fou (ms) de la recherche locale sur l'ordre des villages. */
 const BUDGET_MS = 1200;
@@ -52,9 +60,19 @@ export function medoide(points: Point[], distance: (a: Point, b: Point) => numbe
   return meilleur;
 }
 
+/** Sens habituel à privilégier (biais doux). */
+export interface SensPrefere {
+  /** Clés de secteur (cleSecteur du nom de la liste) dans l'ordre à privilégier. */
+  reference: string[];
+  /** Poids du biais (défaut LAMBDA_SENS, borné à LAMBDA_MAX). */
+  lambda?: number;
+}
+
 export interface OrdreGlobal {
   /** Listes dans l'ordre retenu, positions renumérotées 0, 1, 2… */
   listes: Liste[];
+  /** Avec un sens préféré : désordre (0 à 1) de l'ordre retenu par rapport à lui ; 0 = ordre habituel suivi. */
+  desordreSens?: number;
   /** Km (routiers si matrice) de la tournée complète avec cet ordre, sans horaires. */
   km: number;
   /** Km avec l'ordre des listes d'origine (pour comparaison). */
@@ -73,6 +91,7 @@ export function ordonnerListesGlobalement(
   retour: boolean,
   distance: (a: Point, b: Point) => number = distanceEstimee,
   extremites?: ExtremitesSequence,
+  sens?: SensPrefere,
 ): OrdreGlobal {
   const triees = [...listes].sort((a, b) => a.position - b.position);
   const reportees = new Set(triees.filter(estListeReportee).map((l) => l.id));
@@ -110,9 +129,15 @@ export function ordonnerListesGlobalement(
       extremites,
     ).kmApres;
 
+  const reference = sens && sens.reference.length >= 2 ? sens.reference : null;
+  const lambda = lambdaBorne(sens?.lambda);
+  const cleDe = (l: Liste) => cleSecteur(l.name);
+  const desordreDe = (ordre: Liste[]) => (reference ? desordreSens(assembler(ordre).map(cleDe), reference) : 0);
+  const coutDe = (ordre: Liste[], km = kmDe(ordre)) => coutBiaise(km, desordreDe(ordre), lambda);
+
   if (villages.length <= 1) {
     const ordre = assembler(villages);
-    return { listes: [...ordre, ...vides].map((l, i) => ({ ...l, position: i })), km: kmDe(villages), kmOrdreActuel: kmActuel };
+    return { listes: [...ordre, ...vides].map((l, i) => ({ ...l, position: i })), km: kmDe(villages), kmOrdreActuel: kmActuel, ...(reference ? { desordreSens: desordreDe(villages) } : {}) };
   }
 
   const representants = villages.map((l) => medoide(parListe.get(l.id)!, distance)!);
@@ -123,13 +148,15 @@ export function ordonnerListesGlobalement(
   const proche = extremites?.strategie === "proche";
   const tsp = (proche ? plusProcheVoisin(debutTsp, representants, distance) : optimiserOrdre(debutTsp, representants, boucle, boucle ? null : finTsp, distance)).map((k) => villages[k]!);
   const candidats = proche ? [tsp] : [tsp, [...tsp].reverse(), villages];
+  // Ordre habituel : un candidat de plus (les villages nouveaux s'insèrent là où ils coûtent le moins).
+  if (reference) candidats.push(ordonnerSelonReference(villages, cleDe, reference, kmDe));
   let meilleur = candidats[0]!;
-  let meilleurKm = Infinity;
+  let meilleurCout = Infinity;
   for (const c of candidats) {
-    const km = kmDe(c);
-    if (km + 1e-9 < meilleurKm) {
+    const cout = coutDe(c);
+    if (cout + 1e-9 < meilleurCout) {
       meilleur = c;
-      meilleurKm = km;
+      meilleurCout = cout;
     }
   }
 
@@ -143,10 +170,10 @@ export function ordonnerListesGlobalement(
       for (let p = 0; p <= sans.length; p++) {
         if (p === i) continue;
         const essai = [...sans.slice(0, p), meilleur[i]!, ...sans.slice(p)];
-        const km = kmDe(essai);
-        if (km + 1e-6 < meilleurKm) {
+        const cout = coutDe(essai);
+        if (cout + 1e-6 < meilleurCout) {
           meilleur = essai;
-          meilleurKm = km;
+          meilleurCout = cout;
           ameliore = true;
           break;
         }
@@ -155,5 +182,10 @@ export function ordonnerListesGlobalement(
     }
   }
 
-  return { listes: [...assembler(meilleur), ...vides].map((l, i) => ({ ...l, position: i })), km: meilleurKm, kmOrdreActuel: kmDe(villages) };
+  return {
+    listes: [...assembler(meilleur), ...vides].map((l, i) => ({ ...l, position: i })),
+    km: kmDe(meilleur),
+    kmOrdreActuel: kmDe(villages),
+    ...(reference ? { desordreSens: desordreDe(meilleur) } : {}),
+  };
 }

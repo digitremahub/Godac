@@ -177,6 +177,8 @@ export function AdresseInput({
                   {sug.nom && <span className="block font-semibold">{sug.nom}</span>}
                   <span className={`block ${sug.nom ? "text-xs text-navy/65" : "font-medium"}`}>{sug.adresse}</span>
                   {(sug.detail || sug.source === "annuaire") && <span className="mt-0.5 block text-[11px] text-navy/50">{sug.detail ?? "Déjà livré par votre équipe"}</span>}
+                  {sug.fiche?.creneau && <span className="block text-[11px] text-navy/50">{sug.fiche.creneau}</span>}
+                  {sug.fiche?.echec && <span className="mt-0.5 block text-[11px] font-semibold text-orange-ink">⚠ {sug.fiche.echec}</span>}
                 </span>
               </button>
             </li>

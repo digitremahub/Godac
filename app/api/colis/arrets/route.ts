@@ -15,6 +15,7 @@ import { detecterProfessionnel } from "@/lib/colis/professionnel";
 import { MESSAGE_TOURNEE_CLOTUREE } from "@/lib/colis/cloture";
 import { colonnesCreneau, schemaCreneau } from "@/lib/colis/creneau";
 import { avecIdempotence } from "@/lib/offline/idempotence-serveur";
+import { prerempli } from "@/lib/colis/fiche-client";
 
 const bodySchema = z.object({
   run_id: z.string().uuid(),
@@ -165,6 +166,10 @@ async function ajouterArret(req: Request, appUser: AppUser) {
   // les horaires sont cherchés ensuite, sans bloquer l'ajout
   // (/api/colis/horaires/recherche, appelé par l'écran).
   const pro = kind === "ramasse" || kind === "point_relais" ? null : detecterProfessionnel({ destinataire: parsed.data.destinataire, adresse: parsed.data.adresse });
+  // Fiche client de l'annuaire (tournées précédentes de l'entreprise) : téléphone, contact, consignes
+  // d'accès, nom et créneau repris pour ce qui n'a pas été saisi. Jamais d'écrasement d'une saisie.
+  const fiche = (await horairesDesAdresses(supabase, appUser.organization_id, [parsed.data.adresse]).catch(() => new Map())).get(cle);
+  const pre = fiche ? prerempli(fiche as unknown as Record<string, unknown>, { phone: telephone, recipient: parsed.data.destinataire, business_name: etablissement?.nom ?? (pro?.pro ? pro.nom : null), window_start: creneau?.window_start, window_end: creneau?.window_end }) : null;
   const position = (stops ?? []).reduce((m, s) => Math.max(m, s.position), -1) + 1;
   const { data, error } = await supabase
     .from("delivery_stops")
@@ -182,17 +187,18 @@ async function ajouterArret(req: Request, appUser: AppUser) {
       parcel_count: kind === "livraison" ? 1 : kind === "point_relais" ? (parsed.data.colis ?? 0) : 0,
       ...(relais ? { relay_name: relais } : {}),
       address: parsed.data.adresse,
-      recipient: parsed.data.destinataire || null,
-      phone: telephone,
+      recipient: parsed.data.destinataire || pre?.recipient || null,
+      phone: telephone ?? pre?.phone ?? null,
+      ...(pre?.notes ? { notes: pre.notes } : {}),
       ...(poids ? { weight_kg: poids } : {}),
-      ...(creneau ?? {}),
+      ...(creneau ?? (pre?.window_start || pre?.window_end ? { window_start: pre.window_start, window_end: pre.window_end } : {})),
       lat: pointChoisi?.lat ?? geo?.lat ?? null,
       lng: pointChoisi?.lng ?? geo?.lng ?? null,
     })
     .select(STOP_FIELDS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const nomPro = etablissement?.nom ?? (pro?.pro ? pro.nom : null);
+  const nomPro = etablissement?.nom ?? (pro?.pro ? pro.nom : null) ?? pre?.business_name ?? null;
   if (nomPro) await supabase.from("delivery_stops").update({ business_name: nomPro.slice(0, 200) }).eq("id", data.id).then(() => undefined, () => undefined);
   // Nouvel arrêt avant le départ : l'ordre est à recalculer (fait au lancement).
   if (run.status === "loading" && run.optimized_at) await supabase.from("delivery_runs").update({ optimized_at: null }).eq("id", run.id);
@@ -206,6 +212,8 @@ async function ajouterArret(req: Request, appUser: AppUser) {
     geocoded: Boolean(pointChoisi ?? geo),
     village,
     professionnel: nomPro,
+    /** Ce que la fiche client a prérempli (affiché au chauffeur : « Repris de la fiche : téléphone, consignes… »). */
+    prerempli: pre ? [pre.phone && !telephone ? "téléphone" : null, pre.recipient && !parsed.data.destinataire ? "contact" : null, pre.notes ? "consignes d'accès" : null, pre.window_start || pre.window_end ? "créneau" : null].filter(Boolean) : [],
     ...(kind === "point_relais" ? { horaires } : {}),
   });
 }

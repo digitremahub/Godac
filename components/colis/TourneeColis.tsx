@@ -19,6 +19,8 @@ import { estMarque, estRamasse, estPointRelais, libelleFait, libellePreuve, libe
 import { RESEAUX_RELAIS } from "@/lib/colis/relais";
 import { BadgeArret, ChoixTypeArret, EncocheArret, bordureArret } from "@/components/colis/Ramasse";
 import { estimerAvancement, heureFin } from "@/lib/colis/estimation";
+import { serviceConnu } from "@/lib/colis/fiche-client";
+import type { ModeSens } from "@/lib/colis/sens-tournee";
 import { scannerNatif, scannerNatifDisponible } from "@/lib/colis/natif";
 import { LivraisonSheet } from "@/components/colis/LivraisonSheet";
 import { ClotureSheet } from "@/components/colis/ClotureSheet";
@@ -410,7 +412,7 @@ export function TourneeColis({
           etablissement: d.etablissement ?? null,
           ...(d.type === "point_relais" ? { relais: d.relais?.trim() || null, colis: Math.max(0, d.colis ?? 0) } : {}),
         });
-      let r: { duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null };
+      let r: { duplicate?: boolean; grouped?: boolean; geocoded?: boolean; message?: string; professionnel?: string | null; prerempli?: string[]; relais?: boolean; horaires?: boolean; stop?: Stop | null; village?: { nom: string; horsTournee: boolean } | null };
       try {
         r = await api<typeof r>("/api/colis/arrets", { method: "POST", body: corps });
       } catch (e) {
@@ -421,7 +423,7 @@ export function TourneeColis({
         return setToast({ ok: true, text: "Pas de réseau : l'adresse est conservée et sera ajoutée dès que le réseau revient." });
       }
       // Pas de numéro : l'ajout se fait quand même, mais le chauffeur est prévenu.
-      const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) ? ` ${ALERTE_SANS_TELEPHONE}` : "";
+      const sansTel = !r.duplicate && !r.grouped && !normaliserTelephone(d.telephone, pays) && !r.stop?.phone ? ` ${ALERTE_SANS_TELEPHONE}` : "";
       setToast(
         r.duplicate
           ? { ok: false, text: "Colis déjà scanné." }
@@ -442,6 +444,7 @@ export function TourneeColis({
                     (d.type === "point_relais" ? (r.horaires ? " Horaires du relais pris en compte (annuaire)." : " Ajoutez ses horaires (bouton « Horaires ») pour l'optimisation.") : "") + (r.village ? (r.village.horsTournee ? ` · Rangé dans « ${r.village.nom} » (hors tournée).` : ` · Village : ${r.village.nom}.`) : "") +
                     (creneau.creneau ? ` · Créneau ${libelleCourt(creneau.creneau)}.` : "") +
                     (r.professionnel ? ` · Professionnel détecté : ${r.professionnel} (recherche de ses horaires…).` : "") +
+                    (r.prerempli?.length ? ` · Repris de la fiche client : ${r.prerempli.join(", ")}.` : "") +
                     sansTel,
                 },
       );
@@ -597,14 +600,14 @@ export function TourneeColis({
    * feuille « Optimiser l'ordre » (mémorisés sur la tournée). Renvoie un
    * message d'erreur, ou null.
    */
-  async function optimiser(depuisMaPosition = false, choix?: { depart: Depart | null; arrivee: Arrivee }): Promise<string | null> {
+  async function optimiser(depuisMaPosition = false, choix?: { depart: Depart | null; arrivee: Arrivee; sens?: ModeSens }): Promise<string | null> {
     setBusy("optim");
     try {
       const depuis = depuisMaPosition || choix?.depart?.mode === "position" ? await lirePositionGps() : null;
       if (run && choix) setRun(await memoriserChoix(run, choix.depart, choix.arrivee));
       const r = await api<ResumeOptimisation>("/api/colis/optimiser", {
         method: "POST",
-        body: JSON.stringify({ run_id: run?.id, depuis, ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : {}), ...(depuisMaPosition ? { strategie: "proche" } : {}) }),
+        body: JSON.stringify({ run_id: run?.id, depuis, ...(choix ? { depart: choix.depart, arrivee: choix.arrivee } : {}), ...(choix?.sens ? { sens: choix.sens } : {}), ...(depuisMaPosition ? { strategie: "proche" } : {}) }),
       });
       const gain = r.kmAvant - r.kmApres;
       await recharger(run?.id);
@@ -973,7 +976,7 @@ export function TourneeColis({
   const enLivraison = run.status === "in_progress";
   const choix = choixDeRun(run);
   const avancement = estimerAvancement(
-    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null })),
+    stops.map((s) => ({ status: s.status, parcel_count: s.parcel_count, lat: s.lat, lng: s.lng, done_at: s.done_at ?? null, fenetres: horaires.fenetres.get(s.id) ?? null, service_min: serviceConnu(s.horaire) })),
     {
       depot: run.start_lat !== null && run.start_lng !== null ? { lat: Number(run.start_lat), lng: Number(run.start_lng) } : null,
       retourDepot: run.return_to_start,
@@ -1111,7 +1114,7 @@ export function TourneeColis({
           enLivraison={enLivraison}
           initial={choix}
           onFermer={() => setFeuilleOptim(false)}
-          onValider={(depart, arrivee) => optimiser(enLivraison, { depart: enLivraison && depart?.mode === "position" ? null : depart, arrivee })}
+          onValider={(depart, arrivee, sens) => optimiser(enLivraison, { depart: enLivraison && depart?.mode === "position" ? null : depart, arrivee, sens })}
         />
       )}
       {horairesStop && (

@@ -19,6 +19,7 @@
 //     reste prioritaire, les professionnels SIRENE s'ajoutent à la suite.
 
 import { normaliserTexte } from "@/lib/colis/professionnel";
+import { detailSuggestion, type ResumeFiche } from "@/lib/colis/fiche-client";
 
 /** « pro » : professionnel / entreprise trouvé par son nom (SIRENE) ; se comporte comme un établissement. */
 export type TypeSuggestion = "adresse" | "etablissement" | "pro";
@@ -40,6 +41,8 @@ export interface SuggestionAdresse {
   detail?: string | null;
   /** Identifiant Google Places : les coordonnées sont résolues au choix (Place Details). */
   placeId?: string;
+  /** Annuaire interne : ce que les tournées précédentes ont appris de cette adresse (fiche client). */
+  fiche?: ResumeFiche | null;
 }
 
 /** Texte de la suggestion tel qu'affiché et cherché. */
@@ -59,14 +62,37 @@ export interface EntreeAnnuaire {
   adresse: string;
   lat?: number | null;
   lng?: number | null;
+  /** Fiche client de l'adresse (téléphone, durée d'arrêt, alerte d'échec…). */
+  fiche?: ResumeFiche | null;
 }
 
-/** Entrées de l'annuaire interne qui correspondent à la requête (nom ou adresse). */
+/**
+ * Entrées de l'annuaire interne qui correspondent à la requête (nom ou adresse).
+ * Les fiches viennent avant les arrêts passés (qui ne sont que des noms et des
+ * adresses) ; une adresse n'apparaît qu'une fois, avec la fiche la plus riche.
+ */
 export function filtrerAnnuaire(entrees: readonly EntreeAnnuaire[], requete: string, limite = 5): SuggestionAdresse[] {
-  return entrees
-    .filter((e) => e.adresse && correspondRequete(`${e.nom ?? ""} ${e.adresse}`, requete))
-    .slice(0, limite)
-    .map((e) => ({ type: e.nom ? "etablissement" : "adresse", nom: e.nom || null, adresse: e.adresse, lat: e.lat ?? null, lng: e.lng ?? null, source: "annuaire", detail: "Déjà livré par votre équipe" }));
+  const vus = new Set<string>();
+  const sortie: SuggestionAdresse[] = [];
+  const ordonnees = [...entrees.filter((e) => e.fiche), ...entrees.filter((e) => !e.fiche)];
+  for (const e of ordonnees) {
+    if (!e.adresse || !correspondRequete(`${e.nom ?? ""} ${e.adresse}`, requete)) continue;
+    const cle = `${normaliserTexte(e.nom ?? "")}|${normaliserTexte(e.adresse)}`;
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    sortie.push({
+      type: e.nom ? "etablissement" : "adresse",
+      nom: e.nom || null,
+      adresse: e.adresse,
+      lat: e.lat ?? null,
+      lng: e.lng ?? null,
+      source: "annuaire",
+      detail: e.fiche ? detailSuggestion(e.fiche) : "Déjà livré par votre équipe",
+      ...(e.fiche ? { fiche: e.fiche } : {}),
+    });
+    if (sortie.length >= limite) break;
+  }
+  return sortie;
 }
 
 /** Propriétés d'un résultat Photon (GeoJSON). */

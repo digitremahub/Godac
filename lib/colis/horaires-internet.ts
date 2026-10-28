@@ -165,8 +165,12 @@ export async function rechercherEtEnregistrerHoraires(
   if (!lot.length) return [];
 
   const cles = [...new Set(lot.map((s) => cleAdresse(s.address)))];
-  const { data: fiches } = await supabase.from("delivery_address_hours").select("address_key").eq("organization_id", organizationId).in("address_key", cles);
-  const connues = new Set(((fiches ?? []) as { address_key: string }[]).map((f) => f.address_key));
+  const { data: fiches } = await supabase.from("delivery_address_hours").select("address_key, weekly_schedule").eq("organization_id", organizationId).in("address_key", cles);
+  // Une fiche client sans horaires (créée à la clôture d'un arrêt, migration 20261113000001) n'empêche pas la recherche des horaires.
+  const existantes = (fiches ?? []) as { address_key: string; weekly_schedule: unknown }[];
+  const avecHoraires = (f: { weekly_schedule: unknown }) => Boolean(f.weekly_schedule && typeof f.weekly_schedule === "object" && Object.keys(f.weekly_schedule as object).length);
+  const connues = new Set(existantes.filter(avecHoraires).map((f) => f.address_key));
+  const sansHoraires = new Set(existantes.filter((f) => !avecHoraires(f)).map((f) => f.address_key));
 
   const localises = lot.filter((s) => s.lat !== null && s.lng !== null && !connues.has(cleAdresse(s.address)));
   const commerces = await commercesProches(localises.map((s) => ({ id: s.id, point: { lat: Number(s.lat), lng: Number(s.lng) } })));
@@ -193,18 +197,18 @@ export async function rechercherEtEnregistrerHoraires(
       }
       if (!trouve && nom) trouve = await horairesGoogle(nom, s.address);
       if (trouve) {
-        const { error } = await supabase.from("delivery_address_hours").insert({
-          organization_id: organizationId,
-          address_key: cleAdresse(s.address),
-          address: s.address,
+        const horaires = {
           label: trouve.nom.slice(0, 120),
           weekly_schedule: trouve.semaine,
-          notes: null,
           source: trouve.source,
           source_ref: trouve.ref.slice(0, 300),
           found_at: new Date().toISOString(),
           updated_by: userId,
-        });
+        };
+        // Fiche client déjà là (sans horaires) : on y ajoute les horaires, sans toucher au reste ; sinon nouvelle fiche.
+        const { error } = sansHoraires.has(cleAdresse(s.address))
+          ? await supabase.from("delivery_address_hours").update(horaires).eq("organization_id", organizationId).eq("address_key", cleAdresse(s.address))
+          : await supabase.from("delivery_address_hours").insert({ organization_id: organizationId, address_key: cleAdresse(s.address), address: s.address, notes: null, ...horaires });
         // Conflit (fiche créée entre-temps) ou migration absente : on ne remplace rien.
         if (error) trouve = null;
         else connues.add(cleAdresse(s.address));

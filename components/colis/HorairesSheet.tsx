@@ -26,6 +26,9 @@ import {
 } from "@/lib/colis/horaires";
 import { api, type Run, type Stop } from "@/components/colis/commun";
 import { LIBELLE_SOURCE } from "@/lib/colis/opening-hours";
+import { creneauConseille, dureeServicePrevue, echecFrequent, lireDonnees, serviceConnu } from "@/lib/colis/fiche-client";
+import { libelleMotif } from "@/lib/colis/cloture";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /** Heure saisie / stockée (« 10:00:00 ») → valeur d'un champ <input type="time"> (« 10:00 »). */
 const versChamp = (v: string | null | undefined) => {
@@ -58,7 +61,7 @@ export function useHoraires(run: Run | null, stops: Stop[], position: { lat: num
     const dernierFait = [...stops].reverse().find((s) => s.status !== "pending" && s.lat !== null && s.lng !== null);
     const point = run.status === "in_progress" ? (position ?? (dernierFait ? { lat: Number(dernierFait.lat), lng: Number(dernierFait.lng) } : depot)) : depot;
     const passages = passagesTournee(
-      stops.map((s) => ({ id: s.id, status: s.status, lat: s.lat, lng: s.lng, fenetres: fenetres.get(s.id) ?? null })),
+      stops.map((s) => ({ id: s.id, status: s.status, lat: s.lat, lng: s.lng, fenetres: fenetres.get(s.id) ?? null, ...(serviceConnu(s.horaire) !== null ? { service: serviceConnu(s.horaire)! } : {}) })),
       { point, minute },
     );
     return { jour, depart: minute, fenetres, passages };
@@ -73,7 +76,13 @@ export function useHoraires(run: Run | null, stops: Stop[], position: { lat: num
 export function BadgeHoraires({ stop, fenetres, passage, inverse = false }: { stop: Stop; fenetres: Fenetres; passage?: Passage | null; inverse?: boolean }) {
   const libelle = libelleFenetres(fenetres, aCreneauPonctuel({ debut: stop.window_start, fin: stop.window_end }));
   const alerte = passage && (passage.statut === "hors" || passage.statut === "ferme");
-  if (!libelle && !passage) return null;
+  // Fiche client : alerte « échec fréquent ici » et créneau où la livraison réussit le plus souvent (arrêt à faire seulement).
+  const aFaire = stop.status === "pending";
+  const echec = aFaire ? echecFrequent(stop.horaire) : null;
+  const conseil = aFaire
+    ? creneauConseille(stop.horaire, fenetres && fenetres.length ? (m) => fenetres.some(([o, c]) => m >= o && m < c) : undefined)
+    : null;
+  if (!libelle && !passage && !echec && !conseil) return null;
   const pastille = inverse ? "bg-white/10 text-white" : "bg-navy/[0.06] text-navy/75";
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1 text-[11px] font-semibold">
@@ -86,6 +95,16 @@ export function BadgeHoraires({ stop, fenetres, passage, inverse = false }: { st
       {stop.horaire?.source && stop.horaire.source !== "manuel" && (
         <span className={`rounded-full px-2 py-0.5 ${inverse ? "bg-white/10 text-white" : "bg-teal/10 text-teal-ink"}`} title="Horaires trouvés automatiquement : à vérifier">
           Horaires trouvés ({LIBELLE_SOURCE[stop.horaire.source] ?? stop.horaire.source})
+        </span>
+      )}
+      {echec && (
+        <span className="rounded-full bg-orange/15 px-2 py-0.5 text-orange-ink" title="D'après les passages précédents de votre équipe à cette adresse">
+          ⚠ {echec.libelle}
+        </span>
+      )}
+      {conseil && (
+        <span className={`rounded-full px-2 py-0.5 ${inverse ? "bg-white/10 text-white" : "bg-teal/10 text-teal-ink"}`} title={`${Math.round(conseil.taux * 100)} % de livraisons réussies à cette heure (${conseil.passages} passages)`}>
+          💡 Livraison réussie surtout vers {conseil.debut.replace(":00", " h")}–{conseil.fin.replace(":00", " h")}
         </span>
       )}
       {passage && (
@@ -117,6 +136,10 @@ export interface ResumeOptimisation {
   dureeMin?: number | null;
   /** Départ et arrivée retenus (« Dépôt », « Ma position actuelle », adresse…). */
   extremites?: { depart: string; arrivee: string };
+  /** Adresses dont la durée d'arrêt est celle observée (fiche client) et non la valeur fixe. */
+  dureesApprises?: number;
+  /** Sens de la tournée : choix, habitude (« Soulac → Vendays »), suivie ou écartée pour tenir les horaires. */
+  sens?: { mode: "habituel" | "inverse" | "libre"; habitude: string | null; applique: boolean; suivi: boolean; ecarte: "horaires" | null };
 }
 
 const dureeTexte = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}` : `${min} min`);
@@ -149,10 +172,19 @@ export function ResumeOptimisationCarte({ resume, stops, onFermer }: { resume: R
       )}
       <p className="text-xs text-navy/65">
         Départ {heureIso(resume.depart)} · fin estimée vers {heureIso(resume.finEstimee)}
-        {resume.dureeMin ? ` (≈ ${dureeTexte(resume.dureeMin)} au total, trajets compris)` : ""} · 3 min moyennes par livraison
+        {resume.dureeMin ? ` (≈ ${dureeTexte(resume.dureeMin)} au total, trajets compris)` : ""} · {resume.dureesApprises ? `durée d'arrêt observée pour ${resume.dureesApprises} adresse${resume.dureesApprises > 1 ? "s" : ""}, 3 min sinon` : "3 min moyennes par livraison"}
         {resume.avecHoraires > 0 && ` · ${resume.avecHoraires} adresse${resume.avecHoraires > 1 ? "s" : ""} avec horaires`}
         {resume.sansGps > 0 && ` · ${resume.sansGps} adresse(s) à vérifier en fin de liste`}
       </p>
+      {resume.sens?.habitude && resume.sens.mode !== "libre" && (
+        <p className={`mt-1 text-xs font-semibold ${resume.sens.ecarte ? "text-orange-ink" : "text-teal-ink"}`}>
+          {resume.sens.ecarte
+            ? `Sens habituel (${resume.sens.habitude}) écarté : il aurait fait sortir une adresse de ses horaires.`
+            : resume.sens.suivi
+              ? `${resume.sens.mode === "inverse" ? "Sens habituel inversé" : "Sens habituel suivi"} : ${resume.sens.habitude}`
+              : `Sens habituel privilégié (${resume.sens.habitude}), sauf là où il aurait rallongé nettement la tournée.`}
+        </p>
+      )}
       {signales.map(([titre, ids]) =>
         ids.length ? (
           <div key={titre} className="mt-2">
@@ -207,9 +239,18 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
   const [nom, setNom] = useState(stop.horaire?.label ?? (stop.kind === "point_relais" ? stop.relay_name : null) ?? stop.recipient ?? "");
   const [notes, setNotes] = useState(stop.horaire?.notes ?? "");
   const [semaine, setSemaine] = useState<Semaine>(() => normaliserSemaine(stop.horaire?.weekly_schedule));
+  // Fiche client : coordonnées et consignes retenues des tournées précédentes (modifiables, effaçables).
+  const [telephone, setTelephone] = useState(stop.horaire?.phone ?? "");
+  const [contact, setContact] = useState(stop.horaire?.recipient ?? "");
+  const [consignes, setConsignes] = useState(stop.horaire?.access_notes ?? "");
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const jourTournee = jourIso(jour);
+  const fiche = useMemo(() => lireDonnees((stop.horaire ?? null) as Record<string, unknown> | null), [stop.horaire]);
+  const echec = echecFrequent(fiche);
+  const conseil = creneauConseille(fiche);
+  const passages = fiche.delivered_count + fiche.failed_count;
+  const motifPrincipal = Object.entries(fiche.failure_reasons).sort((a, b) => b[1] - a[1])[0];
 
   async function envoyer(action: () => Promise<unknown>, texte: string) {
     setBusy(true);
@@ -242,7 +283,22 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
       "Horaires enregistrés : ils s'appliqueront à cette adresse dans toutes les tournées.",
     );
   const retirerPro = () =>
-    envoyer(() => api(`/api/colis/horaires?adresse=${encodeURIComponent(stop.address)}`, { method: "DELETE" }), "Adresse retirée de l'annuaire des horaires.");
+    envoyer(() => api(`/api/colis/horaires?adresse=${encodeURIComponent(stop.address)}`, { method: "DELETE" }), "Adresse retirée de l'annuaire (fiche client comprise).");
+  const enregistrerFiche = () =>
+    envoyer(
+      () =>
+        api("/api/colis/horaires", {
+          method: "PUT",
+          body: JSON.stringify({ adresse: stop.address, telephone: telephone.trim() || null, contact: contact.trim() || null, consignes: consignes.trim() || null }),
+        }),
+      "Fiche client enregistrée : elle sera reprise à chaque passage à cette adresse.",
+    );
+  // Droit à l'effacement : supprime la fiche (coordonnées, consignes, statistiques de passage) de l'annuaire de l'entreprise.
+  const effacerFiche = async () => {
+    const ok = await confirmer({ titre: "Effacer la fiche client ?", message: "Téléphone, contact, consignes et statistiques de passage seront supprimés pour toute l'équipe, horaires d'ouverture compris. C'est définitif.", action: "Effacer", danger: true });
+    if (!ok) return;
+    await envoyer(() => api(`/api/colis/horaires?adresse=${encodeURIComponent(stop.address)}`, { method: "DELETE" }), "Fiche client effacée.");
+  };
 
   const majJour = (j: Jour, creneaux: Creneau[] | undefined) =>
     setSemaine((s) => {
@@ -313,6 +369,50 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
             {(stop.window_start || stop.window_end) && (
               <button type="button" className="btn-secondary !py-2 text-sm" disabled={busy} onClick={retirerCreneau}>
                 Retirer le créneau
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-2 rounded-2xl border border-navy/10 p-3">
+          <h3 className="text-sm font-semibold">Fiche client</h3>
+          <p className="text-xs text-navy/60">
+            Retenue automatiquement après chaque passage et partagée avec votre équipe pour préremplir cette adresse. Conservée 12 mois sans mise à jour ; vous pouvez la corriger ou l&apos;effacer.
+          </p>
+          {stop.horaire && passages > 0 && (
+            <ul className="flex flex-col gap-0.5 rounded-xl bg-navy/[0.04] px-3 py-2 text-xs text-navy/75">
+              <li>
+                {passages} passage{passages > 1 ? "s" : ""} : {fiche.delivered_count} livré{fiche.delivered_count > 1 ? "s" : ""}, {fiche.failed_count} non livré{fiche.failed_count > 1 ? "s" : ""}
+              </li>
+              {serviceConnu(fiche) !== null && <li>Durée d&apos;arrêt moyenne observée : ≈ {Math.round(dureeServicePrevue(fiche))} min</li>}
+              {conseil && (
+                <li>
+                  Livraison réussie surtout vers {conseil.debut.replace(":00", " h")}–{conseil.fin.replace(":00", " h")} ({Math.round(conseil.taux * 100)} % sur {conseil.passages} passages)
+                </li>
+              )}
+              {(fiche.contact_message_count > 0 || fiche.contact_phone_count > 0) && (
+                <li>
+                  Contacts déjà faits : {fiche.contact_message_count} message{fiche.contact_message_count > 1 ? "s" : ""}, {fiche.contact_phone_count} appel{fiche.contact_phone_count > 1 ? "s" : ""}
+                </li>
+              )}
+              {motifPrincipal && fiche.failed_count > 0 && (
+                <li>
+                  Motif d&apos;échec le plus fréquent : {libelleMotif(motifPrincipal[0])?.toLowerCase()} ({motifPrincipal[1]})
+                </li>
+              )}
+            </ul>
+          )}
+          {echec && <p className="rounded-xl bg-orange/15 px-3 py-2 text-xs font-semibold text-orange-ink">⚠ {echec.libelle}</p>}
+          <input className="input" type="tel" inputMode="tel" value={telephone} maxLength={40} onChange={(e) => setTelephone(e.target.value)} placeholder="Téléphone de l'établissement" aria-label="Téléphone de la fiche client" />
+          <input className="input" value={contact} maxLength={120} onChange={(e) => setContact(e.target.value)} placeholder="Contact habituel (facultatif)" aria-label="Contact habituel" />
+          <textarea className="input min-h-[72px]" value={consignes} maxLength={500} onChange={(e) => setConsignes(e.target.value)} placeholder="Consignes d'accès : code, stationnement, quai…" aria-label="Consignes d'accès" />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-primary !py-2 text-sm" disabled={busy} onClick={enregistrerFiche}>
+              Enregistrer la fiche
+            </button>
+            {stop.horaire && (
+              <button type="button" className="btn-secondary !py-2 text-sm text-orange-ink" disabled={busy} onClick={effacerFiche}>
+                Effacer la fiche client
               </button>
             )}
           </div>
@@ -394,7 +494,7 @@ export function HorairesSheet({ stop, jour, onClose, onSaved }: { stop: Stop; jo
                 </button>
                 {stop.horaire && (
                   <button type="button" className="btn-secondary !py-2 text-sm text-orange-ink" disabled={busy} onClick={retirerPro}>
-                    Ce n&apos;est plus une adresse pro
+                    Retirer l&apos;adresse de l&apos;annuaire
                   </button>
                 )}
               </div>

@@ -8,6 +8,7 @@ import { refusPreuveSelonMode } from "@/lib/colis/mode-simple";
 import { MESSAGE_TOURNEE_CLOTUREE, refusCloture, tourneeCloturee } from "@/lib/colis/cloture";
 import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, RETOURS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
+import { enregistrerObservationArret } from "@/lib/colis/fiche-client-serveur";
 
 const BUCKET = "delivery-proofs";
 const bodySchema = z.object({
@@ -125,6 +126,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Arrêt déjà clôturé entre-temps : actualisez." }, { status: 409 });
+  // La fiche client de l'adresse retient cette livraison (non bloquant, idempotent).
+  await enregistrerObservationArret(supabase, appUser.organization_id, appUser.id, id);
   return NextResponse.json({ stop: data });
 }
 
