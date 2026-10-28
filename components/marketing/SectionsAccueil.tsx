@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PHOTOS, PhotoVitrine } from "@/components/marketing/PhotoVitrine";
 import { IconArrowRight, IconCoins, IconMapPin, IconShieldCheck, IconTruck, IconUsers, IconWrench } from "@/components/layout/icons";
 
 /* ── Bandeau de réassurance ─────────────────────────────────────────────
@@ -178,6 +179,13 @@ export function CorpsDeMetier() {
             Vous choisissez les modules utiles à votre activité, et vous en ajoutez quand elle grandit.
           </p>
         </div>
+        <PhotoVitrine
+          src={PHOTOS.equipe}
+          alt="Portrait de groupe d'une équipe de cinq personnes, chauffeurs et encadrement, devant des fourgons."
+          sizes="(min-width: 1024px) 896px, calc(100vw - 40px)"
+          ratio="aspect-[16/9] sm:aspect-[21/9]"
+          className="mx-auto mb-10 max-w-4xl"
+        />
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {METIERS.map((m) => (
             <li key={m.titre} className="card flex flex-col gap-3 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-navy/15 hover:shadow-raised">

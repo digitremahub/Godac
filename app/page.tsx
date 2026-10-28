@@ -5,6 +5,7 @@ import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import { HeroScene3D } from "@/components/marketing/HeroScene3D";
 import { AnimationGodac } from "@/components/marketing/AnimationGodac";
 import { BandeauReassurance, CommentCaMarche, CorpsDeMetier, FaqAccueil } from "@/components/marketing/SectionsAccueil";
+import { PHOTOS, PhotoVitrine } from "@/components/marketing/PhotoVitrine";
 import { ModulesProfondeur } from "@/components/marketing/ModulesProfondeur";
 import { MaquetteGoNavigation } from "@/components/marketing/MaquetteGoNavigation";
 import {
@@ -307,6 +308,17 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
         </main>
       </div>
 
+      {/* ── Bandeau photo pleine largeur, sous le héros ── */}
+      <section aria-label="Illustration" className="bg-paper px-5 pt-10 sm:px-6 lg:pt-14">
+        <PhotoVitrine
+          src={PHOTOS.fourgonAube}
+          alt="Fourgon blanc chargé, garé dans une rue de village au lever du soleil, prêt à partir en tournée."
+          sizes="(min-width: 1152px) 1104px, calc(100vw - 40px)"
+          ratio="aspect-[16/9] sm:aspect-[21/9]"
+          className="mx-auto max-w-6xl"
+        />
+      </section>
+
       <BandeauReassurance />
 
       {/* ── What GODAC replaces ── */}
@@ -410,6 +422,13 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               sans ressaisie&nbsp;: le chauffeur photographie son ticket, GODAC fait le reste.
             </p>
           </div>
+          <PhotoVitrine
+            src={PHOTOS.carburant}
+            alt="Chauffeur faisant le plein de son camion à l'aube, sur une aire de ravitaillement."
+            sizes="(min-width: 1024px) 896px, calc(100vw - 40px)"
+            ratio="aspect-[16/9] sm:aspect-[21/9]"
+            className="mx-auto mb-10 max-w-4xl"
+          />
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {LEVIERS_CARBURANT.map((l) => (
               <li key={l.title} className="card flex flex-col gap-3">
@@ -427,9 +446,16 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       {/* ── Flotte ── */}
       <section id="flotte" className="scroll-mt-20 border-t border-navy/[0.08] bg-paper py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="mb-12 max-w-2xl">
-            <p className="kicker !text-teal-ink">Flotte</p>
-            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Vos véhicules suivis, de la carte grise à l&apos;amende.</h2>
+          <div className="mb-12 grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+            <div className="max-w-2xl">
+              <p className="kicker !text-teal-ink">Flotte</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Vos véhicules suivis, de la carte grise à l&apos;amende.</h2>
+            </div>
+            <PhotoVitrine
+              src={PHOTOS.exploitationTablette}
+              alt="Un responsable d'exploitation et un chauffeur consultent ensemble une tablette dans la cour d'un dépôt, à côté des camions."
+              sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, calc(100vw - 40px)"
+            />
           </div>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {FLOTTE.map((f) => (
@@ -448,9 +474,16 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       {/* ── Planning, absences, paie ── */}
       <section id="planning-paie" className="scroll-mt-20 border-y border-orange-fonce/15 bg-orange-clair py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="mb-12 max-w-2xl">
-            <p className="kicker !text-orange-texte">Planning, RH &amp; paie</p>
-            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du planning au bulletin, sans ressaisie.</h2>
+          <div className="mb-12 grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+            <div className="max-w-2xl">
+              <p className="kicker !text-orange-texte">Planning, RH &amp; paie</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du planning au bulletin, sans ressaisie.</h2>
+            </div>
+            <PhotoVitrine
+              src={PHOTOS.bureauPlanning}
+              alt="Une gestionnaire prépare le planning à son ordinateur, entourée de dossiers et d'une carte, avec des camions visibles par la baie vitrée."
+              sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, calc(100vw - 40px)"
+            />
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {PLANNING_PAIE.map((bloc) => (
@@ -540,12 +573,19 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
       {/* ── Tournée colis ── */}
       <section id="tournee-colis" className="scroll-mt-20 bg-surface py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="mb-12 max-w-2xl">
-            <p className="kicker !text-orange-texte">Tournée colis</p>
-            <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du scan du colis à la preuve de livraison.</h2>
-            <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
-              La tournée se prépare depuis le planning, quel que soit le transporteur donneur d&apos;ordre.
-            </p>
+          <div className="mb-12 grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+            <div className="max-w-2xl">
+              <p className="kicker !text-orange-texte">Tournée colis</p>
+              <h2 className="mt-3 text-[28px] leading-tight sm:text-4xl">Du scan du colis à la preuve de livraison.</h2>
+              <p className="mt-4 text-pretty text-navy/65 sm:text-lg">
+                La tournée se prépare depuis le planning, quel que soit le transporteur donneur d&apos;ordre.
+              </p>
+            </div>
+            <PhotoVitrine
+              src={PHOTOS.remiseColis}
+              alt="Un livreur remet un colis à une cliente sur le seuil de sa porte."
+              sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, calc(100vw - 40px)"
+            />
           </div>
           <ul className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {TOURNEE_COLIS.map((bloc) => (
@@ -567,6 +607,13 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
               </li>
             ))}
           </ul>
+          <PhotoVitrine
+            src={PHOTOS.depotTri}
+            alt="Tri des colis dans un dépôt, avec un fourgon chargé à quai."
+            sizes="(min-width: 1024px) 896px, calc(100vw - 40px)"
+            ratio="aspect-[16/9] sm:aspect-[21/9]"
+            className="mx-auto mt-10 max-w-4xl"
+          />
         </div>
       </section>
 
