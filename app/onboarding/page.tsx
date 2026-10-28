@@ -4,6 +4,8 @@ import { getCurrentAppUser } from "@/lib/auth/session";
 import { tryAutoProvisionInvitedUser } from "@/lib/auth/provisioning";
 import { getFullCatalog } from "@/lib/organization/catalog";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { CompteSuspendu } from "@/components/comptes-essai/CompteSuspendu";
+import { compteSuspenduPour } from "@/lib/comptes-essai/garde";
 
 export default async function OnboardingPage({
   searchParams,
@@ -20,6 +22,14 @@ export default async function OnboardingPage({
   // auto-provisioned as an invited member) — nothing left to do.
   const existing = (await getCurrentAppUser()) ?? (await tryAutoProvisionInvitedUser());
   if (existing) redirect("/dashboard");
+  // Compte suspendu par GODAC : jamais l'assistant de création d'organisation.
+  if (await compteSuspenduPour(user.id)) {
+    return (
+      <main>
+        <CompteSuspendu />
+      </main>
+    );
+  }
 
   const params = await searchParams;
   const { plans, modules, prices } = await getFullCatalog(supabase);

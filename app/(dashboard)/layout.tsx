@@ -7,6 +7,8 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StyleCouleursEntreprise } from "@/components/layout/StyleCouleursEntreprise";
 import { couleursOrganisation } from "@/lib/theme/couleurs-entreprise-serveur";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
+import { CompteSuspendu } from "@/components/comptes-essai/CompteSuspendu";
+import { compteSuspenduDeLUtilisateurCourant } from "@/lib/comptes-essai/garde";
 import type { Metadata } from "next";
 
 /** Espace privé : jamais indexé par les moteurs de recherche. */
@@ -21,6 +23,15 @@ export default async function DashboardLayout({
   let appUser = await utilisateurCourant();
 
   if (!appUser) {
+    // Compte suspendu par GODAC : écran clair (l'accès est déjà refusé par
+    // getCurrentAppUser), sans repasser par l'inscription ni la création du profil.
+    if (await compteSuspenduDeLUtilisateurCourant()) {
+      return (
+        <main>
+          <CompteSuspendu />
+        </main>
+      );
+    }
     // An invited user's first visit after clicking their email link
     // finishes silently here; an organic sign-up gets sent to
     // onboarding to create their own organisation.

@@ -7,6 +7,8 @@ import { deciderAcces, ecran, horsOffreGoNavigation } from "@/lib/acces/catalogu
 import { ACCUEIL_GO_NAVIGATION } from "@/lib/go-navigation/offre";
 import { modulesActifs, utilisateurCourant } from "@/lib/acces/modules-requete";
 import { EtatAcces } from "@/components/acces/EtatAcces";
+import { CompteSuspendu } from "@/components/comptes-essai/CompteSuspendu";
+import { compteSuspenduDeLUtilisateurCourant } from "@/lib/comptes-essai/garde";
 
 export type ResultatGarde =
   | { ok: true; appUser: AppUser; supabase: SupabaseClient; modules: ReadonlySet<string> }
@@ -25,7 +27,11 @@ export type ResultatGarde =
 export async function garderPage(id: string): Promise<ResultatGarde> {
   const e = ecran(id);
   const appUser = await utilisateurCourant();
-  if (!appUser) redirect("/onboarding");
+  if (!appUser) {
+    // Compte suspendu par GODAC : écran dédié (jamais l'inscription).
+    if (await compteSuspenduDeLUtilisateurCourant()) return { ok: false, ecran: <CompteSuspendu /> };
+    redirect("/onboarding");
+  }
   const modules = await modulesActifs(appUser.organization_id);
   // Compte d'essai GO Navigation : seuls les écrans de l'offre s'ouvrent.
   if (horsOffreGoNavigation(e.id, modules)) redirect(ACCUEIL_GO_NAVIGATION);

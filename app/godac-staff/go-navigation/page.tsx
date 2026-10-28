@@ -74,6 +74,10 @@ export default async function InvitationsGoNavigationPage() {
         <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
           Usage des essais →
         </Link>
+        {" · "}
+        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
+          Comptes d&apos;essai →
+        </Link>
       </p>
       {error ? (
         <Card>

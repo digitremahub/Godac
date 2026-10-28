@@ -28,12 +28,12 @@ import {
 
 const TAILLE_PAGE = 1000;
 const PAGES_MAX = 100;
-const TAILLE_LOT = 40;
+export const TAILLE_LOT = 40;
 
 type Page<T> = PromiseLike<{ data: T[] | null; error: { code?: string | null; message?: string | null } | null }>;
 
 /** Lit toutes les pages d'une requête (PostgREST plafonne à 1000 lignes). Erreur (table absente…) : liste vide, consignée. */
-async function lireTout<T>(contexte: string, page: (de: number, a: number) => Page<T>): Promise<T[]> {
+export async function lireTout<T>(contexte: string, page: (de: number, a: number) => Page<T>): Promise<T[]> {
   const lignes: T[] = [];
   for (let i = 0; i < PAGES_MAX; i++) {
     const { data, error } = await page(i * TAILLE_PAGE, (i + 1) * TAILLE_PAGE - 1);
@@ -47,7 +47,7 @@ async function lireTout<T>(contexte: string, page: (de: number, a: number) => Pa
   return lignes;
 }
 
-function lots<T>(liste: readonly T[], taille: number): T[][] {
+export function lots<T>(liste: readonly T[], taille: number): T[][] {
   const r: T[][] = [];
   for (let i = 0; i < liste.length; i += taille) r.push(liste.slice(i, i + taille));
   return r;

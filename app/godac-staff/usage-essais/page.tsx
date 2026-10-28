@@ -40,6 +40,10 @@ export default async function UsageEssaisPage() {
         <Link href="/godac-staff/go-navigation" className="text-teal-ink hover:underline">
           Invitations GO Navigation
         </Link>
+        {" · "}
+        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
+          Comptes d&apos;essai →
+        </Link>
       </p>
 
       {!usage ? (

@@ -7,10 +7,12 @@ import { getEnabledModuleKeys } from "@/lib/organization/modules";
 import { memoriserModule } from "@/lib/organization/modules-verifies";
 import { lireEtatOffre } from "@/lib/go-navigation/etat";
 import { MESSAGE_ESSAI_TERMINE, MESSAGE_OFFRE_INDETERMINEE } from "@/lib/go-navigation/offre";
+import { MESSAGE_COMPTE_SUSPENDU } from "@/lib/comptes-essai/regles";
+import { compteSuspenduDeLUtilisateurCourant } from "@/lib/comptes-essai/garde";
 import { TOUS_LES_ROLES, deciderAcces, ecran as ecranDe, libelleModule, libelleRoles, type CleModule, type Ecran } from "@/lib/acces/catalogue";
 import type { UserRole } from "@/lib/types/domain";
 
-export type CodeRefus = "NON_CONNECTE" | "ROLE_REFUSE" | "MODULE_INACTIF" | "LIMITE_FORMULE" | "QUOTA_ATTEINT";
+export type CodeRefus = "NON_CONNECTE" | "ROLE_REFUSE" | "MODULE_INACTIF" | "LIMITE_FORMULE" | "QUOTA_ATTEINT" | "COMPTE_SUSPENDU";
 
 /**
  * Corps JSON homogène des refus. `error` reste une chaîne (les écrans
@@ -27,7 +29,7 @@ export interface CorpsRefus {
   inclus?: number;
 }
 
-const STATUT: Record<CodeRefus, number> = { NON_CONNECTE: 401, ROLE_REFUSE: 403, MODULE_INACTIF: 403, LIMITE_FORMULE: 402, QUOTA_ATTEINT: 429 };
+const STATUT: Record<CodeRefus, number> = { NON_CONNECTE: 401, ROLE_REFUSE: 403, MODULE_INACTIF: 403, LIMITE_FORMULE: 402, QUOTA_ATTEINT: 429, COMPTE_SUSPENDU: 403 };
 
 export function refus(code: CodeRefus, message: string, extra: Omit<CorpsRefus, "error" | "code"> = {}): NextResponse<CorpsRefus> {
   return NextResponse.json({ error: message, code, ...extra }, { status: STATUT[code] });
@@ -90,7 +92,11 @@ export function refusPour(regle: Ecran, role: UserRole, modules: ReadonlySet<str
  */
 export async function garderApi(opts: OptionsGarde = {}): Promise<ResultatGardeApi> {
   const appUser = await getCurrentAppUser();
-  if (!appUser) return { ok: false, reponse: refus("NON_CONNECTE", "Session expirée, reconnectez-vous.") };
+  if (!appUser) {
+    // Compte suspendu par GODAC (getCurrentAppUser rend null) : message dédié, pas « session expirée ».
+    if (await compteSuspenduDeLUtilisateurCourant()) return { ok: false, reponse: refus("COMPTE_SUSPENDU", MESSAGE_COMPTE_SUSPENDU) };
+    return { ok: false, reponse: refus("NON_CONNECTE", "Session expirée, reconnectez-vous.") };
+  }
   const regle = regleEffective(opts);
   // Rôle d'abord : un refus de rôle ne coûte aucune requête.
   if (!regle.roles.includes(appUser.role) || (regle.conducteur && !appUser.conduit)) return { ok: false, reponse: refusPour(regle, appUser.role, new Set(), appUser.conduit)! };

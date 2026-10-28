@@ -4,7 +4,7 @@
 // activer, rôle, limite de formule, quota) au lieu d'un alert(json.error).
 // Fichier pur : importable côté client et testé sans navigateur.
 
-export type CodeRefus = "NON_CONNECTE" | "ROLE_REFUSE" | "MODULE_INACTIF" | "LIMITE_FORMULE" | "QUOTA_ATTEINT" | "ERREUR";
+export type CodeRefus = "NON_CONNECTE" | "ROLE_REFUSE" | "MODULE_INACTIF" | "LIMITE_FORMULE" | "QUOTA_ATTEINT" | "COMPTE_SUSPENDU" | "ERREUR";
 
 export interface Refus {
   code: CodeRefus;
@@ -23,7 +23,7 @@ export interface Refus {
 
 export type ReponseGodac<T> = { ok: true; data: T; statut: number } | { ok: false; refus: Refus };
 
-const CODES: readonly CodeRefus[] = ["NON_CONNECTE", "ROLE_REFUSE", "MODULE_INACTIF", "LIMITE_FORMULE", "QUOTA_ATTEINT"];
+const CODES: readonly CodeRefus[] = ["NON_CONNECTE", "ROLE_REFUSE", "MODULE_INACTIF", "LIMITE_FORMULE", "QUOTA_ATTEINT", "COMPTE_SUSPENDU"];
 
 /** Code déduit du statut quand l'API n'en donne pas (routes non migrées). */
 function codeParStatut(statut: number): CodeRefus {
@@ -106,6 +106,8 @@ export function titreRefus(refus: Refus): string {
       return "Limite de votre formule atteinte";
     case "QUOTA_ATTEINT":
       return "Quota atteint";
+    case "COMPTE_SUSPENDU":
+      return "Compte suspendu par GODAC";
     default:
       return "Action impossible";
   }
