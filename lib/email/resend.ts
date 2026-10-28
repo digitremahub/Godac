@@ -28,12 +28,14 @@ export async function sendTransactionalEmail({
   }
 
   try {
-    await client.emails.send({
+    // Le SDK Resend ne lève pas d'exception sur un refus (domaine non vérifié, clé invalide…) : il renvoie { error }.
+    const { error } = await client.emails.send({
       from: process.env.RESEND_FROM_EMAIL ?? "GODAC <notifications@godac.app>",
       to,
       subject,
       html,
     });
+    if (error) return { sent: false, reason: `${error.name ?? "resend_error"}: ${error.message}` };
     return { sent: true };
   } catch (err) {
     return { sent: false, reason: String(err) };
