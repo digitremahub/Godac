@@ -15,6 +15,8 @@ export const PHOTOS = {
   depotTri: "/photos/depot-tri.webp",
   remiseColis: "/photos/remise-colis.webp",
   fourgonAube: "/photos/fourgon-aube.webp",
+  goChauffeur: "/photos/go-chauffeur.webp",
+  exploitationEcrans: "/photos/exploitation-ecrans.webp",
 } as const;
 
 export function PhotoVitrine({
