@@ -22,6 +22,7 @@ export function TopBar({
   roleTitle,
   onMenuClick,
   goNavigation = false,
+  estStaffGodac = false,
 }: {
   fullName: string;
   role: UserRole;
@@ -29,6 +30,8 @@ export function TopBar({
   onMenuClick?: () => void;
   /** Compte d'essai GO Navigation : pas de lien vers le centre de notifications. */
   goNavigation?: boolean;
+  /** Adresse autorisée du back-office GODAC (jamais affiché à un client). */
+  estStaffGodac?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-navy/[0.08] bg-surface/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
@@ -42,6 +45,14 @@ export function TopBar({
         >
           <IconMenu className="h-5 w-5" />
         </button>
+        {estStaffGodac && (
+          <Link
+            href="/godac-staff"
+            className="inline-flex items-center rounded-lg bg-navy px-2.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy/90"
+          >
+            Back-office GODAC
+          </Link>
+        )}
         <a
           href={VITRINE_URL}
           target="_blank"

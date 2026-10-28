@@ -26,6 +26,7 @@ export function DashboardShell({
   currentUserId,
   organizationId,
   isDemo = false,
+  estStaffGodac = false,
   children,
 }: {
   role: UserRole;
@@ -45,6 +46,8 @@ export function DashboardShell({
   organizationId: string;
   /** « Transports Démo » — shows the demo banner with the way out to a real account. */
   isDemo?: boolean;
+  /** Adresse autorisée du back-office GODAC : affiche le lien « Back-office » dans la barre du haut. */
+  estStaffGodac?: boolean;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -116,7 +119,7 @@ export function DashboardShell({
             </a>
           </div>
         )}
-        <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} goNavigation={goNavigation} />
+        <TopBar fullName={fullName} role={role} roleTitle={roleTitle} onMenuClick={() => setDrawerOpen(true)} goNavigation={goNavigation} estStaffGodac={estStaffGodac} />
         <main id="contenu" tabIndex={-1} className={`flex-1 overflow-x-hidden px-4 py-6 focus:outline-none sm:px-6 lg:px-10 lg:py-8 ${showActionBar ? "pb-[calc(9rem+env(safe-area-inset-bottom))] lg:pb-8" : ""}`}>
           <div className="mx-auto w-full max-w-7xl"><OfflineSyncStatus />{!goNavigation && <BandeauMenuReorganise userId={currentUserId} />}{children}</div>
         </main>
