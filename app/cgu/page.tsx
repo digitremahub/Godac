@@ -49,7 +49,8 @@ export default function CguPage() {
           Les données de l’Utilisateur sont traitées pour le compte de l’Entreprise, responsable de traitement ; l’Éditeur agit
           comme sous-traitant. Le détail figure dans la{" "}
           <Link href="/confidentialite" className={lien}>politique de confidentialité</Link>. La position GPS n’est relevée
-          qu’au moment du pointage et, pour les chauffeurs, pendant une tournée colis en cours (suivi de la livraison par
+          qu’au moment du pointage (conservée 2 mois pour prouver le temps de travail en cas de litige, puis supprimée ; l’heure du
+          pointage est conservée) et, pour les chauffeurs, pendant une tournée colis en cours (suivi de la livraison par
           l’Entreprise : dernière position effacée à la clôture, trajet emprunté conservé 1 an pour l’analyse des trajets,
           masquable pendant une pause). Si l’Entreprise utilise le pointage assisté, la position est aussi lue environ
           toutes les minutes, application ouverte et visible (4 heures au plus), pour détecter l’arrivée au dépôt ou la
@@ -90,8 +91,8 @@ export default function CguPage() {
 
       <Article n={7} titre="Disponibilité">
         <p>
-          L’Éditeur s’efforce de rendre le service accessible en permanence, sous réserve des opérations de maintenance et
-          des aléas des réseaux, dans les conditions de l’<Link href="/sla" className={lien}>engagement de service</Link>{" "}
+          L’Éditeur s’efforce de maintenir le service accessible, sans garantie de disponibilité continue, sous réserve des opérations de maintenance et
+          des aléas des réseaux et des prestataires tiers, dans les conditions de l’<Link href="/sla" className={lien}>engagement de service</Link>{" "}
           souscrit par l’Entreprise.
         </p>
       </Article>

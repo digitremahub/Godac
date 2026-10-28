@@ -279,7 +279,7 @@ describe("vercel.json : plan Hobby, aucun cron plus fréquent qu'une fois par jo
       expect(/^\d+$/.test(heure!), `${c.path} : heure fixe`).toBe(true);
     }
     expect(crons.filter((c) => /fusion/.test(c.path))).toEqual([]);
-    expect(crons).toHaveLength(14);
+    expect(crons).toHaveLength(15);
   });
 
   it("les crons du planning gardent leur rythme (jeudi 4 h, vendredi 15 h et 16 h UTC)", () => {

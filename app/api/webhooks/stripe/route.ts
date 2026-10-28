@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe/client";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { enregistrerFinContratStripe } from "@/lib/fin-contrat/serveur";
 import { effacerImpaye, enregistrerPaiementEchoue } from "@/lib/stripe/impaye-serveur";
 
 const STATUS_MAP: Record<Stripe.Subscription.Status, string> = {
@@ -161,4 +162,6 @@ async function appliquerAbonnement(
   const { data, error } = await supabase.from("organizations").update(update).eq("id", organizationId).select("id");
   if (error) throw new Error(`organization update failed: ${error.message}`);
   if (!data || data.length === 0) console.error("Stripe webhook : organisation introuvable", organizationId);
+  // Fin de contrat (départ du délai de suppression des données) : meilleur effort, n'échoue jamais.
+  if (params.subscription && data && data.length > 0) await enregistrerFinContratStripe(supabase, organizationId, params.subscription);
 }

@@ -7,6 +7,7 @@ import { PayrollTable } from "@/components/payroll/PayrollTable";
 import { PayrollFilters } from "@/components/payroll/PayrollFilters";
 import { firstOfMonth, addMonths, addDays, currentMonth, parisCalendarDate } from "@/lib/planning/dates";
 import { computeHourlyRates } from "@/lib/business/payroll";
+import { moisSansPositions } from "@/lib/retention/gps-pointage";
 import { classifyLocation } from "@/lib/time-clock/classify-location";
 import { buildDriverDepotsMap } from "@/lib/time-clock/driver-depots";
 import { FILTRE_CONDUCTEURS } from "@/lib/roles/conducteurs";
@@ -275,6 +276,12 @@ export default async function PayrollPage({
         title="Heures & salaires"
         description="Heures travaillées × taux horaire — départ planning/arrivée badgée au dépôt si géolocalisée, sinon badge entrée → badge sortie, ou horaire de la tournée si aucun badge ce jour-là. Le taux est à ajuster au cas par cas selon le contrat de chaque chauffeur."
       />
+      {moisSansPositions(`${periodEnd}T23:59:59`) && (
+        <p role="note" className="mb-3 rounded-md border border-navy/10 bg-navy/[0.03] px-3 py-2 text-xs text-navy/70">
+          Les positions GPS de pointage sont effacées après 2 mois : pour ce mois, les heures sont calculées sur les seules heures de badge
+          (sans la substitution par l&apos;heure planifiée à l&apos;arrivée au dépôt). Les bulletins déjà validés ne changent pas.
+        </p>
+      )}
       <PayrollFilters month={month} drivers={(drivers ?? []).map((d) => ({ id: d.id, full_name: d.full_name }))} selectedDriver={selectedDriver} />
       {rows.length === 0 ? (
         <EmptyState title="Aucun chauffeur" description="Aucun chauffeur actif à afficher." />

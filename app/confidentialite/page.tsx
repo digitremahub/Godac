@@ -52,7 +52,8 @@ export default function ConfidentialitePage() {
             dépôt. Si votre entreprise utilise le <strong>pointage assisté</strong>, votre position est aussi lue environ
             une fois par minute, application ouverte et visible (4 heures au plus), pour détecter votre arrivée au dépôt
             ou votre sortie ; rien n&apos;est conservé de ces lectures, sauf l&apos;heure de votre dernière présence au
-            dépôt (et la position de l&apos;arrivée ou de la sortie enregistrée automatiquement).
+            dépôt (et la position de l&apos;arrivée ou de la sortie enregistrée automatiquement). La position
+            enregistrée au pointage est conservée 2 mois, puis supprimée.
           </li>
           <li>
             <strong>Position pendant une tournée colis en cours :</strong> si l&apos;entreprise utilise le module Tournée
@@ -204,14 +205,20 @@ export default function ConfidentialitePage() {
           <li>Compte utilisateur : tant que le compte est actif ; l&apos;entreprise le désactive au départ du salarié, ce qui coupe aussitôt son accès.</li>
           <li>
             Données d&apos;activité (tournées, carburant, planning, congés), photos et messages : pendant la durée du
-            contrat avec l&apos;entreprise cliente, puis supprimées dans les 3 mois suivant sa fin, après export si
-            l&apos;entreprise le demande.
+            contrat avec l&apos;entreprise cliente, puis supprimées* 3 mois après sa fin, après un préavis par e-mail aux
+            administrateurs de l&apos;entreprise (au moins 30 jours avant) qui rappelle la possibilité d&apos;exporter les données.
+            La suppression est suspendue pendant un litige déclaré. GODAC ne conserve alors que le strict nécessaire :
+            données de facturation et identifiants de paiement (durée comptable légale), preuves d&apos;acceptation et de
+            préavis, trace de la suppression.
           </li>
           <li>
             Heures de pointage* : 5 ans maximum, durée pendant laquelle l&apos;employeur peut avoir à justifier le temps
             de travail et la paie.
           </li>
-          <li>Position GPS de pointage* : 1 an, puis effacée (l&apos;heure du pointage est conservée).</li>
+          <li>
+            Position GPS de pointage* : 2 mois, au titre de la preuve du temps de travail en cas de litige, puis les coordonnées sont
+            supprimées ; seul le résultat du pointage est conservé (heures, source, statut).
+          </li>
           <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée.</li>
           <li>Trajet enregistré pendant une tournée colis en cours* : 1 an, puis effacé.</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>

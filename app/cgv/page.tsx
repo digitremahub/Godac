@@ -106,7 +106,7 @@ export default function CgvPage() {
           véhicules, utilisateurs), l’import des données fournies par le Client et la prise en main de l’équipe. Ils sont
           facturés une seule fois, à la commande, ou en plusieurs mensualités sans frais lorsque la Formule ou le bon de
           commande le prévoit (formule Starter : douze mensualités). Ils restent acquis à l’Éditeur ; en cas de résiliation
-          anticipée, les mensualités restantes deviennent exigibles.
+          anticipée de l’offre standard pendant l’engagement initial, les mensualités restantes deviennent exigibles.
         </p>
         <p>
           L’Éditeur ouvre l’accès dans un délai indicatif de dix (10) jours ouvrés à compter de la réception des
@@ -114,18 +114,37 @@ export default function CgvPage() {
         </p>
       </Article>
 
-      <Article n={6} titre="Durée">
+      <Article n={6} titre="Durée, engagement et résiliation">
         <p>
-          L’abonnement est souscrit pour une période initiale de douze (12) mois à compter de l’ouverture de l’accès, sauf
-          durée différente prévue au bon de commande. À son terme, il se renouvelle tacitement par périodes d’un (1) mois.
+          Le bon de commande indique l’une des deux offres suivantes. À défaut de mention, l’offre standard s’applique.
         </p>
+        <ul className={listeLegale}>
+          <li>
+            <strong>Essai gratuit</strong> (article 3) : sans engagement ni reconduction. S’il est suivi d’une souscription,
+            celle-ci prend la forme de l’une des deux offres ci-dessous, indiquée au bon de commande.
+          </li>
+          <li>
+            <strong>Pilote sans engagement</strong> (case « Pilote sans engagement » du bon de commande) : abonnement mensuel,
+            sans durée minimale, qui se renouvelle tacitement de mois en mois. Chaque partie peut y mettre fin à tout moment par
+            écrit (e-mail à {EDITEUR.email} ou depuis l’espace Facturation) ; la résiliation prend effet à la fin du mois en
+            cours, qui reste dû, sans autre frais ni indemnité. Les frais de mise en service éventuels sont ceux indiqués au bon
+            de commande (article 5). Le passage à l’offre standard fait l’objet d’un nouveau bon de commande ; l’engagement de
+            douze mois court alors à la date qu’il indique.
+          </li>
+          <li>
+            <strong>Offre standard 12 mois</strong> (case « Offre standard 12 mois » du bon de commande) : engagement initial
+            ferme de douze (12) mois à compter de l’ouverture de l’accès, sauf durée différente prévue au bon de commande. À son
+            terme, l’abonnement se renouvelle tacitement par périodes d’un (1) mois. Chaque partie peut y mettre fin par écrit
+            avec un préavis d’un (1) mois ; la résiliation prend effet à la fin du mois de préavis ou, si elle est postérieure,
+            à la fin de l’engagement initial. Pendant l’engagement initial, l’abonnement est ferme et ne peut être résilié avant
+            son terme que dans les cas prévus au contrat (manquement, article 17 ; force majeure, article 16 ; révision des
+            prix, article 7 ; modification des CGV, article 20 ; nouveau sous-traitant ultérieur refusé, accord de
+            sous-traitance).
+          </li>
+        </ul>
         <p>
-          Chaque partie peut mettre fin à l’abonnement par écrit (e-mail à {EDITEUR.email} ou depuis l’espace Facturation) avec
-          un préavis d’un (1) mois ; la résiliation prend effet à la fin du mois de préavis ou, si elle est postérieure, à la
-          fin de la période initiale. Pendant la période initiale de douze mois, l’abonnement est ferme et ne peut être
-          résilié avant son terme que dans les cas prévus au contrat (manquement, article 17 ; force majeure, article 16 ;
-          révision des prix, article 7 ; modification des CGV, article 20 ; nouveau sous-traitant ultérieur refusé, accord de
-          sous-traitance).
+          La facturation est la même dans les deux offres : mensuelle, terme à échoir (article 7). À la fin du contrat, les
+          données sont traitées selon l’article 11.
         </p>
       </Article>
 
@@ -143,7 +162,7 @@ export default function CgvPage() {
           </li>
           <li>
             Le Client peut ajouter des Modules à tout moment ; ils sont facturés à compter du mois de leur activation. Le
-            retrait d’un Module prend effet à la fin de la période d’engagement en cours.
+            retrait d’un Module prend effet à la fin de la période d’engagement en cours (offre pilote : à la fin du mois en cours).
           </li>
           <li>
             Les fonctions de lecture automatique et l’assistant (article 12) sont incluses dans chaque Formule dans la limite
@@ -220,7 +239,13 @@ export default function CgvPage() {
         <p>
           À la fin du contrat, quelle qu’en soit la cause, le Client peut exporter ses données depuis la Solution ou demander
           à l’Éditeur, dans les trente (30) jours suivant la fin du contrat, un export dans un format standard (CSV). Les
-          Données du Client sont ensuite supprimées dans un délai de trois (3) mois, sauf obligation légale de conservation.
+          Données du Client sont supprimées trois (3) mois après la fin du contrat, sauf obligation légale de conservation.
+          Au moins trente (30) jours avant cette suppression, l’Éditeur adresse un préavis par e-mail aux administrateurs
+          (rôle direction) de l’espace du Client, qui rappelle la date de suppression et la possibilité d’exporter les
+          données ; il s’efforce de fournir l’export demandé avant cette date. La suppression est suspendue tant qu’un
+          litige est déclaré entre les parties. L’Éditeur ne conserve ensuite que le strict nécessaire : données de
+          facturation et identifiants de paiement, preuves d’acceptation du contrat et du préavis, trace de la suppression, pendant
+          les durées légales applicables.
         </p>
         <p>
           GODAC n’est pas un service d’archivage légal : le Client exporte et archive lui-même, avant cette suppression, les

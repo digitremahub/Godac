@@ -15,17 +15,19 @@ export default function SlaPage() {
   return (
     <LegalPageLayout title="Engagement de niveau de service" contractuel>
       <p>
-        Le présent engagement de niveau de service (« SLA ») fait partie du contrat d’abonnement GODAC. Il précise la
-        disponibilité visée pour la Solution, le support et la maintenance. L’Éditeur est tenu à une obligation de moyens : les
-        niveaux ci-dessous sont des objectifs, sauf l’avoir prévu à l’article 7.
+        Le présent engagement de niveau de service (« SLA ») fait partie du contrat d’abonnement GODAC. Il décrit comment
+        l’Éditeur assure le fonctionnement de la Solution, le support et la maintenance. L’Éditeur est tenu à une obligation de
+        moyens : <strong>il ne garantit aucun taux de disponibilité chiffré et ne prévoit aucun avoir ni crédit automatique</strong>.
+        Les délais ci-dessous sont des objectifs.
       </p>
 
-      <Article n={1} titre="Disponibilité">
+      <Article n={1} titre="Engagement de moyens">
         <p>
-          L’Éditeur se donne pour objectif une disponibilité de la Solution de <strong>99,5 % par mois</strong>, mesurée à
-          partir de sa supervision, hors maintenance planifiée, hors indisponibilités dues au Client, à ses équipements ou à
-          son accès internet, hors cas de force majeure et hors services tiers décrits à l’article 2. Cet objectif n’est pas
-          une garantie de fonctionnement continu : la Solution n’est pas déployée en haute disponibilité sur plusieurs sites.
+          L’Éditeur met en œuvre les moyens raisonnables pour que la Solution soit accessible et fonctionne normalement :
+          surveillance de l’application, correction des incidents dans les meilleurs délais, information du Client en cas de
+          panne significative (article 6) et assistance (article 4). La Solution n’est pas déployée en haute disponibilité
+          sur plusieurs sites : des interruptions, des lenteurs et des périodes de maintenance (article 3) peuvent survenir,
+          y compris du fait des hébergeurs et des services tiers décrits à l’article 2. Aucun pourcentage de disponibilité n’est promis.
         </p>
       </Article>
 
@@ -40,7 +42,7 @@ export default function SlaPage() {
           <li>
             Quand un service tiers est lent ou indisponible, la Solution se dégrade au lieu de s’arrêter : par exemple distances
             à vol d’oiseau à la place d’un itinéraire routier, ou saisie manuelle à la place de la lecture automatique. Ces
-            périodes ne comptent pas comme indisponibilité de la Solution.
+            dégradations font partie du fonctionnement normal de la Solution et ne constituent pas, en elles-mêmes, un manquement de l’Éditeur.
           </li>
           <li>L’Éditeur peut remplacer ou faire évoluer ces prestataires dans les conditions de l’accord de sous-traitance.</li>
         </ul>
@@ -61,7 +63,7 @@ export default function SlaPage() {
         <p>
           Le support est joignable par e-mail à <a href={`mailto:${EDITEUR.email}`} className="text-teal-ink hover:underline">{EDITEUR.email}</a>{" "}
           et depuis la Solution (assistant et demandes d’assistance), du lundi au vendredi de 9 h à 18 h, hors jours fériés.
-          Les délais ci-dessous sont des objectifs exprimés en heures ou jours ouvrés (lundi au vendredi, 9 h à 18 h). Les demandes sont classées par priorité :
+          Les délais d’intervention ci-dessous sont des objectifs, non des garanties, exprimés en heures ou jours ouvrés (lundi au vendredi, 9 h à 18 h). Les demandes sont classées par priorité :
         </p>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
@@ -69,7 +71,7 @@ export default function SlaPage() {
               <tr className="bg-navy/[0.05] text-left text-navy">
                 <th className={cellule}>Priorité</th>
                 <th className={cellule}>Définition</th>
-                <th className={cellule}>Objectif de prise en charge</th>
+                <th className={cellule}>Délai d’intervention cible</th>
                 <th className={cellule}>Objectif de résolution</th>
               </tr>
             </thead>
@@ -104,19 +106,21 @@ export default function SlaPage() {
         </ul>
       </Article>
 
-      <Article n={6} titre="Information en cas d’incident">
+      <Article n={6} titre="Information en cas de panne significative">
         <p>
-          En cas d’incident bloquant, l’Éditeur informe le Client par e-mail dès sa détection, puis à sa résolution, avec
-          un compte rendu de la cause et des mesures prises.
+          En cas de panne significative (Solution inaccessible ou fonction essentielle inutilisable pour l’ensemble des
+          utilisateurs), l’Éditeur s’efforce d’en informer le Client par e-mail ou dans la Solution dès sa détection, puis à sa
+          résolution, avec un compte rendu de la cause et des mesures prises.
         </p>
       </Article>
 
-      <Article n={7} titre="Compensation">
+      <Article n={7} titre="Pas de crédit automatique ; geste commercial">
         <p>
-          Si la disponibilité mensuelle est inférieure à 99,5 % du fait de l’Éditeur (hors panne générale d’un hébergeur ou d’un
-          service tiers), le Client obtient, sur demande dans les trente (30) jours suivant la fin du mois, un avoir de 10 % de
-          l’abonnement du mois concerné, porté à 25 % sous 98 %. Cet avoir est la seule compensation due au titre de la
-          disponibilité, sauf faute lourde ou dolosive de l’Éditeur.
+          Aucun avoir, crédit ou remise n’est dû automatiquement en cas d’indisponibilité, de lenteur ou de dégradation de la
+          Solution : l’engagement de l’Éditeur est un engagement de moyens (articles 1, 4 et 6). L’Éditeur peut, à sa seule
+          discrétion et au cas par cas, accorder un geste commercial après une panne importante ; il ne crée aucun droit pour
+          le Client et ne vaut pas reconnaissance de responsabilité. Les stipulations de l’article 15 des conditions générales de
+          vente (limitation de responsabilité) restent applicables.
         </p>
       </Article>
     </LegalPageLayout>

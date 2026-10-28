@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cheminsPhotos, enLots } from "@/lib/retention/photos";
+import { GPS_POINTAGE_JOURS, limiteGpsPointage } from "@/lib/retention/gps-pointage";
 import { RETENTION_AMENDES_JOURS, STATUTS_AMENDE_CLOTUREE, cheminsAmendes, limiteClotureAmendes } from "@/lib/retention/amendes";
 
 /** Retention periods announced in app/confidentialite — keep both in sync. */
@@ -9,8 +10,8 @@ export const RETENTION_DAYS = {
   questionLog: 90,
   /** Heures de pointage : 5 ans maximum, comme annoncé dans app/confidentialite (justification du temps de travail et de la paie). */
   clockEntries: 5 * 365,
-  /** GPS point recorded at clock-in/out (the clock times themselves are kept). */
-  clockGps: 365,
+  /** Position GPS de pointage : 2 mois (preuve du temps de travail en cas de litige), puis coordonnées effacées ; heures et statut conservés. */
+  clockGps: GPS_POINTAGE_JOURS,
   /** Assistant conversations, counted from their last message — same as the pg_cron cleanup_old_assistant_conversations job. */
   assistantConversations: 90,
   /** Tournées colis : adresses, initiales des destinataires et photos de livraison, gardées pour les contestations. */
@@ -36,7 +37,8 @@ export async function purgeExpiredData() {
   const log = await admin.from("assistant_question_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.questionLog));
   results.questionLog = log.error ? log.error.message : (log.count ?? 0);
 
-  const gpsCutoff = daysAgo(RETENTION_DAYS.clockGps);
+  // Passé 2 mois : coordonnées effacées, heures de pointage, source et statut conservés.
+  const gpsCutoff = limiteGpsPointage();
   const gpsIn = await admin
     .from("time_clock_entries")
     .update({ clock_in_lat: null, clock_in_lng: null }, { count: "exact" })
