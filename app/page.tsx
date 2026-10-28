@@ -366,6 +366,14 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             </p>
           </div>
 
+          <PhotoVitrine
+            src={PHOTOS.exploitationEcrans}
+            alt="Un responsable d'exploitation devant deux écrans GODAC : la carte des véhicules et les notifications d'alerte, aux données floutées."
+            sizes="(min-width: 1024px) 896px, calc(100vw - 40px)"
+            ratio="aspect-[16/9] sm:aspect-[21/9]"
+            className="mx-auto mb-10 max-w-4xl"
+          />
+
           <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {ETAPES_TICPE.map((e, i) => (
               <li key={e.title} className="card flex flex-col gap-3">
@@ -650,6 +658,15 @@ export default async function HomePage({ searchParams }: { searchParams: { demo?
             <p className="mt-3 text-sm">Essai GO Navigation de 30 jours, sur invitation, après un premier échange avec notre équipe.</p>
           </div>
           <MaquetteGoNavigation />
+        </div>
+        <div className="relative mx-auto mt-12 max-w-6xl px-5 sm:px-6">
+          <PhotoVitrine
+            src={PHOTOS.goChauffeur}
+            alt="Un chauffeur au dépôt tient son téléphone sur son support : l'application GODAC est affichée à l'écran, noms et chiffres floutés."
+            sizes="(min-width: 1152px) 1104px, calc(100vw - 40px)"
+            ratio="aspect-[16/9] sm:aspect-[21/9]"
+            className="!ring-2 !ring-white/80"
+          />
         </div>
       </section>
 

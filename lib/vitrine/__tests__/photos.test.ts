@@ -9,13 +9,13 @@ describe("photographies de la vitrine", () => {
   const fichiers = readdirSync(DOSSIER);
 
   it("n'autorise que des fichiers .webp dans public/photos", () => {
-    expect(fichiers.length).toBe(7);
+    expect(fichiers.length).toBe(9);
     for (const f of fichiers) expect(f).toMatch(/^[a-z-]+\.webp$/);
   });
 
-  it("pèse moins de 1 Mo au total", () => {
+  it("pèse moins de 1,2 Mo au total", () => {
     const total = fichiers.reduce((n, f) => n + statSync(join(DOSSIER, f)).size, 0);
-    expect(total).toBeLessThan(1_000_000);
+    expect(total).toBeLessThan(1_200_000);
   });
 
   it("chaque photo référencée par le composant existe", () => {
