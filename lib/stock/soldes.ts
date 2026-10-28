@@ -114,19 +114,25 @@ export interface ResumeUnites {
   auDepot: number;
 }
 
-/** Dénombrement des unités par statut (tableau de bord). */
+/** Dénombrement à partir d'effectifs par statut (tableau de bord : un comptage par statut en base). */
+export function resumerComptes(c: Partial<Record<StatutUnite, number>>): ResumeUnites {
+  const n = (s: StatutUnite) => c[s] ?? 0;
+  return {
+    dansDepot: n("dans_depot"),
+    enTournee: n("en_tournee"),
+    retours: n("retour"),
+    livres: n("livre"),
+    perdus: n("perdu"),
+    endommages: n("endommage"),
+    auDepot: STATUTS_AU_DEPOT.reduce((t, s) => t + n(s), 0),
+  };
+}
+
+/** Dénombrement des unités par statut. */
 export function resumerUnites(unites: readonly { statut: StatutUnite }[]): ResumeUnites {
-  const r: ResumeUnites = { dansDepot: 0, enTournee: 0, retours: 0, livres: 0, perdus: 0, endommages: 0, auDepot: 0 };
-  for (const u of unites) {
-    if (u.statut === "dans_depot") r.dansDepot++;
-    else if (u.statut === "en_tournee") r.enTournee++;
-    else if (u.statut === "retour") r.retours++;
-    else if (u.statut === "livre") r.livres++;
-    else if (u.statut === "perdu") r.perdus++;
-    else if (u.statut === "endommage") r.endommages++;
-    if (STATUTS_AU_DEPOT.includes(u.statut)) r.auDepot++;
-  }
-  return r;
+  const c: Partial<Record<StatutUnite, number>> = {};
+  for (const u of unites) c[u.statut] = (c[u.statut] ?? 0) + 1;
+  return resumerComptes(c);
 }
 
 /** Jours avant une DLC (négatif : dépassée), ou null. `aujourdhui` au format AAAA-MM-JJ. */

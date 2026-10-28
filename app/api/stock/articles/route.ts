@@ -6,8 +6,7 @@ import { traduireErreurStock } from "@/lib/stock/erreurs";
 import { lireCorps, reponseErreur, REQUETE_INVALIDE } from "@/lib/stock/http";
 import { PROFILS, UNITES_ARTICLE, avecArticles } from "@/lib/stock/profils";
 import { lireParametresStock } from "@/lib/stock/serveur";
-import { articlesSousSeuil, type Solde } from "@/lib/stock/soldes";
-import { fetchAllRows } from "@/lib/utils/fetch-all";
+import { avecQuantites, lireSoldes, type ArticleLu } from "@/lib/stock/chargement-serveur";
 
 const COLONNES = "id, activite, code, nom, unite, seuil_mini, suivi_lots, suivi_dlc, actif";
 
@@ -21,18 +20,11 @@ export async function GET(req: Request) {
   let query = supabase.from("stock_articles").select(COLONNES).eq("organization_id", appUser.organization_id).order("nom").limit(500);
   if (url.searchParams.get("inactifs") !== "1") query = query.eq("actif", true);
   if (q) query = query.or(`code.ilike.%${q}%,nom.ilike.%${q}%`);
-  const [articles, soldesLus] = await Promise.all([
-    query,
-    fetchAllRows<{ article_id: string; site_id: string; emplacement_id: string | null; lot: string; dlc: string | null; quantite: number | string }>(
-      (a, b) => supabase.from("stock_soldes").select("article_id, site_id, emplacement_id, lot, dlc, quantite").eq("organization_id", appUser.organization_id).order("id").range(a, b) as unknown as PromiseLike<{ data: never[] | null; error: { message: string } | null }>,
-    ),
-  ]);
+  const [articles, lus] = await Promise.all([query, lireSoldes(supabase, appUser.organization_id)]);
   if (articles.error) return reponseErreur(traduireErreurStock(articles.error));
-  if (soldesLus.error) return reponseErreur({ code: "stock_erreur", message: "Lecture des quantités impossible.", status: 500 });
-  const soldes: Solde[] = soldesLus.rows.map((s) => ({ ...s, quantite: Number(s.quantite) }));
-  const liste = ((articles.data ?? []) as unknown as { id: string; code: string; nom: string; unite: string; seuil_mini: number | string; actif: boolean }[]).map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) }));
-  const sous = new Map(articlesSousSeuil(liste, soldes).map((x) => [x.article.id, x]));
-  let lignes = liste.map((a) => ({ ...a, quantite: soldes.filter((s) => s.article_id === a.id).reduce((n, s) => n + s.quantite, 0), sous_seuil: sous.has(a.id) }));
+  if (lus.erreur) return reponseErreur({ code: "stock_erreur", message: "Lecture des quantités impossible.", status: 500 });
+  const liste = ((articles.data ?? []) as unknown as (Omit<ArticleLu, "seuil_mini"> & { seuil_mini: number | string })[]).map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) }));
+  let lignes = avecQuantites(liste, lus.soldes);
   if (url.searchParams.get("sous_seuil") === "1") lignes = lignes.filter((l) => l.sous_seuil);
   return NextResponse.json({ articles: lignes });
 }

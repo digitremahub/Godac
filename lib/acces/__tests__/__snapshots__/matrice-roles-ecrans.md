@@ -29,6 +29,12 @@
 | Exploitation | Photos de tournée | `/exploitation/historique/photos` | ↪ /exploitation/historique | 🔒 | 🔒 | 🔒 | 🔒 | planning |
 | Exploitation | Tournées colis passées | `/exploitation/historique/colis` | 🔒 | 🔒 | 🔒 | — | 🔒 | route_optimizer |
 | Exploitation | Contestations clients | `/exploitation/contestations` | ✅ | ✅ | ✅ | — | ✅ | customer_disputes |
+| Exploitation | Stock | `/exploitation/stock` | ✅ | ✅ | ✅ | — | ✅ | stock |
+| Exploitation | Entrée, sortie, transfert | `/exploitation/stock/mouvement` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Unités et articles | `/exploitation/stock/liste` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Historique des mouvements | `/exploitation/stock/historique` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Inventaire | `/exploitation/stock/inventaire` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Paramètres du stock | `/exploitation/stock/parametres` | — | — | 🔒 | — | 🔒 | stock |
 | Flotte | Véhicules | `/flotte/vehicules` | ↪ /moi/vehicule | ✅ | ✅ | ✅ | ✅ | fleet |
 | Flotte | Fiche véhicule | `/flotte/vehicules/[id]` | ↪ /moi/vehicule | 🔒 | 🔒 | 🔒 | 🔒 | fleet |
 | Flotte | Nouveau véhicule | `/flotte/vehicules/nouveau` | — | 🔒 | 🔒 | — | 🔒 | fleet |

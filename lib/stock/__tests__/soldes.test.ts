@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appliquerMouvement, articlesSousSeuil, formaterQuantite, joursAvantDlc, resumerUnites, totalArticle, type MouvementArticle, type Solde } from "@/lib/stock/soldes";
+import { appliquerMouvement, articlesSousSeuil, formaterQuantite, joursAvantDlc, resumerComptes, resumerUnites, totalArticle, type MouvementArticle, type Solde } from "@/lib/stock/soldes";
 
 const A = "art-1";
 const S = "site-1";
@@ -106,6 +106,10 @@ describe("tableau de bord", () => {
   it("dénombre les unités par statut", () => {
     const r = resumerUnites([{ statut: "dans_depot" }, { statut: "dans_depot" }, { statut: "en_tournee" }, { statut: "retour" }, { statut: "livre" }, { statut: "perdu" }, { statut: "endommage" }]);
     expect(r).toEqual({ dansDepot: 2, enTournee: 1, retours: 1, livres: 1, perdus: 1, endommages: 1, auDepot: 3 });
+  });
+  it("même résultat à partir d'effectifs par statut", () => {
+    expect(resumerComptes({ dans_depot: 4, retour: 2, en_tournee: 1 })).toEqual({ dansDepot: 4, enTournee: 1, retours: 2, livres: 0, perdus: 0, endommages: 0, auDepot: 6 });
+    expect(resumerComptes({})).toEqual({ dansDepot: 0, enTournee: 0, retours: 0, livres: 0, perdus: 0, endommages: 0, auDepot: 0 });
   });
   it("jours avant DLC", () => {
     expect(joursAvantDlc("2026-11-10", "2026-10-28")).toBe(13);
