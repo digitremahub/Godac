@@ -78,6 +78,8 @@ export interface OptionsHoraires {
   /** Fenêtres d'ouverture de l'arrêt ce jour-là (null : pas de contrainte). */
   fenetres: (id: string) => Fenetres;
   minutesParArret?: number;
+  /** Durée de remise prévue d'un arrêt (fiche client) ; undefined : `minutesParArret`. */
+  service?: (id: string) => number | undefined;
   /** Distance routière fournie par un moteur de routage ; repli géographique si indisponible. */
   distance?: (a: Point, b: Point) => number;
   /** « proche » : prochaine adresse la plus proche depuis le départ (recalcul en cours de route) ; défaut « optimal ». */
@@ -189,11 +191,15 @@ export function sequenceParListes(
       avant.push(pt(s)!);
     }
   }
+  const serviceDe = (id: string): { service?: number } => {
+    const v = horaires?.service?.(id);
+    return v === undefined ? {} : { service: v };
+  };
   const servirFixe = (s: ArretOptimisable, p: Point) => {
     sequence.push(s.id);
     if (!((s === premier && departEstPremier) || (s === dernier && finEstDernier))) apres.push(p);
     if (horaires) {
-      const sim = simulerPassages({ point: courant, minute: heure }, [{ point: p, fenetres: horaires.fenetres(s.id) }], horaires.minutesParArret, { distance: distanceTemps });
+      const sim = simulerPassages({ point: courant, minute: heure }, [{ point: p, fenetres: horaires.fenetres(s.id), ...serviceDe(s.id) }], horaires.minutesParArret, { distance: distanceTemps });
       passages[s.id] = sim.passages[0]!;
       heure = sim.fin;
     }
@@ -215,7 +221,7 @@ export function sequenceParListes(
       const fen = g.avecGps.map((s) => horaires.fenetres(s.id));
       const r = ordonnerAvecHoraires(
         courant,
-        pts.map((p, k) => ({ point: p, fenetres: fen[k]! })),
+        pts.map((p, k) => ({ point: p, fenetres: fen[k]!, ...serviceDe(g.avecGps[k]!.id) })),
         { debut: heure, retour: ferme, arrivee, minutesParArret: horaires.minutesParArret, distance: distanceTemps, strategie: horaires.strategie },
       );
       ordre = r.ordre;
@@ -223,7 +229,7 @@ export function sequenceParListes(
       impossibles.push(...r.impossibles.map((k) => g.avecGps[k]!.id));
       const sim = simulerPassages(
         { point: courant, minute: heure },
-        ordre.map((k) => ({ point: pts[k]!, fenetres: fen[k]! })),
+        ordre.map((k) => ({ point: pts[k]!, fenetres: fen[k]!, ...serviceDe(g.avecGps[k]!.id) })),
         horaires.minutesParArret,
         { distance: distanceTemps },
       );

@@ -5,6 +5,8 @@
 import type { garderApi } from "@/lib/acces/garde-api";
 import { depuisPhoton, filtrerAnnuaire, type EntreeAnnuaire, type ProprietesPhoton, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { departementDepuisReverse, lireEntreprises, preparerRequete, urlRecherche } from "@/lib/colis/recherche-entreprises";
+import { resumeFiche } from "@/lib/colis/fiche-client";
+import { CLIENT_FIELDS } from "@/lib/colis/serveur";
 import { corpsAutocomplete, lireAutocomplete, MASQUE_AUTOCOMPLETE, URL_AUTOCOMPLETE } from "@/lib/colis/places-google";
 
 const UA = "GODAC/1.0 (recherche d'adresses et d'établissements ; https://godac-v2.vercel.app)";
@@ -22,12 +24,24 @@ export function delai(p: Promise<SuggestionAdresse[]>, ms: number): Promise<Sugg
 
 type Client = Awaited<ReturnType<typeof garderApi>> extends infer R ? (R extends { ok: true; supabase: infer S } ? S : never) : never;
 
-/** Annuaire de l'entreprise : fiches horaires nommées et noms d'établissements des arrêts passés. */
+/**
+ * Annuaire de l'entreprise : fiches client (nom, adresse, téléphone, durée d'arrêt,
+ * alerte d'échec fréquent…) et noms d'établissements des arrêts passés. Restreint à
+ * l'organisation de l'utilisateur (RLS + filtre). Les colonnes de la fiche client
+ * sont lues si la migration 20261113000001 est appliquée, sinon la fiche reste nom + adresse.
+ */
 export async function annuaireInterne(supabase: Client, organizationId: string, q: string): Promise<SuggestionAdresse[]> {
   try {
     const motif = `%${q.replace(/[%_,()]/g, " ").trim().split(/\s+/)[0] ?? ""}%`;
-    const [{ data: fiches }, { data: arrets }] = await Promise.all([
-      supabase.from("delivery_address_hours").select("label, address").eq("organization_id", organizationId).or(`label.ilike.${motif},address.ilike.${motif}`).limit(40),
+    const lireFiches = async () => {
+      for (const champs of [`label, address, ${CLIENT_FIELDS}`, "label, address"]) {
+        const r = await supabase.from("delivery_address_hours").select(champs).eq("organization_id", organizationId).or(`label.ilike.${motif},address.ilike.${motif}`).order("updated_at", { ascending: false }).limit(40);
+        if (!r.error) return (r.data ?? []) as unknown as (Record<string, unknown> & { label: string | null; address: string })[];
+      }
+      return [];
+    };
+    const [fiches, { data: arrets }] = await Promise.all([
+      lireFiches(),
       supabase
         .from("delivery_stops")
         .select("business_name, address, lat, lng")
@@ -38,7 +52,13 @@ export async function annuaireInterne(supabase: Client, organizationId: string, 
         .limit(60),
     ]);
     const entrees: EntreeAnnuaire[] = [
-      ...(fiches ?? []).map((f: { label: string | null; address: string }) => ({ nom: f.label, adresse: f.address })),
+      ...fiches.map((f) => ({
+        nom: f.label,
+        adresse: f.address,
+        lat: typeof f.lat === "string" || typeof f.lat === "number" ? Number(f.lat) : null,
+        lng: typeof f.lng === "string" || typeof f.lng === "number" ? Number(f.lng) : null,
+        fiche: resumeFiche(f),
+      })),
       ...(arrets ?? []).map((a: { business_name: string | null; address: string; lat: number | null; lng: number | null }) => ({ nom: a.business_name, adresse: a.address, lat: a.lat, lng: a.lng })),
     ];
     return filtrerAnnuaire(entrees, q, 4);

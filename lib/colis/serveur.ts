@@ -279,25 +279,32 @@ export function cleAdresse(adresse: string): string {
 }
 
 export const HOURS_FIELDS = "id, address_key, label, address, weekly_schedule, notes, updated_at";
+/** Colonnes de la fiche client (migration 20261113000001). */
+export const CLIENT_FIELDS =
+  "phone, recipient, access_notes, lat, lng, window_start, window_end, service_avg_min, service_samples, delivered_count, failed_count, success_by_hour, failure_reasons, contact_message_count, contact_phone_count, last_delivery_at";
 
 /**
  * Fiches horaires de l'entreprise pour ces adresses, indexées par adresse
  * normalisée (cleAdresse). RLS : lecture dans l'entreprise. En cas
- * d'erreur (annuaire indisponible), aucune contrainte horaire.
+ * d'erreur (annuaire indisponible), aucune contrainte horaire. Les colonnes
+ * récentes (origine : migration 190 ; fiche client : migration 20261113000001)
+ * sont lues si elles existent, sinon la lecture retombe sur les précédentes.
  */
 export async function horairesDesAdresses(supabase: SupabaseClient, organizationId: string, adresses: string[]): Promise<Map<string, FicheHoraires>> {
   const cles = [...new Set(adresses.map(cleAdresse).filter(Boolean))];
   const fiches = new Map<string, FicheHoraires>();
+  const colonnes = [`${HOURS_FIELDS}, source, found_at, ${CLIENT_FIELDS}`, `${HOURS_FIELDS}, source, found_at`, HOURS_FIELDS];
   for (let i = 0; i < cles.length; i += 200) {
     const lot = cles.slice(i, i + 200);
-    // Origine de la fiche (migration 190) ; repli sans ces colonnes si elle n'est pas appliquée.
-    let { data, error }: { data: unknown[] | null; error: unknown } = await supabase
-      .from("delivery_address_hours")
-      .select(`${HOURS_FIELDS}, source, found_at`)
-      .eq("organization_id", organizationId)
-      .in("address_key", lot);
-    if (error) ({ data } = await supabase.from("delivery_address_hours").select(HOURS_FIELDS).eq("organization_id", organizationId).in("address_key", lot));
-    for (const f of (data ?? []) as FicheHoraires[]) fiches.set(f.address_key, { ...f, weekly_schedule: normaliserSemaine(f.weekly_schedule) });
+    let data: unknown[] | null = null;
+    for (const champs of colonnes) {
+      const r = await supabase.from("delivery_address_hours").select(champs).eq("organization_id", organizationId).in("address_key", lot);
+      if (!r.error) {
+        data = r.data as unknown[] | null;
+        break;
+      }
+    }
+    for (const f of (data ?? []) as unknown as FicheHoraires[]) fiches.set(f.address_key, { ...f, weekly_schedule: normaliserSemaine(f.weekly_schedule) });
   }
   return fiches;
 }

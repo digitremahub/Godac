@@ -19,6 +19,7 @@ const TRAITEMENTS: [string, string, string][] = [
   ["Paie (si souscrit)", "Salariés", "Rémunération, contrat, heures, primes, absences, frais, acomptes, retenues et saisies sur salaire (saisie, ATD, pension), numéro de sécurité sociale, date de naissance, coordonnées bancaires éventuelles, taux de prélèvement à la source, bulletins et documents de sortie"],
   ["Registre unique du personnel (si souscrit)", "Salariés", "Identité, date et lieu de naissance, nationalité, titre de travail, qualification, dates d’entrée et de sortie"],
   ["Tournée colis (si souscrit)", "Destinataires des colis du Client, chauffeurs", "Nom, adresse, téléphone, photo du colis déposé (nom réduit aux initiales, téléphone et consignes effacés à 30 jours ; adresses et photos conservées 12 mois pour les contestations) ; dernière position du chauffeur pendant la tournée en cours (effacée à la clôture) et trajet emprunté pendant la tournée en cours, pour l'analyse des trajets (conservé 1 an)"],
+  ["Annuaire client de tournée (si Tournée colis souscrite)", "Destinataires professionnels du Client (établissements, points relais), chauffeurs", "Nom de l’établissement, contact habituel et téléphone, consignes d’accès (code, stationnement), horaires d’ouverture et créneaux, durée moyenne d’arrêt, heures de livraison réussie, motifs d’échec, contacts déjà faits ; ordre habituel des villages d’une tournée. Réservé à l’organisation du Client, conservé 12 mois sans mise à jour puis supprimé, effaçable à tout moment par le Client, supprimé avec le compte à la fin du contrat"],
   ["Contestations clients (si souscrit)", "Clients du Client, chauffeurs", "Réclamation, référence, adresse, réponse du chauffeur"],
   ["Assistant (si souscrit)", "Utilisateurs", "Questions posées et réponses"],
   [
@@ -199,7 +200,7 @@ export default function DpaPage() {
         <li>Droits par rôle : un chauffeur ne voit que ses propres données ; documents sensibles réservés à l’encadrement.</li>
         <li>Codes PIN stockés sous forme chiffrée ; connexion sans mot de passe possible (passkeys) ; coupure immédiate d’un compte désactivé.</li>
         <li>Fichiers sensibles (photos de livraison, réclamations) dans des espaces privés, lus uniquement par liens temporaires.</li>
-        <li>Purge automatique des données à durée limitée (positions GPS, tournées colis, conversations de l’assistant, amendes clôturées, pointages anciens).</li>
+        <li>Purge automatique des données à durée limitée (positions GPS, tournées colis, fiches client de l’annuaire, conversations de l’assistant, amendes clôturées, pointages anciens).</li>
         <li>Journal d’audit des actions sensibles (exports, changements de droits, bulletins validés), lisible par la direction du Client, conservé trois ans.</li>
         <li>Sauvegardes de la base de données ; accès d’administration limité à l’Éditeur et protégé.</li>
         <li>Contrôles automatiques du code (typage, tests, compilation) avant toute mise en production.</li>

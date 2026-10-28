@@ -27,7 +27,13 @@ export interface ArretEstimation {
   done_at: string | null;
   /** Créneaux d'ouverture du jour (null : pas de contrainte, [] : fermé). */
   fenetres?: [number, number][] | null;
+  /** Durée de remise observée à cet arrêt (fiche client, lib/colis/fiche-client.ts) ; absente : MINUTES_PAR_ARRET. */
+  service_min?: number | null;
 }
+
+/** Durée de remise d'un arrêt : celle observée si elle existe, sinon la valeur fixe. */
+export const serviceArret = (a: { service_min?: number | null }): number =>
+  typeof a.service_min === "number" && Number.isFinite(a.service_min) && a.service_min > 0 ? a.service_min : MINUTES_PAR_ARRET;
 
 export interface Avancement {
   adressesRestantes: number;
@@ -104,7 +110,7 @@ export function estimerAvancement(
       }
       trajet = minutesTrajet(km) + retour;
     }
-    minutes = trajet + restants.length * MINUTES_PAR_ARRET;
+    minutes = trajet + restants.reduce((t, a) => t + serviceArret(a), 0);
     methode = "estimation";
   }
   minutes += attentesOuverture(restants, cycle, options.position ?? null, minutesParis(maintenant));
@@ -128,7 +134,7 @@ function attentesOuverture(restants: ArretEstimation[], cycle: number | null, po
     const ouverture = a.fenetres?.find(([, c]) => arrivee < c)?.[0];
     const w = ouverture !== undefined && ouverture > arrivee ? ouverture - arrivee : 0;
     attente += w;
-    t = arrivee + w + (cycle === null ? MINUTES_PAR_ARRET : 0);
+    t = arrivee + w + (cycle === null ? serviceArret(a) : 0);
   }
   return attente;
 }

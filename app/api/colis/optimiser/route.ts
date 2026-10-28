@@ -6,13 +6,16 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { consommer } from "@/lib/usage/consommer";
 import { cleAdresse, depotDuService, ecrireExtremitesRun, horairesDesAdresses, lireExtremitesRun, listesDeTournee, moduleActif, tourneeParId } from "@/lib/colis/serveur";
 import { contraintesListes, resoudreExtremites, schemaArrivee, schemaDepart } from "@/lib/colis/extremites";
-import { sequenceParListes } from "@/lib/colis/listes";
 import { fenetresArret, heureDepart, instantParis, lireHeure, type Fenetres } from "@/lib/colis/horaires";
 import { memePoint, type Point } from "@/lib/colis/optimisation";
 import { rechercherEtEnregistrerHoraires } from "@/lib/colis/horaires-internet";
 import { matriceRoutiere } from "@/lib/colis/matrice";
 import { ordonnerListesGlobalement } from "@/lib/colis/tournee-globale";
 import { estListeReportee } from "@/lib/colis/villages";
+import { sequenceParListes, type ResultatSequence } from "@/lib/colis/listes";
+import { ecrirePreferenceSens, lirePreferenceSens, runPourSens, sensDeLaTournee } from "@/lib/colis/sens-serveur";
+import { MODES_SENS, biaisSansRisque, libelleSens, referenceSens, type ModeSens } from "@/lib/colis/sens-tournee";
+import { dureeServicePrevue } from "@/lib/colis/fiche-client";
 
 export const maxDuration = 60;
 
@@ -33,6 +36,13 @@ const bodySchema = z.object({
   strategie: z.enum(["optimal", "proche"]).optional(),
   /** false : départ / arrivée utilisés pour ce calcul seulement, sans modifier le choix mémorisé de la tournée (optimisation ponctuelle depuis ma position ou une adresse). */
   memoriser: z.boolean().optional(),
+  /**
+   * Sens de la tournée (lib/colis/sens-tournee.ts) : « habituel » privilégie l'ordre dans lequel les
+   * secteurs sont d'ordinaire parcourus, « inverse » le prend à l'envers, « libre » n'en tient pas compte.
+   * Absent : le choix mémorisé (habituel par défaut dès qu'une habitude existe). Un choix explicite est
+   * mémorisé pour la prochaine fois, sauf si `memoriser` vaut false.
+   */
+  sens: z.enum(MODES_SENS as unknown as [ModeSens, ...ModeSens[]]).optional(),
 });
 
 /**
@@ -119,12 +129,20 @@ export async function POST(req: Request) {
   const strategie = parsed.data.strategie ?? "proche";
   const extremites = { premierId: ext.premierId, dernierId: ext.dernierId, fin: ext.fin, strategie };
 
+  // Sens habituel de la tournée : biais doux sur l'ordre des villages (jamais au détriment des horaires).
+  const run2 = await runPourSens(supabase, appUser.organization_id, run.id).catch(() => null);
+  const sensCtx = run2 ? await sensDeLaTournee(supabase, appUser.organization_id, appUser.id, run2).catch(() => null) : null;
+  const modeSens: ModeSens = parsed.data.sens ?? sensCtx?.mode ?? "habituel";
+  if (parsed.data.sens && parsed.data.memoriser !== false && sensCtx?.scope && sensCtx.persiste && parsed.data.sens !== sensCtx.mode) {
+    const pref = await lirePreferenceSens(supabase, appUser.organization_id, sensCtx.scope);
+    await ecrirePreferenceSens(supabase, appUser.organization_id, appUser.id, sensCtx.scope, pref, { mode: parsed.data.sens }).catch(() => false);
+  }
+  const reference = referenceSens(sensCtx?.habitude ?? null, modeSens);
+
   // Ordre global des villages : toutes les listes s'enchaînent dans un seul
   // sens de tournée (lib/colis/tournee-globale.ts).
-  const { listes: nouvelOrdre } = ordonnerListesGlobalement(arrets, listes, depart, retour, distance, extremites);
-  await Promise.all(
-    nouvelOrdre.map((l) => (listes.find((x) => x.id === l.id)?.position === l.position ? null : supabase.from("delivery_lists").update({ position: l.position }).eq("id", l.id))),
-  );
+  const neutre = ordonnerListesGlobalement(arrets, listes, depart, retour, distance, extremites);
+  const biaise = reference ? ordonnerListesGlobalement(arrets, listes, depart, retour, distance, extremites, { reference }) : null;
 
   // Adresses pro jamais examinées (ajoutées avant cette fonction, import…) :
   // recherche des horaires sur internet, enregistrés dans l'annuaire.
@@ -149,13 +167,39 @@ export async function POST(req: Request) {
   const fenetres = new Map<string, Fenetres>(
     arrets.map((s) => [s.id, fenetresArret({ semaine: fiches.get(cleAdresse(s.address))?.weekly_schedule, debut: s.window_start, fin: s.window_end }, jour)]),
   );
+  // Durée d'arrêt prévue : celle observée sur la fiche client si l'historique existe, sinon la valeur fixe.
+  const services = new Map<string, number>();
+  for (const s of arrets) {
+    const d = dureeServicePrevue(fiches.get(cleAdresse(s.address)), 0);
+    if (d > 0 && s.status === "pending") services.set(s.id, d);
+  }
 
-  const r = sequenceParListes(arrets, nouvelOrdre, depart, retour, {
-    debut: minute,
-    fenetres: (id) => fenetres.get(id) ?? null,
-    distance,
-    strategie,
-  }, undefined, extremites);
+  const sequencer = (ordre: typeof neutre.listes): ResultatSequence =>
+    sequenceParListes(arrets, ordre, depart, retour, {
+      debut: minute,
+      fenetres: (id) => fenetres.get(id) ?? null,
+      service: (id) => services.get(id),
+      distance,
+      strategie,
+    }, undefined, extremites);
+  const bilan = (x: ResultatSequence) => ({ hors: x.horsHoraires.length, ecartes: x.fermes.length + x.impossibles.length, fin: x.fin });
+  const memeOrdre = (a: typeof neutre.listes, b: typeof neutre.listes) => a.length === b.length && a.every((l, i) => l.id === b[i]!.id);
+
+  let nouvelOrdre = neutre.listes;
+  let r = sequencer(neutre.listes);
+  let ecartSens: "horaires" | null = null;
+  if (biaise && !memeOrdre(biaise.listes, neutre.listes)) {
+    const rb = sequencer(biaise.listes);
+    // Les horaires et les fenêtres d'ouverture passent avant l'habitude.
+    if (biaisSansRisque(bilan(r), bilan(rb))) {
+      nouvelOrdre = biaise.listes;
+      r = rb;
+    } else ecartSens = "horaires";
+  } else if (biaise) nouvelOrdre = biaise.listes;
+  const desordre = biaise && !ecartSens ? (biaise.desordreSens ?? null) : null;
+  await Promise.all(
+    nouvelOrdre.map((l) => (listes.find((x) => x.id === l.id)?.position === l.position ? null : supabase.from("delivery_lists").update({ position: l.position }).eq("id", l.id))),
+  );
 
   // Positions globales et contiguës (0, 1, 2…) dans l'ordre calculé.
   const ecritures = await Promise.all([...r.sequence, ...reportes.map((s) => s.id)].map((id, position) => supabase.from("delivery_stops").update({ position }).eq("id", id)));
@@ -180,6 +224,16 @@ export async function POST(req: Request) {
     fermes: r.fermes,
     impossibles: r.impossibles,
     distanceRoutiere: !matrice.estimation(),
+    /** Adresses dont la durée d'arrêt est celle observée (fiche client) et non la valeur fixe de 3 min. */
+    dureesApprises: services.size,
+    /** Sens de la tournée : choix retenu, ordre habituel suivi, ou écarté pour tenir les horaires. */
+    sens: {
+      mode: modeSens,
+      habitude: sensCtx?.habitude ? libelleSens(sensCtx.habitude.ordre) : null,
+      applique: reference !== null && ecartSens === null,
+      suivi: desordre === 0,
+      ecarte: ecartSens,
+    },
     passages: Object.fromEntries(
       Object.entries(r.passages).map(([id, p]) => [id, { arrivee: iso(p.arrivee), attenteMin: Math.round(p.attente), statut: p.statut }]),
     ),

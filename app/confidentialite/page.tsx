@@ -75,6 +75,15 @@ export default function ConfidentialitePage() {
             réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
           </li>
           <li>
+            <strong>Fiches client de l&apos;annuaire de tournée :</strong> pour préremplir les prochaines tournées de l&apos;entreprise, GODAC retient, par
+            adresse d&apos;établissement (commerce, entreprise, point relais) et uniquement au sein de l&apos;entreprise concernée, les <strong>coordonnées des
+            destinataires professionnels</strong> (nom de l&apos;établissement, contact habituel, téléphone), les <strong>consignes d&apos;accès</strong> (code,
+            stationnement, quai), les horaires d&apos;ouverture ou créneaux, la durée moyenne d&apos;arrêt, les heures où la livraison réussit, les motifs d&apos;échec
+            fréquents et les contacts déjà faits (message, appel). Les particuliers ne sont pas ajoutés à cet annuaire. Le chauffeur et l&apos;encadrement peuvent
+            corriger ou <strong>effacer</strong> une fiche à tout moment depuis l&apos;écran « Horaires » de l&apos;arrêt. GODAC retient aussi, par modèle de tournée
+            ou par chauffeur, l&apos;<strong>ordre habituel des villages</strong> parcourus (noms de villages seulement) pour proposer le sens habituel de la tournée.
+          </li>
+          <li>
             <strong>Véhicules loués :</strong> si l&apos;entreprise l&apos;active, une demande d&apos;entretien validée par un responsable
             (immatriculation, modèle, kilométrage, urgence, description et photos, nom et coordonnées du responsable) est transmise au
             loueur ou au garage choisi par l&apos;entreprise, qui en devient destinataire. Il y accède par un lien personnel limité à cette
@@ -227,6 +236,11 @@ export default function ConfidentialitePage() {
             Tournées colis* : téléphones, consignes et noms complets des destinataires effacés 30 jours après la tournée (le nom est
             réduit aux initiales) ; adresses, initiales et photos de livraison conservées 12 mois pour traiter les contestations, puis
             supprimées.
+          </li>
+          <li>
+            Fiches client de l&apos;annuaire de tournée* (téléphone, contact, consignes d&apos;accès, statistiques de passage) et sens habituel des tournées :
+            12 mois sans mise à jour, puis supprimés (la fiche est conservée pour ses seuls horaires d&apos;ouverture si l&apos;entreprise en a renseigné) ;
+            effacées à tout moment à la demande depuis l&apos;écran « Horaires », et avec toutes les données de l&apos;entreprise 3 mois après la fin du contrat.
           </li>
           <li>Amendes* : jusqu&apos;à leur traitement (réglée ou classée), puis 1 an maximum (délai de prescription des contraventions), avis et pièces jointes compris.</li>
           <li>Journal d&apos;audit des actions sensibles (exports, changements de droits, bulletins validés)* : 3 ans.</li>

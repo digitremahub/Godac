@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { IconX } from "@/components/layout/icons";
 import { AdresseInput } from "@/components/colis/AdresseInput";
 import { api, type Run, type Stop } from "@/components/colis/commun";
 import { lireArrivee, lireDepart, resoudreExtremites, type Arrivee, type Depart } from "@/lib/colis/extremites";
 import { networkErrorMessage } from "@/lib/utils/network-error";
+import type { ModeSens } from "@/lib/colis/sens-tournee";
+import { confirmer } from "@/lib/ui/confirmation";
 
 /**
  * Choix du départ et de l'arrivée de l'optimisation (« Optimiser l'ordre »),
@@ -97,6 +99,13 @@ function Option({ actif, onChoisir, titre, detail, desactive, children }: { acti
   );
 }
 
+/** Sens habituel de la tournée tel que le renvoie /api/colis/sens. */
+interface InfoSens {
+  disponible: boolean;
+  mode: ModeSens;
+  habitude: { ordre: string[]; observations: number; accord: number; libelle: string } | null;
+}
+
 type KindDepart = "depot" | "position" | "arret" | "adresse" | "libre";
 type KindArrivee = "depot" | "meme" | "arret" | "adresse" | "libre";
 type Lieu = { label: string; lat: number; lng: number };
@@ -116,7 +125,7 @@ export function OptimiserSheet({
   enLivraison: boolean;
   initial: { depart: Depart | null; arrivee: Arrivee | null };
   /** Lance l'optimisation ; renvoie un message d'erreur, ou null si tout s'est bien passé. */
-  onValider: (depart: Depart | null, arrivee: Arrivee) => Promise<string | null>;
+  onValider: (depart: Depart | null, arrivee: Arrivee, sens?: ModeSens) => Promise<string | null>;
   onFermer: () => void;
 }) {
   const depotConnu = run.start_lat !== null && run.start_lng !== null;
@@ -151,6 +160,35 @@ export function OptimiserSheet({
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
+  // Sens habituel : activé par défaut dès qu'une habitude existe (choix mémorisé pour la prochaine fois).
+  const [infoSens, setInfoSens] = useState<InfoSens | null>(null);
+  const [modeSens, setModeSens] = useState<ModeSens>("habituel");
+  useEffect(() => {
+    let annule = false;
+    api<InfoSens>(`/api/colis/sens?run_id=${encodeURIComponent(run.id)}`)
+      .then((i) => {
+        if (annule) return;
+        setInfoSens(i);
+        setModeSens(i.mode);
+      })
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [run.id]);
+  async function oublierHabitude() {
+    if (!(await confirmer({ titre: "Oublier le sens habituel ?", message: "Il se reconstruira à partir des prochaines tournées clôturées.", action: "Oublier", danger: true }))) return;
+    setErreur(null);
+    try {
+      const i = await api<InfoSens>("/api/colis/sens", { method: "POST", body: JSON.stringify({ run_id: run.id, action: "oublier" }) });
+      setInfoSens(i);
+      setModeSens(i.mode);
+    } catch (e) {
+      setErreur(networkErrorMessage(e));
+    }
+  }
+  const habitude = infoSens?.habitude ?? null;
+
   const depart: Depart | null =
     dKind === "depot" ? { mode: "depot" } : dKind === "position" ? { mode: "position" } : dKind === "arret" && dArret ? { mode: "arret", arret_id: dArret } : dKind === "adresse" && dLieu ? { mode: "adresse", ...dLieu } : null;
   const arrivee: Arrivee | null =
@@ -174,7 +212,7 @@ export function OptimiserSheet({
     if (!arrivee || departIncomplet || conflit) return;
     setBusy(true);
     setErreur(null);
-    const msg = await onValider(depart, arrivee);
+    const msg = await onValider(depart, arrivee, habitude ? modeSens : undefined);
     setBusy(false);
     if (msg) setErreur(msg);
     else onFermer();
@@ -280,6 +318,21 @@ export function OptimiserSheet({
           </Option>
           <Option actif={aKind === "libre"} onChoisir={() => setAKind("libre")} titre="Pas de retour imposé" detail="Vous finissez au dernier arrêt, sans trajet en plus." />
         </section>
+
+        {habitude && (
+          <section className="flex flex-col gap-2" role="radiogroup" aria-label="Sens de la tournée">
+            <h3 className="text-sm font-semibold">↻ Sens de la tournée</h3>
+            <Option actif={modeSens === "habituel"} onChoisir={() => setModeSens("habituel")} titre="Garder mon sens habituel" detail={habitude.libelle} />
+            <Option actif={modeSens === "inverse"} onChoisir={() => setModeSens("inverse")} titre="Inverser le sens" detail={`À l'envers : ${[...habitude.ordre].reverse().join(" → ")}`} />
+            <Option actif={modeSens === "libre"} onChoisir={() => setModeSens("libre")} titre="Ne pas en tenir compte" detail="Le trajet le plus court uniquement." />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-navy/60">Appris de vos {habitude.observations} dernières tournées. Un détour manifeste ou un horaire d&apos;ouverture passent toujours avant.</p>
+              <button type="button" className="btn-ghost min-h-[44px] !px-3 text-xs text-orange-ink" onClick={() => void oublierHabitude()} disabled={busy}>
+                Oublier l&apos;habitude
+              </button>
+            </div>
+          </section>
+        )}
 
         {conflit && <p className="rounded-xl bg-orange/15 px-3 py-2 text-sm font-semibold text-orange-ink">Un même arrêt ne peut pas être le premier et le dernier : choisissez deux arrêts différents.</p>}
         {erreur && (

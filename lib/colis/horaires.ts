@@ -57,6 +57,24 @@ export interface FicheHoraires {
   /** Origine : saisie manuelle, ou trouvée sur internet (openstreetmap, google) — migration 190. */
   source?: string | null;
   found_at?: string | null;
+  /**
+   * Fiche client (migration 20261113000001) : informations retenues des tournées
+   * précédentes de l'organisation. Absentes tant que la migration n'est pas appliquée.
+   */
+  phone?: string | null;
+  recipient?: string | null;
+  access_notes?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  service_avg_min?: number | string | null;
+  service_samples?: number | null;
+  delivered_count?: number | null;
+  failed_count?: number | null;
+  success_by_hour?: unknown;
+  failure_reasons?: unknown;
+  contact_message_count?: number | null;
+  contact_phone_count?: number | null;
+  last_delivery_at?: string | null;
 }
 
 export const MAX_CRENEAUX = 2;
@@ -297,6 +315,8 @@ export function servir(t: number, f: Fenetres): { debut: number; statut: StatutP
 export interface ArretPlanifiable {
   point: Point | null;
   fenetres: Fenetres;
+  /** Durée de remise prévue à cet arrêt (min), d'après la fiche client ; absent : `minutesParArret`. */
+  service?: number;
 }
 
 /**
@@ -318,7 +338,7 @@ export function simulerPassages(
     if (a.point) prec = a.point;
     const s = servir(t, a.fenetres);
     const p: Passage = { arrivee: t, debut: s.debut, attente: s.debut - t, statut: s.statut };
-    t = s.debut + minutesParArret;
+    t = s.debut + (a.service ?? minutesParArret);
     return p;
   });
   return { passages, fin: t, dernier: prec };
@@ -333,7 +353,8 @@ const BUDGET_MS = 1500;
 
 interface Probleme {
   debut: number;
-  service: number;
+  /** Durée de remise de chaque arrêt (min). */
+  service: number[];
   depuisDepart: number[];
   t: number[][];
   versFin: number[];
@@ -362,7 +383,7 @@ function evaluer(p: Probleme, ordre: number[]) {
       hors++;
       retard += s.retard;
     }
-    t = s.debut + p.service;
+    t = s.debut + p.service[i]!;
     prec = i;
   }
   if (prec >= 0) t += p.versFin[prec]!;
@@ -377,7 +398,7 @@ function evaluer(p: Probleme, ordre: number[]) {
  */
 export function ordonnerAvecHoraires(
   depart: Point | null,
-  arrets: { point: Point; fenetres: Fenetres }[],
+  arrets: { point: Point; fenetres: Fenetres; service?: number }[],
   options: {
     debut: number;
     retour?: boolean;
@@ -412,7 +433,7 @@ export function ordonnerAvecHoraires(
     const fin = arrivee ?? (retour ? depart : null);
     const p: Probleme = {
       debut,
-      service: minutesParArret,
+      service: arrets.map((a) => a.service ?? minutesParArret),
       depuisDepart: arrets.map((a) => trajet(depart, a.point)),
       t: arrets.map((a) => arrets.map((b) => trajet(a.point, b.point))),
       versFin: arrets.map((a) => trajet(a.point, fin)),
@@ -514,13 +535,13 @@ export function heureDepart(
  * affiché (pour l'écran du chauffeur et de l'exploitation).
  */
 export function passagesTournee(
-  arrets: { id: string; status: string; lat: number | string | null; lng: number | string | null; fenetres: Fenetres }[],
+  arrets: { id: string; status: string; lat: number | string | null; lng: number | string | null; fenetres: Fenetres; service?: number }[],
   depart: { point: Point | null; minute: number },
 ): Map<string, Passage> {
   const restants = arrets.filter((a) => a.status === "pending");
   const { passages } = simulerPassages(
     depart,
-    restants.map((a) => ({ point: a.lat === null || a.lng === null ? null : { lat: Number(a.lat), lng: Number(a.lng) }, fenetres: a.fenetres })),
+    restants.map((a) => ({ point: a.lat === null || a.lng === null ? null : { lat: Number(a.lat), lng: Number(a.lng) }, fenetres: a.fenetres, ...(a.service !== undefined ? { service: a.service } : {}) })),
   );
   return new Map(restants.map((a, i) => [a.id, passages[i]!]));
 }

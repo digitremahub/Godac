@@ -14,6 +14,7 @@ import { NOM_RELAIS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 import { reordonner } from "@/lib/colis/reordonner";
 import { majContacts } from "@/lib/colis/contacts";
 import { estSchemaManquant } from "@/lib/rattachement/tolerance";
+import { enregistrerObservationArret } from "@/lib/colis/fiche-client-serveur";
 
 const patchSchema = z.object({
   status: z.enum(["pending", "delivered", "failed"]).optional(),
@@ -252,6 +253,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     details: contacts.details,
   });
   if (events.length) await journaliserArret(supabase, events);
+  // Arrêt clôturé : la fiche client de l'adresse retient ce que cette visite a appris (non bloquant, idempotent).
+  if (status === "delivered" || status === "failed") await enregistrerObservationArret(supabase, appUser.organization_id, appUser.id, data.id);
   return NextResponse.json({ stop: { ...data, ...(contacts ? { contact_message: contacts.update.contact_message, contact_phone: contacts.update.contact_phone, contact_at: contacts.update.contact_at } : {}) } });
 }
 
