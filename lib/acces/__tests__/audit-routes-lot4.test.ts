@@ -104,6 +104,8 @@ describe("aucune route API ne s'ouvre sans garde", () => {
     "app/api/public/prestataire/[token]/route.ts",
     "app/api/cron/reset-demo/route.ts",
     "app/api/cron/retention/route.ts",
+    "app/api/cron/fin-contrat/route.ts",
+    "app/api/godac-staff/organisations/[id]/fin-contrat/route.ts",
     "app/api/cron/surveillance-tournees/route.ts",
     "app/api/cron/loueurs/route.ts",
     "app/api/cron/ticpe/route.ts",

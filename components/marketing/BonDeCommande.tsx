@@ -137,11 +137,28 @@ export function BonDeCommande({
 
       <section className="flex flex-col gap-1 text-xs leading-relaxed text-navy/75">
         <p className="text-sm font-semibold text-navy">Conditions</p>
+        <p className="font-semibold text-navy">Offre souscrite (cocher une case ; à défaut, l’offre standard s’applique) :</p>
+        <ul className="flex flex-col gap-1">
+          <li className="flex items-start gap-2">
+            <span aria-hidden="true" className="text-base leading-none">☐</span>
+            <span>
+              <strong>Pilote sans engagement</strong> : abonnement mensuel, sans durée minimale, résiliable à tout moment par
+              écrit avec effet à la fin du mois en cours (CGV, article 6).
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span aria-hidden="true" className="text-base leading-none">☐</span>
+            <span>
+              <strong>Offre standard 12 mois</strong> : engagement initial ferme de 12 mois à compter de l’ouverture de l’accès,
+              puis renouvellement de mois en mois, résiliable avec un préavis d’un mois (CGV, article 6).
+            </span>
+          </li>
+        </ul>
         <p>
-          Abonnement d’une durée initiale de 12 mois à compter de l’ouverture de l’accès, puis renouvelable de mois en mois,
-          résiliable avec un préavis d’un mois. Facturation mensuelle terme à échoir, payable à réception par prélèvement SEPA
-          ou carte bancaire. Mise en service facturée à la commande, ou échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour le chauffeur, facturée à l’entreprise par palier d’utilisateurs.
-          Données stockées sur des serveurs situés en France. Prix hors taxes ; TVA française 20 % pour un client établi en France
+          L’essai gratuit de 30 jours, sur invitation, n’est pas un engagement. Dans les deux offres : facturation mensuelle terme
+          à échoir, payable à réception par prélèvement SEPA ou carte bancaire. Mise en service facturée à la commande, ou
+          échelonnée lorsque c’est indiqué ci-dessus. Application GODAC Livreur gratuite pour le chauffeur, facturée à l’entreprise par palier d’utilisateurs.
+          Données stockées sur des serveurs situés en France. Niveau de service : engagement de moyens, sans garantie chiffrée de disponibilité ni avoir automatique (SLA). Suppression des données 3 mois après la fin du contrat (CGV, article 11). Prix hors taxes ; TVA française 20 % pour un client établi en France
           (client assujetti établi hors de France : voir CGV, article 7). Retard de paiement : intérêts et indemnité forfaitaire
           de 40 € (CGV, article 8). Outil d’organisation : paramètres, calculs et déclarations (paie, TICPE, carburant) à vérifier
           par le client avec son expert-comptable (CGV, article 13).

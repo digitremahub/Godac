@@ -21,6 +21,10 @@
       "schedule": "15 3 * * *"
     },
     {
+      "path": "/api/cron/fin-contrat",
+      "schedule": "10 5 * * *"
+    },
+    {
       "path": "/api/cron/paliers",
       "schedule": "45 3 * * *"
     },

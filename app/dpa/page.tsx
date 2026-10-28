@@ -12,7 +12,7 @@ const TRAITEMENTS: [string, string, string][] = [
   ["Comptes et rôles", "Salariés et dirigeants du Client", "Nom, prénom, e-mail, téléphone, rôle, service, code chauffeur, code PIN chiffré, clés de connexion"],
   ["Carburant, flotte et TICPE", "Chauffeurs", "Pleins, kilométrages, photos de tickets et de compteurs, véhicule utilisé, cartes grises des véhicules"],
   ["Planning, tournées, congés", "Chauffeurs et encadrement", "Affectations, horaires, tournées, absences et congés"],
-  ["Pointage", "Salariés", "Heures de pointage, position GPS au moment du pointage ; si le pointage assisté est utilisé : lecture ponctuelle de la position (environ chaque minute, application ouverte et visible) pour détecter l’arrivée au dépôt ou la sortie, seule l’heure de dernière présence au dépôt étant mémorisée"],
+  ["Pointage", "Salariés", "Heures de pointage, position GPS au moment du pointage ; si le pointage assisté est utilisé : lecture ponctuelle de la position (environ chaque minute, application ouverte et visible) pour détecter l’arrivée au dépôt ou la sortie, seule l’heure de dernière présence au dépôt étant mémorisée. Position de pointage conservée 2 mois (preuve du temps de travail en cas de litige), puis supprimée ; les heures sont conservées"],
   ["Messagerie, intranet, alertes", "Salariés", "Messages, pièces jointes, convocations, notifications"],
   ["Amendes", "Conducteurs", "Avis de contravention (données relatives à des infractions routières), véhicule, conducteur désigné"],
   ["Absences et arrêts de travail", "Salariés", "Dates, type d’arrêt, prolongation, photo du volet destiné à l’employeur (jamais le volet médical) ; congés"],
@@ -130,7 +130,11 @@ export default function DpaPage() {
         <p>
           À la fin du contrat, l’Éditeur met les données à disposition du Client pour export pendant trente (30) jours, puis
           les supprime, y compris des sauvegardes, dans un délai de trois (3) mois, sauf obligation légale de conservation.
-          Il en atteste par écrit sur demande.
+          Au moins trente (30) jours avant la suppression, il adresse un préavis par e-mail aux administrateurs du Client,
+          avec un rappel de l’export. La suppression est suspendue tant qu’un litige est déclaré entre les parties. L’Éditeur ne
+          conserve ensuite, en qualité de responsable de traitement pour ses propres obligations, que le strict nécessaire
+          (données de facturation et identifiants de paiement, preuves d’acceptation et de préavis, trace de la suppression).
+          Il atteste de la suppression par écrit sur demande.
         </p>
       </Article>
 

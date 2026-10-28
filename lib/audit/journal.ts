@@ -93,6 +93,9 @@ export const ACTIONS_AUDIT = {
   facturation_impaye: "Paiement échoué enregistré (facture Stripe impayée)",
   palier_stripe_echec: "Palier d'utilisateurs : mise à jour Stripe en échec (reprise au prochain passage)",
   accuse_parametres_indicatifs: "Mention « documents indicatifs » (paie, TICPE, carburant) lue et acceptée : l'entreprise vérifie paramètres et résultats",
+  fin_contrat_preavis: "Fin de contrat : préavis de suppression des données envoyé au contact de l'organisation",
+  fin_contrat_date_modifiee: "Fin de contrat : date de fin posée ou retirée par GODAC",
+  fin_contrat_suppression_bloquee: "Fin de contrat : suppression des données suspendue (litige) ou reprise par GODAC",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

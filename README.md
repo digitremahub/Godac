@@ -237,6 +237,7 @@ intégration :
   humain (Lot B, `lib/assistant/` — le bouton flottant n'apparaît pas
   du tout sans la clé, voir `app/(dashboard)/layout.tsx`).
 - **GODAC_STAFF_EMAILS** : allowlist du backoffice opérateur.
+- **FIN_CONTRAT_PURGE_ACTIVE** : `true` pour activer la suppression des données 3 mois après la fin de contrat (et l'envoi des préavis). Absente ou autre valeur : DRY-RUN, le cron `/api/cron/fin-contrat` ne fait que journaliser. Irréversible : voir `docs/garde-fous-techniques.md`.
 - **SUPABASE_DB_WEBHOOK_SECRET** : secret partagé pour le webhook DB → email d'alerte.
 - **CRON_SECRET** : requise pour le digest hebdomadaire de planning
   (`app/api/cron/weekly-planning-digest/route.ts`, déclenché par

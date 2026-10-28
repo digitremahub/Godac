@@ -7,6 +7,8 @@ import { PageHeader, Card } from "@/components/ui";
 import { apporteurStaff, nomsApporteurs } from "@/lib/partage-go/staff";
 import { statutCompte } from "@/lib/partage-go/apporteur";
 import { StaffUsersPanel } from "@/components/godac-staff/StaffUsersPanel";
+import { FinContratStaff, type EtatFinContrat } from "@/components/godac-staff/FinContratStaff";
+import { COLONNES_FIN_CONTRAT, dateFinContrat, dateSuppressionPrevue, preavisEnvoye, type OrganisationFinContrat } from "@/lib/fin-contrat/regles";
 
 export default async function GodacStaffOrgPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
@@ -39,6 +41,27 @@ export default async function GodacStaffOrgPage({ params }: { params: Promise<{ 
     : null;
   const etatCompte = attrib ? statutCompte(attrib) : null;
 
+  // Fin de contrat (colonnes absentes avant la migration 20261112000001 : bloc masqué).
+  const { data: brut, error: erreurFinContrat } = await admin.from("organizations").select(COLONNES_FIN_CONTRAT).eq("id", orgId).maybeSingle();
+  let finContrat: EtatFinContrat | null = null;
+  if (brut && !erreurFinContrat) {
+    const o = brut as unknown as OrganisationFinContrat & { suppression_bloquee_le?: string | null; suppression_bloquee_par?: string | null };
+    const { data: meta } = await admin.from("organizations").select("suppression_bloquee_le, suppression_bloquee_par").eq("id", orgId).maybeSingle();
+    const fin = dateFinContrat(o);
+    const preavis = fin ? preavisEnvoye(o, fin) : null;
+    const jour = (d: Date | string | null | undefined) => (d ? new Date(d).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) : null);
+    finContrat = {
+      finContrat: jour(fin),
+      contratTermineLe: o.contrat_termine_le ? o.contrat_termine_le.slice(0, 10) : null,
+      preavisEnvoyeLe: jour(preavis),
+      suppressionPrevue: fin ? jour(dateSuppressionPrevue(fin, preavis, new Date())) : null,
+      bloquee: Boolean(o.suppression_bloquee),
+      motif: o.suppression_bloquee_motif ?? null,
+      bloqueeLe: jour((meta as { suppression_bloquee_le?: string | null } | null)?.suppression_bloquee_le),
+      bloqueePar: (meta as { suppression_bloquee_par?: string | null } | null)?.suppression_bloquee_par ?? null,
+    };
+  }
+
   return (
     <main className="min-h-screen p-6">
       <Link href="/godac-staff" className="text-sm text-teal-ink hover:underline">
@@ -58,6 +81,7 @@ export default async function GodacStaffOrgPage({ params }: { params: Promise<{ 
           </p>
         </Card>
       )}
+      {finContrat && <FinContratStaff organisationId={orgId} etat={finContrat} />}
       <StaffUsersPanel users={(users ?? []) as any} />
     </main>
   );
