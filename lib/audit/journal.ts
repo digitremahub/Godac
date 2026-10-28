@@ -98,6 +98,7 @@ export const ACTIONS_AUDIT = {
   fin_contrat_suppression_bloquee: "Fin de contrat : suppression des données suspendue (litige) ou reprise par GODAC",
   stock_ajustement: "Stock : ajustement manuel enregistré (avec motif)",
   stock_inventaire_valide: "Stock : inventaire validé (écarts corrigés par des ajustements)",
+  stock_inventaire_annule: "Stock : inventaire en cours abandonné",
   stock_archivage: "Stock : dépôt, zone, emplacement ou article désactivé / réactivé",
   stock_profils_modifies: "Stock : profils d'activité modifiés",
   stock_seuil_modifie: "Stock : seuil mini d'un article modifié",

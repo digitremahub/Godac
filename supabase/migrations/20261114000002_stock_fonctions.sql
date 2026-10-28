@@ -6,6 +6,7 @@
 --   stock_creer_inventaire       ouvre un comptage (dépôt ou zone)
 --   stock_compter                enregistre un comptage (unité ou article)
 --   stock_valider_inventaire     calcule les écarts et les corrige par des ajustements
+--   stock_annuler_inventaire     abandonne un comptage en cours (aucun mouvement)
 --
 -- Toutes les fonctions publiques sont « security definer » : elles revérifient
 -- l'organisation, l'activation du module, le rôle et le périmètre de service de
@@ -121,7 +122,7 @@ begin
   if p_motif is not null and char_length(p_motif) > 300 then
     raise exception 'stock_motif_trop_long' using errcode = 'P0001';
   end if;
-  if p_type in ('ajustement', 'casse', 'perte') and (p_motif is null or btrim(p_motif) = '') and p_source = 'app' then
+  if p_type in ('ajustement', 'casse', 'perte') and (p_motif is null or btrim(p_motif) = '') then
     raise exception 'stock_motif_requis' using errcode = 'P0001';
   end if;
   if v_site is null or not exists (select 1 from public.stock_sites s where s.id = v_site and s.organization_id = p_org and s.actif) then
@@ -626,5 +627,39 @@ $$;
 
 revoke all on function public.stock_valider_inventaire(uuid, text) from public, anon;
 grant execute on function public.stock_valider_inventaire(uuid, text) to authenticated;
+
+-- ── 8. Inventaire : abandon d'un comptage en cours ─────────────────────
+
+create or replace function public.stock_annuler_inventaire(p_inventaire uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  c record;
+  v_inv public.stock_inventaires%rowtype;
+begin
+  select * into c from public.stock__contexte();
+  if c.o_role not in ('manager', 'manager_chauffeur', 'exploitation', 'direction') then
+    raise exception 'stock_role_refuse' using errcode = 'P0001';
+  end if;
+  select * into v_inv from public.stock_inventaires where id = p_inventaire and organization_id = c.o_org for update;
+  if not found or not public.stock__site_autorise(c.o_org, c.o_role, v_inv.site_id) then
+    raise exception 'stock_inventaire_introuvable' using errcode = 'P0001';
+  end if;
+  if v_inv.statut = 'annule' then
+    return jsonb_build_object('ok', true, 'doublon', true);
+  end if;
+  if v_inv.statut <> 'en_cours' then
+    raise exception 'stock_inventaire_clos' using errcode = 'P0001';
+  end if;
+  update public.stock_inventaires set statut = 'annule' where id = p_inventaire and organization_id = c.o_org;
+  return jsonb_build_object('ok', true, 'doublon', false);
+end;
+$$;
+
+revoke all on function public.stock_annuler_inventaire(uuid) from public, anon;
+grant execute on function public.stock_annuler_inventaire(uuid) to authenticated;
 
 notify pgrst, 'reload schema';

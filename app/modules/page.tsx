@@ -29,6 +29,10 @@ const NOUVEAUTES: { titre: string; texte: string; go?: boolean }[] = [
     texte: "Modèle IDCC 16 (paniers, primes, heures sup., prélèvement à la source, net social), bulletins PDF, export comptable, validation par la direction, acomptes déduits automatiquement.",
   },
   {
+    titre: "Stock : colis, palettes, références",
+    texte: "Entrées et sorties par scan, emplacements, inventaire guidé, historique non modifiable, liens avec les tournées et alertes de seuil. Trois profils au choix, activables ensemble : messagerie, palettes, vrac. Tarif sur demande.",
+  },
+  {
     titre: "Tournée colis + GO Navigation",
     texte: "Scan et lecture d'étiquette, optimisation sur les km routiers avec les horaires des pros, navigation intégrée en vue conduite, ramasses, points relais et preuves de livraison.",
     go: true,
@@ -144,6 +148,8 @@ export default async function ModulesPage() {
                 )}
                 {alwaysIncluded ? (
                   <p className="text-sm text-teal-ink">Inclus dans tous les plans</p>
+                ) : !cheapestPrice ? (
+                  <p className="text-sm text-navy/70">Tarif sur demande</p>
                 ) : (
                   cheapestPrice && (
                     <p className="text-xl font-bold tabular-nums text-gold-ink">

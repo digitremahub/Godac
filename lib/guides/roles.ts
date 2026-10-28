@@ -135,6 +135,14 @@ const QUOTIDIEN_CHAUFFEUR: SectionGuide[] = [
     ],
   },
   {
+    titre: "Stock : colis et palettes",
+    etapes: [
+      { titre: "Enregistrer une entrée ou une sortie", texte: "« Stock › Mouvement » : choisissez le mouvement et l'emplacement une seule fois, puis scannez les colis ou les palettes l'un après l'autre (« Scanner en rafale »), ou saisissez le code. Chaque scan est confirmé à l'écran ; un double appui ne crée jamais deux mouvements.", lien: { href: "/exploitation/stock/mouvement", label: "Entrée, sortie, transfert" }, module: "stock" },
+      { titre: "Rentrer les colis non livrés", texte: "Au retour au dépôt, choisissez « Retour » puis scannez les colis revenus : ils sont remis en stock (ou placés en zone de retours). Un colis cassé ou perdu se déclare avec « Casse » ou « Perte » et un motif.", lien: { href: "/exploitation/stock/mouvement", label: "Retour au dépôt" }, module: "stock" },
+      { titre: "Compter dans un inventaire", texte: "Quand un responsable a ouvert un inventaire, « Stock › Inventaire » vous permet de scanner ce que vous trouvez. Seule la validation est réservée aux responsables.", lien: { href: "/exploitation/stock/inventaire", label: "Inventaire" }, module: "stock" },
+    ],
+  },
+  {
     titre: "Équipe et documents",
     etapes: [
       { titre: "Demander un congé", texte: "« Congés & Absences » → nouvelle demande. Vous êtes prévenu dès que votre responsable l'a validée.", lien: { href: "/moi/conges", label: "Mes congés" }, module: "leave_management" },
@@ -192,6 +200,14 @@ const ENCADREMENT: SectionGuide[] = [
       { titre: "Suivre les cuves", texte: "Niveaux, approvisionnements et index des cuves dans « Cuves & Approvisionnements ».", lien: { href: "/carburant/cuves", label: "Cuves" } },
       { titre: "Gérer la flotte", texte: "Fiche de chaque véhicule : documents, échéances (contrôle technique, assurance), kilométrage.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
       { titre: "Traiter les demandes d'entretien", texte: "Prenez en charge les signalements des chauffeurs selon leur urgence.", lien: { href: "/flotte/entretien", label: "Demandes d'entretien" }, module: "maintenance_requests" },
+    ],
+  },
+  {
+    titre: "Stock",
+    etapes: [
+      { titre: "Tableau de bord du stock", texte: "En dépôt, en tournée, retours à traiter, articles sous leur seuil mini et colis chargés sur une tournée clôturée mais pas rentrés. Un manager ne voit que les dépôts de ses services.", lien: { href: "/exploitation/stock", label: "Stock" }, module: "stock" },
+      { titre: "Inventaire d'une zone", texte: "« Inventaire » : ouvrez un comptage pour une zone, faites scanner et compter, puis validez. Les écarts sont corrigés par des ajustements tracés (jamais effacés) et une alerte est envoyée à l'encadrement.", lien: { href: "/exploitation/stock/inventaire", label: "Inventaire" }, module: "stock" },
+      { titre: "Historique et export", texte: "Chaque mouvement est conservé avec son auteur et ne peut plus être modifié. Filtrez par période, mouvement, code ou article, puis exportez en CSV ou en Excel.", lien: { href: "/exploitation/stock/historique", label: "Historique des mouvements" }, module: "stock" },
     ],
   },
   {
@@ -275,6 +291,7 @@ export const GUIDES: GuideRole[] = [
           { titre: "Planning et tournées de tous les services", texte: "Affectez, suivez en direct et consultez l'historique et les tracés GPS des tournées de tous les services, villages et Tournée colis compris.", lien: { href: "/exploitation/planning", label: "Planning" }, module: "planning" },
           { titre: "Carburant, cuves et écarts", texte: "Traitez les écarts de carburant et suivez les cuves de toute l'entreprise. La TICPE (montants, contrôles et documents) est consultable et téléchargeable.", lien: { href: "/carburant/pleins", label: "Carburant" } },
           { titre: "Flotte, entretien, loueurs et amendes", texte: "Tous les véhicules, les demandes d'entretien, les loueurs, les amendes et les contestations ; vous validez comme responsable, comme un manager ou la direction.", lien: { href: "/flotte/vehicules", label: "Flotte" }, module: "fleet" },
+          { titre: "Paramétrer le stock", texte: "Choisissez vos profils d'activité (messagerie, palettes, vrac), créez les dépôts, zones et emplacements, les articles et leurs seuils mini. Désactiver ne supprime rien.", lien: { href: "/exploitation/stock/parametres", label: "Paramètres du stock" }, module: "stock" },
           { titre: "Congés", texte: "Vous validez les congés de toute l'entreprise.", lien: { href: "/equipe/conges", label: "Congés" }, module: "leave_management" },
           { titre: "Reporting", texte: "Indicateurs d'exploitation consolidés : carburant, consommation, activité (sans la paie).", lien: { href: "/dashboard/reporting", label: "Reporting BI" }, module: "bi_reporting" },
         ],
@@ -336,6 +353,7 @@ export const GUIDES: GuideRole[] = [
             lien: { href: "/equipe/utilisateurs", label: "Utilisateurs" },
           },
           { titre: "Abonnement et modules", texte: "Activez ou retirez des modules, consultez vos factures.", lien: { href: "/admin/abonnement", label: "Abonnement" } },
+          { titre: "Paramétrer le stock", texte: "Si vous avez activé le module Stock : profils d'activité (messagerie, palettes, vrac), dépôts, zones et emplacements, articles et seuils mini.", lien: { href: "/exploitation/stock/parametres", label: "Paramètres du stock" }, module: "stock" },
           { titre: "Lien d'inscription des chauffeurs", texte: "Partagez le lien d'inscription (page Organisation) : les chauffeurs s'inscrivent et vous les validez.", lien: { href: "/equipe/inscriptions", label: "Chauffeurs à valider" } },
         ],
       },

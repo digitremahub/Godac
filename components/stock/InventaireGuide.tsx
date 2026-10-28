@@ -103,6 +103,20 @@ export function InventaireGuide({ inventaireId, enCours, peutValider, emplacemen
     demarrer(() => router.refresh());
   }
 
+  async function abandonner() {
+    const ok = await confirmer({ titre: "Abandonner ce comptage ?", message: "Aucun mouvement n'est créé et le stock ne change pas. Vous pourrez ouvrir un nouvel inventaire pour cette zone.", action: "Abandonner", danger: true });
+    if (!ok) return;
+    setOccupe(true);
+    const r = await appeler(`/api/stock/inventaires/${inventaireId}/annulation`, { method: "POST", corps: {} });
+    setOccupe(false);
+    if (!r.ok) {
+      setMessage({ texte: r.erreur, erreur: true });
+      return;
+    }
+    router.push("/exploitation/stock/inventaire");
+    router.refresh();
+  }
+
   const nomArticle = (id: string | null) => articles.find((a) => a.id === id);
 
   return (
@@ -215,9 +229,14 @@ export function InventaireGuide({ inventaireId, enCours, peutValider, emplacemen
         {enCours && (
           <div>
             {peutValider ? (
-              <button type="button" className="btn-primary min-h-11 w-full sm:w-auto" onClick={valider} disabled={occupe}>
-                Valider l&apos;inventaire
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" className="btn-primary min-h-11 w-full sm:w-auto" onClick={valider} disabled={occupe}>
+                  Valider l&apos;inventaire
+                </button>
+                <button type="button" className="btn-secondary min-h-11 w-full sm:w-auto" onClick={abandonner} disabled={occupe}>
+                  Abandonner le comptage
+                </button>
+              </div>
             ) : (
               <p className="text-sm text-navy/65">La validation est réservée au manager, à l&apos;exploitation et à la direction.</p>
             )}

@@ -59,6 +59,7 @@ const ATTENDU: Record<string, Record<string, string>> = {
   "app/api/stock/inventaires/[id]/route.ts": { GET: LECTURE },
   "app/api/stock/inventaires/[id]/comptage/route.ts": { POST: LECTURE },
   "app/api/stock/inventaires/[id]/validation/route.ts": { POST: ENCAD },
+  "app/api/stock/inventaires/[id]/annulation/route.ts": { POST: ENCAD },
 };
 
 describe("routes du stock : une garderApi par handler, avec les bons rôles et le module", () => {

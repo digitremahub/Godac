@@ -149,7 +149,7 @@ describe("fonctions SQL", () => {
   const sql = code(FONCTIONS);
   it("toutes les fonctions appelables sont security definer et fixent le search_path", () => {
     const fonctions = [...sql.matchAll(/create or replace function public\.(\w+)\(([\s\S]*?)\)\s*(?:returns\s+\w+\s+)?language (\w+)([\s\S]*?)as \$\$/g)];
-    expect(fonctions.map((m) => m[1])).toEqual(expect.arrayContaining(["stock_transition_autorisee", "stock__appliquer", "stock__contexte", "stock__site_autorise", "stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire"]));
+    expect(fonctions.map((m) => m[1])).toEqual(expect.arrayContaining(["stock_transition_autorisee", "stock__appliquer", "stock__contexte", "stock__site_autorise", "stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire", "stock_annuler_inventaire"]));
     for (const m of fonctions) {
       if (m[1] === "stock_transition_autorisee") continue;
       expect(m[4], m[1]).toMatch(/security definer/);
@@ -157,7 +157,7 @@ describe("fonctions SQL", () => {
     }
   });
   it("fonctions publiques : exécution retirée à public et anon, donnée à authenticated seulement", () => {
-    for (const nom of ["stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire"]) {
+    for (const nom of ["stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire", "stock_annuler_inventaire"]) {
       expect(sql, nom).toMatch(new RegExp(`revoke all on function public\\.${nom}\\([^)]*\\) from public, anon;`));
       expect(sql, nom).toMatch(new RegExp(`grant execute on function public\\.${nom}\\([^)]*\\) to authenticated;`));
     }
@@ -172,7 +172,7 @@ describe("fonctions SQL", () => {
     expect(contexte).toContain("auth.uid()");
     expect(contexte).toContain("m.module_key = 'stock' and m.enabled");
     expect(contexte).toContain("stock_non_authentifie");
-    for (const nom of ["stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire"]) {
+    for (const nom of ["stock_enregistrer_mouvement", "stock_creer_inventaire", "stock_compter", "stock_valider_inventaire", "stock_annuler_inventaire"]) {
       const i = sql.indexOf(`function public.${nom}(`);
       const corps = sql.slice(i, sql.indexOf("$$;", sql.indexOf("as $$", i)));
       expect(corps, nom).toContain("public.stock__contexte()");
@@ -181,7 +181,7 @@ describe("fonctions SQL", () => {
   });
   it("l'ajustement est refusé au chauffeur ; l'inventaire est ouvert et validé par l'encadrement seulement", () => {
     expect(sql).toMatch(/p_type = 'ajustement' and c\.o_role = 'chauffeur'/);
-    for (const nom of ["stock_creer_inventaire", "stock_valider_inventaire"]) {
+    for (const nom of ["stock_creer_inventaire", "stock_valider_inventaire", "stock_annuler_inventaire"]) {
       const i = sql.indexOf(`function public.${nom}(`);
       const corps = sql.slice(i, sql.indexOf("$$;", sql.indexOf("as $$", i)));
       expect(corps, nom).toMatch(/not in \('manager', 'manager_chauffeur', 'exploitation', 'direction'\)/);
@@ -198,6 +198,9 @@ describe("fonctions SQL", () => {
     expect(debut).toMatch(/where organization_id = p_org and cle_idempotence = p_cle/);
     expect(debut).toMatch(/'doublon', true/);
     expect(debut.indexOf("'doublon', true")).toBeLessThan(debut.indexOf("stock_type_invalide"));
+  });
+  it("casse, perte et ajustement exigent un motif, quel que soit l'appelant (même en appelant la fonction directement)", () => {
+    expect(sql).toMatch(/p_type in \('ajustement', 'casse', 'perte'\) and \(p_motif is null or btrim\(p_motif\) = ''\) then\s+raise exception 'stock_motif_requis'/);
   });
   it("la validation d'un inventaire est rejouable (même clé ou déjà validé)", () => {
     expect(sql).toMatch(/if v_inv\.statut = 'valide' then\s+return jsonb_build_object\('ok', true, 'doublon', true/);

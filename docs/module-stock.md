@@ -44,7 +44,7 @@ Toutes les tables : `organization_id` avec `on delete cascade` vers `organizatio
 Source de vérité : `lib/stock/transitions.ts`, reproduite dans la fonction SQL `stock_transition_autorisee` (comparaison testée).
 
 - `entree` : nouvelle unité, ou `livre`, `retour`, `perdu`, `endommage` vers `dans_depot`.
-- `sortie` : `dans_depot` ou `retour` vers `en_tournee` (avec tournée) ou `livre` (sortie définitive).
+- `sortie` : `dans_depot` ou `retour` vers `en_tournee` (avec tournée) ou `livre` (sortie définitive) ; `en_tournee` vers `livre` (remise au destinataire).
 - `transfert` : `dans_depot` ou `retour`, statut inchangé, emplacement modifié.
 - `retour` : `en_tournee`, `livre` ou `retour` vers `retour` (rentré, à ranger) ou `dans_depot`.
 - `casse` : `dans_depot`, `en_tournee`, `retour` vers `endommage`. `perte` : idem vers `perdu`.
@@ -70,15 +70,24 @@ Audit (`audit_log`) : ajustement, inventaire validé, désactivation (suppressio
 
 `lib/stock/integration-tournee.ts`, appelée **après** l'action colis et **jamais bloquante** (try/catch, journal serveur seulement). Si le module `stock` n'est pas actif, ou si les migrations ne sont pas appliquées, rien ne change.
 
-- Passage de la tournée à `in_progress` (départ) : pour chaque arrêt dont `parcel_code` correspond à une unité `dans_depot`, mouvement `sortie` lié à la tournée et à l'arrêt, statut `en_tournee`.
-- Arrêt `delivered` : l'unité `en_tournee` correspondante passe `livre` (mouvement `sortie`, lié à l'arrêt).
-- Arrêt `failed` : l'unité passe `retour` (à rentrer au dépôt).
-- Clôture de la tournée (`done`) : les unités encore `en_tournee` ou `retour` de cette tournée déclenchent l'alerte `stock_non_rentre`, qui se referme quand elles sont rentrées. Le chauffeur ou le magasinier les rentre par un mouvement `retour` (scan).
-- Les codes sans unité en stock sont ignorés (le flux colis ne dépend pas du stock).
+- Passage de la tournée à `in_progress` (départ) : pour chaque arrêt en attente dont `parcel_code` correspond à une unité `dans_depot` (ou `retour`), mouvement `sortie` lié à la tournée et à l'arrêt, statut `en_tournee`. Clé d'idempotence `tournee:<tournée>:<arrêt>:depart` : relancer la requête ne sort pas deux fois le colis.
+- Arrêt `delivered` (route de l'arrêt ou route de livraison) : l'unité correspondante passe `livre` (mouvement `sortie`, clé `tournee:<arrêt>:livre`).
+- Arrêt `failed` : l'unité `en_tournee` passe `retour` (mouvement `retour`, clé `tournee:<arrêt>:echec`) : elle est « à rentrer », toujours dans le véhicule jusqu'à son retour au dépôt.
+- Clôture de la tournée (`done`) : les unités encore `en_tournee`, ou `retour` sans emplacement (pas rangées), de cette tournée déclenchent l'alerte `stock_non_rentre`, qui se referme quand elles sont rentrées (mouvement `retour` avec « Remis en stock » et un emplacement). Le cron quotidien refait ce contrôle.
+- Les codes sans unité en stock sont ignorés : le flux colis ne dépend pas du stock. Chaque appel est enveloppé dans un `try/catch` et n'écrit qu'une ligne de journal en cas d'échec. Au plus 400 mouvements et 5 s par requête de départ.
+- Statut « retour » : l'unité est revenue (échec de livraison, retour client) et attend d'être rangée ; elle compte dans les « retours à traiter ».
+
+## Interface et programmes
+
+- Écrans : `/exploitation/stock` (tableau de bord), `/mouvement`, `/liste`, `/historique`, `/inventaire`, `/parametres`, sous-onglets de la section Exploitation du menu ; une entrée « Stock » dans « Plus » sur mobile.
+- Routes `app/api/stock/*` : toutes derrière `garderApi` (rôles et module `stock`), listées dans `lib/acces/__tests__/audit-routes-stock.test.ts`. Le cron `/api/cron/stock` (une fois par jour, 5 h 40 UTC) est protégé par `CRON_SECRET`.
+- Mouvement : choix du mouvement et de l'emplacement une fois, puis scan en rafale (`ParcelScanner`) ou saisie ; chaque envoi a sa clé d'idempotence, conservée tant qu'une coupure réseau n'a pas permis de confirmer l'action. La file hors ligne complète (mise en attente locale) est reportée en V2.
 
 ## Alertes
 
-Types additifs : `stock_seuil` (article sous son seuil mini), `stock_ecart` (écart à la validation d'un inventaire), `stock_non_rentre` (unités en tournée non rentrées après clôture). Migration d'enum séparée, puis policies RLS re-déclarées en conservant tous les types existants. Lecture : direction et exploitation ; manager pour les alertes de ses services ; ni chauffeur ni comptable. Vérification quotidienne par le cron `/api/cron/stock` (une fois par jour) et, pour le seuil, après chaque sortie.
+Types additifs : `stock_seuil` (article sous son seuil mini), `stock_ecart` (écart à la validation d'un inventaire), `stock_non_rentre` (unités en tournée non rentrées après clôture). Migration d'enum séparée, puis policies RLS re-déclarées en conservant tous les types existants. Lecture : direction et exploitation ; manager pour les alertes de ses services ; ni chauffeur ni comptable. Vérification quotidienne par le cron `/api/cron/stock` (une fois par jour) et, pour le seuil, après chaque retrait d'article et chaque changement de seuil. Une alerte par article (clé `stock:seuil:<article>`), rouverte si le stock repasse sous le seuil après avoir été résolue, close automatiquement quand le stock remonte. Le seuil est global à l'organisation : son alerte n'a pas de service et ne va qu'à la direction et à l'exploitation (le tableau de bord montre aux managers les articles sous le seuil de leurs dépôts).
+
+Tolérance : tant que les migrations 3 et 4 ne sont pas appliquées, aucune alerte n'est créée (`typeAbsent`), tout le reste fonctionne. Tant que les migrations 1 et 2 ne sont pas appliquées, les écrans affichent « module installé, base pas encore mise à jour » et les routes répondent 503.
 
 ## Données personnelles et conservation
 
@@ -86,6 +95,15 @@ Types additifs : `stock_seuil` (article sous son seuil mini), `stock_ecart` (éc
 - Le registre garde le nom de l'auteur d'un mouvement (salarié du client) pour la traçabilité.
 - **Conservation du registre : 5 ans proposés, aucune purge automatique** (le registre peut servir de pièce comptable ou de preuve en cas de litige). La durée est à confirmer par le fondateur ; une purge éventuelle serait une décision séparée. Les unités, soldes et inventaires sont conservés pendant le contrat. Tout est effacé avec l'organisation à la fin du contrat (cascade).
 - Mention ajoutée à la politique de confidentialité et à l'annexe 1 du DPA (catégories de données).
+
+## Migrations (à appliquer dans l'ordre, par `execute_sql`)
+
+1. `20261114000001_stock_schema.sql` : fiche du module (sans prix), tables, index, RLS, registre immuable.
+2. `20261114000002_stock_fonctions.sql` : fonctions SQL transactionnelles.
+3. `20261114000003_alerte_stock_types.sql` : trois valeurs d'enum (à appliquer seule : une valeur d'enum ne s'utilise pas dans la transaction qui l'ajoute).
+4. `20261114000004_alerte_stock_lecture.sql` : policies d'alertes re-déclarées avec tous les types existants.
+
+Toutes sont additives et rejouables (aucun `drop`, aucune suppression ni mise à jour de masse). Leur contenu est relu par `lib/stock/__tests__/migrations.test.ts`. La table `lib/stock/__tests__/transitions-sql.json` a été générée en exécutant `stock_transition_autorisee` sur PostgreSQL 16 ; elle empêche toute divergence entre la fonction SQL et `lib/stock/transitions.ts`.
 
 ## Hors périmètre V1
 
