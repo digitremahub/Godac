@@ -8,6 +8,9 @@ import { calculerEcarts, emplacementsDeLaZone, type BilanInventaire } from "@/li
 export const COLONNES_MOUVEMENT =
   "id, created_at, type, sens, quantite, unite_code, lot, dlc, statut_avant, statut_apres, motif, source, auteur_nom, run_id, stop_id, article:stock_articles(code, nom, unite), site:stock_sites(nom), src:stock_emplacements!emplacement_source_id(code), dest:stock_emplacements!emplacement_dest_id(code)";
 
+/** Avec les attributs de l'unité (code interne, nature, température) : migrations des codes appliquées. */
+export const COLONNES_MOUVEMENT_CODES = `${COLONNES_MOUVEMENT}, unite:stock_unites(code_interne, nature, nature_libelle, temperature, temperature_libelle, fragile, urgent)`;
+
 /** Articles dont la référence ou le nom contient le texte (pour filtrer l'historique). */
 async function articlesCorrespondants(supabase: SupabaseClient, organizationId: string, q: string): Promise<string[]> {
   const { data } = await supabase.from("stock_articles").select("id").eq("organization_id", organizationId).or(`code.ilike.%${q}%,nom.ilike.%${q}%`).limit(50);
@@ -19,12 +22,18 @@ async function articlesCorrespondants(supabase: SupabaseClient, organizationId: 
  * dépôts). Les deux plus récents d'abord ; `colonnes` et `compter` laissent la
  * page, l'API et l'export partager les mêmes filtres.
  */
-export async function requeteMouvements(supabase: SupabaseClient, organizationId: string, f: FiltresHistorique, options: { colonnes?: string; compter?: boolean } = {}) {
+export async function requeteMouvements(supabase: SupabaseClient, organizationId: string, f: FiltresHistorique, options: { colonnes?: string; compter?: boolean; codesInstalles?: boolean } = {}) {
   let ids: string[] = [];
+  let unitesInternes: string[] = [];
   if (f.q) ids = await articlesCorrespondants(supabase, organizationId, f.q);
+  // Recherche par code interne complémentaire : les mouvements portent le code principal de l'unité.
+  if (f.q && options.codesInstalles) {
+    const { data } = await supabase.from("stock_unites").select("id").eq("organization_id", organizationId).ilike("code_interne", `%${f.q}%`).limit(50);
+    unitesInternes = ((data ?? []) as { id: string }[]).map((u) => u.id);
+  }
   let query = supabase
     .from("stock_mouvements")
-    .select(options.colonnes ?? COLONNES_MOUVEMENT, options.compter ? { count: "exact" } : undefined)
+    .select(options.colonnes ?? (options.codesInstalles ? COLONNES_MOUVEMENT_CODES : COLONNES_MOUVEMENT), options.compter ? { count: "exact" } : undefined)
     .eq("organization_id", organizationId);
   if (f.du) query = query.gte("created_at", parisMidnightIso(f.du));
   if (f.au) query = query.lt("created_at", parisMidnightIso(nextDay(f.au)));
@@ -32,7 +41,12 @@ export async function requeteMouvements(supabase: SupabaseClient, organizationId
   if (f.site) query = query.eq("site_id", f.site);
   if (f.article) query = query.eq("article_id", f.article);
   if (f.tournee) query = query.eq("run_id", f.tournee);
-  if (f.q) query = query.or(ids.length ? `unite_code.ilike.%${f.q}%,article_id.in.(${ids.join(",")})` : `unite_code.ilike.%${f.q}%`);
+  if (f.q) {
+    const clauses = [`unite_code.ilike.%${f.q}%`];
+    if (ids.length) clauses.push(`article_id.in.(${ids.join(",")})`);
+    if (unitesInternes.length) clauses.push(`unite_id.in.(${unitesInternes.join(",")})`);
+    query = query.or(clauses.join(","));
+  }
   // Dans un objet : une fonction async ne doit pas « résoudre » la requête avant ses .range() / .limit().
   return { requete: query.order("created_at", { ascending: false }).order("id", { ascending: false }) };
 }

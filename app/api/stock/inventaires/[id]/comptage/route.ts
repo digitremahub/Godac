@@ -5,6 +5,7 @@ import { LECTEURS_STOCK } from "@/lib/acces/catalogue";
 import { traduireErreurStock } from "@/lib/stock/erreurs";
 import { lireCorps, reponseErreur, REQUETE_INVALIDE } from "@/lib/stock/http";
 import { normaliserCode } from "@/lib/stock/mouvements";
+import { trouverUniteParCode } from "@/lib/stock/unites-serveur";
 
 const corps = z
   .object({
@@ -31,8 +32,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const parsed = corps.safeParse(await lireCorps(req));
   if (!z.string().uuid().safeParse(id).success || !parsed.success) return reponseErreur(REQUETE_INVALIDE);
-  const code = parsed.data.code !== undefined ? normaliserCode(parsed.data.code) : null;
-  if (parsed.data.code !== undefined && !code) return reponseErreur({ code: "stock_requete_invalide", message: "Code invalide.", status: 400 });
+  const saisi = parsed.data.code !== undefined ? normaliserCode(parsed.data.code) : null;
+  if (parsed.data.code !== undefined && !saisi) return reponseErreur({ code: "stock_requete_invalide", message: "Code invalide.", status: 400 });
+  // Le scan d'un code interne complémentaire compte l'unité sous son code principal.
+  const code = saisi ? ((await trouverUniteParCode(g.supabase, g.appUser.organization_id, saisi).catch(() => null))?.code ?? saisi) : null;
   const { data, error } = await g.supabase.rpc("stock_compter", {
     p_inventaire: id,
     p_unite_code: code,

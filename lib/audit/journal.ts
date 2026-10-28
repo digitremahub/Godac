@@ -103,6 +103,13 @@ export const ACTIONS_AUDIT = {
   stock_profils_modifies: "Stock : profils d'activité modifiés",
   stock_seuil_modifie: "Stock : seuil mini d'un article modifié",
   stock_export: "Stock : historique des mouvements exporté (CSV ou Excel)",
+  stock_export_unites: "Stock : liste des unités exportée (CSV ou Excel)",
+  stock_prefixe_modifie: "Stock : préfixe des codes internes modifié",
+  stock_profil_config_modifie: "Stock : personnalisation d'un profil d'activité modifiée (vocabulaire, champs, alertes, étiquette)",
+  stock_format_etiquette_modifie: "Stock : format d'étiquette par défaut modifié",
+  stock_codes_generes: "Stock : codes internes générés (planche d'étiquettes ou entrée)",
+  stock_etiquettes_imprimees: "Stock : étiquettes imprimées (PDF généré)",
+  stock_unite_modifiee: "Stock : attributs ou code interne d'une unité modifiés",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

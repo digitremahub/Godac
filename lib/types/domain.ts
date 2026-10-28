@@ -48,7 +48,8 @@ export type AlertType =
   | "usage_quota"
   | "stock_seuil"
   | "stock_ecart"
-  | "stock_non_rentre";
+  | "stock_non_rentre"
+  | "stock_dlc_proche";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 

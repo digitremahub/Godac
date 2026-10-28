@@ -26,6 +26,8 @@ export interface ArticleLu {
   suivi_lots: boolean;
   suivi_dlc: boolean;
   actif: boolean;
+  /** Profil d'activité de l'article (migration 20261115 ; absent avant). */
+  profil?: string | null;
 }
 
 export interface ArticleAvecQuantite extends ArticleLu {
@@ -40,18 +42,21 @@ export interface Referentiel {
 }
 
 const COLONNES_ARTICLE = "id, activite, code, nom, unite, seuil_mini, suivi_lots, suivi_dlc, actif";
+const COLONNES_ARTICLE_PROFIL = `${COLONNES_ARTICLE}, profil`;
 
 /** Dépôts, zones et emplacements, articles : de quoi remplir les listes déroulantes. */
 export async function chargerReferentiel(supabase: SupabaseClient, organizationId: string): Promise<Referentiel> {
-  const [sites, emplacements, articles] = await Promise.all([
+  const [sites, emplacements, articlesAvecProfil] = await Promise.all([
     supabase.from("stock_sites").select("id, nom, adresse, service_id, actif").eq("organization_id", organizationId).order("nom"),
     supabase.from("stock_emplacements").select("id, site_id, parent_id, genre, type_zone, code, libelle, actif").eq("organization_id", organizationId).order("code").limit(5000),
-    supabase.from("stock_articles").select(COLONNES_ARTICLE).eq("organization_id", organizationId).order("nom").limit(5000),
+    supabase.from("stock_articles").select(COLONNES_ARTICLE_PROFIL).eq("organization_id", organizationId).order("nom").limit(5000),
   ]);
+  // Migration des codes pas encore appliquée : la colonne « profil » n'existe pas, on relit sans elle.
+  const articles = articlesAvecProfil.error ? await supabase.from("stock_articles").select(COLONNES_ARTICLE).eq("organization_id", organizationId).order("nom").limit(5000) : articlesAvecProfil;
   return {
     sites: (sites.data ?? []) as SiteLu[],
     emplacements: (emplacements.data ?? []) as EmplacementLu[],
-    articles: ((articles.data ?? []) as (Omit<ArticleLu, "seuil_mini"> & { seuil_mini: number | string })[]).map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) })),
+    articles: ((articles.data ?? []) as unknown as (Omit<ArticleLu, "seuil_mini"> & { seuil_mini: number | string })[]).map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) })),
   };
 }
 

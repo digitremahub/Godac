@@ -31,4 +31,24 @@ describe("erreurs du stock", () => {
     expect(codes.size).toBeGreaterThan(20);
     for (const c of codes) expect(traduireErreurStock({ message: c }).code, c).toBe(c);
   });
+  it("tous les codes des fonctions des codes et attributs sont traduits (20261115)", () => {
+    const sql = readFileSync("supabase/migrations/20261115000002_stock_codes_fonctions.sql", "utf8") + readFileSync("supabase/migrations/20261115000001_stock_codes_attributs_schema.sql", "utf8");
+    const codes = new Set([...sql.matchAll(/raise exception '(stock_[a-z_]+)'/g)].map((m) => m[1]!));
+    expect(codes.size).toBeGreaterThan(12);
+    for (const c of codes) expect(traduireErreurStock({ message: c }).code, c).toBe(c);
+  });
+  it("champ obligatoire manquant : le champ est nommé en français", () => {
+    expect(traduireErreurStock({ message: "stock_champ_requis_temperature" })).toMatchObject({ code: "stock_champ_requis", status: 400, message: "Le champ « Température cible » est obligatoire pour ce profil d'activité." });
+    expect(traduireErreurStock({ message: "stock_champ_requis_dlc" }).message).toMatch(/Date limite/);
+    expect(traduireErreurStock({ message: "stock_champ_requis_temperature_releve" }).message).toMatch(/Température relevée/);
+  });
+  it("ambiguïté de code : message clair, aussi quand c'est l'index unique du code interne qui refuse", () => {
+    expect(traduireErreurStock({ message: "stock_code_ambigu" })).toMatchObject({ status: 409, message: expect.stringContaining("autre unité") });
+    expect(traduireErreurStock({ code: "23505", message: 'duplicate key value violates unique constraint "stock_unites_code_interne_unique"' }).code).toBe("stock_code_ambigu");
+  });
+  it("génération de codes : limites et préfixe", () => {
+    expect(traduireErreurStock({ message: "stock_limite_depassee" })).toMatchObject({ status: 400, message: expect.stringContaining("500") });
+    expect(traduireErreurStock({ message: "stock_prefixe_invalide" }).message).toMatch(/2 à 6 caractères/);
+    expect(traduireErreurStock({ message: "stock_compteur_epuise" }).status).toBe(409);
+  });
 });

@@ -1,4 +1,5 @@
 import { documentCsv } from "@/lib/paie/csv";
+import { libelleNature, libelleTemperature, type Nature, type Temperature } from "@/lib/stock/attributs";
 import { dateValide } from "@/lib/stock/mouvements";
 import { LIBELLES_MOUVEMENT, LIBELLES_STATUT, estStatutUnite, estTypeMouvement, type TypeMouvement } from "@/lib/stock/transitions";
 
@@ -61,9 +62,21 @@ export interface MouvementBrut {
   run_id: string | null;
   stop_id: string | null;
   article?: { code: string; nom: string; unite: string } | { code: string; nom: string; unite: string }[] | null;
+  /** Attributs de l'unité (jointure sur stock_unites ; absents tant que les migrations des codes ne sont pas appliquées). */
+  unite?: UniteJointe | UniteJointe[] | null;
   site?: { nom: string } | { nom: string }[] | null;
   src?: { code: string } | { code: string }[] | null;
   dest?: { code: string } | { code: string }[] | null;
+}
+
+export interface UniteJointe {
+  code_interne?: string | null;
+  nature?: Nature | null;
+  nature_libelle?: string | null;
+  temperature?: Temperature | null;
+  temperature_libelle?: string | null;
+  fragile?: boolean | null;
+  urgent?: boolean | null;
 }
 
 const un = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -82,6 +95,12 @@ export interface LigneHistorique {
   vers: string;
   lot: string;
   dlc: string;
+  /** Code interne complémentaire, nature et température de l'unité (valeurs actuelles de la fiche). */
+  codeInterne: string;
+  nature: string;
+  temperature: string;
+  fragile: boolean;
+  urgent: boolean;
   statut: string;
   motif: string;
   auteur: string;
@@ -116,6 +135,11 @@ export function ligneHistorique(m: MouvementBrut): LigneHistorique {
     vers: un(m.dest)?.code ?? "",
     lot: m.lot ?? "",
     dlc: m.dlc ?? "",
+    codeInterne: un(m.unite)?.code_interne ?? "",
+    nature: libelleNature(un(m.unite)?.nature ?? null, un(m.unite)?.nature_libelle),
+    temperature: libelleTemperature(un(m.unite)?.temperature ?? null, un(m.unite)?.temperature_libelle),
+    fragile: Boolean(un(m.unite)?.fragile),
+    urgent: Boolean(un(m.unite)?.urgent),
     statut: statutAvant && statutApres && statutAvant !== statutApres ? `${statutAvant} → ${statutApres}` : statutApres,
     motif: m.motif ?? "",
     auteur: m.auteur_nom ?? "",
@@ -124,10 +148,15 @@ export function ligneHistorique(m: MouvementBrut): LigneHistorique {
   };
 }
 
-export const ENTETE_EXPORT_STOCK = ["Date", "Heure", "Mouvement", "Unité ou article", "Quantité", "Unité", "Dépôt", "De", "Vers", "Lot", "DLC", "Statut", "Motif", "Auteur", "Origine", "Liée à une tournée"] as const;
+export const ENTETE_EXPORT_STOCK = ["Date", "Heure", "Mouvement", "Unité ou article", "Code interne", "Nature", "Température", "Quantité", "Unité", "Dépôt", "De", "Vers", "Lot", "DLC", "Statut", "Motif", "Auteur", "Origine", "Liée à une tournée"] as const;
+
+/** Cellules d'une ligne de l'export (CSV et Excel : mêmes colonnes, même ordre). */
+export function cellulesHistorique(l: LigneHistorique): (string | number)[] {
+  return [l.date, l.heure, l.libelleType, l.objet, l.codeInterne, l.nature, l.temperature, l.quantite, l.unite, l.depot, l.de, l.vers, l.lot, l.dlc, l.statut, l.motif, l.auteur, l.origine, l.tournee ? "oui" : "non"];
+}
 
 export function csvMouvements(lignes: readonly LigneHistorique[], options: { tronque?: boolean } = {}): string {
-  const cellules = lignes.map((l) => [l.date, l.heure, l.libelleType, l.objet, l.quantite, l.unite, l.depot, l.de, l.vers, l.lot, l.dlc, l.statut, l.motif, l.auteur, l.origine, l.tournee ? "oui" : "non"]);
+  const cellules = lignes.map(cellulesHistorique);
   const pied: (string | number)[][] = options.tronque ? [[`Export tronqué à ${EXPORT_MAX_MOUVEMENTS} lignes : affinez la période.`]] : [];
   return documentCsv(ENTETE_EXPORT_STOCK, [...cellules, ...pied]);
 }

@@ -4,6 +4,8 @@ import type { LigneHistorique } from "@/lib/stock/historique";
 /** Mouvements : fiches empilées sur téléphone, tableau à partir de md. Composant serveur, sans script. */
 export function TableauMouvements({ lignes, legende }: { lignes: readonly LigneHistorique[]; legende: string }) {
   const trajet = (l: LigneHistorique) => (l.de || l.vers ? `${l.de || "—"} → ${l.vers || "—"}` : "");
+  /** Code interne, nature, température, fragile, urgent : valeurs actuelles de la fiche de l'unité. */
+  const details = (l: LigneHistorique) => [l.codeInterne ? `code interne ${l.codeInterne}` : "", l.nature, l.temperature, l.fragile ? "fragile" : "", l.urgent ? "urgent" : ""].filter(Boolean).join(" · ");
   const quantite = (l: LigneHistorique) => `${formaterQuantite(l.quantite)}${l.unite && l.unite !== "unité" ? ` ${l.unite}` : ""}`;
   return (
     <>
@@ -16,6 +18,7 @@ export function TableauMouvements({ lignes, legende }: { lignes: readonly LigneH
               </p>
               <span className="shrink-0 text-sm font-semibold tabular-nums">{quantite(l)}</span>
             </div>
+            {details(l) && <p className="mt-0.5 break-words text-xs text-navy/80">{details(l)}</p>}
             <p className="mt-0.5 text-xs text-navy/65">
               {l.date} à {l.heure} · {l.auteur || "—"} · {l.origine}
               {l.depot ? ` · ${l.depot}` : ""}
@@ -45,7 +48,10 @@ export function TableauMouvements({ lignes, legende }: { lignes: readonly LigneH
                   {l.date} {l.heure}
                 </td>
                 <td className="px-3 py-2.5 font-semibold">{l.libelleType}</td>
-                <td className="break-words px-3 py-2.5">{l.objet}</td>
+                <td className="break-words px-3 py-2.5">
+                  {l.objet}
+                  {details(l) && <span className="block text-xs text-navy/65">{details(l)}</span>}
+                </td>
                 <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{quantite(l)}</td>
                 <td className="px-3 py-2.5">{l.depot}</td>
                 <td className="whitespace-nowrap px-3 py-2.5">{trajet(l)}</td>

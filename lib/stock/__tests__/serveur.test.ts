@@ -15,7 +15,7 @@ const rpc = (reponse: { data?: unknown; error?: { code?: string; message: string
 describe("appel de la fonction de mouvement", () => {
   it("succès : identifiants du mouvement et de l'unité", async () => {
     const r = await appelerMouvement(rpc({ data: { ok: true, doublon: false, mouvement_id: "m1", unite_id: "u1", statut: "dans_depot" } }), params);
-    expect(r).toEqual({ ok: true, doublon: false, mouvementId: "m1", uniteId: "u1", statut: "dans_depot", quantiteApres: null });
+    expect(r).toEqual({ ok: true, doublon: false, mouvementId: "m1", uniteId: "u1", statut: "dans_depot", quantiteApres: null, code: null, codeInterne: null });
   });
   it("rejeu d'une même clé : succès marqué doublon", async () => {
     const r = await appelerMouvement(rpc({ data: { ok: true, doublon: true, mouvement_id: "m1" } }), params);
@@ -39,12 +39,12 @@ describe("profils activés", () => {
   const lecture = (reponse: { data?: unknown; error?: { code?: string; message: string } | null }) =>
     ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: reponse.data ?? null, error: reponse.error ?? null }) }) }) }) }) as never;
   it("lit et normalise les profils", async () => {
-    expect(await lireParametresStock(lecture({ data: { profils: ["vrac", "x", "messagerie"] } }), "o1")).toEqual({ profils: ["messagerie", "vrac"], schemaAbsent: false });
+    expect(await lireParametresStock(lecture({ data: { profils: ["vrac", "x", "messagerie"] } }), "o1")).toMatchObject({ profils: ["messagerie", "vrac"], schemaAbsent: false, codesInstalles: true });
   });
   it("aucune ligne : aucun profil", async () => {
-    expect(await lireParametresStock(lecture({ data: null }), "o1")).toEqual({ profils: [], schemaAbsent: false });
+    expect(await lireParametresStock(lecture({ data: null }), "o1")).toMatchObject({ profils: [], schemaAbsent: false });
   });
   it("table absente : aucun profil, schéma signalé absent", async () => {
-    expect(await lireParametresStock(lecture({ error: { code: "42P01", message: "relation does not exist" } }), "o1")).toEqual({ profils: [], schemaAbsent: true });
+    expect(await lireParametresStock(lecture({ error: { code: "42P01", message: "relation does not exist" } }), "o1")).toMatchObject({ profils: [], schemaAbsent: true });
   });
 });

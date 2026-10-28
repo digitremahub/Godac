@@ -1,5 +1,24 @@
 import { z } from "zod";
-import { typeUniteAutorise, avecArticles, avecUnites, sscc as normaliserSscc, TYPES_UNITE, type CleProfil } from "@/lib/stock/profils";
+import { schemaAttributs, attributsPourRpc, type AttributsLus, type AttributsUnite } from "@/lib/stock/attributs";
+import { analyserCodeInterne } from "@/lib/stock/codes";
+import {
+  PROFILS,
+  avecArticles,
+  avecUnites,
+  champsManquants,
+  champsObligatoires,
+  messageChampsManquants,
+  profilsArticles,
+  profilsUnites,
+  resoudreProfil,
+  sscc as normaliserSscc,
+  typeUniteAutorise,
+  TYPES_UNITE,
+  type ChampStock,
+  type CleProfil,
+  type ProfilsConfig,
+  type ValeursChamps,
+} from "@/lib/stock/profils";
 import { TYPES_AVEC_MOTIF, TYPES_ENCADREMENT, TYPES_MOUVEMENT, sensDe, type TypeMouvement } from "@/lib/stock/transitions";
 
 /**
@@ -39,6 +58,12 @@ export const schemaMouvement = z.object({
   poids_kg: z.number().min(0).max(100_000).nullable().optional(),
   volume_m3: z.number().min(0).max(1_000).nullable().optional(),
   sscc: z.string().max(40).nullable().optional(),
+  /** Profil d'activité de l'entrée (obligatoire quand plusieurs profils correspondent). */
+  profil: z.enum(PROFILS).optional(),
+  /** Code interne complémentaire (généré par « Générer un code »), à rattacher à l'unité d'origine. */
+  code_interne: z.string().max(LONGUEUR_CODE_MAX).nullable().optional(),
+  /** Attributs génériques de l'unité (nature, température, fragile, urgent, consigne, lot, DLC…). */
+  attributs: schemaAttributs.optional(),
 });
 export type EntreeMouvement = z.infer<typeof schemaMouvement>;
 
@@ -81,11 +106,43 @@ export interface ParametresRpcMouvement {
   p_volume: number | null;
   p_sscc: string | null;
   p_source: "app" | "tournee";
+  /** Absents des appels des liens tournées : ils passent par la fonction d'origine. */
+  p_profil?: CleProfil | null;
+  p_code_interne?: string | null;
+  p_attributs?: Record<string, unknown> | null;
 }
 
 export type ResultatValidation = { ok: true; params: ParametresRpcMouvement } | { ok: false; erreur: string };
 
-export function validerMouvement(entree: EntreeMouvement, contexte: { profils: readonly CleProfil[]; role: string }): ResultatValidation {
+export interface ContexteValidation {
+  profils: readonly CleProfil[];
+  role: string;
+  /** Personnalisation des profils (stock_parametres.profils_config). */
+  config?: ProfilsConfig | null;
+  /** Unité déjà enregistrée sous ce code : ses valeurs comptent pour les champs obligatoires (entrée d'une unité connue). */
+  uniteExistante?: (Partial<AttributsLus> & { poids_kg?: number | null; volume_m3?: number | null; sscc?: string | null }) | null;
+}
+
+/**
+ * Profil d'une entrée : celui qui est demandé (il doit être actif et correspondre au suivi
+ * unités / articles), sinon l'unique profil actif de ce suivi ; plusieurs possibles = à choisir.
+ */
+export function profilDeLEntree(profils: readonly CleProfil[], config: ProfilsConfig | null | undefined, cible: "unites" | "articles", choisi?: CleProfil): { ok: true; profil: CleProfil | null } | { ok: false; erreur: string } {
+  const possibles = cible === "unites" ? profilsUnites(profils, config) : profilsArticles(profils, config);
+  if (choisi) {
+    if (!possibles.includes(choisi)) return { ok: false, erreur: "Ce profil n'est pas activé pour ce type de mouvement (voir les paramètres du stock)." };
+    return { ok: true, profil: choisi };
+  }
+  if (possibles.length === 1) return { ok: true, profil: possibles[0]! };
+  // Plusieurs profils possibles : le choix n'est exigé que si l'un d'eux impose des champs obligatoires.
+  if (possibles.length > 1) {
+    if (possibles.every((p) => champsObligatoires(resoudreProfil(p, config)).length === 0)) return { ok: true, profil: null };
+    return { ok: false, erreur: "Choisissez le profil d'activité de cette entrée." };
+  }
+  return { ok: true, profil: null };
+}
+
+export function validerMouvement(entree: EntreeMouvement, contexte: ContexteValidation): ResultatValidation {
   const { type } = entree;
   const refus = (erreur: string): ResultatValidation => ({ ok: false, erreur });
   const parUnite = entree.code !== undefined && entree.code !== "";
@@ -128,7 +185,7 @@ export function validerMouvement(entree: EntreeMouvement, contexte: { profils: r
       if (!ssccNormalise) return refus("SSCC invalide : 18 chiffres attendus.");
     }
     if ((type === "entree" || (type === "ajustement" && sens === 1)) && !typeUnite) return refus("Choisissez le type d'unité (colis ou palette).");
-    if (lot || entree.dlc) return refus("Lot et date limite ne concernent que les articles.");
+    if (lot || entree.dlc) return refus("Lot et date limite d'une unité se saisissent dans ses attributs (profil avec lot et DLC), pas dans les champs des articles.");
   } else {
     if (!avecArticles(contexte.profils)) return refus("Le suivi des marchandises en vrac n'est pas activé dans les paramètres du stock.");
     if (entree.quantite === undefined) return refus("Indiquez la quantité.");
@@ -138,6 +195,50 @@ export function validerMouvement(entree: EntreeMouvement, contexte: { profils: r
 
   if (type === "transfert" && !(entree.emplacement_dest_id)) return refus("Choisissez l'emplacement de destination.");
   if (type === "transfert" && parArticle && (entree.emplacement_source_id ?? null) === (entree.emplacement_dest_id ?? null)) return refus("L'origine et la destination sont identiques.");
+
+  // Code interne complémentaire : format contrôlé ici, existence et ambiguïté par la base.
+  let codeInterne: string | null = null;
+  if (entree.code_interne && entree.code_interne.trim()) {
+    if (!parUnite) return refus("Un code interne se rattache à une unité (colis, palette, échantillon), pas à un article.");
+    if (type !== "entree" && !(type === "ajustement" && sens === 1)) return refus("Un code interne se rattache à l'entrée d'une unité, ou depuis sa fiche.");
+    codeInterne = entree.code_interne.trim();
+    if (!analyserCodeInterne(codeInterne)) return refus("Ce n'est pas un code interne valide (format PREFIXE-AAAA-NNNNNN) : utilisez « Générer un code ».");
+  }
+
+  // Profil et champs obligatoires (entrées seulement).
+  const estEntree = type === "entree" || (type === "ajustement" && sens === 1);
+  const choix = profilDeLEntree(contexte.profils, contexte.config, parUnite ? "unites" : "articles", entree.profil);
+  if (!choix.ok) return refus(choix.erreur);
+  const attributs: AttributsUnite | null = parUnite ? (entree.attributs ?? null) : null;
+  if (estEntree && choix.profil) {
+    const profil = resoudreProfil(choix.profil, contexte.config);
+    const existant = contexte.uniteExistante ?? null;
+    const texte = (nouveau: unknown, ancien: unknown): string | number | null => {
+      const v = nouveau !== undefined && nouveau !== null && String(nouveau).trim() !== "" ? nouveau : ancien;
+      return v === undefined || v === null || String(v).trim() === "" ? null : (v as string | number);
+    };
+    let valeurs: ValeursChamps;
+    if (parUnite) {
+      valeurs = {
+        poids: texte(entree.poids_kg, existant?.poids_kg),
+        volume: texte(entree.volume_m3, existant?.volume_m3),
+        sscc: texte(ssccNormalise, existant?.sscc),
+        lot: texte(attributs?.lot, existant?.lot),
+        dlc: texte(attributs?.dlc, existant?.dlc),
+        temperature: texte(attributs?.temperature, existant?.temperature),
+        temperature_releve: texte(attributs?.temperature_releve, existant?.temperature_releve),
+        nature: texte(attributs?.nature, existant?.nature),
+        consigne: texte(attributs?.consigne, existant?.consigne),
+        reference_client: texte(attributs?.reference_client, existant?.reference_client),
+      };
+    } else {
+      // Un article ne porte que le lot et la DLC : les autres champs ne s'appliquent pas.
+      const nonApplicable = Object.fromEntries((["poids", "volume", "sscc", "temperature", "temperature_releve", "nature", "consigne", "reference_client"] as ChampStock[]).map((c) => [c, "n/a"]));
+      valeurs = { ...nonApplicable, lot: lot || null, dlc: entree.dlc || null };
+    }
+    const manquants = champsManquants(profil, valeurs);
+    if (manquants.length) return refus(messageChampsManquants(profil, manquants));
+  }
 
   return {
     ok: true,
@@ -162,6 +263,9 @@ export function validerMouvement(entree: EntreeMouvement, contexte: { profils: r
       p_volume: entree.volume_m3 ?? null,
       p_sscc: ssccNormalise,
       p_source: "app",
+      p_profil: estEntree ? (choix.profil ?? null) : null,
+      p_code_interne: codeInterne,
+      p_attributs: estEntree ? attributsPourRpc(attributs) : null,
     },
   };
 }

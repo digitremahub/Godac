@@ -64,6 +64,8 @@ const nextConfig = {
       // Journal de paie et registre du personnel (lib/paie/pdf-registres.tsx).
       "/api/paie/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/api/exploitation/export": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
+      // Étiquettes du stock (lib/stock/etiquettes-pdf.tsx).
+      "/api/stock/etiquettes": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/api/paie/registre": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/api/cron/reset-demo": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],
       "/demo": ["./assets/fonts/**", "./assets/pdfkit-standard-fonts/**"],

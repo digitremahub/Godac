@@ -63,7 +63,7 @@ export const TYPES_ALERTE_FUSION: readonly string[] = ["planning_fusion"];
  * sans service, comme un seuil d'article, ne va qu'à la direction et à l'exploitation) ;
  * jamais le chauffeur ni le comptable.
  */
-export const TYPES_ALERTE_STOCK: readonly string[] = ["stock_seuil", "stock_ecart", "stock_non_rentre"];
+export const TYPES_ALERTE_STOCK: readonly string[] = ["stock_seuil", "stock_ecart", "stock_non_rentre", "stock_dlc_proche"];
 
 /** Alertes de facturation (paiement échoué) : la direction seule. */
 export const TYPES_ALERTE_DIRECTION: readonly string[] = ["paiement_echoue"];

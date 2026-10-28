@@ -53,6 +53,10 @@ const ATTENDU: Record<string, Record<string, string>> = {
   "app/api/stock/articles/route.ts": { GET: LECTURE, POST: PARAM },
   "app/api/stock/articles/[id]/route.ts": { PATCH: PARAM },
   "app/api/stock/unites/route.ts": { GET: LECTURE },
+  "app/api/stock/unites/[id]/route.ts": { PATCH: ENCAD },
+  "app/api/stock/unites/export/route.ts": { GET: LECTURE },
+  "app/api/stock/codes/route.ts": { POST: LECTURE },
+  "app/api/stock/etiquettes/route.ts": { GET: LECTURE, POST: LECTURE },
   "app/api/stock/mouvements/route.ts": { GET: LECTURE, POST: LECTURE },
   "app/api/stock/mouvements/export/route.ts": { GET: LECTURE },
   "app/api/stock/inventaires/route.ts": { GET: LECTURE, POST: ENCAD },
@@ -142,21 +146,69 @@ describe("matrice rôle × route", () => {
   });
 });
 
+describe("matrice rôle × route : codes, étiquettes, attributs, export des unités", () => {
+  const route = (fichier: string, methode: string) => {
+    const src = lire(fichier);
+    const garde = /garderApi\(([^)]*)\)/.exec(corps(src, methode))![1]!;
+    return normalise(garde);
+  };
+  it("génération de codes et impression d'étiquettes : chauffeur, manager, exploitation, direction ; jamais le comptable", () => {
+    expect(route("app/api/stock/codes/route.ts", "POST")).toBe(normalise(LECTURE));
+    expect(route("app/api/stock/etiquettes/route.ts", "GET")).toBe(normalise(LECTURE));
+    expect(route("app/api/stock/etiquettes/route.ts", "POST")).toBe(normalise(LECTURE));
+    expect(rolesOk({ roles: LECTEURS_STOCK, modules: ["stock"] })).toEqual(["chauffeur", "direction", "exploitation", "manager"]);
+    expect(autorise({ roles: LECTEURS_STOCK, modules: ["stock"] }, "comptable")).toBe(false);
+  });
+  it("modification des attributs d'une unité et rattachement d'un code interne : encadrement (pas le chauffeur)", () => {
+    expect(route("app/api/stock/unites/[id]/route.ts", "PATCH")).toBe(normalise(ENCAD));
+    expect(autorise({ roles: ENCADREMENT, modules: ["stock"] }, "chauffeur")).toBe(false);
+    expect(autorise({ roles: ENCADREMENT, modules: ["stock"] }, "manager")).toBe(true);
+  });
+  it("préfixe des codes, profils adaptables, format d'étiquette : exploitation et direction seulement", () => {
+    expect(route("app/api/stock/parametres/route.ts", "PUT")).toBe(normalise(PARAM));
+    expect(rolesOk({ roles: PARAMETREURS_STOCK, modules: ["stock"] })).toEqual(["direction", "exploitation"]);
+  });
+  it("export des unités : lecteurs, comme l'export de l'historique", () => {
+    expect(route("app/api/stock/unites/export/route.ts", "GET")).toBe(normalise(LECTURE));
+    expect(route("app/api/stock/mouvements/export/route.ts", "GET")).toBe(normalise(LECTURE));
+  });
+  it("module Stock non activé : ni codes, ni étiquettes, ni attributs, pour aucun rôle", () => {
+    for (const opts of [{ roles: LECTEURS_STOCK, modules: ["stock"] as const }, { roles: ENCADREMENT, modules: ["stock"] as const }]) expect(rolesOk(opts, sansStock)).toEqual([]);
+  });
+  it("audit : paramétrage, générations de codes, impressions, modifications d'unités et exports sont journalisés", () => {
+    expect(lire("app/api/stock/parametres/route.ts")).toMatch(/action: "stock_prefixe_modifie"/);
+    expect(lire("app/api/stock/parametres/route.ts")).toMatch(/action: "stock_profil_config_modifie"/);
+    expect(lire("app/api/stock/parametres/route.ts")).toMatch(/action: "stock_profils_modifies"/);
+    expect(lire("app/api/stock/parametres/route.ts")).toMatch(/action: "stock_format_etiquette_modifie"/);
+    expect(lire("lib/stock/codes-serveur.ts")).toMatch(/action: "stock_codes_generes"/);
+    expect(lire("lib/stock/etiquettes-serveur.ts")).toMatch(/action: "stock_etiquettes_imprimees"/);
+    expect(lire("app/api/stock/unites/[id]/route.ts")).toMatch(/action: "stock_unite_modifiee"/);
+    expect(lire("app/api/stock/unites/export/route.ts")).toMatch(/action: "stock_export_unites"/);
+    expect(lire("app/api/stock/codes/route.ts")).toContain("genererCodesInternes(");
+    expect(lire("lib/stock/etiquettes-serveur.ts")).toContain("genererCodesInternes(");
+  });
+  it("le journal ne contient jamais le contenu libre : seulement des nombres, des clés et des formats", () => {
+    const codes = lire("lib/stock/codes-serveur.ts");
+    expect(codes).toMatch(/details: \{ nombre: codes\.length, premier: codes\[0\], dernier: codes\[codes\.length - 1\], origine \}/);
+    expect(lire("app/api/stock/unites/[id]/route.ts")).toMatch(/details: \{ champs: attributs \? Object\.keys\(attributs\) : \[\], code_interne: /);
+  });
+});
+
 describe("matrice rôle × écran du stock", () => {
   const ECRANS_STOCK = ECRANS.filter((e) => e.id.startsWith("stock."));
   const ouverts = (role: (typeof TOUS_LES_ROLES)[number], modules: ReadonlySet<string> = tout) => ECRANS_STOCK.filter((e) => deciderAcces(e, role, modules, role === "chauffeur").ok).map((e) => e.id);
 
-  it("six écrans, tous sous Exploitation › Stock", () => {
-    expect(ECRANS_STOCK.map((e) => e.id)).toEqual(["stock.accueil", "stock.mouvement", "stock.liste", "stock.historique", "stock.inventaire", "stock.parametres"]);
+  it("huit écrans (dont la fiche d'unité, cachée du menu), tous sous Exploitation › Stock", () => {
+    expect(ECRANS_STOCK.map((e) => e.id)).toEqual(["stock.accueil", "stock.mouvement", "stock.liste", "stock.etiquettes", "stock.unite_fiche", "stock.historique", "stock.inventaire", "stock.parametres"]);
     expect(ECRANS_STOCK.every((e) => e.href.startsWith("/exploitation/stock"))).toBe(true);
     expect(ECRANS_STOCK.every((e) => e.section === "exploitation")).toBe(true);
     expect(ECRANS_STOCK.every((e) => (e.modules ?? []).includes("stock"))).toBe(true);
   });
   it("chauffeur et manager : tout sauf les paramètres", () => {
-    for (const role of ["chauffeur", "manager"] as const) expect(ouverts(role)).toEqual(["stock.accueil", "stock.mouvement", "stock.liste", "stock.historique", "stock.inventaire"]);
+    for (const role of ["chauffeur", "manager"] as const) expect(ouverts(role)).toEqual(["stock.accueil", "stock.mouvement", "stock.liste", "stock.etiquettes", "stock.unite_fiche", "stock.historique", "stock.inventaire"]);
   });
   it("exploitation et direction : tout, paramètres compris", () => {
-    for (const role of ["exploitation", "direction"] as const) expect(ouverts(role)).toHaveLength(6);
+    for (const role of ["exploitation", "direction"] as const) expect(ouverts(role)).toHaveLength(8);
   });
   it("comptable : aucun écran du stock", () => {
     expect(ouverts("comptable")).toEqual([]);
@@ -166,7 +218,7 @@ describe("matrice rôle × écran du stock", () => {
   });
   it("les écrans suivent les droits des routes (jamais plus ouverts que l'API)", () => {
     expect(ecran("stock.parametres").roles).toEqual(PARAMETREURS_STOCK);
-    for (const id of ["stock.accueil", "stock.mouvement", "stock.liste", "stock.historique", "stock.inventaire"]) expect(ecran(id).roles).toEqual(LECTEURS_STOCK);
+    for (const id of ["stock.accueil", "stock.mouvement", "stock.liste", "stock.etiquettes", "stock.unite_fiche", "stock.historique", "stock.inventaire"]) expect(ecran(id).roles).toEqual(LECTEURS_STOCK);
   });
   it("menu : une entrée « Stock » pour les lecteurs, les autres écrans en sous-onglets", () => {
     const dansLeMenu = (role: (typeof TOUS_LES_ROLES)[number], modules: ReadonlySet<string> = tout) => menuPour(role, modules, role === "chauffeur").flatMap((s) => s.ecrans.map((e) => e.id)).filter((id) => id.startsWith("stock."));
