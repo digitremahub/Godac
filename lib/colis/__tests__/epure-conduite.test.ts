@@ -4,15 +4,16 @@ import { SEUIL_ARRET_KMH, SEUIL_MOUVEMENT_KMH, bandeauDeplie, elementsConduite, 
 const base: EntreeEpure = { mouvement: false, vue: "conduite", position: { lat: 45, lng: 4 }, fige: false, enCours: true, traceActive: true };
 
 describe("mouvement du véhicule", () => {
-  it("se met en mouvement au-dessus de 5 km/h", () => {
-    expect(SEUIL_MOUVEMENT_KMH).toBe(5);
-    expect(enMouvementApres(false, 5)).toBe(false);
-    expect(enMouvementApres(false, 6)).toBe(true);
+  it("se met en mouvement au-dessus de 15 km/h (pas à la marche)", () => {
+    expect(SEUIL_MOUVEMENT_KMH).toBe(15);
+    expect(enMouvementApres(false, 6)).toBe(false); // livreur qui marche jusqu'à la porte
+    expect(enMouvementApres(false, 15)).toBe(false);
+    expect(enMouvementApres(false, 16)).toBe(true);
   });
   it("hystérésis : reste en mouvement tant que la vitesse ne tombe pas sous le seuil d'arrêt", () => {
-    expect(enMouvementApres(true, 4)).toBe(true);
+    expect(enMouvementApres(true, 10)).toBe(true);
     expect(enMouvementApres(true, SEUIL_ARRET_KMH)).toBe(true);
-    expect(enMouvementApres(true, 2)).toBe(false);
+    expect(enMouvementApres(true, 7)).toBe(false);
     expect(enMouvementApres(true, 0)).toBe(false);
   });
   it("sans vitesse connue, garde l'état précédent", () => {
