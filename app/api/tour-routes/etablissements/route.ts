@@ -3,7 +3,7 @@ import { garderApi } from "@/lib/acces/garde-api";
 import { codePays } from "@/lib/pays/serveur";
 import { lireBiais, ordonnerRapide } from "@/lib/colis/recherche-adresses";
 import { cleGoogle, lireDetail, MASQUE_DETAIL, placeIdValide, sessionValide, URL_DETAIL } from "@/lib/colis/places-google";
-import { annuaireInterne, baseAdresseNationale, delai, DELAI_ANNUAIRE_MS, googlePlaces, photon } from "@/lib/colis/recherche-adresses-serveur";
+import { annuaireInterne, baseAdresseNationale, delai, DELAI_ANNUAIRE_MS, DELAI_PRO_MS, entreprises, googlePlaces, photon } from "@/lib/colis/recherche-adresses-serveur";
 import { classerParProximite } from "@/lib/tours/ajout-arret";
 
 export const dynamic = "force-dynamic";
@@ -51,9 +51,11 @@ export async function GET(req: Request) {
     if (cle) return NextResponse.json({ resultats: [], complement: false });
     return NextResponse.json({ resultats: classerParProximite(await photon(q, biais, pays), biais), complement: false });
   }
-  const [annuaire, principal] = await Promise.all([
+  const [annuaire, principal, pros] = await Promise.all([
     delai(annuaireInterne(supabase, appUser.organization_id, q), DELAI_ANNUAIRE_MS),
     cle ? googlePlaces(cle, q, biais, pays, sessionValide(session) ? session : null) : pays === "FR" ? baseAdresseNationale(q, biais) : Promise.resolve([]),
+    // Professionnels par leur nom (SIRENE, gratuit, sans clé) : France, en complément de la source principale.
+    pays === "FR" ? delai(entreprises(q, biais), DELAI_PRO_MS) : Promise.resolve([]),
   ]);
-  return NextResponse.json({ resultats: classerParProximite(ordonnerRapide(annuaire, principal), biais), complement: !cle });
+  return NextResponse.json({ resultats: classerParProximite(ordonnerRapide(annuaire, principal, 8, pros, q), biais), complement: !cle });
 }
