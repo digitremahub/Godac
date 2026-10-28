@@ -85,6 +85,10 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   planning_a_confirmer: (id) => ({ id: "exploitation.planning", suite: id ? `?semaine_auto=${encodeURIComponent(id)}` : "" }),
   // Tournée fusionnée (alerte d'encadrement, related_id = ligne hôte du jour) : le Planning au jour de la fusion, tournée hôte mise en avant.
   planning_fusion: (id) => ({ id: "exploitation.planning", suite: id ? `?entry=${encodeURIComponent(id)}` : "" }),
+  // Stock : article sous son seuil mini (tableau de bord), écart d'inventaire (inventaires), unités non rentrées (tableau de bord, vue tournées).
+  stock_seuil: () => ({ id: "stock.accueil" }),
+  stock_ecart: (id) => ({ id: "stock.inventaire", suite: id ? `?inventaire=${encodeURIComponent(id)}` : "" }),
+  stock_non_rentre: (id) => ({ id: "stock.accueil", suite: id ? `?tournee=${encodeURIComponent(id)}#non-rentrees` : "" }),
   // Échéance RH (permis, visite médicale, fin de contrat, document) : la fiche du salarié.
   echeance_rh: (id) => (id ? { id: "equipe.utilisateur_fiche", params: { id } } : { id: "equipe.utilisateurs" }),
   // Sortie oubliée, pointage clos avec une heure estimée : la liste « Pointages à régulariser ».

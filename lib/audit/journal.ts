@@ -96,6 +96,12 @@ export const ACTIONS_AUDIT = {
   fin_contrat_preavis: "Fin de contrat : préavis de suppression des données envoyé au contact de l'organisation",
   fin_contrat_date_modifiee: "Fin de contrat : date de fin posée ou retirée par GODAC",
   fin_contrat_suppression_bloquee: "Fin de contrat : suppression des données suspendue (litige) ou reprise par GODAC",
+  stock_ajustement: "Stock : ajustement manuel enregistré (avec motif)",
+  stock_inventaire_valide: "Stock : inventaire validé (écarts corrigés par des ajustements)",
+  stock_archivage: "Stock : dépôt, zone, emplacement ou article désactivé / réactivé",
+  stock_profils_modifies: "Stock : profils d'activité modifiés",
+  stock_seuil_modifie: "Stock : seuil mini d'un article modifié",
+  stock_export: "Stock : historique des mouvements exporté (CSV ou Excel)",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 

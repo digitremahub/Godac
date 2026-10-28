@@ -45,7 +45,10 @@ export type AlertType =
   | "ocr_failure"
   | "maintenance_request"
   | "odometer_anomaly"
-  | "usage_quota";
+  | "usage_quota"
+  | "stock_seuil"
+  | "stock_ecart"
+  | "stock_non_rentre";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
