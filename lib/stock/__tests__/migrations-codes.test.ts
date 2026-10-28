@@ -30,8 +30,10 @@ describe("numérotation et ordre d'application", () => {
     for (const f of FICHIERS) expect(existsSync(`${DOSSIER}/${f}`), f).toBe(true);
     const tous = readdirSync(DOSSIER).filter((f) => f.endsWith(".sql"));
     for (const f of FICHIERS) expect(tous.filter((t) => t.slice(0, 14) === f.slice(0, 14)), f).toEqual([f]);
-    const avant = tous.filter((f) => !FICHIERS.includes(f)).sort().at(-1)!;
-    expect(avant < SCHEMA).toBe(true);
+    // Aucune autre migration ne s'intercale dans la plage de ces quatre fichiers (les migrations
+    // ultérieures, par exemple 20261116…, restent permises : elles sont appliquées après).
+    const intercalees = tous.filter((f) => !FICHIERS.includes(f) && f.slice(0, 14) >= SCHEMA.slice(0, 14) && f.slice(0, 14) <= LECTURE.slice(0, 14));
+    expect(intercalees).toEqual([]);
     expect(FICHIERS).toEqual([...FICHIERS].sort());
   });
   it("le type d'alerte est dans un fichier séparé, appliqué seul, avant les policies qui le citent", () => {

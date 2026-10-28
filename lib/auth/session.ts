@@ -2,6 +2,8 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/types/domain";
 import { estConducteur } from "@/lib/roles/conducteurs";
+import { estSuspendue } from "@/lib/comptes-essai/regles";
+import { estSchemaManquant } from "@/lib/rattachement/tolerance";
 
 export interface AppUser {
   id: string;
@@ -20,6 +22,21 @@ export interface AppUser {
 }
 
 const COLONNES = "id, organization_id, role, role_title, full_name, email, phone, active, pending_approval";
+
+/**
+ * L'organisation est-elle suspendue par GODAC ? Colonne absente (migration
+ * 20261116000001 pas encore appliquée) : non. Lecture impossible pour une
+ * autre raison : oui, par prudence (l'accès se rétablit dès que la base répond).
+ */
+async function organisationSuspendue(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, organizationId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("organizations").select("suspendue_le").eq("id", organizationId).maybeSingle<{ suspendue_le: string | null }>();
+  if (error) {
+    if (estSchemaManquant(error)) return false;
+    console.error("getCurrentAppUser: état de suspension illisible, accès refusé par prudence", error);
+    return true;
+  }
+  return estSuspendue(data);
+}
 
 /**
  * The GODAC roles (chauffeur, manager, exploitation, comptable, direction) are domain-specific and live in our own `users`
@@ -62,6 +79,14 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
   }
 
   if (!data) return null;
+
+  // Compte suspendu par GODAC (organizations.suspendue_le) : plus aucun
+  // accès, rien n'est supprimé. Revérifié à CHAQUE appel (page, API, session
+  // déjà ouverte : bloquée au prochain appel). Le profil n'est pas rendu
+  // (null) : toutes les gardes refusent, et le layout affiche l'écran
+  // « Compte suspendu » (lib/comptes-essai/garde.ts).
+  if (await organisationSuspendue(supabase, data.organization_id as string)) return null;
+
   // Ancien rôle manager_chauffeur (plus attribuable) : manager qui conduit.
   const brut = data as unknown as Omit<AppUser, "conduit" | "can_drive" | "role"> & { role: string; can_drive?: boolean | null };
   const ancien = brut.role === "manager_chauffeur";

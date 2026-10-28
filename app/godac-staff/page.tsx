@@ -58,6 +58,10 @@ export default async function GodacStaffPage() {
           Invitations GO Navigation →
         </Link>
         {" · "}
+        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
+          Comptes d&apos;essai (suspendre / rétablir) →
+        </Link>
+        {" · "}
         <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
           Usage des essais →
         </Link>

@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { AppUser } from "@/lib/auth/session";
 import type { UserRole } from "@/lib/types/domain";
+import { organisationSuspendueAdmin } from "@/lib/comptes-essai/garde";
 
 /**
  * Called for a signed-in user who has no `public.users` row yet. If
@@ -26,6 +27,9 @@ export async function tryAutoProvisionInvitedUser(): Promise<AppUser | null> {
 
   const organizationId = user.app_metadata?.organization_id as string | undefined;
   if (!organizationId) return null;
+
+  // Organisation suspendue par GODAC : pas de profil créé ni rétabli (garde fail-closed).
+  if (await organisationSuspendueAdmin(organizationId, true)) return null;
 
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin

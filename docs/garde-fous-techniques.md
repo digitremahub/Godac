@@ -100,3 +100,13 @@ La page `/sla` ne promet ni pourcentage de disponibilité ni avoir ou crédit au
 - Les copies de travail `.claude/worktrees` sont exclues de `tsconfig.json` et de `vitest.config.ts`.
 - Plan Vercel Hobby : aucun cron plus fréquent qu'une fois par jour (`vercel.json`, test de garde dans `audit-routes-lot2.test.ts` et `audit-routes-lot4.test.ts`).
 - `npm run lint` n'est pas dans le flux de vérification : le dépôt n'a aucune configuration ESLint (`next lint` pose une question interactive). À traiter à part.
+
+## Comptes d'essai et suspension d'un compte (back-office GODAC)
+
+Page `godac-staff/comptes-essai` (liste hors démonstration : offre, essai, usage 30 jours, dernière activité, modules, actions). Accès : liste blanche `GODAC_STAFF_EMAILS`, client service, hors RLS.
+
+- **Suspension** : `organizations.suspendue_le / suspendue_motif / suspendue_par` (migration `20261116000001_comptes_suspension.sql`, additive, trigger `organizations_guard_suspension` : les rôles clients ne peuvent pas les modifier). Rien n'est supprimé ; rétablir remet les trois colonnes à `null`.
+- **Garde côté application** : `getCurrentAppUser()` (`lib/auth/session.ts`) rend `null` pour tout utilisateur d'une organisation suspendue, à chaque appel (session déjà ouverte bloquée au prochain appel). Toutes les gardes (`garderApi` → 403 `COMPTE_SUSPENDU`, `garderPage`, layout du tableau de bord) affichent « Compte suspendu par GODAC » avec le contact. Le motif reste interne. Colonne absente (migration non appliquée) : personne n'est bloqué ; lecture impossible pour une autre raison : accès refusé par prudence.
+- **Hors périmètre de la garde** : routes publiques, webhooks, crons et espace staff (qui ne passent pas par `getCurrentAppUser`).
+- **Actions** (`POST /api/godac-staff/comptes-essai/<id>`, `lib/comptes-essai/actions.ts`) : `suspendre`, `retablir`, `revoquer` (suspension + invitations « Faire essayer GO » non utilisées de l'organisation et liens personnels révoqués), `terminer_essai` (`trial_ends_at = maintenant`, essai GO Navigation en cours seulement). Motif obligatoire, tracé au journal d'audit (`compte_suspendu`, `compte_retabli`, `compte_revoque`, `essai_termine_staff`). Démo : jamais. Organisation du staff : nom exact à retaper.
+- **Limite connue** : la garde est applicative. Un utilisateur suspendu qui appellerait directement l'API REST de Supabase avec son jeton conserverait l'accès que lui donnent les policies RLS (non modifiées volontairement : aucune policy ne relit sa propre table).

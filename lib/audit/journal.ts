@@ -110,6 +110,10 @@ export const ACTIONS_AUDIT = {
   stock_codes_generes: "Stock : codes internes générés (planche d'étiquettes ou entrée)",
   stock_etiquettes_imprimees: "Stock : étiquettes imprimées (PDF généré)",
   stock_unite_modifiee: "Stock : attributs ou code interne d'une unité modifiés",
+  compte_suspendu: "Compte suspendu par GODAC (accès de toute l'organisation coupé, motif enregistré)",
+  compte_retabli: "Compte rétabli par GODAC (suspension levée)",
+  compte_revoque: "Compte révoqué par GODAC (suspendu, invitations « Faire essayer GO » invalidées)",
+  essai_termine_staff: "Essai GO Navigation terminé par GODAC avant son terme",
 } as const;
 export type ActionAudit = keyof typeof ACTIONS_AUDIT;
 
