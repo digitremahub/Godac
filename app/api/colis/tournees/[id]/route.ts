@@ -11,6 +11,7 @@ import { refusDemarrageFiche } from "@/lib/planning/ouverture-serveur";
 import { refusReouverture } from "@/lib/colis/cloture";
 import { estEncadrement } from "@/lib/roles/perimetre";
 import { enregistrerSensRun } from "@/lib/colis/sens-serveur";
+import { stockApresCloture, stockAuDepartTournee } from "@/lib/stock/integration-tournee";
 
 async function contexte(id: string) {
   const g = await garderApi({ modules: ["route_optimizer"] });
@@ -85,6 +86,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     // Clôture : on retient l'ordre dans lequel les secteurs ont été parcourus (sens habituel). Non bloquant.
     if (parsed.data.status === "done" && ctx.run.status !== "done") await enregistrerSensRun(ctx.supabase, ctx.appUser.organization_id, ctx.appUser.id, ctx.run.id);
+    // Module Stock (tolérant, jamais bloquant) : départ = sortie des colis en stock, clôture = alerte des unités non rentrées.
+    if (parsed.data.status === "in_progress" && ctx.run.status !== "in_progress") await stockAuDepartTournee(ctx.supabase, ctx.appUser, ctx.run.id);
+    if (parsed.data.status === "done" && ctx.run.status !== "done") await stockApresCloture(ctx.supabase, ctx.appUser);
     if (ctx.run.status === "done" && parsed.data.status && parsed.data.status !== "done") {
       await journaliser({ organizationId: ctx.appUser.organization_id, userId: ctx.appUser.id, action: "tournee_colis_rouverte", targetTable: "delivery_runs", targetId: ctx.run.id, details: { nouveau_statut: parsed.data.status } });
     }

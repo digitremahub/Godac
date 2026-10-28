@@ -109,6 +109,7 @@ describe("aucune route API ne s'ouvre sans garde", () => {
     "app/api/cron/surveillance-tournees/route.ts",
     "app/api/cron/loueurs/route.ts",
     "app/api/cron/ticpe/route.ts",
+    "app/api/cron/stock/route.ts",
     "app/api/cron/usage-billing/route.ts",
     "app/api/cron/paliers/route.ts",
     "app/api/cron/weekly-planning-digest/route.ts",

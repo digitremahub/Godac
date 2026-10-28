@@ -75,6 +75,12 @@ export default function ConfidentialitePage() {
             réclamations des clients de l&apos;entreprise et réponses des chauffeurs.
           </li>
           <li>
+            <strong>Stock (si l&apos;entreprise utilise le module Stock) :</strong> colis, palettes et références suivis par leur code, avec leur emplacement,
+            leur statut et l&apos;historique des mouvements (entrée, sortie, transfert, retour, casse, perte, ajustement, inventaire). <strong>Aucune donnée de
+            destinataire n&apos;y figure</strong> : le seul lien avec les tournées est l&apos;identifiant de la tournée ou de l&apos;arrêt concerné. Le nom du salarié
+            qui effectue un mouvement ou un inventaire est conservé pour la traçabilité.
+          </li>
+          <li>
             <strong>Fiches client de l&apos;annuaire de tournée :</strong> pour préremplir les prochaines tournées de l&apos;entreprise, GODAC retient, par
             adresse d&apos;établissement (commerce, entreprise, point relais) et uniquement au sein de l&apos;entreprise concernée, les <strong>coordonnées des
             destinataires professionnels</strong> (nom de l&apos;établissement, contact habituel, téléphone), les <strong>consignes d&apos;accès</strong> (code,
@@ -236,6 +242,11 @@ export default function ConfidentialitePage() {
             Tournées colis* : téléphones, consignes et noms complets des destinataires effacés 30 jours après la tournée (le nom est
             réduit aux initiales) ; adresses, initiales et photos de livraison conservées 12 mois pour traiter les contestations, puis
             supprimées.
+          </li>
+          <li>
+            Stock* (unités, quantités, inventaires et registre des mouvements) : conservé pendant le contrat. Le registre n&apos;est pas purgé
+            automatiquement, car il peut servir de justificatif comptable ou de preuve en cas de litige : l&apos;entreprise le garde aussi longtemps que ses
+            obligations le demandent (5 ans est la durée usuelle). Tout est effacé avec les données de l&apos;entreprise 3 mois après la fin du contrat.
           </li>
           <li>
             Fiches client de l&apos;annuaire de tournée* (téléphone, contact, consignes d&apos;accès, statistiques de passage) et sens habituel des tournées :

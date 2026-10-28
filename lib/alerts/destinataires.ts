@@ -56,11 +56,20 @@ export const TYPES_ALERTE_PLANNING: readonly string[] = ["planning_a_confirmer"]
  */
 export const TYPES_ALERTE_FUSION: readonly string[] = ["planning_fusion"];
 
+/**
+ * Module Stock (seuil mini, écart d'inventaire, unités non rentrées après la
+ * clôture d'une tournée). Information d'encadrement : direction et exploitation
+ * pour toute l'organisation, manager pour le service porté par l'alerte (une alerte
+ * sans service, comme un seuil d'article, ne va qu'à la direction et à l'exploitation) ;
+ * jamais le chauffeur ni le comptable.
+ */
+export const TYPES_ALERTE_STOCK: readonly string[] = ["stock_seuil", "stock_ecart", "stock_non_rentre"];
+
 /** Alertes de facturation (paiement échoué) : la direction seule. */
 export const TYPES_ALERTE_DIRECTION: readonly string[] = ["paiement_echoue"];
 
-/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte, alertes RH, planning à confirmer et tournées fusionnées. */
-const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH, ...TYPES_ALERTE_PLANNING, ...TYPES_ALERTE_FUSION];
+/** Alertes réservées à l'encadrement et bornées au service : tournées, échéances de la flotte, alertes RH, planning à confirmer, tournées fusionnées et stock. */
+const TYPES_ALERTE_ENCADREMENT_SERVICE: readonly string[] = [...TYPES_ALERTE_TOURNEE, ...TYPES_ALERTE_ECHEANCE, ...TYPES_ALERTE_RH, ...TYPES_ALERTE_PLANNING, ...TYPES_ALERTE_FUSION, ...TYPES_ALERTE_STOCK];
 
 export interface DestinatairePossible {
   id: string;

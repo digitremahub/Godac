@@ -43,7 +43,8 @@ describe("rôle exploitation : entre le manager et la direction", () => {
     const manager = ouverts("manager");
     const exploitation = ouverts("exploitation");
     const enPlus = [...exploitation].filter((id) => !manager.has(id)).sort();
-    expect(enPlus.filter((id) => !id.startsWith("carburant.ticpe"))).toEqual(["dashboard.reporting"]);
+    // + les paramètres du stock (profils, dépôts, articles, seuils) : exploitation et direction seulement.
+    expect(enPlus.filter((id) => !id.startsWith("carburant.ticpe"))).toEqual(["dashboard.reporting", "stock.parametres"]);
     expect(enPlus).toEqual(expect.arrayContaining(["carburant.ticpe", "carburant.ticpe_detail", "carburant.ticpe_vehicules"]));
     // Réglages TICPE (régime de TVA, taux particuliers) : direction et comptable seulement.
     expect(enPlus).not.toContain("carburant.ticpe_reglages");

@@ -29,6 +29,13 @@ export const ENCADREMENT: readonly UserRole[] = ["manager", "exploitation", "dir
  * que la personne conduise : un manager sans can_drive en est exclu.
  */
 export const TERRAIN: readonly UserRole[] = ["chauffeur", "manager", "exploitation"];
+/**
+ * Module Stock : lecture et mouvements pour chauffeur, manager (ses services),
+ * exploitation et direction. Le comptable n'y a pas accès (aucune valorisation).
+ * Paramétrage (profils, dépôts, emplacements, articles, seuils) : exploitation et direction.
+ */
+export const LECTEURS_STOCK: readonly UserRole[] = ["chauffeur", "manager", "exploitation", "direction"];
+export const PARAMETREURS_STOCK: readonly UserRole[] = ["exploitation", "direction"];
 
 /** Clés réelles de la table `modules` qui correspondent à du code. */
 export const MODULES_AVEC_CODE = [
@@ -56,6 +63,7 @@ export const MODULES_AVEC_CODE = [
   "route_optimizer",
   "customer_disputes",
   "rental_providers",
+  "stock",
 ] as const;
 export type CleModule = (typeof MODULES_AVEC_CODE)[number];
 
@@ -114,6 +122,7 @@ export const LIBELLES_MODULES: Record<CleModule, string> = {
   route_optimizer: "Tournée colis",
   customer_disputes: "Contestations clients",
   rental_providers: "Véhicules loués",
+  stock: "Stock (palettes, colis, références)",
 };
 
 export function libelleModule(cle: string): string {
@@ -547,6 +556,80 @@ export const ECRANS: readonly Ecran[] = [
     modules: ["customer_disputes"],
     icone: "file",
     note: "chauffeur : les siennes",
+  }),
+
+  E({
+    id: "stock.accueil",
+    section: "exploitation",
+    libelle: "Stock",
+    libelleOnglet: "Stock",
+    libelleSousOnglet: "Tableau de bord",
+    href: "/exploitation/stock",
+    roles: LECTEURS_STOCK,
+    modules: ["stock"],
+    icone: "cylinder",
+    mobile: "plus",
+    note: "en dépôt, en tournée, retours, alertes de seuil ; manager : ses services",
+  }),
+  E({
+    id: "stock.mouvement",
+    section: "exploitation",
+    libelle: "Entrée, sortie, transfert",
+    libelleSousOnglet: "Mouvement",
+    href: "/exploitation/stock/mouvement",
+    roles: LECTEURS_STOCK,
+    modules: ["stock"],
+    icone: "qr",
+    parent: "stock.accueil",
+    note: "scan ou saisie ; chauffeur : tout sauf l'ajustement ; manager : ses services",
+  }),
+  E({
+    id: "stock.liste",
+    section: "exploitation",
+    libelle: "Unités et articles",
+    libelleSousOnglet: "Unités et articles",
+    href: "/exploitation/stock/liste",
+    roles: LECTEURS_STOCK,
+    modules: ["stock"],
+    icone: "grid",
+    parent: "stock.accueil",
+    note: "recherche par code, référence, statut ; manager : ses services",
+  }),
+  E({
+    id: "stock.historique",
+    section: "exploitation",
+    libelle: "Historique des mouvements",
+    libelleSousOnglet: "Historique",
+    href: "/exploitation/stock/historique",
+    roles: LECTEURS_STOCK,
+    modules: ["stock"],
+    icone: "file",
+    parent: "stock.accueil",
+    note: "registre non modifiable, filtres et export CSV ou Excel ; manager : ses services",
+  }),
+  E({
+    id: "stock.inventaire",
+    section: "exploitation",
+    libelle: "Inventaire",
+    libelleSousOnglet: "Inventaire",
+    href: "/exploitation/stock/inventaire",
+    roles: LECTEURS_STOCK,
+    modules: ["stock"],
+    icone: "flag",
+    parent: "stock.accueil",
+    note: "chauffeur : compte seulement ; manager (ses services), exploitation, direction : ouvrent et valident",
+  }),
+  E({
+    id: "stock.parametres",
+    section: "exploitation",
+    libelle: "Paramètres du stock",
+    libelleSousOnglet: "Paramètres",
+    href: "/exploitation/stock/parametres",
+    roles: PARAMETREURS_STOCK,
+    modules: ["stock"],
+    icone: "wrench",
+    parent: "stock.accueil",
+    note: "profils d'activité, dépôts, zones et emplacements, articles et seuils",
   }),
 
   // ── Flotte ───────────────────────────────────────────────────────

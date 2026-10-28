@@ -9,6 +9,7 @@ import { MESSAGE_TOURNEE_CLOTUREE, refusCloture, tourneeCloturee } from "@/lib/c
 import { CODE_QR_MAX, LIEUX_LIVRAISON, libelleLieu, normaliserCodeQr, qrObligatoire, relaisObligatoire, type LieuLivraison } from "@/lib/colis/livraison";
 import { NOM_RELAIS_MAX, RETOURS_MAX, normaliserNomRelais } from "@/lib/colis/relais";
 import { enregistrerObservationArret } from "@/lib/colis/fiche-client-serveur";
+import { stockApresArret } from "@/lib/stock/integration-tournee";
 
 const BUCKET = "delivery-proofs";
 const bodySchema = z.object({
@@ -128,6 +129,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!data) return NextResponse.json({ error: "Arrêt déjà clôturé entre-temps : actualisez." }, { status: 409 });
   // La fiche client de l'adresse retient cette livraison (non bloquant, idempotent).
   await enregistrerObservationArret(supabase, appUser.organization_id, appUser.id, id);
+  // Module Stock (tolérant, jamais bloquant) : l'unité du colis passe « livrée ».
+  await stockApresArret(supabase, appUser, { id, run_id: stop.run_id, parcel_code: (data as { parcel_code?: string | null }).parcel_code ?? null }, "delivered");
   return NextResponse.json({ stop: data });
 }
 
