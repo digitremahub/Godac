@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconBuilding, IconMapPin } from "@/components/layout/icons";
 import { CacheSuggestions, cleBiais } from "@/lib/colis/cache-adresses";
-import { completerSuggestions, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { completerSuggestions, estLieuNomme, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { suggestionValidee } from "@/lib/colis/recherche-arret";
 
 /** Debounce court : la réponse serveur est rapide (Google ou BAN), on ne retarde pas la frappe. */
@@ -169,11 +169,11 @@ export function AdresseInput({
           {suggestions.map((sug, i) => (
             <li key={`${sug.source}-${sug.nom ?? ""}-${sug.adresse}`} id={`${listeId}-${i}`} role="option" aria-selected={i === actif}>
               <button type="button" className={`flex min-h-[44px] w-full items-start gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-navy/[0.05] ${i === actif ? "bg-navy/[0.05]" : ""}`} onClick={() => void choisir(sug)}>
-                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${sug.type === "etablissement" ? "bg-teal/15 text-teal-ink" : "bg-navy/[0.06] text-navy/55"}`} aria-hidden="true">
-                  {sug.type === "etablissement" ? <IconBuilding className="h-3.5 w-3.5" /> : <IconMapPin className="h-3.5 w-3.5" />}
+                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${estLieuNomme(sug) ? "bg-teal/15 text-teal-ink" : "bg-navy/[0.06] text-navy/55"}`} aria-hidden="true">
+                  {estLieuNomme(sug) ? <IconBuilding className="h-3.5 w-3.5" /> : <IconMapPin className="h-3.5 w-3.5" />}
                 </span>
                 <span className="min-w-0">
-                  <span className="sr-only">{sug.type === "etablissement" ? "Établissement : " : "Adresse : "}</span>
+                  <span className="sr-only">{estLieuNomme(sug) ? "Établissement : " : "Adresse : "}</span>
                   {sug.nom && <span className="block font-semibold">{sug.nom}</span>}
                   <span className={`block ${sug.nom ? "text-xs text-navy/65" : "font-medium"}`}>{sug.adresse}</span>
                   {(sug.detail || sug.source === "annuaire") && <span className="mt-0.5 block text-[11px] text-navy/50">{sug.detail ?? "Déjà livré par votre équipe"}</span>}

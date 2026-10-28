@@ -1,8 +1,10 @@
 // Sources réseau de la recherche d'adresses et d'établissements (annuaire
-// interne, OpenStreetMap/Photon, Base Adresse Nationale, Google Places).
+// interne, OpenStreetMap/Photon, Base Adresse Nationale, Google Places, et
+// « Recherche d'entreprises » (SIRENE) pour les professionnels par leur nom).
 // Partagées par /api/colis/adresses/recherche et /api/tour-routes/etablissements.
 import type { garderApi } from "@/lib/acces/garde-api";
 import { depuisPhoton, filtrerAnnuaire, type EntreeAnnuaire, type ProprietesPhoton, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { departementDepuisReverse, lireEntreprises, preparerRequete, urlRecherche } from "@/lib/colis/recherche-entreprises";
 import { corpsAutocomplete, lireAutocomplete, MASQUE_AUTOCOMPLETE, URL_AUTOCOMPLETE } from "@/lib/colis/places-google";
 
 const UA = "GODAC/1.0 (recherche d'adresses et d'établissements ; https://godac-v2.vercel.app)";
@@ -10,6 +12,8 @@ const UA = "GODAC/1.0 (recherche d'adresses et d'établissements ; https://godac
 export const DELAI_RAPIDE_MS = 1200;
 export const DELAI_ANNUAIRE_MS = 700;
 export const DELAI_COMPLEMENT_MS = 1500;
+/** SIRENE dans la réponse rapide : assez court pour ne jamais retarder la BAN de façon perceptible. */
+export const DELAI_PRO_MS = 900;
 
 /** Résultat de repli si la source dépasse le délai (sans l'annuler : elle se termine seule). */
 export function delai(p: Promise<SuggestionAdresse[]>, ms: number): Promise<SuggestionAdresse[]> {
@@ -98,5 +102,44 @@ export async function googlePlaces(cle: string, q: string, biais: { lat: number;
   } catch {
     // Google injoignable ou lent : repli BAN pour ne jamais laisser le champ vide.
     return pays === "FR" ? baseAdresseNationale(q, biais) : [];
+  }
+}
+
+/** Département (« 17 ») du point, par géocodage inverse BAN : sert à restreindre la recherche d'entreprises. */
+async function departementDuBiais(biais: { lat: number; lng: number }, signal: AbortSignal): Promise<string | null> {
+  try {
+    // Coordonnées arrondies : les frappes successives partagent la même réponse en cache.
+    const p = new URLSearchParams({ lat: biais.lat.toFixed(2), lon: biais.lng.toFixed(2) });
+    const res = await fetch(`https://api-adresse.data.gouv.fr/reverse/?${p.toString()}`, { headers: { Accept: "application/json" }, signal, next: { revalidate: 60 } });
+    return res.ok ? departementDepuisReverse(await res.json()) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Professionnels par leur nom : API publique « Recherche d'entreprises »
+ * (répertoire SIRENE, gratuite, sans clé, ≤ 7 requêtes/s). France seulement ;
+ * ne cherche que si le texte ressemble à un nom. Filtre par code postal du
+ * texte, sinon par département du biais GPS (puis, si rien, sans filtre).
+ * Repli silencieux ([]) sur toute erreur ou dépassement de DELAI_COMPLEMENT_MS ;
+ * rien n'est stocké (cache de requête de 60 s seulement).
+ */
+export async function entreprises(q: string, biais: { lat: number; lng: number } | null): Promise<SuggestionAdresse[]> {
+  try {
+    const requete = preparerRequete(q);
+    if (!requete) return [];
+    const signal = AbortSignal.timeout(DELAI_COMPLEMENT_MS);
+    const departement = !requete.codePostal && biais ? await departementDuBiais(biais, signal) : null;
+    const appeler = async (dep: string | null) => {
+      const res = await fetch(urlRecherche(requete, dep), { headers: { Accept: "application/json", "User-Agent": UA }, signal, next: { revalidate: 60 } });
+      return res.ok ? lireEntreprises(await res.json()) : [];
+    };
+    const filtre = Boolean(requete.codePostal || departement);
+    const trouves = await appeler(departement);
+    // Filtre trop strict (commune voisine, chaîne nationale) : on retente sans.
+    return trouves.length === 0 && filtre && !requete.codePostal ? await appeler(null) : trouves;
+  } catch {
+    return [];
   }
 }

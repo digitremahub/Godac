@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { IconBuilding, IconMapPin } from "@/components/layout/icons";
 import { ChampSuggestions } from "@/components/tours/ChampSuggestions";
-import { completerSuggestions, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { completerSuggestions, estLieuNomme, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 import { arretDepuisSuggestion, arretManuelValide, type ArretDepuisSuggestion, type Biais } from "@/lib/tours/ajout-arret";
 
 const nouveauJeton = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`.padEnd(16, "0"));
@@ -84,13 +84,14 @@ export function AjoutArret({
         cle={(s) => `${s.source}-${s.nom ?? ""}-${s.adresse}`}
         rendu={(s) => (
           <>
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${s.type === "etablissement" ? "bg-teal/15 text-teal-ink" : "bg-navy/[0.06] text-navy/55"}`} aria-hidden="true">
-              {s.type === "etablissement" ? <IconBuilding className="h-4 w-4" /> : <IconMapPin className="h-4 w-4" />}
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${estLieuNomme(s) ? "bg-teal/15 text-teal-ink" : "bg-navy/[0.06] text-navy/55"}`} aria-hidden="true">
+              {estLieuNomme(s) ? <IconBuilding className="h-4 w-4" /> : <IconMapPin className="h-4 w-4" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="sr-only">{s.type === "etablissement" ? "Établissement : " : "Adresse : "}</span>
+              <span className="sr-only">{estLieuNomme(s) ? "Établissement : " : "Adresse : "}</span>
               {s.nom && <span className="block truncate font-semibold">{s.nom}</span>}
               <span className={`block truncate ${s.nom ? "text-xs text-navy/65" : "font-medium"}`}>{s.adresse}</span>
+              {s.source === "sirene" && s.detail && <span className="block truncate text-[11px] text-navy/50">{s.detail}</span>}
             </span>
           </>
         )}

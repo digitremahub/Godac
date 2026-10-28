@@ -5,7 +5,7 @@
  * Places, BAN, OpenStreetMap) sont celles de la tournée colis.
  */
 import { haversineKm } from "@/lib/tours/carte-villages";
-import type { SuggestionAdresse } from "@/lib/colis/recherche-adresses";
+import { estLieuNomme, type SuggestionAdresse } from "@/lib/colis/recherche-adresses";
 
 export interface Biais {
   lat: number;
@@ -43,7 +43,7 @@ export function classerParProximite(suggestions: readonly SuggestionAdresse[], b
     liste[place.i] = triees[k]!.s;
   });
   // Établissements d'abord (tri stable).
-  return liste.map((s, i) => ({ s, i })).sort((a, b) => Number(b.s.type === "etablissement") - Number(a.s.type === "etablissement") || a.i - b.i).map((x) => x.s);
+  return liste.map((s, i) => ({ s, i })).sort((a, b) => Number(estLieuNomme(b.s)) - Number(estLieuNomme(a.s)) || a.i - b.i).map((x) => x.s);
 }
 
 /** « 12 rue X, 66300 Thuir » → code postal et commune. */

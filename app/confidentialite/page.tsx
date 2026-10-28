@@ -146,7 +146,7 @@ export default function ConfidentialitePage() {
             <strong>Stripe</strong> — paiement de l&apos;abonnement.
           </li>
           <li>
-            <strong>Cartes, adresses et itinéraires</strong> — Base Adresse Nationale (France), Photon / Komoot (Allemagne),
+            <strong>Cartes, adresses et itinéraires</strong> — Base Adresse Nationale et API Recherche d&apos;entreprises (France), Photon / Komoot (Allemagne),
             OpenStreetMap / Nominatim (Royaume-Uni), un service d&apos;itinéraires OSRM et, le cas échéant, Google Places
             (États-Unis) : ils reçoivent le texte d&apos;une adresse saisie ou des coordonnées de points d&apos;arrêt (sans nom),
             et les serveurs de cartes (OpenStreetMap, OpenFreeMap) reçoivent l&apos;adresse IP de votre appareil et la zone

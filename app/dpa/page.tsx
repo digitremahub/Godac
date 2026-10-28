@@ -36,6 +36,7 @@ const SOUS_TRAITANTS: [string, string, string][] = [
   ["Resend Inc.", "Envoi des e-mails de notification", "États-Unis (DPF / clauses types)"],
   ["Services de notification (Apple, Google, Mozilla)", "Acheminement des notifications sur les téléphones", "Variable ; contenu limité au message affiché"],
   ["Base Adresse Nationale (État français)", "Recherche et géolocalisation d’adresses en France (texte de l’adresse saisie)", "France"],
+  ["API « Recherche d’entreprises » (DINUM, État français)", "Recherche d’entreprises et de commerces par leur nom dans le répertoire SIRENE (texte saisi, code postal ou département déduit de la position du dépôt ; aucune donnée de personne physique n’est transmise)", "France"],
   ["Komoot GmbH (Photon)", "Recherche d’adresses et d’établissements (texte saisi, position approximative pour classer les résultats)", "Allemagne (Union européenne)"],
   ["OpenStreetMap Foundation (Nominatim)", "Géolocalisation d’adresses et d’établissements (texte saisi), notamment pour les Clients établis hors de France", "Royaume-Uni (décision d’adéquation)"],
   ["Service d’itinéraires OSRM (serveur public du projet OSRM)", "Calcul des itinéraires et des indications de navigation : coordonnées des arrêts et du point de départ, sans nom ni identifiant", "Localisation variable, à confirmer ; l’Éditeur peut le remplacer par un serveur d’itinéraires dédié"],

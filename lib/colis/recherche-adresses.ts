@@ -10,12 +10,22 @@
 //     dépôt ou du chauffeur) et la Base Adresse Nationale (France) ;
 //  3. Google Places Autocomplete : source PRINCIPALE si une clé existe
 //     (lib/colis/places-google.ts) ; sinon la BAN répond seule et vite, et
-//     OpenStreetMap complète ensuite (deuxième requête, jamais bloquante).
+//     OpenStreetMap complète ensuite (deuxième requête, jamais bloquante) ;
+//  4. professionnels par leur nom : API publique « Recherche d'entreprises »
+//     (répertoire SIRENE, gratuite, sans clé ; lib/colis/recherche-entreprises.ts),
+//     France seulement et si le texte ressemble à un nom. Ordre : annuaire,
+//     professionnels dont le nom correspond au texte, adresses BAN, autres
+//     professionnels, puis OpenStreetMap en complément. Avec Google : Google
+//     reste prioritaire, les professionnels SIRENE s'ajoutent à la suite.
 
 import { normaliserTexte } from "@/lib/colis/professionnel";
 
-export type TypeSuggestion = "adresse" | "etablissement";
-export type SourceSuggestion = "annuaire" | "osm" | "ban" | "google";
+/** « pro » : professionnel / entreprise trouvé par son nom (SIRENE) ; se comporte comme un établissement. */
+export type TypeSuggestion = "adresse" | "etablissement" | "pro";
+export type SourceSuggestion = "annuaire" | "osm" | "ban" | "google" | "sirene";
+
+/** Lieu nommé (commerce, entreprise) par opposition à une adresse postale seule. */
+export const estLieuNomme = (s: Pick<SuggestionAdresse, "type">): boolean => s.type !== "adresse";
 
 export interface SuggestionAdresse {
   type: TypeSuggestion;
@@ -115,9 +125,19 @@ export function libelleCategorie(osmValue: string): string {
   return CATEGORIES[osmValue] ?? osmValue.replace(/_/g, " ");
 }
 
-/** Clé de déduplication : nom + adresse normalisés. */
-function cle(s: SuggestionAdresse): string {
-  return `${normaliserTexte(s.nom ?? "")}|${normaliserTexte(s.adresse)}`;
+/**
+ * Clés de déduplication : nom + adresse normalisés, et, pour un lieu nommé,
+ * nom + code postal + numéro de rue (« 12 Av. de la Gare » = « 12 Avenue de la
+ * Gare » venant d'une autre source). Deux suggestions sont des doublons si
+ * elles partagent une clé.
+ */
+function cles(s: SuggestionAdresse): string[] {
+  const nom = normaliserTexte(s.nom ?? "");
+  const k = [`${nom}|${normaliserTexte(s.adresse)}`];
+  const cp = /\b(\d{5})\b/.exec(s.adresse)?.[1];
+  const numero = /^\s*(\d+)/.exec(s.adresse)?.[1];
+  if (nom && cp && numero) k.push(`${nom}|${cp}|${numero}`);
+  return k;
 }
 
 /**
@@ -125,23 +145,15 @@ function cle(s: SuggestionAdresse): string {
  * adresses (la requête peut viser l'un ou l'autre), sans doublon.
  */
 export function fusionnerSuggestions(annuaire: readonly SuggestionAdresse[], externes: readonly SuggestionAdresse[][], limite = 8): SuggestionAdresse[] {
-  const vus = new Set<string>();
-  const sortie: SuggestionAdresse[] = [];
-  const ajouter = (s: SuggestionAdresse) => {
-    const k = cle(s);
-    if (!s.adresse || vus.has(k) || sortie.length >= limite) return;
-    vus.add(k);
-    sortie.push(s);
-  };
-  annuaire.forEach(ajouter);
   const toutes = externes.flat();
-  const etab = toutes.filter((s) => s.type === "etablissement");
-  const adr = toutes.filter((s) => s.type === "adresse");
+  const etab = toutes.filter(estLieuNomme);
+  const adr = toutes.filter((s) => !estLieuNomme(s));
+  const alternes: SuggestionAdresse[] = [];
   for (let i = 0; i < Math.max(etab.length, adr.length); i++) {
-    if (etab[i]) ajouter(etab[i]!);
-    if (adr[i]) ajouter(adr[i]!);
+    if (etab[i]) alternes.push(etab[i]!);
+    if (adr[i]) alternes.push(adr[i]!);
   }
-  return sortie;
+  return ajouterSansDoublon([], [...annuaire, ...alternes], limite);
 }
 
 /** Biais géographique : coordonnées valides, sinon null. */
@@ -155,9 +167,22 @@ export function lireBiais(lat: string | null, lng: string | null): { lat: number
 /**
  * Réponse rapide : annuaire interne d'abord, puis la source principale
  * (Google ou BAN) dans SON ordre de pertinence, sans doublon.
+ *
+ * `pros` : professionnels trouvés par leur nom (SIRENE). Sans Google, ceux dont
+ * le nom (ou l'adresse) contient tous les mots de `requete` passent juste après
+ * l'annuaire (3 au plus), les autres après les adresses BAN. Avec Google, qui
+ * reste prioritaire, ils s'ajoutent à la suite (2 places leur sont réservées).
  */
-export function ordonnerRapide(annuaire: readonly SuggestionAdresse[], principal: readonly SuggestionAdresse[], limite = 8): SuggestionAdresse[] {
-  return ajouterSansDoublon([], [...annuaire, ...principal], limite);
+export function ordonnerRapide(annuaire: readonly SuggestionAdresse[], principal: readonly SuggestionAdresse[], limite = 8, pros: readonly SuggestionAdresse[] = [], requete = ""): SuggestionAdresse[] {
+  if (pros.length === 0) return ajouterSansDoublon([], [...annuaire, ...principal], limite);
+  const correspond = (s: SuggestionAdresse) => correspondRequete(`${s.nom ?? ""} ${s.detail ?? ""} ${s.adresse}`, requete);
+  const nommes = pros.filter(correspond).slice(0, 3);
+  const autres = pros.filter((s) => !nommes.includes(s));
+  if (principal.some((s) => s.source === "google")) {
+    const place = Math.max(0, limite - annuaire.length - Math.min(2, pros.length));
+    return ajouterSansDoublon([], [...annuaire, ...principal.slice(0, place), ...nommes, ...autres, ...principal.slice(place)], limite);
+  }
+  return ajouterSansDoublon([], [...annuaire, ...nommes, ...principal, ...autres], limite);
 }
 
 /**
@@ -166,8 +191,8 @@ export function ordonnerRapide(annuaire: readonly SuggestionAdresse[], principal
  * et adresses alternés.
  */
 export function completerSuggestions(existantes: readonly SuggestionAdresse[], complement: readonly SuggestionAdresse[], limite = 8): SuggestionAdresse[] {
-  const etab = complement.filter((s) => s.type === "etablissement");
-  const adr = complement.filter((s) => s.type === "adresse");
+  const etab = complement.filter(estLieuNomme);
+  const adr = complement.filter((s) => !estLieuNomme(s));
   const alternes: SuggestionAdresse[] = [];
   for (let i = 0; i < Math.max(etab.length, adr.length); i++) {
     if (etab[i]) alternes.push(etab[i]!);
@@ -177,12 +202,12 @@ export function completerSuggestions(existantes: readonly SuggestionAdresse[], c
 }
 
 function ajouterSansDoublon(base: readonly SuggestionAdresse[], ajouts: readonly SuggestionAdresse[], limite: number): SuggestionAdresse[] {
-  const vus = new Set(base.map(cle));
+  const vus = new Set(base.flatMap(cles));
   const sortie = [...base];
   for (const s of ajouts) {
-    const k = cle(s);
-    if (!s.adresse || vus.has(k) || sortie.length >= limite) continue;
-    vus.add(k);
+    const k = cles(s);
+    if (!s.adresse || k.some((c) => vus.has(c)) || sortie.length >= limite) continue;
+    k.forEach((c) => vus.add(c));
     sortie.push(s);
   }
   return sortie;
