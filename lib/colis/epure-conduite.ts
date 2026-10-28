@@ -8,10 +8,14 @@
 
 import type { Point } from "@/lib/colis/itineraire";
 
-/** Au-dessus de cette vitesse (km/h, GPS), le véhicule est considéré en mouvement. */
-export const SEUIL_MOUVEMENT_KMH = 5;
+/**
+ * Au-dessus de cette vitesse (km/h, GPS), le véhicule est considéré en mouvement.
+ * 5 km/h était la vitesse de marche : un livreur qui marche jusqu'à la porte
+ * perdait « ‹ » et « Options ». 15 km/h ne s'atteint qu'en véhicule.
+ */
+export const SEUIL_MOUVEMENT_KMH = 15;
 /** En dessous, il est de nouveau à l'arrêt (hystérésis : pas de va-et-vient autour du seuil). */
-export const SEUIL_ARRET_KMH = 3;
+export const SEUIL_ARRET_KMH = 8;
 
 /**
  * Mouvement après un nouveau relevé de vitesse. `precedent` évite que l'écran

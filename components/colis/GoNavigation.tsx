@@ -173,7 +173,7 @@ export function GoNavigation(p: GoNavigationProps) {
   /** Vitesse réelle (km/h, GPS) et limitation indicative de la route (OpenStreetMap). */
   const [vitesseKmh, setVitesseKmh] = useState<number | null>(null);
   const [limiteKmh, setLimiteKmh] = useState<number | null>(null);
-  /** En mouvement (> 5 km/h) : l'écran ne garde que ce qui sert à conduire (lib/colis/epure-conduite.ts). */
+  /** En mouvement (> 15 km/h, pas à la marche) : l'écran ne garde que ce qui sert à conduire (lib/colis/epure-conduite.ts). */
   const [mouvement, setMouvement] = useState(false);
   const derniereLimite = useRef<{ pos: Point; t: number } | null>(null);
   const [erreurGps, setErreurGps] = useState<string | null>(null);
