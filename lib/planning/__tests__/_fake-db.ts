@@ -92,6 +92,10 @@ class Requete implements PromiseLike<Resultat> {
     this.filtres.push((l) => l[c] != null);
     return this;
   }
+  gt(c: string, v: unknown) {
+    this.filtres.push((l) => l[c] != null && comparer(l[c], v) > 0);
+    return this;
+  }
   gte(c: string, v: unknown) {
     this.filtres.push((l) => l[c] != null && comparer(l[c], v) >= 0);
     return this;
