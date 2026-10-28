@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StyleCouleursEntreprise } from "@/components/layout/StyleCouleursEntreprise";
 import { couleursOrganisation } from "@/lib/theme/couleurs-entreprise-serveur";
+import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
 import type { Metadata } from "next";
 
 /** Espace privé : jamais indexé par les moteurs de recherche. */
@@ -31,6 +32,9 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabaseClient();
+  // Lien « Back-office GODAC » : seulement pour les adresses de GODAC_STAFF_EMAILS (jamais pour un client).
+  const { data: { user: utilisateurAuth } } = await supabase.auth.getUser();
+  const estStaffGodac = isGodacStaffEmail(utilisateurAuth?.email);
   const isFieldRole = appUser.conduit;
   const [{ modules, offre }, { data: organization }, activeTour, couleurs] = await Promise.all([
     etatModulesCourant(appUser.organization_id),
@@ -72,6 +76,7 @@ export default async function DashboardLayout({
       messengerAvailable={messengerAvailable}
       currentUserId={appUser.id}
       organizationId={appUser.organization_id}
+      estStaffGodac={estStaffGodac}
     >
       {children}
     </DashboardShell>
