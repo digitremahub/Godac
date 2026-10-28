@@ -7,11 +7,12 @@ import { formaterQuantite, type ArticleSousSeuil } from "@/lib/stock/soldes";
  *   stock_seuil       article sous son seuil mini (une alerte par article tant qu'il l'est)
  *   stock_ecart       inventaire validé avec des écarts
  *   stock_non_rentre  unités chargées en tournée non rentrées après la clôture
+ *   stock_dlc_proche  lot ou unités dont la date limite approche (J-n selon la règle du profil)
  * Lecture : direction, exploitation, manager de l'alerte ayant son service ; jamais
  * chauffeur ni comptable (lib/alerts/destinataires.ts).
  */
 
-export const TYPES_ALERTE_STOCK = ["stock_seuil", "stock_ecart", "stock_non_rentre"] as const;
+export const TYPES_ALERTE_STOCK = ["stock_seuil", "stock_ecart", "stock_non_rentre", "stock_dlc_proche"] as const;
 export type TypeAlerteStock = (typeof TYPES_ALERTE_STOCK)[number];
 
 /** Rôles destinataires (e-mail, push) ; le manager reçoit celles de son service. */
@@ -20,6 +21,9 @@ export const ROLES_DESTINATAIRES_STOCK = ["direction", "exploitation", "manager"
 export const cleAlerteSeuil = (articleId: string) => `stock:seuil:${articleId}`;
 export const cleAlerteEcart = (inventaireId: string) => `stock:ecart:${inventaireId}`;
 export const cleAlerteNonRentre = (runId: string) => `stock:non_rentre:${runId}`;
+
+export const cleAlerteDlc = (articleId: string, lot: string) => `stock:dlc:${articleId}:${lot || "-"}`;
+export const CLE_ALERTE_DLC_UNITES = "stock:dlc:unites";
 
 export function messageSeuil(x: ArticleSousSeuil): string {
   const { article, quantite } = x;
@@ -86,4 +90,37 @@ export function grouperNonRentrees(
     if (t?.cloturee) res.push({ run_id, nombre, libelle: t.libelle, service_id: t.service_id });
   }
   return res.sort((a, b) => b.nombre - a.nombre || a.libelle.localeCompare(b.libelle, "fr"));
+}
+
+// ── DLC proche ─────────────────────────────────────────────────────────
+
+export interface LotDlcProche {
+  article: { id: string; code: string; nom: string };
+  lot: string;
+  dlc: string;
+  /** Jours restants (négatif : dépassée). */
+  jours: number;
+  quantite: number;
+  unite: string;
+}
+
+export function messageDlcLot(x: LotDlcProche): string {
+  const date = x.dlc.split("-").reverse().join("/");
+  const quand = x.jours < 0 ? `dépassée depuis ${-x.jours} jour${-x.jours > 1 ? "s" : ""}` : x.jours === 0 ? "aujourd'hui" : `dans ${x.jours} jour${x.jours > 1 ? "s" : ""}`;
+  return `DLC ${x.jours < 0 ? "dépassée" : "proche"} : ${x.article.nom} (${x.article.code})${x.lot ? `, lot ${x.lot}` : ""}, ${formaterQuantite(x.quantite)} ${x.unite}, date limite ${date} (${quand}).`;
+}
+
+export function messageDlcUnites(nombre: number, jours: number): string {
+  return `${nombre} unité${nombre > 1 ? "s" : ""} en stock ${nombre > 1 ? "ont" : "a"} une date limite dans les ${jours} prochains jours (ou dépassée).`;
+}
+
+/** Décision pour la DLC : lots à signaler et alertes à clore (lot épuisé, DLC changée ou hors délai), par clé de dédoublonnage. */
+export function decisionsDlc<T extends { cle: string }>(lots: readonly T[], ouvertes: readonly AlerteStockOuverte[]): { aSignaler: T[]; aClore: string[] } {
+  const dlc = ouvertes.filter((a) => a.type === "stock_dlc_proche");
+  const dejaSignalees = new Set(dlc.map((a) => a.cle_dedoublonnage));
+  const encore = new Set(lots.map((l) => l.cle));
+  return {
+    aSignaler: lots.filter((l) => !dejaSignalees.has(l.cle)),
+    aClore: dlc.filter((a) => a.cle_dedoublonnage && !encore.has(a.cle_dedoublonnage)).map((a) => a.id),
+  };
 }

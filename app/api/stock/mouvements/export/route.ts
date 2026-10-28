@@ -4,6 +4,7 @@ import { LECTEURS_STOCK } from "@/lib/acces/catalogue";
 import { journaliser } from "@/lib/audit/journal";
 import { EXPORT_MAX_MOUVEMENTS, FORMATS_EXPORT_STOCK, csvMouvements, ligneHistorique, lireFiltresHistorique, nomFichierMouvements, type FormatExportStock, type MouvementBrut } from "@/lib/stock/historique";
 import { requeteMouvements } from "@/lib/stock/requetes-serveur";
+import { lireParametresStock } from "@/lib/stock/serveur";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function GET(req: Request) {
   if (!FORMATS_EXPORT_STOCK.includes(format)) return NextResponse.json({ error: "Format inconnu (csv ou xlsx)." }, { status: 400 });
   const filtres = lireFiltresHistorique(p);
   try {
-    const { requete } = await requeteMouvements(supabase, appUser.organization_id, filtres);
+    const { codesInstalles } = await lireParametresStock(supabase, appUser.organization_id);
+    const { requete } = await requeteMouvements(supabase, appUser.organization_id, filtres, { codesInstalles });
     const { data, error } = await requete.limit(EXPORT_MAX_MOUVEMENTS + 1);
     if (error) throw new Error(error.message);
     const brut = (data ?? []) as unknown as MouvementBrut[];

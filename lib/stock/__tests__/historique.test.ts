@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvMouvements, dateHeureParis, ligneHistorique, lireFiltresHistorique, nomFichierMouvements, type MouvementBrut } from "@/lib/stock/historique";
+import { cellulesHistorique, ENTETE_EXPORT_STOCK, csvMouvements, dateHeureParis, ligneHistorique, lireFiltresHistorique, nomFichierMouvements, type MouvementBrut } from "@/lib/stock/historique";
 
 const brut = (p: Partial<MouvementBrut> = {}): MouvementBrut => ({
   id: "m1",
@@ -54,7 +54,7 @@ describe("export CSV", () => {
     const csv = csvMouvements([ligneHistorique(brut({ motif: "=SOMME(A1)", quantite: 2.5 }))]);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     const lignes = csv.split("\r\n");
-    expect(lignes[0]).toBe("Date;Heure;Mouvement;Unité ou article;Quantité;Unité;Dépôt;De;Vers;Lot;DLC;Statut;Motif;Auteur;Origine;Liée à une tournée".replace(/^/, "﻿"));
+    expect(lignes[0]).toBe("Date;Heure;Mouvement;Unité ou article;Code interne;Nature;Température;Quantité;Unité;Dépôt;De;Vers;Lot;DLC;Statut;Motif;Auteur;Origine;Liée à une tournée".replace(/^/, "﻿"));
     expect(lignes[1]).toContain("2,5");
     expect(lignes[1]).not.toContain(";=SOMME");
   });
@@ -64,5 +64,34 @@ describe("export CSV", () => {
   it("nom de fichier", () => {
     expect(nomFichierMouvements("2026-10-01", "2026-10-28", "xlsx")).toBe("mouvements-stock-2026-10-01-2026-10-28.xlsx");
     expect(nomFichierMouvements(null, null, "csv")).toBe("mouvements-stock-debut-aujourdhui.csv");
+  });
+});
+
+describe("code interne, nature et température dans l'historique et l'export", () => {
+  const avecUnite = (unite: Record<string, unknown> | Record<string, unknown>[] | null) => ligneHistorique(brut({ unite } as never));
+  it("la ligne reprend le code interne, la nature et la température de l'unité (valeurs de la fiche)", () => {
+    const l = avecUnite({ code_interne: "TRA-2026-000001", nature: "prelevement", temperature: "frais", fragile: true, urgent: false });
+    expect(l).toMatchObject({ codeInterne: "TRA-2026-000001", nature: "Prélèvement / échantillon biologique", temperature: "Frais (2 à 8 °C)", fragile: true, urgent: false });
+  });
+  it("jointure renvoyée en tableau : même résultat ; sans unité (article) : cellules vides", () => {
+    expect(avecUnite([{ nature: "colis" }]).nature).toBe("Colis");
+    expect(avecUnite(null)).toMatchObject({ codeInterne: "", nature: "", temperature: "", fragile: false, urgent: false });
+  });
+  it("libellé libre pour « autre »", () => {
+    expect(avecUnite({ nature: "autre", nature_libelle: "Matériel", temperature: "autre", temperature_libelle: "+15 °C" })).toMatchObject({ nature: "Matériel", temperature: "+15 °C" });
+  });
+  it("export CSV : colonnes code interne, nature et température après l'objet, mêmes cellules que l'écran", () => {
+    const csv = csvMouvements([avecUnite({ code_interne: "TRA-2026-000001", nature: "medicament", temperature: "congele" })]);
+    const [entete, ligne] = csv.split("\r\n");
+    const cols = entete!.replace("\ufeff", "").split(";");
+    expect(cols.slice(3, 7)).toEqual(["Unité ou article", "Code interne", "Nature", "Température"]);
+    const cellules = ligne!.split(";");
+    expect(cellules[4]).toBe("TRA-2026-000001");
+    expect(cellules[5]).toBe("Médicament");
+    expect(cellules[6]).toBe("Congelé");
+    expect(cellules).toHaveLength(cols.length);
+  });
+  it("la ligne d'export et l'en-tête ont toujours le même nombre de colonnes", () => {
+    expect(cellulesHistorique(avecUnite(null))).toHaveLength(ENTETE_EXPORT_STOCK.length);
   });
 });

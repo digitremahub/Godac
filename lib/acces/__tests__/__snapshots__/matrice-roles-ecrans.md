@@ -32,6 +32,8 @@
 | Exploitation | Stock | `/exploitation/stock` | ✅ | ✅ | ✅ | — | ✅ | stock |
 | Exploitation | Entrée, sortie, transfert | `/exploitation/stock/mouvement` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
 | Exploitation | Unités et articles | `/exploitation/stock/liste` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Étiquettes et codes | `/exploitation/stock/etiquettes` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
+| Exploitation | Fiche d'unité | `/exploitation/stock/unites/[id]` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
 | Exploitation | Historique des mouvements | `/exploitation/stock/historique` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
 | Exploitation | Inventaire | `/exploitation/stock/inventaire` | 🔒 | 🔒 | 🔒 | — | 🔒 | stock |
 | Exploitation | Paramètres du stock | `/exploitation/stock/parametres` | — | — | 🔒 | — | 🔒 | stock |

@@ -8,14 +8,22 @@ import {
   cleAlerteEcart,
   cleAlerteNonRentre,
   cleAlerteSeuil,
+  CLE_ALERTE_DLC_UNITES,
+  decisionsDlc,
   decisionsNonRentre,
   decisionsSeuil,
   grouperNonRentrees,
+  messageDlcLot,
+  messageDlcUnites,
   messageEcart,
   messageNonRentre,
   messageSeuil,
   type AlerteStockOuverte,
 } from "@/lib/stock/alertes";
+import { lotsDlcProches, profilDeLArticle, unitesDlcProches } from "@/lib/stock/fefo";
+import { lireParametresStock } from "@/lib/stock/serveur";
+import { profilsUnites, resoudreProfil } from "@/lib/stock/profils";
+import { parisDay } from "@/lib/utils/paris-time";
 import { fetchAllRows } from "@/lib/utils/fetch-all";
 
 /**
@@ -62,7 +70,7 @@ async function clore(admin: Db, organizationId: string, ids: readonly string[]):
 }
 
 interface NouvelleAlerte {
-  type: "stock_seuil" | "stock_ecart" | "stock_non_rentre";
+  type: "stock_seuil" | "stock_ecart" | "stock_non_rentre" | "stock_dlc_proche";
   severity: "info" | "warning";
   message: string;
   related_table: string;
@@ -99,12 +107,16 @@ async function creer(admin: Db, organizationId: string, a: NouvelleAlerte): Prom
 export async function synchroniserAlertesSeuil(admin: Db, organizationId: string): Promise<BilanAlertesStock> {
   const bilan = vide();
   try {
-    const { data: articles, error } = await admin.from("stock_articles").select("id, code, nom, unite, seuil_mini, actif").eq("organization_id", organizationId).gt("seuil_mini", 0).limit(5000);
+    const parametres = await lireParametresStock(admin, organizationId);
+    const { data: articles, error } = await admin.from("stock_articles").select(parametres.codesInstalles ? "id, code, nom, unite, seuil_mini, actif, profil" : "id, code, nom, unite, seuil_mini, actif").eq("organization_id", organizationId).gt("seuil_mini", 0).limit(5000);
     if (error) {
       if (!estSchemaManquant(error)) bilan.erreur = error.message;
       return bilan;
     }
-    const liste = ((articles ?? []) as (Omit<ArticleSeuil, "seuil_mini"> & { seuil_mini: number | string })[]).map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) }));
+    // Règle du profil de l'article : « seuil mini » désactivable (un article d'un profil sans alerte de seuil n'est pas évalué).
+    const liste = ((articles ?? []) as unknown as (Omit<ArticleSeuil, "seuil_mini"> & { seuil_mini: number | string; profil?: string | null })[])
+      .filter((a) => profilDeLArticle(a, parametres.profils, parametres.config)?.alertes.seuilMini ?? true)
+      .map((a) => ({ ...a, seuil_mini: Number(a.seuil_mini) }));
     const lus = await fetchAllRows<{ article_id: string; site_id: string; emplacement_id: string | null; lot: string; quantite: number | string }>(
       (a, b) => admin.from("stock_soldes").select("article_id, site_id, emplacement_id, lot, quantite").eq("organization_id", organizationId).order("id").range(a, b) as unknown as PromiseLike<{ data: never[] | null; error: { message: string } | null }>,
     );
@@ -134,6 +146,10 @@ export async function synchroniserAlertesSeuil(admin: Db, organizationId: string
 export async function synchroniserAlertesNonRentre(admin: Db, organizationId: string): Promise<BilanAlertesStock> {
   const bilan = vide();
   try {
+    // Règle des profils : alerte « unités non rentrées » désactivable (aucun profil à unités ne la demande).
+    const parametres = await lireParametresStock(admin, organizationId);
+    const unitesActives = profilsUnites(parametres.profils, parametres.config);
+    if (unitesActives.length > 0 && !unitesActives.some((p) => resoudreProfil(p, parametres.config).alertes.nonRentre)) return bilan;
     const { data: unites, error } = await admin
       .from("stock_unites")
       .select("run_id, statut, emplacement_id")
@@ -180,9 +196,61 @@ export async function synchroniserAlertesNonRentre(admin: Db, organizationId: st
   return bilan;
 }
 
+/**
+ * DLC proche : un lot d'article dont la date limite tombe dans le délai de son profil (alimentaire 7 jours,
+ * pharmacie 90, vrac 30 par défaut, réglable) ou est dépassée, et les unités individualisées dans le même cas.
+ * Une alerte par lot (clé stock:dlc:<article>:<lot>), close quand le lot est épuisé ou sorti du délai ;
+ * une alerte récapitulative pour les unités.
+ */
+export async function synchroniserAlertesDlc(admin: Db, organizationId: string): Promise<BilanAlertesStock> {
+  const bilan = vide();
+  try {
+    const parametres = await lireParametresStock(admin, organizationId);
+    if (!parametres.codesInstalles) return bilan;
+    const aujourdhui = parisDay();
+    const { data: articles, error } = await admin.from("stock_articles").select("id, code, nom, unite, actif, profil").eq("organization_id", organizationId).limit(5000);
+    if (error) {
+      if (!estSchemaManquant(error)) bilan.erreur = error.message;
+      return bilan;
+    }
+    const lus = await fetchAllRows<{ article_id: string; site_id: string; emplacement_id: string | null; lot: string; dlc: string | null; quantite: number | string }>(
+      (a, b) => admin.from("stock_soldes").select("article_id, site_id, emplacement_id, lot, dlc, quantite").eq("organization_id", organizationId).not("dlc", "is", null).gt("quantite", 0).order("id").range(a, b) as unknown as PromiseLike<{ data: never[] | null; error: { message: string } | null }>,
+    );
+    if (lus.error) {
+      bilan.erreur = lus.error;
+      return bilan;
+    }
+    const soldes = lus.rows.map((s) => ({ ...s, quantite: Number(s.quantite) }));
+    const lots = lotsDlcProches((articles ?? []) as { id: string; code: string; nom: string; unite: string; actif: boolean; profil: string | null }[], soldes, aujourdhui, parametres.profils, parametres.config);
+    const { data: unites } = await admin.from("stock_unites").select("profil, dlc, statut").eq("organization_id", organizationId).not("dlc", "is", null).in("statut", ["dans_depot", "retour"]).limit(5000);
+    const resumeUnites = unitesDlcProches((unites ?? []) as { profil: string | null; dlc: string | null; statut: string }[], aujourdhui, parametres.profils, parametres.config);
+
+    const { lignes, typeAbsent } = await alertesOuvertes(admin, organizationId, "stock_dlc_proche");
+    if (typeAbsent) return { ...bilan, typeAbsent };
+    const candidats = [...lots.map((l) => ({ ...l, kind: "lot" as const })), ...(resumeUnites.nombre > 0 ? [{ cle: CLE_ALERTE_DLC_UNITES, kind: "unites" as const }] : [])];
+    const { aSignaler, aClore } = decisionsDlc(candidats, lignes);
+    bilan.closes = await clore(admin, organizationId, aClore);
+    for (const x of aSignaler) {
+      const r =
+        x.kind === "lot"
+          ? await creer(admin, organizationId, { type: "stock_dlc_proche", severity: x.jours < 0 ? "warning" : "info", message: messageDlcLot(x), related_table: "stock_articles", related_id: x.article.id, service_id: null, cle: x.cle })
+          : await creer(admin, organizationId, { type: "stock_dlc_proche", severity: "info", message: messageDlcUnites(resumeUnites.nombre, resumeUnites.delaiMax), related_table: "stock_unites", related_id: organizationId, service_id: null, cle: CLE_ALERTE_DLC_UNITES });
+      if (r.typeAbsent) return { ...bilan, typeAbsent: true };
+      if (r.creee) bilan.creees++;
+    }
+  } catch (e) {
+    bilan.erreur = e instanceof Error ? e.message : String(e);
+    console.warn("[stock] alertes de DLC", bilan.erreur);
+  }
+  return bilan;
+}
+
 /** Inventaire validé avec des écarts : une alerte par inventaire. */
 export async function alerterEcartInventaire(admin: Db, p: { organizationId: string; inventaireId: string; site: string; serviceId: string | null; phrase: string }): Promise<{ creee: boolean; typeAbsent: boolean }> {
   try {
+    // Règle des profils : alerte d'écart d'inventaire désactivable.
+    const parametres = await lireParametresStock(admin, p.organizationId);
+    if (parametres.profils.length > 0 && !parametres.profils.some((c) => resoudreProfil(c, parametres.config).alertes.ecartInventaire)) return { creee: false, typeAbsent: false };
     return await creer(admin, p.organizationId, {
       type: "stock_ecart",
       severity: "warning",

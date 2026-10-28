@@ -8,6 +8,7 @@ import { lireCorps, reponseErreur, REQUETE_INVALIDE } from "@/lib/stock/http";
 import { schemaMouvement, validerMouvement } from "@/lib/stock/mouvements";
 import { requeteMouvements } from "@/lib/stock/requetes-serveur";
 import { appelerMouvement, lireParametresStock } from "@/lib/stock/serveur";
+import { trouverUniteParCode } from "@/lib/stock/unites-serveur";
 import { reevaluerSeuils } from "@/lib/stock/alertes-serveur";
 
 /** Historique des mouvements (filtres : du, au, type, q, site, article, tournee, page). Le registre est en lecture seule. */
@@ -16,7 +17,8 @@ export async function GET(req: Request) {
   if (!g.ok) return g.reponse;
   const { supabase, appUser } = g;
   const f = lireFiltresHistorique(Object.fromEntries(new URL(req.url).searchParams.entries()));
-  const { requete } = await requeteMouvements(supabase, appUser.organization_id, f, { compter: true });
+  const { codesInstalles } = await lireParametresStock(supabase, appUser.organization_id);
+  const { requete } = await requeteMouvements(supabase, appUser.organization_id, f, { compter: true, codesInstalles });
   const { data, error, count } = await requete.range((f.page - 1) * PAGE_HISTORIQUE, f.page * PAGE_HISTORIQUE - 1);
   if (error) return reponseErreur(traduireErreurStock(error));
   return NextResponse.json({ mouvements: ((data ?? []) as unknown as MouvementBrut[]).map(ligneHistorique), total: count ?? 0, page: f.page, parPage: PAGE_HISTORIQUE });
@@ -34,8 +36,10 @@ export async function POST(req: Request) {
   const parsed = schemaMouvement.safeParse(await lireCorps(req));
   if (!parsed.success) return reponseErreur(REQUETE_INVALIDE);
   const { supabase, appUser } = g;
-  const { profils } = await lireParametresStock(supabase, appUser.organization_id);
-  const v = validerMouvement(parsed.data, { profils, role: appUser.role });
+  const { profils, config } = await lireParametresStock(supabase, appUser.organization_id);
+  // Unité déjà connue (code principal ou code interne) : ses valeurs comptent pour les champs obligatoires.
+  const existante = parsed.data.code ? await trouverUniteParCode(supabase, appUser.organization_id, parsed.data.code).catch(() => null) : null;
+  const v = validerMouvement(parsed.data, { profils, role: appUser.role, config, uniteExistante: existante });
   if (!v.ok) return reponseErreur({ code: "stock_requete_invalide", message: v.erreur, status: 400 });
   const r = await appelerMouvement(supabase, v.params);
   if (!r.ok) return reponseErreur(r);
@@ -55,5 +59,5 @@ export async function POST(req: Request) {
       await reevaluerSeuils(appUser.organization_id);
     }
   }
-  return NextResponse.json({ ok: true, doublon: r.doublon, mouvement_id: r.mouvementId, unite_id: r.uniteId, statut: r.statut, quantite_apres: r.quantiteApres });
+  return NextResponse.json({ ok: true, doublon: r.doublon, mouvement_id: r.mouvementId, unite_id: r.uniteId, statut: r.statut, quantite_apres: r.quantiteApres, code: r.code, code_interne: r.codeInterne });
 }

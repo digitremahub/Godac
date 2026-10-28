@@ -14,19 +14,22 @@ import {
 } from "@/lib/stock/profils";
 
 describe("profils d'activité", () => {
-  it("trois profils, chacun avec son vocabulaire et ses unités", () => {
-    expect(PROFILS).toEqual(["messagerie", "palettes", "vrac"]);
+  it("sept profils prédéfinis, dont les trois historiques, avec leur vocabulaire et leurs unités", () => {
+    expect(PROFILS).toEqual(["messagerie", "palettes", "sante", "pharmacie", "alimentaire", "vrac", "personnalise"]);
     expect(DEFINITION_PROFILS.messagerie.vocabulaire.un).toBe("colis");
-    expect(DEFINITION_PROFILS.messagerie.champs).toEqual(["poids", "volume"]);
+    expect(DEFINITION_PROFILS.messagerie.champs.poids).toBe("affiche");
+    expect(DEFINITION_PROFILS.messagerie.champs.volume).toBe("affiche");
     expect(DEFINITION_PROFILS.palettes.vocabulaire.un).toBe("palette");
     expect(DEFINITION_PROFILS.palettes.typesUnite).toEqual(["palette_eur", "demi_palette", "palette_autre"]);
-    expect(DEFINITION_PROFILS.palettes.champs).toContain("sscc");
+    expect(DEFINITION_PROFILS.palettes.champs.sscc).toBe("affiche");
     expect(DEFINITION_PROFILS.vrac.suivi).toBe("articles");
-    expect(DEFINITION_PROFILS.vrac.champs).toEqual(["lot", "dlc"]);
+    expect(DEFINITION_PROFILS.vrac.champs.lot).toBe("affiche");
+    expect(DEFINITION_PROFILS.vrac.champs.dlc).toBe("affiche");
   });
 
   it("normalise une liste : valeurs inconnues et doublons écartés, ordre canonique", () => {
     expect(normaliserProfils(["vrac", "x", "messagerie", "vrac", 3])).toEqual(["messagerie", "vrac"]);
+    expect(normaliserProfils(["personnalise", "sante", "pharmacie"])).toEqual(["sante", "pharmacie", "personnalise"]);
     expect(normaliserProfils(null)).toEqual([]);
     expect(normaliserProfils("vrac")).toEqual([]);
   });
@@ -57,7 +60,9 @@ describe("profils d'activité", () => {
     expect(motUnite(["messagerie"]).un).toBe("colis");
     expect(motUnite(["palettes", "vrac"]).un).toBe("palette");
     expect(motUnite(["messagerie", "palettes"]).un).toBe("unité");
-    expect(libelleProfils(["messagerie", "vrac"])).toBe("Messagerie / colis · Marchandises en vrac / références");
+    expect(libelleProfils(["messagerie", "vrac"])).toBe("Colis / messagerie · Références en vrac");
+    expect(motUnite(["sante"]).un).toBe("échantillon");
+    expect(motUnite(["sante", "messagerie"]).un).toBe("unité");
   });
 
   it("l'activité d'une unité se déduit de son type", () => {

@@ -16,6 +16,7 @@ const UNIQUES: Record<string, string[]> = {
   planning_entries: ["organization_id", "service_id", "tour_number", "start_at"],
   planning_validations: ["organization_id", "service_id", "week_start"],
   alerts: ["organization_id", "cle_dedoublonnage"],
+  stock_parametres: ["organization_id"],
 };
 
 /** Valeurs par défaut des colonnes (comme la base). */

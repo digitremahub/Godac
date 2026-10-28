@@ -1,3 +1,5 @@
+import { LIBELLES_CHAMP, type ChampStock } from "@/lib/stock/profils";
+
 /**
  * Codes d'erreur des fonctions SQL du stock (message d'exception « stock_xxx »)
  * traduits en français, avec le statut HTTP à renvoyer. Fichier pur.
@@ -35,6 +37,17 @@ const TABLE: Record<string, { message: string; status: number }> = {
   stock_inventaire_en_cours: { message: "Un inventaire est déjà en cours pour ce dépôt et cette zone.", status: 409 },
   stock_inventaire_introuvable: { message: "Inventaire introuvable.", status: 404 },
   stock_inventaire_clos: { message: "Cet inventaire est clos : il ne peut plus être modifié.", status: 409 },
+  stock_nombre_invalide: { message: "Indiquez un nombre de codes entre 1 et 500.", status: 400 },
+  stock_limite_depassee: { message: "500 codes au plus par demande : faites plusieurs demandes.", status: 400 },
+  stock_compteur_epuise: { message: "Le compteur de codes de l'année est épuisé (999 999 codes). Contactez GODAC.", status: 409 },
+  stock_prefixe_invalide: { message: "Préfixe invalide : 2 à 6 caractères, lettres A-Z et chiffres seulement (ex. TRA).", status: 400 },
+  stock_code_ambigu: { message: "Ce code désigne déjà une autre unité (code principal ou code interne) : un code ne peut identifier qu'une seule unité.", status: 409 },
+  stock_code_interne_invalide: { message: "Ce n'est pas un code interne valide (format PREFIXE-AAAA-NNNNNN).", status: 400 },
+  stock_code_interne_inconnu: { message: "Ce code interne n'a pas été généré pour votre entreprise : utilisez « Générer un code ».", status: 400 },
+  stock_code_interne_deja: { message: "Cette unité a déjà un autre code interne.", status: 409 },
+  stock_code_interne_entree_seulement: { message: "Un code interne se rattache à l'entrée d'une unité (ou depuis sa fiche).", status: 400 },
+  stock_attribut_invalide: { message: "Un attribut (nature, température, consigne…) est invalide ou trop long.", status: 400 },
+  stock_profil_invalide: { message: "Profil d'activité inconnu.", status: 400 },
   stock_registre_immuable: { message: "Le registre des mouvements ne peut pas être modifié.", status: 409 },
 };
 
@@ -45,9 +58,16 @@ export function traduireErreurStock(erreur: { code?: string | null; message?: st
   const message = erreur?.message ?? "";
   const trouve = /stock_[a-z_]+/.exec(message)?.[0];
   if (trouve && TABLE[trouve]) return { code: trouve, ...TABLE[trouve]! };
+  const requis = /^stock_champ_requis_([a-z_]+)$/.exec(trouve ?? "");
+  if (requis) {
+    const champ = requis[1] as ChampStock;
+    const libelle = LIBELLES_CHAMP[champ] ?? requis[1];
+    return { code: "stock_champ_requis", message: `Le champ « ${libelle} » est obligatoire pour ce profil d'activité.`, status: 400 };
+  }
   if (erreur?.code && SCHEMA_ABSENT.includes(erreur.code)) {
     return { code: "stock_schema_absent", message: "Le module Stock n'est pas encore installé sur la base (mise à jour en attente).", status: 503 };
   }
+  if (erreur?.code === "23505" && /code_interne|stock_unites_organization_id_code_key/.test(message)) return { code: "stock_code_ambigu", ...TABLE.stock_code_ambigu! };
   if (erreur?.code === "23505") return { code: "stock_doublon", message: "Cette valeur existe déjà.", status: 409 };
   if (erreur?.code === "23514") return { code: "stock_valeur_invalide", message: "Valeur refusée par les contrôles de la base.", status: 400 };
   return { code: "stock_erreur", message: "Enregistrement impossible, réessayez.", status: 500 };

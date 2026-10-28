@@ -88,6 +88,7 @@ const CIBLE_PAR_TYPE: Record<string, (relatedId: string | null) => Cible> = {
   // Stock : article sous son seuil mini (tableau de bord), écart d'inventaire (inventaires), unités non rentrées (tableau de bord, vue tournées).
   stock_seuil: () => ({ id: "stock.accueil" }),
   stock_ecart: (id) => ({ id: "stock.inventaire", suite: id ? `?inventaire=${encodeURIComponent(id)}` : "" }),
+  stock_dlc_proche: () => ({ id: "stock.liste", suite: "?vue=articles" }),
   stock_non_rentre: (id) => ({ id: "stock.accueil", suite: id ? `?tournee=${encodeURIComponent(id)}#non-rentrees` : "" }),
   // Échéance RH (permis, visite médicale, fin de contrat, document) : la fiche du salarié.
   echeance_rh: (id) => (id ? { id: "equipe.utilisateur_fiche", params: { id } } : { id: "equipe.utilisateurs" }),

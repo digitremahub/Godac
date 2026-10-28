@@ -78,7 +78,11 @@ export default function ConfidentialitePage() {
             <strong>Stock (si l&apos;entreprise utilise le module Stock) :</strong> colis, palettes et références suivis par leur code, avec leur emplacement,
             leur statut et l&apos;historique des mouvements (entrée, sortie, transfert, retour, casse, perte, ajustement, inventaire). <strong>Aucune donnée de
             destinataire n&apos;y figure</strong> : le seul lien avec les tournées est l&apos;identifiant de la tournée ou de l&apos;arrêt concerné. Le nom du salarié
-            qui effectue un mouvement ou un inventaire est conservé pour la traçabilité.
+            qui effectue un mouvement ou un inventaire est conservé pour la traçabilité. L&apos;entreprise peut y ajouter des informations logistiques facultatives
+            (nature de l&apos;objet, température, fragile, urgent, consigne de manipulation, référence client, lot, date limite) et imprimer des étiquettes dont le QR
+            code et le code-barres <strong>ne contiennent que le code</strong>. <strong>Aucune donnée de santé nominative</strong> (patient, donneur) ne doit être saisie dans
+            les champs libres. GODAC fournit un suivi logistique : le respect des exigences réglementaires propres au secteur de l&apos;entreprise (chaîne du froid,
+            traçabilité sanitaire, pharmacie, produits sanguins) reste à la charge de l&apos;entreprise.
           </li>
           <li>
             <strong>Fiches client de l&apos;annuaire de tournée :</strong> pour préremplir les prochaines tournées de l&apos;entreprise, GODAC retient, par
