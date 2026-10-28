@@ -108,7 +108,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-white/10">
-        <p className="mx-auto max-w-6xl px-5 py-5 text-xs text-white/60 sm:px-6">© {new Date().getFullYear()} GODAC · Tous droits réservés</p>
+        <p className="mx-auto max-w-6xl px-5 py-5 text-xs text-white/60 sm:px-6">© {new Date().getFullYear()} GODAC · Tous droits réservés · Photographies d&apos;illustration.</p>
       </div>
     </footer>
   );
