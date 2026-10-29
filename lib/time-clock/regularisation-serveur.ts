@@ -29,7 +29,7 @@ export interface BilanCloture {
 export async function cloturerPointagesOuverts(admin: SupabaseClient, organizationId: string, maintenant: Date = new Date(), seulementUserId?: string): Promise<BilanCloture> {
   let requete = admin
     .from("time_clock_entries")
-    .select("id, user_id, clocked_in_at, needs_regularization, users(full_name)")
+    .select("id, user_id, clocked_in_at, needs_regularization, users!time_clock_entries_user_id_fkey(full_name)")
     .eq("organization_id", organizationId)
     .is("clocked_out_at", null)
     .limit(500);
@@ -125,7 +125,7 @@ async function alerterPointage(
 export async function listerPointagesARegulariser(db: SupabaseClient, organizationId: string, limite = 100): Promise<PointageARegulariser[]> {
   const { data, error } = await db
     .from("time_clock_entries")
-    .select("id, user_id, clocked_in_at, clocked_out_at, estimated_out_source, users(full_name)")
+    .select("id, user_id, clocked_in_at, clocked_out_at, estimated_out_source, users!time_clock_entries_user_id_fkey(full_name)")
     .eq("organization_id", organizationId)
     .eq("needs_regularization", true)
     .order("clocked_in_at", { ascending: true })
