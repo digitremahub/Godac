@@ -72,13 +72,14 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
   let query = supabase
     .from("time_clock_entries")
     .select(
-      "id, clocked_in_at, clocked_out_at, clock_in_source, clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, users(full_name, address_lat, address_lng)",
+      "id, clocked_in_at, clocked_out_at, clock_in_source, clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, users!time_clock_entries_user_id_fkey(id, full_name, address_lat, address_lng)",
     )
     .order("clocked_in_at", { ascending: false })
     .limit(100);
   if (!vueEquipe) query = query.eq("user_id", appUser.id);
 
-  const { data: entries } = await query;
+  const { data: entries, error: erreurHistorique } = await query;
+  if (erreurHistorique) console.error("VuePointage : lecture de l'historique", erreurHistorique.message);
 
   // Arrêts de travail en cours (non refusés) : aucun badgeage attendu ces jours-là.
   const aujourdhui = parisDay();
@@ -129,7 +130,9 @@ export async function VuePointage({ appUser, supabase, equipe }: { appUser: AppU
       </div>
 
       <h3 className="mb-2 text-base">{vueEquipe ? (isDirection ? "Historique (tous les employés)" : "Historique (vous et votre service)") : "Mon historique"}</h3>
-      {(entries ?? []).length === 0 ? (
+      {erreurHistorique ? (
+        <p role="alert" className="max-w-xl rounded-lg bg-orange/10 px-3 py-2 text-sm text-orange-ink">L&apos;historique n&apos;a pas pu être lu. Réessayez dans un instant.</p>
+      ) : (entries ?? []).length === 0 ? (
         <EmptyState title="Aucun badgeage enregistré." />
       ) : (
         <Card className="flex flex-col gap-1.5">
