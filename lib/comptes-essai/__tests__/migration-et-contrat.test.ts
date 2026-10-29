@@ -12,11 +12,11 @@ const MIGRATION = "supabase/migrations/20261116000001_comptes_suspension.sql";
 const sql = () => lire(MIGRATION).replace(/--.*$/gm, "");
 
 describe("migration 20261116000001 : additive, idempotente, sans suppression", () => {
-  it("le numéro suit la dernière migration existante avant elle et est unique", () => {
+  it("le numéro est unique", () => {
     const fichiers = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
     expect(fichiers).toContain("20261116000001_comptes_suspension.sql");
     expect(fichiers.filter((f) => f.startsWith("20261116000001"))).toHaveLength(1);
-    expect(fichiers.filter((f) => f.slice(0, 14) > "20261116000001")).toEqual([]);
+    // D'autres migrations peuvent la suivre (ex. 20261117000001_go_lieux.sql) : seule son unicité compte.
   });
   it("aucune instruction destructrice ni modification de données existantes", () => {
     const s = sql().toLowerCase();

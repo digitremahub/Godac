@@ -770,6 +770,9 @@ export function AppLivreur({
             <IconRefresh className="h-5 w-5" />
           </button>
         </div>
+        <Link href="/livreur/aller-a" className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-white/15 px-4 text-sm font-bold text-white hover:bg-white/20" aria-label="Aller à… : navigation vers une destination libre, sans tournée">
+          <IconNavigation className="h-5 w-5 text-teal" /> Aller à…
+        </Link>
         {runs !== null && (
           <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[11px] font-semibold" aria-label="Étapes de la tournée colis">
             {etatsEtapes(etape).map((x, i) => (
@@ -1010,8 +1013,8 @@ export function AppLivreur({
                   {arretCarte.status === "pending" && <BadgeHoraires stop={arretCarte} fenetres={horaires.fenetres.get(arretCarte.id) ?? null} passage={horaires.passages.get(arretCarte.id)} />}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <a href={lienExterne(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm" target="_blank" rel="noreferrer">
-                    <IconNavigation className="h-4 w-4" /> Y aller
+                  <a href={lienExterne(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm font-bold" target="_blank" rel="noreferrer" aria-label={`Lancer le guidage vers ${arretCarte.address}`}>
+                    <IconNavigation className="h-4 w-4" /> GO
                   </a>
                   {arretCarte.phone ? (
                     <a href={lienTel(arretCarte.phone)} onClick={() => lancerAppel(arretCarte)} className="btn-secondary justify-center !px-2 !py-2.5 text-sm text-teal-ink">
@@ -1159,9 +1162,9 @@ export function AppLivreur({
               </button>
             )}
             {navPreferee !== "go" && (
-              // Waze ou Google Maps préféré : « Y aller » ouvre l'app choisie ; livraison, preuves et ordre restent ici.
-              <a href={lienExterne(prochain)} className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" target="_blank" rel="noreferrer">
-                <IconNavigation className="h-5 w-5 text-teal" /> Y aller avec {libelleNavigation(navPreferee)}
+              // Waze ou Google Maps préféré : « GO » ouvre l'app choisie ; livraison, preuves et ordre restent ici.
+              <a href={lienExterne(prochain)} className="btn-primary justify-center !bg-marine !py-3.5 text-base !text-white" target="_blank" rel="noreferrer" aria-label={`Lancer le guidage avec ${libelleNavigation(navPreferee)} vers ${prochain.address}`}>
+                <IconNavigation className="h-5 w-5 text-teal" /> GO avec {libelleNavigation(navPreferee)}
               </a>
             )}
             <div className="grid grid-cols-2 gap-2">

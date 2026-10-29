@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { traceGpsAutorisee } from "@/lib/go-lieux/mission";
 import { MAX_POINTS_REQUETE, ajouterAFile, doitEnvoyer, doitEnvoyerPosition, garderPoint, lireFile, type PointTrace } from "@/lib/colis/trace-gps";
 
 const CLE_FILE = (runId: string) => `godac.trace-gps.${runId}`;
@@ -38,7 +39,8 @@ export function useTraceGps(runId: string | null, actif: boolean): boolean {
   const envoiEnCours = useRef(false);
 
   useEffect(() => {
-    if (!runId || !actif || typeof navigator === "undefined" || !navigator.geolocation) {
+    // « Aller à… » (mission libre) : jamais de trace, quoi qu'il arrive (RGPD).
+    if (!runId || !traceGpsAutorisee(runId) || !actif || typeof navigator === "undefined" || !navigator.geolocation) {
       setEnregistre(false);
       return;
     }

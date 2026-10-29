@@ -23,9 +23,14 @@ export async function AccueilGoNavigation({ organizationId }: { organizationId: 
             Essai gratuit : {jours > 1 ? `${jours} jours restants` : jours === 1 ? "dernier jour" : "terminé"}.
           </p>
         </div>
-        <Link href="/livreur/navigation" className="btn-primary">
-          Ouvrir GO Navigation
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/livreur/navigation" className="btn-primary">
+            Ouvrir GO Navigation
+          </Link>
+          <Link href="/livreur/aller-a" className="btn-secondary">
+            Aller à…
+          </Link>
+        </div>
       </div>
       <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-navy/80">
         <li>Créez votre tournée colis ci-dessous (« + Nouvelle tournée colis »).</li>
