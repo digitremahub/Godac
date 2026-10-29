@@ -1,5 +1,6 @@
 import "server-only";
 import webpush from "web-push";
+import { lienAbsolu } from "@/lib/push/lien";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let configured = false;
@@ -42,7 +43,8 @@ export async function sendPushToSubscriptions(
 ): Promise<{ sent: number }> {
   if (!ensureConfigured() || subscriptions.length === 0) return { sent: 0 };
 
-  const body = JSON.stringify(payload);
+  // Lien absolu vers godac.app : un abonnement créé sur un autre hôte (godac-v2.vercel.app) ouvrirait sinon cet hôte-là.
+  const body = JSON.stringify({ ...payload, url: lienAbsolu(payload.url) });
   let sent = 0;
 
   await Promise.all(

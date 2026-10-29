@@ -147,41 +147,45 @@ function FicheCompte({ ligne: l, suspensionDisponible }: { ligne: LigneCompte; s
           </p>
         )}
 
-        <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 lg:grid-cols-4">
           <Champ libelle="Créé le">{dateCourte(l.creeLe)}</Champ>
-          <Champ libelle="Abonnement">
-            {l.abonnement ?? "—"}
-            {l.plan ? <span className="capitalize"> · plan {l.plan}</span> : null}
-          </Champ>
           <Champ libelle="Fin d'essai">{l.trialEndsAt ? dateCourte(l.trialEndsAt) : "—"}</Champ>
-          <Champ libelle="Apporteur / parrainage">{l.apporteur ?? "—"}</Champ>
-          <Champ libelle="Utilisateurs actifs">{l.utilisateursActifs}</Champ>
-          <Champ libelle="Compte direction">
-            {l.emailDirection ? (
-              <a href={`mailto:${l.emailDirection}`} className="text-teal-ink hover:underline">
-                {l.emailDirection}
-              </a>
-            ) : (
-              "—"
-            )}
-          </Champ>
-          <Champ libelle="Dernière activité">{l.derniereActivite ? `${dateHeure(l.derniereActivite)} (${l.sourceActivite === "connexion" ? "connexion" : "activité"})` : "Aucune connue"}</Champ>
+          <Champ libelle="Dernière activité">{l.derniereActivite ? dateHeure(l.derniereActivite) : "Aucune connue"}</Champ>
           <Champ libelle="Usage (30 jours)">
             <span className="tabular-nums">
-              {l.tournees} tournée{l.tournees > 1 ? "s" : ""} ({l.tourneesDemarrees} démarrée{l.tourneesDemarrees > 1 ? "s" : ""}) · {l.arrets} arrêt{l.arrets > 1 ? "s" : ""} ({l.arretsLivres} livré{l.arretsLivres > 1 ? "s" : ""})
+              {l.tournees} tournée{l.tournees > 1 ? "s" : ""} · {l.arrets} arrêt{l.arrets > 1 ? "s" : ""} ({l.arretsLivres} livré{l.arretsLivres > 1 ? "s" : ""})
             </span>
-            {l.optimisations + l.lecturesEtiquettes > 0 && (
-              <span className="block text-xs text-navy/60">
-                {l.optimisations} optimisation{l.optimisations > 1 ? "s" : ""} · {l.lecturesEtiquettes} étiquette{l.lecturesEtiquettes > 1 ? "s" : ""} lue{l.lecturesEtiquettes > 1 ? "s" : ""}
-              </span>
-            )}
           </Champ>
         </dl>
 
-        <div>
-          <p className="mb-1 text-xs font-medium text-navy/55">Modules activés ({l.modules.length})</p>
+        <details className="text-sm">
+          <summary className="cursor-pointer font-semibold text-teal-ink">Détails du compte</summary>
+          <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+            <Champ libelle="Abonnement">
+              {l.abonnement ?? "—"}
+              {l.plan ? <span className="capitalize"> · plan {l.plan}</span> : null}
+            </Champ>
+            <Champ libelle="Apporteur / parrainage">{l.apporteur ?? "—"}</Champ>
+            <Champ libelle="Utilisateurs actifs">{l.utilisateursActifs}</Champ>
+            <Champ libelle="Compte direction">
+              {l.emailDirection ? (
+                <a href={`mailto:${l.emailDirection}`} className="text-teal-ink hover:underline">
+                  {l.emailDirection}
+                </a>
+              ) : (
+                "Aucun (pas de rôle direction)"
+              )}
+            </Champ>
+            <Champ libelle="Source de l'activité">{l.derniereActivite ? (l.sourceActivite === "connexion" ? "connexion" : "activité") : "—"}</Champ>
+            <Champ libelle="Détail de l'usage">
+              <span className="tabular-nums">
+                {l.tourneesDemarrees} tournée{l.tourneesDemarrees > 1 ? "s" : ""} démarrée{l.tourneesDemarrees > 1 ? "s" : ""} · {l.optimisations} optimisation{l.optimisations > 1 ? "s" : ""} · {l.lecturesEtiquettes} étiquette{l.lecturesEtiquettes > 1 ? "s" : ""} lue{l.lecturesEtiquettes > 1 ? "s" : ""}
+              </span>
+            </Champ>
+          </dl>
+          <p className="mb-1 mt-3 text-xs font-medium text-navy/55">Modules activés ({l.modules.length})</p>
           {l.modules.length === 0 ? (
-            <p className="text-sm text-navy/60">Aucun</p>
+            <p className="text-navy/60">Aucun</p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
               {l.modules.map((m) => (
@@ -191,7 +195,7 @@ function FicheCompte({ ligne: l, suspensionDisponible }: { ligne: LigneCompte; s
               ))}
             </ul>
           )}
-        </div>
+        </details>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-navy/5 pt-3 text-sm">
           <Link href={`/godac-staff/${l.id}`} className="font-semibold text-teal-ink hover:underline">

@@ -89,10 +89,10 @@ describe("accès : route et page réservées au staff GODAC", () => {
     expect(src).toContain("if (!isGodacStaffEmail(user?.email)) redirect(\"/dashboard\")");
     expect(src.indexOf("isGodacStaffEmail(user")).toBeLessThan(src.indexOf("createAdminSupabaseClient()"));
   });
-  it("la page est liée depuis le back-office et ses pages voisines", () => {
-    for (const f of ["app/godac-staff/page.tsx", "app/godac-staff/go-navigation/page.tsx", "app/godac-staff/usage-essais/page.tsx"]) {
-      expect(lire(f), f).toContain("/godac-staff/comptes-essai");
-    }
+  it("la page est liée depuis la barre de navigation commune du back-office", () => {
+    expect(lire("components/godac-staff/NavigationStaff.tsx")).toContain("/godac-staff/comptes-essai");
+    expect(lire("components/godac-staff/NavigationStaff.tsx")).toContain("/dashboard");
+    expect(lire("app/godac-staff/layout.tsx")).toContain("NavigationStaff");
     expect(existsSync("app/godac-staff/comptes-essai/page.tsx")).toBe(true);
   });
   it("la route figure dans la liste des routes sans garderApi (audit-routes)", () => {

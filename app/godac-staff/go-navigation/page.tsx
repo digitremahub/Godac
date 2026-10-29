@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
@@ -66,19 +65,6 @@ export default async function InvitationsGoNavigationPage() {
         title="Invitations GO Navigation"
         description="Liens uniques d'inscription à l'essai GO Navigation (30 jours, Tournée colis seule, 3 000 lectures d'étiquettes et 300 optimisations par mois)."
       />
-      <p className="mb-4 text-sm">
-        <Link href="/godac-staff" className="text-teal-ink hover:underline">
-          ← Backoffice opérateur
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
-          Usage des essais →
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
-          Comptes d&apos;essai →
-        </Link>
-      </p>
       {error ? (
         <Card>
           <p className="text-sm text-navy/70">Invitations indisponibles : appliquez la migration 20261023000003_inscription_go_navigation.sql.</p>

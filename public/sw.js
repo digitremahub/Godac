@@ -29,6 +29,10 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Lien vers un autre domaine que celui du service worker (ex. abonnement créé sur godac-v2.vercel.app,
+      // lien envoyé vers godac.app) : on ouvre une fenêtre, un onglet ne peut pas naviguer entre origines.
+      const autreOrigine = new URL(url, self.location.origin).origin !== self.location.origin;
+      if (autreOrigine) return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
       for (const client of windowClients) {
         if ("focus" in client) {
           client.navigate(url);

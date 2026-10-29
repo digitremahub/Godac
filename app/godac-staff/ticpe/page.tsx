@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
@@ -35,11 +34,6 @@ export default async function BaremeTicpeStaffPage() {
         title="Barème TICPE"
         description="Taux de remboursement partiel d'accise sur le gazole (€/hl), datés, par activité et zone. Toute modification s'applique immédiatement à toutes les organisations."
       />
-      <p className="mb-4 text-sm">
-        <Link href="/godac-staff" className="text-teal-ink hover:underline">
-          ← Backoffice opérateur
-        </Link>
-      </p>
       {error ? (
         <Card>
           <p className="text-sm text-navy/70">Barème indisponible : appliquez la migration 20261031000001_ticpe_bareme_reglages.sql.</p>

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isGodacStaffEmail } from "@/lib/godac-staff/auth";
@@ -31,17 +30,6 @@ export default async function ComptesEssaiPage() {
   return (
     <main className="min-h-screen p-4 sm:p-6">
       <PageHeader title="Comptes d'essai" description="Toutes les organisations hors démonstration : abonnement ou essai, usage récent, suspension. Usage interne GODAC." />
-      <p className="mb-4 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-        <Link href="/godac-staff" className="text-teal-ink hover:underline">
-          ← Backoffice opérateur
-        </Link>
-        <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
-          Usage des essais →
-        </Link>
-        <Link href="/godac-staff/go-navigation" className="font-semibold text-teal-ink hover:underline">
-          Invitations GO Navigation →
-        </Link>
-      </p>
 
       {!comptes ? (
         <Card>

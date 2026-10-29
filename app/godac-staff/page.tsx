@@ -53,27 +53,6 @@ export default async function GodacStaffPage() {
         title="GODAC — Backoffice opérateur"
         description={`Connecté en tant que ${email}. Vue cross-tenant, hors RLS — usage interne uniquement.`}
       />
-      <p className="mb-4 text-sm">
-        <Link href="/godac-staff/go-navigation" className="font-semibold text-teal-ink hover:underline">
-          Invitations GO Navigation →
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
-          Comptes d&apos;essai (suspendre / rétablir) →
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/usage-essais" className="font-semibold text-teal-ink hover:underline">
-          Usage des essais →
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/recommandations" className="font-semibold text-teal-ink hover:underline">
-          Recommandations d&apos;employeur →
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/ticpe" className="font-semibold text-teal-ink hover:underline">
-          Barème TICPE →
-        </Link>
-      </p>
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-navy/60">
