@@ -770,8 +770,8 @@ export function AppLivreur({
             <IconRefresh className="h-5 w-5" />
           </button>
         </div>
-        <Link href="/livreur/aller-a" className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-white/15 px-4 text-sm font-bold text-white hover:bg-white/20" aria-label="Aller à… : navigation vers une destination libre, sans tournée">
-          <IconNavigation className="h-5 w-5 text-teal" /> Aller à…
+        <Link href="/livreur/aller-a" className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-white/15 px-4 text-sm font-bold text-white hover:bg-white/20" aria-label="Go! : navigation vers une destination libre, sans tournée">
+          <IconNavigation className="h-5 w-5 text-teal" /> Go!
         </Link>
         {runs !== null && (
           <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[11px] font-semibold" aria-label="Étapes de la tournée colis">

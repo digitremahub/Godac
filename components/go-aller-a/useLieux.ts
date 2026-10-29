@@ -6,7 +6,7 @@ import { ajouterFavori, ajouterRecent, effacerRecents, renommer, supprimer, type
 
 /**
  * Favoris et récents de l'utilisateur (API /api/go/lieux). Table absente ou
- * réseau coupé : les listes restent vides et « Aller à… » fonctionne quand même.
+ * réseau coupé : les listes restent vides et « Go! » fonctionne quand même.
  */
 export function useLieux() {
   const [lieux, setLieux] = useState<Lieu[]>([]);

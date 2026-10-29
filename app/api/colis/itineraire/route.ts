@@ -8,7 +8,7 @@ import { ligneDroite, troncons, type Itineraire, type Point } from "@/lib/colis/
 import { manoeuvresOsrm, type EtapeOsrm } from "@/lib/colis/manoeuvres";
 
 const bodySchema = z.object({
-  /** Absent pour « Aller à… » (destination libre, sans tournée) : seule la voie rapide ci-dessous est alors permise. */
+  /** Absent pour « Go! » (destination libre, sans tournée) : seule la voie rapide ci-dessous est alors permise. */
   run_id: z.string().uuid().optional(),
   depuis: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).nullable().optional(),
   /**
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   // Voie rapide (GO Navigation, recalcul en route) : position et destination fournies, aucun accès base de données.
   if (parsed.data.cible && parsed.data.depuis && parsed.data.point) return NextResponse.json(await troncon([parsed.data.depuis, parsed.data.point], true));
-  // Sans tournée (« Aller à… »), seul le trajet position → destination est servi : rien ne se lit en base.
+  // Sans tournée (« Go! »), seul le trajet position → destination est servi : rien ne se lit en base.
   if (!parsed.data.run_id) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   const supabase = await createServerSupabaseClient();
   if (!(await moduleActif(supabase, appUser.organization_id))) return NextResponse.json({ error: "Module Tournée colis non activé." }, { status: 403 });

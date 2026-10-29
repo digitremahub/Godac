@@ -1,5 +1,5 @@
 /**
- * Destinations récentes de GO (« Aller à… », table go_lieux, genre « recent ») :
+ * Destinations récentes de GO (« Go! », table go_lieux, genre « recent ») :
  * 90 jours après le dernier usage, puis supprimées par le cron retention
  * existant (quotidien). Les favoris restent jusqu'à ce que l'utilisateur les
  * supprime (ou que son compte / son organisation soit effacé, en cascade).

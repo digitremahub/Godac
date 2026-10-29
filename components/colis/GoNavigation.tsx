@@ -147,7 +147,7 @@ export interface GoNavigationProps {
   /** Trajet en cours d'enregistrement pour l'historique (indicateur discret, RGPD). */
   traceActive?: boolean;
   /**
-   * « Aller à… » (mission libre, EN MÉMOIRE) : `run` et `stops` sont virtuels
+   * « Go! » (mission libre, EN MÉMOIRE) : `run` et `stops` sont virtuels
    * (lib/go-lieux/mission.ts). Aucun appel qui touche une tournée (itinéraire
    * complet, position remontée), pas de menu d'options ni de feuille d'arrêts ;
    * trajet jamais enregistré. `onAtteint` : arrêt virtuel atteint (index) ;
@@ -985,11 +985,11 @@ export function GoNavigation(p: GoNavigationProps) {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-1.5">
           {el.retour && (
-            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine/85 text-2xl text-white shadow-pop backdrop-blur-sm" aria-label={p.libre ? "Arrêter le guidage et choisir une autre destination" : "Retour à la préparation de la tournée colis"}>
+            <button type="button" onClick={p.onFermer} className="flex w-12 shrink-0 items-center justify-center rounded-2xl bg-marine/90 text-3xl text-white shadow-pop backdrop-blur-sm" aria-label={p.libre ? "Arrêter le guidage et choisir une autre destination" : "Retour à la préparation de la tournée colis"}>
               ‹
             </button>
           )}
-          <div className="min-w-0 flex-1 rounded-2xl bg-marine/85 px-3 py-1.5 text-white shadow-pop backdrop-blur-sm" aria-live="polite">
+          <div className="min-w-0 flex-1 rounded-2xl bg-marine/90 px-3.5 py-2.5 text-white shadow-pop backdrop-blur-sm" aria-live="polite">
             {fige ? (
               <p className="py-1 text-sm font-semibold">Tournée clôturée : consultation seulement.</p>
             ) : cible ? (
@@ -998,40 +998,40 @@ export function GoNavigation(p: GoNavigationProps) {
                 onClick={() => setChoixBandeau(!deplie)}
                 aria-expanded={deplie}
                 aria-label={deplie ? "Réduire les détails du guidage" : "Afficher les détails du guidage"}
-                className="block min-h-[44px] w-full text-left"
+                className="block min-h-[64px] w-full text-left"
               >
                 {manoeuvre && courante && !arrive ? (
-                  <span className="flex items-center gap-2.5">
-                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-9 w-9 shrink-0 text-teal" />
-                    <span className="shrink-0 font-display text-2xl font-bold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={texteManoeuvre(manoeuvre)}>
+                  <span className="flex items-center gap-3">
+                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-14 w-14 shrink-0 text-teal" />
+                    <span className="shrink-0 font-display text-4xl font-extrabold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-lg font-bold leading-snug" title={texteManoeuvre(manoeuvre)}>
                       {texteManoeuvre(manoeuvre)}
                     </span>
                   </span>
                 ) : arrive ? (
-                  <span className="block font-display text-xl font-bold leading-tight text-teal">Arrivé</span>
+                  <span className="block font-display text-3xl font-extrabold leading-tight text-teal">Arrivé</span>
                 ) : (
-                  <span className="flex items-baseline gap-2">
-                    <span className="shrink-0 font-display text-2xl font-bold tabular-nums leading-tight text-teal">{formatDistance(distanceAffichee)}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{cible.address}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="shrink-0 font-display text-4xl font-extrabold tabular-nums leading-none text-teal">{formatDistance(distanceAffichee)}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-lg font-bold leading-snug">{cible.address}</span>
                   </span>
                 )}
                 {(eta || el.indicateurTrace || p.libre) && (
                   // Une seule ligne fine : arrivée estimée (et trajet enregistré, RGPD, qui reste affiché en roulant).
-                  <span className="mt-0.5 flex items-center gap-2 text-[11px] leading-tight text-white/80">
+                  <span className="mt-1.5 flex items-center gap-2 text-base leading-tight text-white/90">
                     {eta && (
                       <span className="min-w-0 flex-1 truncate">
-                        <span className="uppercase tracking-wide text-white/65">Arrivée</span> <strong className="font-bold tabular-nums text-white">{eta.heure}</strong> · <span className="font-semibold tabular-nums text-teal">{eta.dans}</span> · {eta.distance}
+                        <span className="text-sm uppercase tracking-wide text-white/75">Arrivée</span> <strong className="font-bold tabular-nums text-white">{eta.heure}</strong> · <span className="font-semibold tabular-nums text-teal">{eta.dans}</span> · {eta.distance}
                         {eta.estimee && " (est.)"}
                       </span>
                     )}
                     {p.libre && (
-                      <span className="ml-auto shrink-0 text-white/65" title="Navigation libre : ni le trajet ni la position ne sont enregistrés.">
+                      <span className="ml-auto shrink-0 text-sm text-white/75" title="Navigation libre : ni le trajet ni la position ne sont enregistrés.">
                         Trajet non enregistré
                       </span>
                     )}
                     {el.indicateurTrace && (
-                      <span className="ml-auto shrink-0 text-white/65" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
+                      <span className="ml-auto shrink-0 text-sm text-white/75" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
                         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-orange align-middle" aria-hidden="true" />
                         Trajet enregistré
                       </span>
@@ -1039,13 +1039,13 @@ export function GoNavigation(p: GoNavigationProps) {
                   </span>
                 )}
                 {deplie && suivante && manoeuvre && !arrive && (
-                  <span className="mt-0.5 flex items-center gap-1 text-[11px] leading-tight text-white/75">
-                    <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-3.5 w-3.5 shrink-0 text-white/75" />
+                  <span className="mt-1 flex items-center gap-1.5 text-sm leading-tight text-white/85">
+                    <FlecheManoeuvre picto={pictogramme(suivante)} sortie={suivante.sortie} className="h-5 w-5 shrink-0 text-white/85" />
                     <span className="truncate">Puis : {texteManoeuvre(suivante)}</span>
                   </span>
                 )}
                 {el.ligneEtat && !p.libre && (
-                  <span className="mt-0.5 block truncate text-[11px] leading-tight text-white/65">
+                  <span className="mt-1 block truncate text-sm leading-tight text-white/75">
                     {faits}/{stops.length} faits
                     {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis restants`}
                     {avancement.finEstimee && ` · fin ≈ ${heureFin(avancement.finEstimee)}`}
@@ -1475,7 +1475,7 @@ export function GoNavigation(p: GoNavigationProps) {
 /** Ligne d'un menu (Options) : zone tactile de 48 px. */
 const ITEM_MENU = "min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5";
 
-/** Feuille de la mission libre (« Aller à… ») : destination suivie, étape atteinte, arrêt du guidage. */
+/** Feuille de la mission libre (« Go! ») : destination suivie, étape atteinte, arrêt du guidage. */
 function FeuilleLibre({ cible, total, numero, onAtteint, onQuitter }: { cible: Stop; total: number; numero: number; onAtteint: (index: number) => void; onQuitter: () => void }) {
   const derniere = numero === total - 1;
   return (

@@ -1,5 +1,5 @@
 /**
- * « Aller à… » de GO : lieux enregistrés par l'utilisateur (favoris, récents).
+ * « Go! » de GO : lieux enregistrés par l'utilisateur (favoris, récents).
  * Logique pure, sans base ni réseau, testée dans lib/go-lieux/__tests__.
  * Stockage : table go_lieux (migration 20261117000001), une ligne par lieu et
  * par utilisateur ; l'API (app/api/go/lieux) applique les mêmes règles.

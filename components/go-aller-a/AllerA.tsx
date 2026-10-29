@@ -13,7 +13,7 @@ import { CLE_AVERTISSEMENT, TEXTE_AVERTISSEMENT, avertissementDejaVu } from "@/l
 type Etape = { nom: "destination" } | { nom: "navigation"; mission: MissionLibre } | { nom: "arrivee"; mission: MissionLibre };
 
 /**
- * « Aller à… » : navigation vers une destination libre avec le moteur GO,
+ * « Go! » : navigation vers une destination libre avec le moteur GO,
  * sans tournée. Tout reste en mémoire : aucune tournée ni arrêt créé, aucun
  * trajet ni position enregistrés (la trace GPS n'est jamais montée ici).
  * Une tournée en cours reste intacte : « Retour à ma tournée » la rouvre.

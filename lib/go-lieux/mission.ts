@@ -1,5 +1,5 @@
 /**
- * Mission libre de GO (« Aller à… ») : une destination et 0 à 3 étapes, EN
+ * Mission libre de GO (« Go! ») : une destination et 0 à 3 étapes, EN
  * MÉMOIRE seulement. Jamais de delivery_run ni de delivery_stop : GO reçoit
  * une tournée virtuelle (id « libre ») dont les arrêts virtuels ne
  * correspondent à aucune ligne de base. Logique pure, testée dans
@@ -84,7 +84,7 @@ export function arretsVirtuels(m: MissionLibre, atteints: ReadonlySet<number>) {
 export function tourneeVirtuelle() {
   return {
     id: ID_TOURNEE_LIBRE,
-    name: "Aller à…",
+    name: "Go!",
     run_date: new Date().toISOString().slice(0, 10),
     status: "in_progress" as const,
     start_label: null,

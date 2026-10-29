@@ -103,7 +103,7 @@ export function EcranDestination({
           <Link href="/livreur" className="flex min-h-[44px] items-center gap-1 text-sm text-white/80" aria-label="Retour à ma tournée colis">
             <span aria-hidden="true" className="text-lg leading-none">‹</span> {tourneeEnCours ? "Ma tournée" : "Retour"}
           </Link>
-          <h1 className="font-display text-lg font-bold">Aller à…</h1>
+          <h1 className="font-display text-lg font-bold">Go!</h1>
           <span className="w-16" aria-hidden="true" />
         </div>
       </header>

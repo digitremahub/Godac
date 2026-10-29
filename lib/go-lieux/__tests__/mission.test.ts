@@ -52,7 +52,7 @@ describe("mission libre : arrêts virtuels, rien en base", () => {
       expect(estIdLibre(s.id)).toBe(true);
     }
   });
-  it("aucune écriture de tournée : le code « Aller à… » n'appelle aucune route ni table de tournée", () => {
+  it("aucune écriture de tournée : le code « Go! » n'appelle aucune route ni table de tournée", () => {
     const fichiers = ["components/go-aller-a/AllerA.tsx", "components/go-aller-a/NavigationLibre.tsx", "components/go-aller-a/EcranDestination.tsx", "components/go-aller-a/EcranArrivee.tsx", "components/go-aller-a/useLieux.ts", "components/go-aller-a/usePosition.ts", "components/go-aller-a/EnregistrerFavori.tsx", "lib/go-lieux/serveur.ts", "lib/go-lieux/mission.ts", "app/api/go/lieux/route.ts", "app/api/go/lieux/[id]/route.ts"];
     for (const f of fichiers) {
       const src = sansCommentaires(readFileSync(f, "utf8"));
@@ -77,7 +77,7 @@ describe("RGPD : aucune trace GPS ni position enregistrée pour une navigation l
     expect(src).toContain("traceGpsAutorisee(runId)");
     expect(src.indexOf("traceGpsAutorisee(runId)")).toBeLessThan(src.indexOf("watchPosition"));
   });
-  it("les écrans « Aller à… » ne montent ni useTraceGps ni aucun envoi de position", () => {
+  it("les écrans « Go! » ne montent ni useTraceGps ni aucun envoi de position", () => {
     for (const f of ["AllerA.tsx", "NavigationLibre.tsx", "EcranDestination.tsx", "EcranArrivee.tsx", "usePosition.ts", "useLieux.ts"]) {
       const src = readFileSync(`components/go-aller-a/${f}`, "utf8");
       expect(src, f).not.toMatch(/useTraceGps|trace-gps|\/api\/colis\/(trace|position)|localStorage\.setItem\([^)]*(lat|position|trace)/);
