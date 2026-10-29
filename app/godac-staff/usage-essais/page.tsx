@@ -32,19 +32,6 @@ export default async function UsageEssaisPage() {
         title="Usage des essais GO Navigation"
         description="Statistiques agrégées par compte d'essai. Aucune adresse, aucun nom ni téléphone de destinataire n'est lu ici ; le détail d'un compte n'est accessible qu'avec son accord facultatif."
       />
-      <p className="mb-4 text-sm">
-        <Link href="/godac-staff" className="text-teal-ink hover:underline">
-          ← Backoffice opérateur
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/go-navigation" className="text-teal-ink hover:underline">
-          Invitations GO Navigation
-        </Link>
-        {" · "}
-        <Link href="/godac-staff/comptes-essai" className="font-semibold text-teal-ink hover:underline">
-          Comptes d&apos;essai →
-        </Link>
-      </p>
 
       {!usage ? (
         <Card>
