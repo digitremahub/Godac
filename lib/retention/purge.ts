@@ -30,7 +30,7 @@ export const RETENTION_DAYS = {
   clientFiches: RETENTION_FICHES_CLIENT_JOURS,
   /** Amendes : un an après leur clôture (réglée ou classée), comme annoncé ; en cours, jamais. */
   fines: RETENTION_AMENDES_JOURS,
-  /** Destinations récentes de GO (« Aller à… ») : 90 jours après le dernier usage ; les favoris restent jusqu'à suppression par l'utilisateur. */
+  /** Destinations récentes de GO (« Go! ») : 90 jours après le dernier usage ; les favoris restent jusqu'à suppression par l'utilisateur. */
   goLieuxRecents: GO_LIEUX_RECENTS_JOURS,
 } as const;
 
@@ -137,7 +137,7 @@ export async function purgeExpiredData() {
   results.clientFichesAnonymisees = fiches.erreur ?? fiches.anonymisees;
   results.tourneeSens = fiches.erreurSens ?? fiches.sens;
 
-  // Destinations récentes de GO (« Aller à… ») de plus de 90 jours ; table absente = rien à purger.
+  // Destinations récentes de GO (« Go! ») de plus de 90 jours ; table absente = rien à purger.
   const lieux = await purgerLieuxRecents(admin);
   results.goLieuxRecents = lieux.erreur ?? lieux.supprimes;
 

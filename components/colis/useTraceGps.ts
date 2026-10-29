@@ -39,7 +39,7 @@ export function useTraceGps(runId: string | null, actif: boolean): boolean {
   const envoiEnCours = useRef(false);
 
   useEffect(() => {
-    // « Aller à… » (mission libre) : jamais de trace, quoi qu'il arrive (RGPD).
+    // « Go! » (mission libre) : jamais de trace, quoi qu'il arrive (RGPD).
     if (!runId || !traceGpsAutorisee(runId) || !actif || typeof navigator === "undefined" || !navigator.geolocation) {
       setEnregistre(false);
       return;

@@ -150,11 +150,11 @@ describe("matrice des rôles : même accès que « Ma tournée colis »", () => 
 });
 
 describe("entrées dans l'application", () => {
-  it("l'application chauffeur affiche « Aller à… » vers /livreur/aller-a", () => {
+  it("l'application chauffeur affiche « Go! » vers /livreur/aller-a", () => {
     const src = readFileSync("components/colis/AppLivreur.tsx", "utf8");
     expect(src).toMatch(/href="\/livreur\/aller-a"/);
   });
-  it("barre mobile : l'essai GO Navigation gagne « Aller à… » ; la barre des chauffeurs (déjà à 4 boutons) n'est pas encombrée", () => {
+  it("barre mobile : l'essai GO Navigation gagne « Go! » ; la barre des chauffeurs (déjà à 4 boutons) n'est pas encombrée", () => {
     const essai = new Set(["route_optimizer", MARQUEUR_GO_NAVIGATION]);
     expect(boutonsBarreMobile("chauffeur", essai, false, true).map((b) => b.href)).toContain("/livreur/aller-a");
     const classique = new Set(["planning", "route_optimizer", "messenger", "fuel_tracking"]);
@@ -196,7 +196,7 @@ describe("accessibilité et mobile 375 px", () => {
   });
   it("textes en français et mentions obligatoires", () => {
     const dest = ecrans.find(([n]) => n === "EcranDestination")![1];
-    for (const t of ["Aller à…", "Ma position actuelle", "Ajouter une étape", "Optimiser l&apos;ordre", "Renommer", "Supprimer", "Tout effacer l&apos;historique", "GO"]) expect(dest).toContain(t);
+    for (const t of ["Go!", "Ma position actuelle", "Ajouter une étape", "Optimiser l&apos;ordre", "Renommer", "Supprimer", "Tout effacer l&apos;historique", "GO"]) expect(dest).toContain(t);
     const arrivee = ecrans.find(([n]) => n === "EcranArrivee")![1];
     for (const t of ["Vous êtes arrivé", "Ajouter aux favoris", "Nouvelle destination", "Retour à ma tournée"]) expect(arrivee).toContain(t);
   });

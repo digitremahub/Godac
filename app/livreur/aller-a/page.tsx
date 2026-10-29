@@ -4,10 +4,10 @@ import { AllerA } from "@/components/go-aller-a/AllerA";
 import { lireEtatOffre } from "@/lib/go-navigation/etat";
 import { EssaiTermine } from "@/components/go-navigation/EssaiTermine";
 
-export const metadata: Metadata = { title: "Aller à… — GODAC" };
+export const metadata: Metadata = { title: "Go! — GODAC" };
 
 /**
- * « Aller à… » : navigation GO vers une destination libre, sans tournée.
+ * « Go! » : navigation GO vers une destination libre, sans tournée.
  * Même garde que « Ma tournée colis » (rôle qui conduit, module Tournée
  * colis, compte non suspendu ; essai terminé = écran dédié).
  */

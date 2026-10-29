@@ -12,7 +12,7 @@ export interface PositionGo {
 }
 
 /**
- * Position et mouvement sur l'écran « Aller à… », EN MÉMOIRE seulement :
+ * Position et mouvement sur l'écran « Go! », EN MÉMOIRE seulement :
  * rien n'est envoyé au serveur ni stocké. Sert au départ implicite (« Ma
  * position actuelle »), au biais de recherche et au blocage de la saisie en
  * roulant (15 / 8 km/h).

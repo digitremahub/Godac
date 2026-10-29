@@ -7,7 +7,7 @@ import { effacerHistorique, enregistrerFavori, enregistrerRecent, listerLieux } 
 export const dynamic = "force-dynamic";
 
 /**
- * Lieux enregistrés de « Aller à… » (favoris, récents) de l'utilisateur
+ * Lieux enregistrés de « Go! » (favoris, récents) de l'utilisateur
  * connecté. Même accès que « Ma tournée colis » (personnes qui conduisent,
  * module Tournée colis, essai en cours). La RLS limite chaque requête aux
  * lignes de l'utilisateur ; table absente : listes vides, l'écran fonctionne.

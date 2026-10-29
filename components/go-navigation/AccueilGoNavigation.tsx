@@ -28,7 +28,7 @@ export async function AccueilGoNavigation({ organizationId }: { organizationId: 
             Ouvrir GO Navigation
           </Link>
           <Link href="/livreur/aller-a" className="btn-secondary">
-            Aller à…
+            Go!
           </Link>
         </div>
       </div>
