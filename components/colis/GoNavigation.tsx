@@ -1002,39 +1002,51 @@ export function GoNavigation(p: GoNavigationProps) {
               >
                 {manoeuvre && courante && !arrive ? (
                   <span className="flex items-center gap-3">
-                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-14 w-14 shrink-0 text-teal" />
-                    <span className="shrink-0 font-display text-4xl font-extrabold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
-                    <span className="line-clamp-2 min-w-0 flex-1 text-lg font-bold leading-snug" title={texteManoeuvre(manoeuvre)}>
-                      {texteManoeuvre(manoeuvre)}
+                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-12 w-12 shrink-0 text-teal" />
+                    <span className="shrink-0 font-display text-3xl font-extrabold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
+                    <span className="min-w-0 flex-1" title={texteManoeuvre(manoeuvre)}>
+                      {manoeuvre.rue ? (
+                        <>
+                          <span className="block truncate text-sm font-semibold leading-tight text-white/80">{texteManoeuvre({ ...manoeuvre, rue: "" })}</span>
+                          <span className="line-clamp-2 block text-xl font-extrabold leading-tight">{manoeuvre.rue}</span>
+                        </>
+                      ) : (
+                        <span className="line-clamp-2 block text-xl font-extrabold leading-tight">{texteManoeuvre(manoeuvre)}</span>
+                      )}
                     </span>
                   </span>
                 ) : arrive ? (
                   <span className="block font-display text-3xl font-extrabold leading-tight text-teal">Arrivé</span>
                 ) : (
                   <span className="flex items-center gap-3">
-                    <span className="shrink-0 font-display text-4xl font-extrabold tabular-nums leading-none text-teal">{formatDistance(distanceAffichee)}</span>
-                    <span className="line-clamp-2 min-w-0 flex-1 text-lg font-bold leading-snug">{cible.address}</span>
+                    <span className="shrink-0 font-display text-3xl font-extrabold tabular-nums leading-none text-teal">{formatDistance(distanceAffichee)}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-xl font-extrabold leading-tight">{cible.address}</span>
                   </span>
                 )}
-                {(eta || el.indicateurTrace || p.libre) && (
-                  // Une seule ligne fine : arrivée estimée (et trajet enregistré, RGPD, qui reste affiché en roulant).
-                  <span className="mt-1.5 flex items-center gap-2 text-base leading-tight text-white/90">
-                    {eta && (
-                      <span className="min-w-0 flex-1 truncate">
-                        <span className="text-sm uppercase tracking-wide text-white/75">Arrivée</span> <strong className="font-bold tabular-nums text-white">{eta.heure}</strong> · <span className="font-semibold tabular-nums text-teal">{eta.dans}</span> · {eta.distance}
-                        {eta.estimee && " (est.)"}
-                      </span>
-                    )}
-                    {p.libre && (
-                      <span className="ml-auto shrink-0 text-sm text-white/75" title="Navigation libre : ni le trajet ni la position ne sont enregistrés.">
-                        Trajet non enregistré
-                      </span>
-                    )}
-                    {el.indicateurTrace && (
-                      <span className="ml-auto shrink-0 text-sm text-white/75" title="Trajet enregistré pendant la tournée en cours pour l'historique (conservé 1 an). Mettre en pause : « masquer » sur l'écran de la tournée.">
+                {eta && (
+                  // Le plus important d'un coup d'œil : heure d'arrivée, durée restante, kilomètres restants.
+                  <span className="mt-2 flex items-end justify-between gap-3 border-t border-white/20 pt-2 leading-none">
+                    <span>
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Arrivée{eta.estimee && " (est.)"}</span>
+                      <span className="mt-1 block font-display text-4xl font-extrabold tabular-nums text-white">{eta.heure}</span>
+                    </span>
+                    <span className="text-right">
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Dans</span>
+                      <span className="mt-1 block font-display text-3xl font-extrabold tabular-nums text-teal">{eta.dans.replace(/^dans /, "")}</span>
+                    </span>
+                    <span className="text-right">
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Reste</span>
+                      <span className="mt-1 block font-display text-3xl font-extrabold tabular-nums text-white">{eta.distance}</span>
+                    </span>
+                  </span>
+                )}
+                {(el.indicateurTrace || p.libre) && (
+                  <span className="mt-1.5 block text-xs leading-tight text-white/75">
+                    {p.libre ? "Trajet non enregistré" : (
+                      <>
                         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-orange align-middle" aria-hidden="true" />
                         Trajet enregistré
-                      </span>
+                      </>
                     )}
                   </span>
                 )}
