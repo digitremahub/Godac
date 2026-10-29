@@ -7,6 +7,9 @@ import type { UserRole } from "@/lib/types/domain";
 import { MARQUEUR_GO_NAVIGATION, urlDe } from "@/lib/acces/catalogue";
 import { ecranOuvrable } from "@/lib/acces/tuiles-accueil";
 
+/** « Aller à… » : navigation GO vers une destination libre (même accès que « Ma tournée colis »). */
+export const URL_ALLER_A = "/livreur/aller-a";
+
 export type IconeBarre = "depart" | "retour" | "plein" | "colis" | "planning" | "messages" | "signaler" | "navigation" | "atraiter" | "suivi";
 
 export interface BoutonBarre {
@@ -38,6 +41,8 @@ export function boutonsBarreMobile(role: UserRole, modules: ReadonlySet<string>,
       ? [
           { href: urlDe("moi.tournee_colis"), libelle: "Tournée colis", icone: "colis" },
           { href: urlDe("exploitation.go_navigation"), libelle: "GO Navigation", icone: "navigation" },
+          // Place libre dans la barre de l'essai : navigation vers une destination libre, sans tournée.
+          { href: URL_ALLER_A, libelle: "Aller à…", icone: "navigation" },
         ]
       : [];
   }

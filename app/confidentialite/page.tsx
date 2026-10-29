@@ -67,6 +67,14 @@ export default function ConfidentialitePage() {
             (pause) : rien n&apos;est alors enregistré. En dehors de ces moments, GODAC ne suit jamais vos déplacements.
           </li>
           <li>
+            <strong>Lieux enregistrés dans GO (« Aller à… ») :</strong> pour vous guider vers une destination de votre choix
+            sans tournée, GO garde vos <strong>favoris</strong> (Domicile, Travail et jusqu&apos;à 20 lieux nommés par vous) et vos
+            <strong> 10 destinations récentes</strong> (nom, adresse et coordonnées du lieu). <strong>Le trajet et votre position ne sont pas
+            enregistrés</strong> pendant une navigation libre, et rien n&apos;est partagé avec l&apos;encadrement ni intégré aux tournées, rapports ou
+            suivis en direct. Ces lieux ne sont visibles que de vous ; vous les renommez, supprimez ou effacez (« Tout effacer
+            l&apos;historique ») à tout moment.
+          </li>
+          <li>
             <strong>Amendes :</strong> avis de contravention liés aux véhicules, pour permettre à l&apos;entreprise
             d&apos;identifier le conducteur dans les délais légaux.
           </li>
@@ -239,6 +247,10 @@ export default function ConfidentialitePage() {
             supprimées ; seul le résultat du pointage est conservé (heures, source, statut).
           </li>
           <li>Dernière position pendant une tournée colis : effacée à la clôture de la tournée.</li>
+          <li>
+            Lieux enregistrés dans GO (« Aller à… »)* : destinations récentes supprimées 90 jours après leur dernier usage ; favoris conservés jusqu&apos;à
+            leur suppression par vous, et effacés avec votre compte ou avec les données de l&apos;entreprise 3 mois après la fin du contrat.
+          </li>
           <li>Trajet enregistré pendant une tournée colis en cours* : 1 an, puis effacé.</li>
           <li>Conversations avec l&apos;assistant* : 90 jours après le dernier message.</li>
           <li>Questions anonymisées en attente d&apos;analyse pour la FAQ* : 90 jours.</li>

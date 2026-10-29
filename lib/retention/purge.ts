@@ -3,6 +3,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cheminsPhotos, enLots } from "@/lib/retention/photos";
 import { GPS_POINTAGE_JOURS, limiteGpsPointage } from "@/lib/retention/gps-pointage";
 import { COLONNES_CLIENT_EFFACEES, RETENTION_FICHES_CLIENT_JOURS, limiteFichesClient } from "@/lib/retention/fiches-client";
+import { GO_LIEUX_RECENTS_JOURS, limiteLieuxRecents } from "@/lib/retention/lieux-go";
 import { RETENTION_AMENDES_JOURS, STATUTS_AMENDE_CLOTUREE, cheminsAmendes, limiteClotureAmendes } from "@/lib/retention/amendes";
 
 /** Retention periods announced in app/confidentialite — keep both in sync. */
@@ -29,6 +30,8 @@ export const RETENTION_DAYS = {
   clientFiches: RETENTION_FICHES_CLIENT_JOURS,
   /** Amendes : un an après leur clôture (réglée ou classée), comme annoncé ; en cours, jamais. */
   fines: RETENTION_AMENDES_JOURS,
+  /** Destinations récentes de GO (« Aller à… ») : 90 jours après le dernier usage ; les favoris restent jusqu'à suppression par l'utilisateur. */
+  goLieuxRecents: GO_LIEUX_RECENTS_JOURS,
 } as const;
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -134,6 +137,10 @@ export async function purgeExpiredData() {
   results.clientFichesAnonymisees = fiches.erreur ?? fiches.anonymisees;
   results.tourneeSens = fiches.erreurSens ?? fiches.sens;
 
+  // Destinations récentes de GO (« Aller à… ») de plus de 90 jours ; table absente = rien à purger.
+  const lieux = await purgerLieuxRecents(admin);
+  results.goLieuxRecents = lieux.erreur ?? lieux.supprimes;
+
   const access = await admin.from("rental_provider_access_log").delete({ count: "exact" }).lt("created_at", daysAgo(RETENTION_DAYS.providerAccessLog));
   results.providerAccessLog = access.error ? access.error.message : (access.count ?? 0);
 
@@ -171,6 +178,16 @@ export async function purgerFichesClient(admin: Admin, maintenant: Date = new Da
   const sens = await admin.from("tournee_sens").delete({ count: "exact" }).lt("updated_at", limite);
   const erreurSens = sens.error ? (manquante(sens.error) ? null : sens.error.message) : null;
   return { supprimees, anonymisees, sens: sens.error ? 0 : (sens.count ?? 0), erreur, erreurSens };
+}
+
+/** Supprime les récents de GO plus vieux que 90 jours (jamais les favoris). Table absente (migration pas appliquée) : sans erreur. */
+export async function purgerLieuxRecents(admin: Admin, maintenant: Date = new Date()): Promise<{ supprimes: number; erreur: string | null }> {
+  const r = await admin.from("go_lieux").delete({ count: "exact" }).eq("genre", "recent").lt("dernier_usage", limiteLieuxRecents(maintenant));
+  if (r.error) {
+    const manquante = r.error.code === "42P01" || r.error.code === "PGRST205" || /does not exist|could not find/i.test(r.error.message ?? "");
+    return { supprimes: 0, erreur: manquante ? null : r.error.message };
+  }
+  return { supprimes: r.count ?? 0, erreur: null };
 }
 
 /**

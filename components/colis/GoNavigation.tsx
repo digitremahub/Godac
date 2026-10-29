@@ -146,6 +146,14 @@ export interface GoNavigationProps {
   onPosition: (p: Point, precision?: number) => void;
   /** Trajet en cours d'enregistrement pour l'historique (indicateur discret, RGPD). */
   traceActive?: boolean;
+  /**
+   * « Aller à… » (mission libre, EN MÉMOIRE) : `run` et `stops` sont virtuels
+   * (lib/go-lieux/mission.ts). Aucun appel qui touche une tournée (itinéraire
+   * complet, position remontée), pas de menu d'options ni de feuille d'arrêts ;
+   * trajet jamais enregistré. `onAtteint` : arrêt virtuel atteint (index) ;
+   * `onQuitter` : arrêter le guidage.
+   */
+  libre?: { onAtteint: (index: number) => void; onQuitter: () => void };
 }
 
 /**
@@ -490,7 +498,7 @@ export function GoNavigation(p: GoNavigationProps) {
   const onPosition = p.onPosition;
   useEffect(() => {
     if (!navigator.geolocation) {
-      setErreurGps("Ce téléphone ne donne pas sa position : le trajet part du dépôt.");
+      setErreurGps(p.libre ? "Ce téléphone ne donne pas sa position : le guidage est impossible." : "Ce téléphone ne donne pas sa position : le trajet part du dépôt.");
       return;
     }
     const id = navigator.geolocation.watchPosition(
@@ -539,10 +547,11 @@ export function GoNavigation(p: GoNavigationProps) {
         const maintenant = Date.now();
         if (maintenant - derniereRemontee.current > REMONTEE_POSITION_MS) {
           derniereRemontee.current = maintenant;
-          onPosition(pos, g.coords.accuracy);
+          // Mission libre : la position ne part nulle part (ni exploitation en direct, ni trace).
+          if (!p.libre) onPosition(pos, g.coords.accuracy);
         }
       },
-      (e) => setErreurGps(e.code === e.PERMISSION_DENIED ? "Localisation refusée : autorisez-la pour suivre le trajet. En attendant, le trajet part du dépôt." : "Position GPS indisponible pour le moment."),
+      (e) => setErreurGps(e.code === e.PERMISSION_DENIED ? p.libre ? "Localisation refusée : autorisez-la pour être guidé." : "Localisation refusée : autorisez-la pour suivre le trajet. En attendant, le trajet part du dépôt." : "Position GPS indisponible pour le moment."),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(id);
@@ -564,7 +573,9 @@ export function GoNavigation(p: GoNavigationProps) {
       cibleTracee.current = versId;
       traceDepuisGps.current = Boolean(depuis);
       try {
-        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify(versId === ID_RETOUR && p.retour ? { run_id: run.id, depuis, cible: ID_RETOUR, point: { lat: p.retour.lat, lng: p.retour.lng } } : (() => {
+        const virtuel = stopsRef.current.find((x) => x.id === versId);
+        // Mission libre : voie rapide sans tournée (position + destination), jamais de run_id.
+        const it = await api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify(p.libre && depuis && virtuel && virtuel.lat !== null && virtuel.lng !== null ? { depuis, cible: "retour", point: { lat: Number(virtuel.lat), lng: Number(virtuel.lng) } } : versId === ID_RETOUR && p.retour ? { run_id: run.id, depuis, cible: ID_RETOUR, point: { lat: p.retour.lat, lng: p.retour.lng } } : (() => {
           const a = stopsRef.current.find((x) => x.id === versId);
           return { run_id: run.id, depuis, cible: versId, ...(depuis && a && a.lat !== null && a.lng !== null ? { point: { lat: Number(a.lat), lng: Number(a.lng) } } : {}) };
         })()) });
@@ -584,6 +595,8 @@ export function GoNavigation(p: GoNavigationProps) {
 
   useEffect(() => {
     if (!prete) return;
+    // Mission libre : le trajet part de la position GPS (pas de dépôt), on l'attend.
+    if (p.libre && !position) return;
     if (!cible) {
       cibleTracee.current = null;
       setTrajet(null);
@@ -624,7 +637,8 @@ export function GoNavigation(p: GoNavigationProps) {
   const positionRef = useRef(position);
   positionRef.current = position;
   useEffect(() => {
-    if (!prete) return;
+    // Mission libre : pas de suite de tournée à tracer ni d'heure de fin à estimer.
+    if (!prete || p.libre) return;
     let annule = false;
     api<Itineraire>("/api/colis/itineraire", { method: "POST", body: JSON.stringify({ run_id: run.id, depuis: positionRef.current }) })
       .then((it) => {
@@ -684,6 +698,16 @@ export function GoNavigation(p: GoNavigationProps) {
   const arrive = directM !== null && directM < RAYON_ARRIVEE_M;
   // Heure d'arrivée au prochain arrêt : depuis la position GPS et la durée OSRM déjà reçue (pas d'appel en plus).
   const eta = cible && position && !arrive && !fige ? etaArret({ maintenant, distanceM: distanceAffichee, dureeMin: dureeAffichee, approx: trajet?.approx }) : null;
+
+  // Mission libre : arrivée à l'arrêt virtuel suivi (étape ou destination), signalée une fois par arrêt.
+  const atteintRef = useRef(p.libre?.onAtteint);
+  atteintRef.current = p.libre?.onAtteint;
+  const idAnnonce = useRef<string | null>(null);
+  useEffect(() => {
+    if (!atteintRef.current || !cible || !arrive || cible.id === ID_RETOUR || idAnnonce.current === cible.id) return;
+    idAnnonce.current = cible.id;
+    atteintRef.current(Number(cible.id.slice("libre-".length)));
+  }, [arrive, cible?.id]);
 
   // ——— Indications de direction (manœuvres OSRM) ———
   const trajetValide = trajet && cible && cibleTracee.current === cible.id ? trajet : null;
@@ -754,7 +778,7 @@ export function GoNavigation(p: GoNavigationProps) {
   const defilementAuto = useRef(0);
   /** Doigt posé sur la rangée de cartes : ni choix d'arrêt ni recentrage automatique pendant le geste. */
   const doigtCartes = useRef(false);
-  /** Vue conduite : carte regardée en glissant, sans changer le guidage tant que le chauffeur n'a pas appuyé sur « Y aller ». */
+  /** Vue conduite : carte regardée en glissant, sans changer le guidage tant que le chauffeur n'a pas appuyé sur « GO ». */
   const [consulte, setConsulte] = useState<string | null>(null);
   useEffect(() => {
     if (vue !== "conduite" || cible?.id === consulte) setConsulte(null);
@@ -961,7 +985,7 @@ export function GoNavigation(p: GoNavigationProps) {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div ref={bandeauRef} className="pointer-events-auto mx-auto flex max-w-xl items-stretch gap-1.5">
           {el.retour && (
-            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine/85 text-2xl text-white shadow-pop backdrop-blur-sm" aria-label="Retour à la préparation de la tournée colis">
+            <button type="button" onClick={p.onFermer} className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-marine/85 text-2xl text-white shadow-pop backdrop-blur-sm" aria-label={p.libre ? "Arrêter le guidage et choisir une autre destination" : "Retour à la préparation de la tournée colis"}>
               ‹
             </button>
           )}
@@ -992,13 +1016,18 @@ export function GoNavigation(p: GoNavigationProps) {
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{cible.address}</span>
                   </span>
                 )}
-                {(eta || el.indicateurTrace) && (
+                {(eta || el.indicateurTrace || p.libre) && (
                   // Une seule ligne fine : arrivée estimée (et trajet enregistré, RGPD, qui reste affiché en roulant).
                   <span className="mt-0.5 flex items-center gap-2 text-[11px] leading-tight text-white/80">
                     {eta && (
                       <span className="min-w-0 flex-1 truncate">
                         <span className="uppercase tracking-wide text-white/65">Arrivée</span> <strong className="font-bold tabular-nums text-white">{eta.heure}</strong> · <span className="font-semibold tabular-nums text-teal">{eta.dans}</span> · {eta.distance}
                         {eta.estimee && " (est.)"}
+                      </span>
+                    )}
+                    {p.libre && (
+                      <span className="ml-auto shrink-0 text-white/65" title="Navigation libre : ni le trajet ni la position ne sont enregistrés.">
+                        Trajet non enregistré
                       </span>
                     )}
                     {el.indicateurTrace && (
@@ -1015,7 +1044,7 @@ export function GoNavigation(p: GoNavigationProps) {
                     <span className="truncate">Puis : {texteManoeuvre(suivante)}</span>
                   </span>
                 )}
-                {el.ligneEtat && (
+                {el.ligneEtat && !p.libre && (
                   <span className="mt-0.5 block truncate text-[11px] leading-tight text-white/65">
                     {faits}/{stops.length} faits
                     {avancement.colisRestants > 0 && ` · ${avancement.colisRestants} colis restants`}
@@ -1034,7 +1063,7 @@ export function GoNavigation(p: GoNavigationProps) {
           !position && <p className="mx-auto mt-1.5 w-fit max-w-xl rounded-full bg-surface/90 px-3 py-1 text-[11px] font-semibold text-navy/70 shadow-card">Vue d&apos;ensemble : en attente de la position GPS…</p>
         )}
         <div className="pointer-events-auto relative mx-auto mt-1.5 flex max-w-xl items-center justify-end gap-1.5">
-          {el.menuOptions && (
+          {el.menuOptions && !p.libre && (
             <>
               <button
                 type="button"
@@ -1153,7 +1182,9 @@ export function GoNavigation(p: GoNavigationProps) {
           feuille === "pleine" ? "max-h-[85dvh]" : feuille === "moyenne" ? "max-h-[40dvh] min-h-[220px]" : ""
         }`}
       >
-        {feuille === "reduite" ? (
+        {p.libre && cible ? (
+          <FeuilleLibre cible={cible} total={stops.length} numero={stops.indexOf(cible)} onAtteint={p.libre.onAtteint} onQuitter={p.libre.onQuitter} />
+        ) : feuille === "reduite" ? (
           <div id="go-feuille-contenu" className="relative flex items-center gap-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5">
             <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-navy/20" aria-hidden="true" />
             <button type="button" className="flex min-h-[52px] min-w-0 flex-1 touch-none flex-col justify-center text-left" aria-label={libellePoignee} {...poignee}>
@@ -1444,6 +1475,25 @@ export function GoNavigation(p: GoNavigationProps) {
 /** Ligne d'un menu (Options) : zone tactile de 48 px. */
 const ITEM_MENU = "min-h-[48px] rounded-xl px-3 text-left text-sm font-semibold text-navy hover:bg-navy/5";
 
+/** Feuille de la mission libre (« Aller à… ») : destination suivie, étape atteinte, arrêt du guidage. */
+function FeuilleLibre({ cible, total, numero, onAtteint, onQuitter }: { cible: Stop; total: number; numero: number; onAtteint: (index: number) => void; onQuitter: () => void }) {
+  const derniere = numero === total - 1;
+  return (
+    <div id="go-feuille-contenu" className="flex items-center gap-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-ink">{derniere ? "Destination" : `Étape ${numero + 1} / ${total - 1}`}</p>
+        <p className="truncate text-sm font-bold leading-snug text-navy">{adresseCourte(cible.address)}</p>
+      </div>
+      <button type="button" className="btn-primary min-h-[52px] shrink-0 justify-center !px-3 text-sm" onClick={() => onAtteint(numero)}>
+        {derniere ? "Je suis arrivé" : "Étape atteinte"}
+      </button>
+      <button type="button" className="flex min-h-[52px] shrink-0 items-center justify-center rounded-xl bg-navy/[0.06] px-3 text-sm font-semibold text-navy" onClick={onQuitter} aria-label="Arrêter le guidage">
+        Arrêter
+      </button>
+    </div>
+  );
+}
+
 /** Identifiant de la destination « retour » (dépôt ou siège) suivie comme un arrêt. */
 const ID_RETOUR = "retour";
 
@@ -1568,8 +1618,8 @@ function CarteArret({
     >
       <EncocheArret stop={s} large />
       {onAller && (
-        <button type="button" className="btn-dark min-h-[44px] justify-center text-sm" onClick={onAller}>
-          🧭 Y aller (guidage vers cet arrêt)
+        <button type="button" className="btn-dark min-h-[44px] justify-center text-sm font-bold" onClick={onAller} aria-label={`Lancer le guidage vers ${s.address}`}>
+          🧭 GO (guidage vers cet arrêt)
         </button>
       )}
       <div>

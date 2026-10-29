@@ -32,9 +32,9 @@ describe("menu réduit des comptes GO Navigation", () => {
     expect(horsOffreGoNavigation("dashboard.accueil", new Set(["route_optimizer"]))).toBe(false);
   });
 
-  it("barre mobile : Tournée colis (point d'entrée unique) et GO Navigation (un seul nom, icône navigation), sans Plein", () => {
+  it("barre mobile : Tournée colis (point d'entrée unique), GO Navigation (un seul nom, icône navigation) et Aller à…, sans Plein", () => {
     const b = boutonsBarreMobile("manager", modulesGo, false, true);
-    expect(b.map((x) => x.libelle)).toEqual(["Tournée colis", "GO Navigation"]);
+    expect(b.map((x) => x.libelle)).toEqual(["Tournée colis", "GO Navigation", "Aller à…"]);
     expect(b.map((x) => x.href)).toContain("/livreur/navigation");
     expect(b[1]!.icone).toBe("navigation");
   });
