@@ -1002,42 +1002,36 @@ export function GoNavigation(p: GoNavigationProps) {
               >
                 {manoeuvre && courante && !arrive ? (
                   <span className="flex items-center gap-3">
-                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-12 w-12 shrink-0 text-teal" />
-                    <span className="shrink-0 font-display text-3xl font-extrabold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
+                    <FlecheManoeuvre picto={pictogramme(manoeuvre)} sortie={manoeuvre.sortie} className="h-10 w-10 shrink-0 text-teal" />
+                    <span className="shrink-0 whitespace-nowrap text-2xl font-extrabold tabular-nums leading-none text-teal">{formatDistanceManoeuvre(courante.distanceM)}</span>
                     <span className="min-w-0 flex-1" title={texteManoeuvre(manoeuvre)}>
                       {manoeuvre.rue ? (
                         <>
-                          <span className="block truncate text-sm font-semibold leading-tight text-white/80">{texteManoeuvre({ ...manoeuvre, rue: "" })}</span>
-                          <span className="line-clamp-2 block text-xl font-extrabold leading-tight">{manoeuvre.rue}</span>
+                          <span className="block truncate text-xs font-semibold leading-tight text-white/80">{texteManoeuvre({ ...manoeuvre, rue: "" })}</span>
+                          <span className="line-clamp-2 block text-lg font-bold leading-tight">{manoeuvre.rue}</span>
                         </>
                       ) : (
-                        <span className="line-clamp-2 block text-xl font-extrabold leading-tight">{texteManoeuvre(manoeuvre)}</span>
+                        <span className="line-clamp-2 block text-lg font-bold leading-tight">{texteManoeuvre(manoeuvre)}</span>
                       )}
                     </span>
                   </span>
                 ) : arrive ? (
-                  <span className="block font-display text-3xl font-extrabold leading-tight text-teal">Arrivé</span>
+                  <span className="block text-2xl font-extrabold leading-tight text-teal">Arrivé</span>
                 ) : (
                   <span className="flex items-center gap-3">
-                    <span className="shrink-0 font-display text-3xl font-extrabold tabular-nums leading-none text-teal">{formatDistance(distanceAffichee)}</span>
-                    <span className="line-clamp-2 min-w-0 flex-1 text-xl font-extrabold leading-tight">{cible.address}</span>
+                    <span className="shrink-0 whitespace-nowrap text-2xl font-extrabold tabular-nums leading-none text-teal">{formatDistance(distanceAffichee)}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-lg font-bold leading-tight">{cible.address}</span>
                   </span>
                 )}
                 {eta && (
-                  // Le plus important d'un coup d'œil : heure d'arrivée, durée restante, kilomètres restants.
-                  <span className="mt-2 flex items-end justify-between gap-3 border-t border-white/20 pt-2 leading-none">
+                  // Le plus important d'un coup d'œil : heure d'arrivée, durée restante, kilomètres restants (une seule ligne, polices étroites).
+                  <span className="mt-1.5 flex items-baseline justify-between gap-2 whitespace-nowrap border-t border-white/20 pt-1.5 leading-none">
                     <span>
-                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Arrivée{eta.estimee && " (est.)"}</span>
-                      <span className="mt-1 block font-display text-4xl font-extrabold tabular-nums text-white">{eta.heure}</span>
+                      <span className="mr-1 text-[11px] font-semibold uppercase text-white/70">Arrivée{eta.estimee && "~"}</span>
+                      <span className="text-2xl font-extrabold tabular-nums text-white">{eta.heure}</span>
                     </span>
-                    <span className="text-right">
-                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Dans</span>
-                      <span className="mt-1 block font-display text-3xl font-extrabold tabular-nums text-teal">{eta.dans.replace(/^dans /, "")}</span>
-                    </span>
-                    <span className="text-right">
-                      <span className="block text-xs font-semibold uppercase tracking-wide text-white/70">Reste</span>
-                      <span className="mt-1 block font-display text-3xl font-extrabold tabular-nums text-white">{eta.distance}</span>
-                    </span>
+                    <span className="text-xl font-bold tabular-nums text-teal">{eta.dans.replace(/^dans /, "")}</span>
+                    <span className="text-xl font-bold tabular-nums text-white">{eta.distance}</span>
                   </span>
                 )}
                 {(el.indicateurTrace || p.libre) && (
